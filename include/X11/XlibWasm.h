@@ -44,6 +44,7 @@ EXTERN XImage *XGetSubImage(Display *d, Drawable dr, int i1, int i2,
 	XImage *x, int i4, int i5);
 EXTERN char *XGetAtomName(Display *d, Atom a);
 EXTERN char *XKeysymToString(KeySym k);
+EXTERN Colormap XCopyColormapAndFree(Display *d, Colormap c);
 EXTERN Colormap XCreateColormap(Display *d, Window w, Visual *v, int i);
 EXTERN Cursor XCreatePixmapCursor(Display *d, Pixmap p1, Pixmap p2,
 	XColor *x1, XColor *x2, unsigned int ui1, unsigned int ui2);
@@ -63,6 +64,7 @@ EXTERN int XRemoveHost(Display *d, XHostAddress *host);
 EXTERN int XRemoveHosts(Display *d, XHostAddress *hosts, int nhosts);
 EXTERN int XSetAccessControl(Display *d, int mode);
 EXTERN char **XListExtensions(Display *d, int *i);
+EXTERN Colormap *XListInstalledColormaps(Display *d, Window w, int *i);
 EXTERN KeySym XKeycodeToKeysym(Display *d, unsigned int k, int i);
 EXTERN KeySym XkbKeycodeToKeysym(Display *d, unsigned int k, int g, int i);
 EXTERN KeySym XStringToKeysym(_Xconst char *c);
@@ -163,8 +165,15 @@ EXTERN Status XGetWMNormalHints(Display *d, Window w,
 EXTERN Status XGetWMSizeHints(Display *d, Window w,
 	XSizeHints *hints_return, long *supplied_return, Atom property);
 EXTERN Status XAllocColor(Display *d, Colormap c, XColor *xp);
+EXTERN Status XAllocColorCells(Display *d, Colormap c, Bool contig,
+	unsigned long *plane_masks_return, unsigned int nplanes,
+	unsigned long *pixels_return, unsigned int npixels);
 EXTERN Status XAllocNamedColor(Display *d, Colormap c, _Xconst char *name,
 	XColor *screen_def_return, XColor *exact_def_return);
+EXTERN Status XAllocColorPlanes(Display *d, Colormap c, Bool contig,
+	unsigned long *pixels_return, int ncolors, int nreds, int ngreens,
+	int nblues, unsigned long *rmask_return,
+	unsigned long *gmask_return, unsigned long *bmask_return);
 	EXTERN int XBell(Display *d, int i);
 EXTERN int XChangeActivePointerGrab(Display *d, unsigned int ui,
 	Cursor c, Time t);
@@ -263,6 +272,7 @@ EXTERN KeySym XLookupKeysym(XKeyEvent *key_event, int index);
 	EXTERN int XMapRaised(Display *d, Window w);
 	EXTERN int XMapSubwindows(Display *d, Window w);
 	EXTERN int XMapWindow(Display *d, Window w);
+EXTERN int XInstallColormap(Display *d, Colormap c);
 EXTERN int XCirculateSubwindows(Display *d, Window w, int i);
 EXTERN int XCirculateSubwindowsDown(Display *d, Window w);
 EXTERN int XCirculateSubwindowsUp(Display *d, Window w);
@@ -382,6 +392,10 @@ EXTERN int XSetWindowBorder(Display *d, Window w, unsigned long ul);
 EXTERN int XSetWindowBorderPixmap(Display *d, Window w, Pixmap p);
 EXTERN int XSetWindowBorderWidth(Display *d, Window w, unsigned int ui);
 EXTERN int XSetWindowColormap(Display *d, Window w, Colormap c);
+EXTERN int XStoreColor(Display *d, Colormap c, XColor *xp);
+EXTERN int XStoreColors(Display *d, Colormap c, XColor *xp, int i);
+EXTERN int XStoreNamedColor(Display *d, Colormap c, _Xconst char *name,
+	unsigned long pixel, int flags);
 EXTERN int XStoreName(Display *d, Window w, _Xconst char *name);
 EXTERN int XStoreBuffer(Display *d, _Xconst char *c, int i1, int i2);
 EXTERN int XStoreBytes(Display *d, _Xconst char *c, int i);
@@ -393,6 +407,7 @@ EXTERN int XUngrabButton(Display *d, unsigned int ui1, unsigned int ui2,
 EXTERN int XUngrabKey(Display *d, int i, unsigned int ui, Window w);
 EXTERN int XUngrabKeyboard(Display *d, Time t);
 EXTERN int XUngrabPointer(Display *d, Time t);
+EXTERN int XUninstallColormap(Display *d, Colormap c);
 EXTERN int XUnmapSubwindows(Display *d, Window w);
 EXTERN int XUnmapWindow(Display *d, Window w);
 EXTERN int XWindowEvent(Display *d, Window w, long l, XEvent *x);

@@ -142,9 +142,17 @@
 #define X11_WASM_XREQ_IMAGE_TEXT_16 77
 #define X11_WASM_XREQ_CREATE_COLORMAP 78
 #define X11_WASM_XREQ_FREE_COLORMAP 79
+#define X11_WASM_XREQ_COPY_COLORMAP_AND_FREE 80
+#define X11_WASM_XREQ_INSTALL_COLORMAP 81
+#define X11_WASM_XREQ_UNINSTALL_COLORMAP 82
+#define X11_WASM_XREQ_LIST_INSTALLED_COLORMAPS 83
 #define X11_WASM_XREQ_ALLOC_COLOR 84
 #define X11_WASM_XREQ_ALLOC_NAMED_COLOR 85
+#define X11_WASM_XREQ_ALLOC_COLOR_CELLS 86
+#define X11_WASM_XREQ_ALLOC_COLOR_PLANES 87
 #define X11_WASM_XREQ_FREE_COLORS 88
+#define X11_WASM_XREQ_STORE_COLORS 89
+#define X11_WASM_XREQ_STORE_NAMED_COLOR 90
 #define X11_WASM_XREQ_QUERY_COLORS 91
 #define X11_WASM_XREQ_LOOKUP_COLOR 92
 #define X11_WASM_XREQ_CREATE_CURSOR 93
@@ -551,6 +559,9 @@ int BrowserColormapOrError(
     int allowNone);
 X11WasmResource *BrowserColormapResource(
     Colormap colormap);
+void BrowserCopyColormapColors(
+    Colormap source,
+    Colormap target);
 int BrowserCompleteRequest(
     Display *display,
     int flush);
@@ -1347,6 +1358,8 @@ void BrowserRegisterGC(
 void BrowserRememberColor(
     Colormap colormap,
     const XColor *colorPtr);
+unsigned long BrowserReserveColorPixel(
+    Colormap colormap);
 void BrowserRememberHostAddress(
     const XHostAddress *hostPtr);
 void BrowserRememberKeycode(

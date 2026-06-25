@@ -501,6 +501,26 @@ test("Xlib extension and error text compatibility APIs are stable", async ({
   expect(result).toBe(1);
 });
 
+test("Xlib colormap compatibility APIs are stable", async ({ page }) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestColormapApis?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestColormapApis) {
+      throw new Error("missing Xlib colormap test hooks");
+    }
+    return module._X11WasmTestColormapApis();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XSendEvent resolves InputFocus and PointerWindow targets", async ({
   page,
 }) => {

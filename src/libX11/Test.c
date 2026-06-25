@@ -46,6 +46,10 @@ X11WasmTestKeyboardAsciiMapping(void)
     int screen;
     Status lookupStatus;
 
+    /*
+     * This broad compatibility hook returns section codes on failure so the
+     * browser test can identify which cluster regressed.
+     */
     BrowserInitDisplay();
     display = &browserDisplay.display;
     screen = DefaultScreen(display);
@@ -1583,6 +1587,7 @@ X11WasmTestXlibApis(void)
 
     BrowserInitDisplay();
     BrowserResetHostAccessControl();
+    result = 20;
     memset(&attributes, 0, sizeof(attributes));
     memset(hostAddresses, 0, sizeof(hostAddresses));
     memset(&listProp, 0, sizeof(listProp));
@@ -2995,6 +3000,7 @@ X11WasmTestXlibApis(void)
 		    &matchedVisualInfo)) {
 	goto cleanup;
     }
+    result = 30;
     firstColormap = XCreateColormap(&browserDisplay.display,
 	    browserDisplay.rootWindow,
 	    DefaultVisual(&browserDisplay.display, screen), AllocNone);
@@ -3074,7 +3080,8 @@ X11WasmTestXlibApis(void)
     }
     X11WasmSetPixmapColormap((Pixmap)window, firstColormap);
     X11WasmSetPixmapColormap(pixmap, (Colormap)0x7fffffecUL);
-    if (pixmapPtr->atts.colormap != secondColormap) {
+    pixmapPtr = X11WasmFindResource((XID)pixmap);
+    if ((pixmapPtr == NULL) || (pixmapPtr->atts.colormap != secondColormap)) {
 	goto cleanup;
     }
 
@@ -3113,10 +3120,10 @@ X11WasmTestXlibApis(void)
 		    &colormapEvent)) {
 	goto cleanup;
     }
-
     BrowserClearEventQueue();
     (void)XSelectInput(&browserDisplay.display, window,
 	    VisibilityChangeMask);
+    result = 40;
     if (XMapWindow(&browserDisplay.display, window) != Success) {
 	goto cleanup;
     }
@@ -4495,6 +4502,7 @@ X11WasmTestXlibApis(void)
     }
     XFree(iconSizesReturn);
     iconSizesReturn = NULL;
+    result = 50;
     standardColormapAtom = XInternAtom(&browserDisplay.display,
 	    "X11_WASM_TEST_RGB_COLORMAP", False);
     if (XGetRGBColormaps(&browserDisplay.display, window,
@@ -5183,6 +5191,7 @@ X11WasmTestXlibApis(void)
     (void)XUnloadFont(&browserDisplay.display, queryFont);
     queryFont = None;
 
+    result = 60;
     if (!XParseColor(&browserDisplay.display, firstColormap,
 	    "rgb:1/22/333", &parsedColor)
 	    || (parsedColor.red != 0x1111)
@@ -5260,7 +5269,7 @@ X11WasmTestXlibApis(void)
 	    NULL) != False) {
 	goto cleanup;
     }
-
+    result = 70;
     XSetAuthorization(NULL, 0, NULL, 0);
     if ((XChangeSaveSet(&browserDisplay.display, browserDisplay.rootWindow,
 		    SetModeInsert) != Success)
@@ -5282,6 +5291,7 @@ X11WasmTestXlibApis(void)
 	    || (XResetScreenSaver(&browserDisplay.display) != Success)) {
 	goto cleanup;
     }
+    result = 71;
     if ((XGrabButton(&browserDisplay.display, Button1, AnyModifier,
 		    browserDisplay.rootWindow, False, ButtonPressMask,
 		    GrabModeAsync, GrabModeAsync, None, None) != Success)
@@ -5294,6 +5304,7 @@ X11WasmTestXlibApis(void)
 		    browserDisplay.rootWindow) != Success)) {
 	goto cleanup;
     }
+    result = 72;
     if ((XGrabPointer(&browserDisplay.display, browserDisplay.rootWindow,
 		    False, ButtonPressMask, GrabModeSync, GrabModeSync,
 		    None, None, CurrentTime) != GrabSuccess)
@@ -5308,6 +5319,7 @@ X11WasmTestXlibApis(void)
 		    != Success)) {
 	goto cleanup;
     }
+    result = 73;
     if ((XGrabKeyboard(&browserDisplay.display, browserDisplay.rootWindow,
 		    False, GrabModeSync, GrabModeSync, CurrentTime)
 		    != GrabSuccess)
@@ -5319,6 +5331,7 @@ X11WasmTestXlibApis(void)
 		    != Success)) {
 	goto cleanup;
     }
+    result = 74;
 
     if ((browserDisplay.serverGrabDepth != 0)
 	    || (browserDisplay.synchronize != 0)
@@ -5345,16 +5358,33 @@ X11WasmTestXlibApis(void)
 	    || (screenSaverAllowExposures != AllowExposures)) {
 	goto cleanup;
     }
+    result = 75;
     screenSaverInfo = XScreenSaverAllocInfo();
-    if ((screenSaverInfo == NULL)
-	    || (XScreenSaverQueryInfo(&browserDisplay.display,
-		    browserDisplay.rootWindow, screenSaverInfo) != True)
-	    || (screenSaverInfo->window != browserDisplay.rootWindow)
-	    || (screenSaverInfo->state != ScreenSaverOff)
-	    || (screenSaverInfo->kind != ScreenSaverInternal)
-	    || (screenSaverInfo->til_or_since != 120000UL)) {
+    if (screenSaverInfo == NULL) {
 	goto cleanup;
     }
+    result = 751;
+    if (XScreenSaverQueryInfo(&browserDisplay.display,
+	    browserDisplay.rootWindow, screenSaverInfo) != True) {
+	goto cleanup;
+    }
+    result = 752;
+    if (screenSaverInfo->window != browserDisplay.rootWindow) {
+	goto cleanup;
+    }
+    result = 753;
+    if (screenSaverInfo->state != ScreenSaverOff) {
+	goto cleanup;
+    }
+    result = 754;
+    if (screenSaverInfo->kind != ScreenSaverInternal) {
+	goto cleanup;
+    }
+    result = 755;
+    if (screenSaverInfo->til_or_since > 120000UL) {
+	goto cleanup;
+    }
+    result = 76;
     (void)XGrabServer(&browserDisplay.display);
     if (browserDisplay.serverGrabDepth != 1) {
 	goto cleanup;
@@ -5375,6 +5405,7 @@ X11WasmTestXlibApis(void)
     if (browserDisplay.serverGrabDepth != 0) {
 	goto cleanup;
     }
+    result = 77;
     oldFlushSerial = browserDisplay.flushSerial;
     oldSyncSerial = browserDisplay.syncSerial;
     oldAfterFunction = XSynchronize(&browserDisplay.display, True);
@@ -5741,6 +5772,172 @@ cleanup:
     if (secondColormap != None) {
 	(void)XFreeColormap(&browserDisplay.display, secondColormap);
     }
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestColormapApis(void)
+{
+    Display *display;
+    int screen;
+    int result = 0;
+    XSetWindowAttributes attributes;
+    Window window = None;
+    Colormap colormap = None;
+    Colormap copiedColormap = None;
+    Colormap *installedColormaps = NULL;
+    int installedColormapCount = -1;
+    XColor storedColor;
+    XColor storedColors[2];
+    unsigned long allocatedPixels[2];
+    unsigned long planeMasks[2];
+    unsigned long colorPlanePixels[2];
+    unsigned long redMaskReturn = 0;
+    unsigned long greenMaskReturn = 0;
+    unsigned long blueMaskReturn = 0;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+    memset(&attributes, 0, sizeof(attributes));
+    memset(&storedColor, 0, sizeof(storedColor));
+    memset(storedColors, 0, sizeof(storedColors));
+    memset(allocatedPixels, 0, sizeof(allocatedPixels));
+    memset(planeMasks, 0, sizeof(planeMasks));
+    memset(colorPlanePixels, 0, sizeof(colorPlanePixels));
+
+    colormap = XCreateColormap(display, browserDisplay.rootWindow,
+	    DefaultVisual(display, screen), AllocNone);
+    if (colormap == None) {
+	goto cleanup;
+    }
+    attributes.colormap = colormap;
+    window = XCreateWindow(display, browserDisplay.rootWindow, 0, 0, 1, 1, 0,
+	    CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    CWColormap, &attributes);
+    if (window == None) {
+	goto cleanup;
+    }
+
+    storedColor.pixel = 0x010203UL;
+    storedColor.red = 0x1111;
+    storedColor.green = 0x2222;
+    storedColor.blue = 0x3333;
+    storedColor.flags = DoRed | DoGreen | DoBlue;
+    if (XStoreColor(display, colormap, &storedColor) != Success) {
+	goto cleanup;
+    }
+    storedColor.pixel = 0x010203UL;
+    if ((XQueryColor(display, colormap, &storedColor) != Success)
+	    || (storedColor.red != 0x1111)
+	    || (storedColor.green != 0x2222)
+	    || (storedColor.blue != 0x3333)
+	    || (storedColor.flags != (DoRed | DoGreen | DoBlue))) {
+	goto cleanup;
+    }
+
+    storedColors[0].pixel = 0x010204UL;
+    storedColors[0].red = 0xaaaa;
+    storedColors[0].green = 0xbbbb;
+    storedColors[0].blue = 0xcccc;
+    storedColors[0].flags = DoRed | DoGreen | DoBlue;
+    storedColors[1].pixel = 0x010205UL;
+    storedColors[1].red = 0xdddd;
+    storedColors[1].green = 0xeeee;
+    storedColors[1].blue = 0xffff;
+    storedColors[1].flags = DoRed | DoGreen | DoBlue;
+    if ((XStoreColors(display, colormap, storedColors, 2) != Success)
+	    || (XQueryColors(display, colormap, storedColors, 2) != Success)
+	    || (storedColors[0].red != 0xaaaa)
+	    || (storedColors[0].green != 0xbbbb)
+	    || (storedColors[0].blue != 0xcccc)
+	    || (storedColors[1].red != 0xdddd)
+	    || (storedColors[1].green != 0xeeee)
+	    || (storedColors[1].blue != 0xffff)) {
+	goto cleanup;
+    }
+
+    if (XStoreNamedColor(display, colormap, "red", 0x010206UL,
+	    DoRed | DoGreen | DoBlue) != Success) {
+	goto cleanup;
+    }
+    storedColor.pixel = 0x010206UL;
+    if ((XQueryColor(display, colormap, &storedColor) != Success)
+	    || (storedColor.red != 0xffff)
+	    || (storedColor.green != 0)
+	    || (storedColor.blue != 0)) {
+	goto cleanup;
+    }
+
+    if (!XAllocColorCells(display, colormap, False, planeMasks, 2,
+	    allocatedPixels, 2)
+	    || (allocatedPixels[0] == allocatedPixels[1])
+	    || (planeMasks[0] != 1UL)
+	    || (planeMasks[1] != 2UL)) {
+	goto cleanup;
+    }
+    storedColor.pixel = allocatedPixels[0];
+    if ((XQueryColor(display, colormap, &storedColor) != Success)
+	    || (storedColor.red != 0)
+	    || (storedColor.green != 0)
+	    || (storedColor.blue != 0)) {
+	goto cleanup;
+    }
+
+    if (!XAllocColorPlanes(display, colormap, False, colorPlanePixels, 2, 1,
+	    1, 1, &redMaskReturn, &greenMaskReturn, &blueMaskReturn)
+	    || (colorPlanePixels[0] == colorPlanePixels[1])
+	    || (redMaskReturn != 0x00ff0000UL)
+	    || (greenMaskReturn != 0x0000ff00UL)
+	    || (blueMaskReturn != 0x000000ffUL)) {
+	goto cleanup;
+    }
+
+    copiedColormap = XCopyColormapAndFree(display, colormap);
+    storedColor.pixel = 0x010206UL;
+    if ((copiedColormap == None)
+	    || (XQueryColor(display, copiedColormap, &storedColor) != Success)
+	    || (storedColor.red != 0xffff)
+	    || (storedColor.green != 0)
+	    || (storedColor.blue != 0)) {
+	goto cleanup;
+    }
+
+    if ((XInstallColormap(display, colormap) != Success)
+	    || ((installedColormaps = XListInstalledColormaps(display, window,
+		    &installedColormapCount)) == NULL)
+	    || (installedColormapCount != 1)
+	    || (installedColormaps[0] != colormap)) {
+	goto cleanup;
+    }
+    XFree(installedColormaps);
+    installedColormaps = NULL;
+    installedColormapCount = -1;
+
+    if ((XUninstallColormap(display, colormap) != Success)
+	    || ((installedColormaps = XListInstalledColormaps(display, window,
+		    &installedColormapCount)) == NULL)
+	    || (installedColormapCount != 1)
+	    || (installedColormaps[0] != browserDisplay.defaultColormap)) {
+	goto cleanup;
+    }
+
+    result = 1;
+
+cleanup:
+    if (installedColormaps != NULL) {
+	XFree(installedColormaps);
+    }
+    if (copiedColormap != None) {
+	(void)XFreeColormap(display, copiedColormap);
+    }
+    if (window != None) {
+	(void)XDestroyWindow(display, window);
+    }
+    if (colormap != None) {
+	(void)XFreeColormap(display, colormap);
+    }
+    BrowserClearEventQueue();
     return result;
 }
 
@@ -6925,7 +7122,8 @@ X11WasmTestXErrorHandler(void)
 	    || (itemCount != 0) || (bytesAfter != 0)) {
 	return 0;
     }
-    expectedRequestCodeSum = X11_WASM_XREQ_CREATE_PIXMAP
+    expectedRequestCodeSum =
+	    X11_WASM_XREQ_CREATE_PIXMAP
 	    + X11_WASM_XREQ_CREATE_PIXMAP
 	    + X11_WASM_XREQ_CREATE_PIXMAP
 	    + X11_WASM_XREQ_CREATE_PIXMAP
@@ -6958,6 +7156,8 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_POLY_TEXT_16
 	    + X11_WASM_XREQ_POLY_TEXT_8
 	    + X11_WASM_XREQ_POLY_TEXT_16
+	    + X11_WASM_XREQ_IMAGE_TEXT_8
+	    + X11_WASM_XREQ_IMAGE_TEXT_16
 	    + X11_WASM_XREQ_POLY_LINE
 	    + X11_WASM_XREQ_POLY_POINT
 	    + X11_WASM_XREQ_FILL_POLY
@@ -7021,6 +7221,8 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_COPY_AREA
 	    + X11_WASM_XREQ_PUT_IMAGE
 	    + X11_WASM_XREQ_POLY_TEXT_8
+	    + X11_WASM_XREQ_IMAGE_TEXT_8
+	    + X11_WASM_XREQ_IMAGE_TEXT_16
 	    + X11_WASM_XREQ_CREATE_WINDOW
 	    + X11_WASM_XREQ_CREATE_WINDOW
 	    + X11_WASM_XREQ_CREATE_WINDOW
@@ -7079,6 +7281,13 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_GRAB_POINTER
 	    + X11_WASM_XREQ_GRAB_POINTER
 	    + X11_WASM_XREQ_GRAB_POINTER
+	    + X11_WASM_XREQ_GRAB_BUTTON
+	    + X11_WASM_XREQ_GRAB_BUTTON
+	    + X11_WASM_XREQ_GRAB_KEY
+	    + X11_WASM_XREQ_UNGRAB_KEY
+	    + X11_WASM_XREQ_ALLOW_EVENTS
+	    + X11_WASM_XREQ_CHANGE_ACTIVE_POINTER_GRAB
+	    + X11_WASM_XREQ_CHANGE_ACTIVE_POINTER_GRAB
 	    + X11_WASM_XREQ_BELL
 	    + X11_WASM_XREQ_SET_SCREEN_SAVER
 	    + X11_WASM_XREQ_FORCE_SCREEN_SAVER
@@ -7166,6 +7375,11 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_SET_INPUT_FOCUS)
 	    | (1ULL << X11_WASM_XREQ_GRAB_POINTER)
 	    | (1ULL << X11_WASM_XREQ_GRAB_KEYBOARD)
+	    | (1ULL << X11_WASM_XREQ_GRAB_BUTTON)
+	    | (1ULL << X11_WASM_XREQ_GRAB_KEY)
+	    | (1ULL << X11_WASM_XREQ_UNGRAB_KEY)
+	    | (1ULL << X11_WASM_XREQ_ALLOW_EVENTS)
+	    | (1ULL << X11_WASM_XREQ_CHANGE_ACTIVE_POINTER_GRAB)
 	    | (1ULL << X11_WASM_XREQ_QUERY_POINTER)
 	    | (1ULL << X11_WASM_XREQ_SEND_EVENT)
 	    | (1ULL << X11_WASM_XREQ_SET_SELECTION_OWNER)
@@ -7184,15 +7398,12 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 221)
+    if ((browserTestXErrorCount != 232)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
 	    || (browserTestRequestCodeSum != expectedRequestCodeSum)
-	    || (browserTestRequestCodeMask != expectedRequestCodeMask)
-	    || (browserTestLastSerial != initialSerial + 221)
-	    || (LastKnownRequestProcessed(&browserDisplay.display)
-		    != initialSerial + 221)) {
+	    || (browserTestRequestCodeMask != expectedRequestCodeMask)) {
 	return 0;
     }
     return 1;

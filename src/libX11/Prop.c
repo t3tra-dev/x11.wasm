@@ -387,6 +387,57 @@ BrowserRememberColor(
     entryPtr->flags = colorPtr->flags;
 }
 
+unsigned long
+BrowserReserveColorPixel(
+    Colormap colormap)
+{
+    X11WasmResource *resourcePtr = BrowserColormapResource(colormap);
+    unsigned long pixel;
+
+    if (resourcePtr == NULL) {
+	return 0;
+    }
+    for (pixel = 0; ; pixel++) {
+	X11WasmColorEntry *entryPtr;
+	int inUse = 0;
+
+	for (entryPtr = resourcePtr->colorList; entryPtr != NULL;
+		entryPtr = entryPtr->nextPtr) {
+	    if (entryPtr->pixel == pixel) {
+		inUse = 1;
+		break;
+	    }
+	}
+	if (!inUse) {
+	    return pixel;
+	}
+    }
+}
+
+void
+BrowserCopyColormapColors(
+    Colormap source,
+    Colormap target)
+{
+    X11WasmResource *sourcePtr = BrowserColormapResource(source);
+    X11WasmColorEntry *entryPtr;
+
+    if (sourcePtr == NULL) {
+	return;
+    }
+    for (entryPtr = sourcePtr->colorList; entryPtr != NULL;
+	    entryPtr = entryPtr->nextPtr) {
+	XColor color;
+
+	color.pixel = entryPtr->pixel;
+	color.red = entryPtr->red;
+	color.green = entryPtr->green;
+	color.blue = entryPtr->blue;
+	color.flags = entryPtr->flags;
+	BrowserRememberColor(target, &color);
+    }
+}
+
 void
 BrowserForgetColors(
     Colormap colormap,

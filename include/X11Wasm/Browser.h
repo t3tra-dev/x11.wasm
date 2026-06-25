@@ -58,6 +58,7 @@ typedef struct X11WasmResource {
     char *fontFamily;
     int fontPixelSize;
     int fontPointSize;
+    int colormapInstalled;
     X11WasmProperty *propertyList;
     X11WasmColorEntry *colorList;
     Window metadataTarget;

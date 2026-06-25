@@ -12,6 +12,72 @@ BrowserValidateDrawableDimensions(
 		    requestCode);
 }
 
+static int
+BrowserValidateColorFlags(
+    Display **displayPtr,
+    int flags,
+    unsigned char requestCode)
+{
+    return BrowserValueOrError(displayPtr, flags,
+	    (flags & ~(DoRed | DoGreen | DoBlue)) == 0, requestCode);
+}
+
+static void
+BrowserColorFromPixel(
+    unsigned long pixel,
+    XColor *colorPtr)
+{
+    if (colorPtr == NULL) {
+	return;
+    }
+    colorPtr->red = (unsigned short)(((pixel >> 16) & 0xff) * 257U);
+    colorPtr->green = (unsigned short)(((pixel >> 8) & 0xff) * 257U);
+    colorPtr->blue = (unsigned short)((pixel & 0xff) * 257U);
+    colorPtr->flags = DoRed | DoGreen | DoBlue;
+}
+
+static void
+BrowserStoreColorDefinition(
+    Colormap colormap,
+    const XColor *definitionPtr)
+{
+    XColor color;
+
+    if (definitionPtr == NULL) {
+	return;
+    }
+    color = *definitionPtr;
+    if (BrowserLookupColorEntry(colormap, color.pixel, &color)) {
+	if (definitionPtr->flags & DoRed) {
+	    color.red = definitionPtr->red;
+	}
+	if (definitionPtr->flags & DoGreen) {
+	    color.green = definitionPtr->green;
+	}
+	if (definitionPtr->flags & DoBlue) {
+	    color.blue = definitionPtr->blue;
+	}
+	color.flags |= (unsigned char)(definitionPtr->flags
+		& (DoRed | DoGreen | DoBlue));
+    } else {
+	if (!(definitionPtr->flags & DoRed)) {
+	    color.red = (unsigned short)(((color.pixel >> 16) & 0xff) * 257U);
+	}
+	if (!(definitionPtr->flags & DoGreen)) {
+	    color.green = (unsigned short)(((color.pixel >> 8) & 0xff) * 257U);
+	}
+	if (!(definitionPtr->flags & DoBlue)) {
+	    color.blue = (unsigned short)((color.pixel & 0xff) * 257U);
+	}
+	color.flags = (unsigned char)(definitionPtr->flags
+		& (DoRed | DoGreen | DoBlue));
+	if (color.flags == 0) {
+	    color.flags = DoRed | DoGreen | DoBlue;
+	}
+    }
+    BrowserRememberColor(colormap, &color);
+}
+
 int XCopyArea(Display *d, Drawable s, Drawable t, GC g, int sx, int sy,
 	unsigned int w, unsigned int h, int dx, int dy)
 {
@@ -496,6 +562,101 @@ XAllocNamedColor(
 }
 
 Status
+XAllocColorCells(
+    Display *display,
+    Colormap colormap,
+    Bool contig,
+    unsigned long *planeMasksReturn,
+    unsigned int nplanes,
+    unsigned long *pixelsReturn,
+    unsigned int npixels)
+{
+    unsigned int i;
+
+    (void)contig;
+    if (!BrowserColormapOrError(&display, colormap,
+	    X11_WASM_XREQ_ALLOC_COLOR_CELLS, 0)) {
+	return False;
+    }
+    if (!BrowserValueOrError(&display, (long)nplanes,
+	    nplanes <= (unsigned int)INT_MAX,
+	    X11_WASM_XREQ_ALLOC_COLOR_CELLS)
+	    || !BrowserValueOrError(&display, (long)npixels,
+		    npixels <= (unsigned int)INT_MAX,
+		    X11_WASM_XREQ_ALLOC_COLOR_CELLS)
+	    || !BrowserValidateCountedList(&display, planeMasksReturn,
+		    (int)nplanes, X11_WASM_XREQ_ALLOC_COLOR_CELLS)
+	    || !BrowserValidateCountedList(&display, pixelsReturn,
+		    (int)npixels, X11_WASM_XREQ_ALLOC_COLOR_CELLS)) {
+	return False;
+    }
+    for (i = 0; i < nplanes; i++) {
+	planeMasksReturn[i] = (i < (unsigned int)(sizeof(unsigned long)
+		* CHAR_BIT)) ? (1UL << i) : 0UL;
+    }
+    for (i = 0; i < npixels; i++) {
+	XColor color;
+
+	pixelsReturn[i] = BrowserReserveColorPixel(colormap);
+	memset(&color, 0, sizeof(color));
+	color.pixel = pixelsReturn[i];
+	color.flags = DoRed | DoGreen | DoBlue;
+	BrowserRememberColor(colormap, &color);
+    }
+    return True;
+}
+
+Status
+XAllocColorPlanes(
+    Display *display,
+    Colormap colormap,
+    Bool contig,
+    unsigned long *pixelsReturn,
+    int ncolors,
+    int nreds,
+    int ngreens,
+    int nblues,
+    unsigned long *rmaskReturn,
+    unsigned long *gmaskReturn,
+    unsigned long *bmaskReturn)
+{
+    int i;
+
+    (void)contig;
+    if (!BrowserColormapOrError(&display, colormap,
+	    X11_WASM_XREQ_ALLOC_COLOR_PLANES, 0)) {
+	return False;
+    }
+    if (!BrowserValidateCountedList(&display, pixelsReturn, ncolors,
+	    X11_WASM_XREQ_ALLOC_COLOR_PLANES)
+	    || !BrowserValueOrError(&display, nreds, nreds >= 0,
+		    X11_WASM_XREQ_ALLOC_COLOR_PLANES)
+	    || !BrowserValueOrError(&display, ngreens, ngreens >= 0,
+		    X11_WASM_XREQ_ALLOC_COLOR_PLANES)
+	    || !BrowserValueOrError(&display, nblues, nblues >= 0,
+		    X11_WASM_XREQ_ALLOC_COLOR_PLANES)
+	    || !BrowserValueOrError(&display, 0,
+		    (rmaskReturn != NULL) && (gmaskReturn != NULL)
+		    && (bmaskReturn != NULL),
+		    X11_WASM_XREQ_ALLOC_COLOR_PLANES)) {
+	return False;
+    }
+    *rmaskReturn = (nreds > 0) ? 0x00ff0000UL : 0UL;
+    *gmaskReturn = (ngreens > 0) ? 0x0000ff00UL : 0UL;
+    *bmaskReturn = (nblues > 0) ? 0x000000ffUL : 0UL;
+    for (i = 0; i < ncolors; i++) {
+	XColor color;
+
+	pixelsReturn[i] = BrowserReserveColorPixel(colormap);
+	memset(&color, 0, sizeof(color));
+	color.pixel = pixelsReturn[i];
+	color.flags = DoRed | DoGreen | DoBlue;
+	BrowserRememberColor(colormap, &color);
+    }
+    return True;
+}
+
+Status
 XLookupColor(
     Display *display,
     Colormap colormap,
@@ -547,10 +708,7 @@ XQueryColor(
     }
     if (color != NULL) {
 	if (!BrowserLookupColorEntry(colormap, color->pixel, color)) {
-	    color->red = (unsigned short)(((color->pixel >> 16) & 0xff) * 257U);
-	    color->green = (unsigned short)(((color->pixel >> 8) & 0xff) * 257U);
-	    color->blue = (unsigned short)((color->pixel & 0xff) * 257U);
-	    color->flags = DoRed | DoGreen | DoBlue;
+	    BrowserColorFromPixel(color->pixel, color);
 	}
     }
     return Success;
@@ -576,6 +734,73 @@ XQueryColors(
     for (i = 0; i < ncolors; i++) {
 	XQueryColor(display, colormap, &defs[i]);
     }
+    return Success;
+}
+
+int
+XStoreColor(
+    Display *display,
+    Colormap colormap,
+    XColor *color)
+{
+    return XStoreColors(display, colormap, color, (color != NULL) ? 1 : 0);
+}
+
+int
+XStoreColors(
+    Display *display,
+    Colormap colormap,
+    XColor *defs,
+    int ncolors)
+{
+    int i;
+
+    if (!BrowserColormapOrError(&display, colormap,
+	    X11_WASM_XREQ_STORE_COLORS, 0)) {
+	return Success;
+    }
+    if (!BrowserValidateCountedList(&display, defs, ncolors,
+	    X11_WASM_XREQ_STORE_COLORS)) {
+	return Success;
+    }
+    for (i = 0; i < ncolors; i++) {
+	if (!BrowserValidateColorFlags(&display, defs[i].flags,
+		X11_WASM_XREQ_STORE_COLORS)) {
+	    return Success;
+	}
+    }
+    for (i = 0; i < ncolors; i++) {
+	BrowserStoreColorDefinition(colormap, &defs[i]);
+    }
+    return Success;
+}
+
+int
+XStoreNamedColor(
+    Display *display,
+    Colormap colormap,
+    _Xconst char *name,
+    unsigned long pixel,
+    int flags)
+{
+    XColor color;
+
+    if (!BrowserColormapOrError(&display, colormap,
+	    X11_WASM_XREQ_STORE_NAMED_COLOR, 0)) {
+	return Success;
+    }
+    if (!BrowserValidateColorFlags(&display, flags,
+	    X11_WASM_XREQ_STORE_NAMED_COLOR)) {
+	return Success;
+    }
+    if (!BrowserParseColor(name, &color)) {
+	(void)BrowserReportXError(display, BadName, (XID)colormap,
+		X11_WASM_XREQ_STORE_NAMED_COLOR, 0);
+	return Success;
+    }
+    color.pixel = pixel;
+    color.flags = (unsigned char)(flags & (DoRed | DoGreen | DoBlue));
+    BrowserStoreColorDefinition(colormap, &color);
     return Success;
 }
 

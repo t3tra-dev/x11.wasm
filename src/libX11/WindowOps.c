@@ -41,6 +41,23 @@ XDefaultString(void)
     return "";
 }
 
+static void
+BrowserNotifyColormapInstallState(
+    Colormap colormap,
+    int state)
+{
+    X11WasmResource *resourcePtr;
+
+    for (resourcePtr = browserDisplay.resourceList; resourcePtr != NULL;
+	    resourcePtr = resourcePtr->nextPtr) {
+	if ((resourcePtr->type == X11_WASM_RESOURCE_WINDOW)
+		&& (resourcePtr->atts.colormap == colormap)) {
+	    (void)BrowserQueueColormapNotify(resourcePtr, colormap, False,
+		    state);
+	}
+    }
+}
+
 void
 XrmInitialize(void)
 {
@@ -1331,6 +1348,34 @@ XCreateColormap(
     return (Colormap)resourcePtr->id;
 }
 
+Colormap
+XCopyColormapAndFree(
+    Display *display,
+    Colormap colormap)
+{
+    Colormap copy;
+    X11WasmResource *sourcePtr;
+    X11WasmResource *copyPtr;
+
+    if (!BrowserColormapOrError(&display, colormap,
+	    X11_WASM_XREQ_COPY_COLORMAP_AND_FREE, 0)) {
+	return None;
+    }
+    sourcePtr = BrowserColormapResource(colormap);
+    copy = XCreateColormap(display, browserDisplay.rootWindow,
+	    DefaultVisual(display, DefaultScreen(display)), AllocNone);
+    if (copy == None) {
+	return None;
+    }
+    copyPtr = BrowserColormapResource(copy);
+    if (copyPtr != NULL) {
+	copyPtr->colormapInstalled = (sourcePtr != NULL)
+		? sourcePtr->colormapInstalled : 1;
+    }
+    BrowserCopyColormapColors(colormap, copy);
+    return copy;
+}
+
 int
 XFreeColormap(
     Display *display,
@@ -1345,6 +1390,77 @@ XFreeColormap(
     }
     X11WasmDeleteResource(colormap);
     return Success;
+}
+
+int
+XInstallColormap(
+    Display *display,
+    Colormap colormap)
+{
+    X11WasmResource *resourcePtr;
+
+    if (!BrowserColormapOrError(&display, colormap,
+	    X11_WASM_XREQ_INSTALL_COLORMAP, 0)) {
+	return Success;
+    }
+    resourcePtr = BrowserColormapResource(colormap);
+    if (resourcePtr != NULL) {
+	resourcePtr->colormapInstalled = 1;
+    }
+    BrowserNotifyColormapInstallState(colormap, ColormapInstalled);
+    return Success;
+}
+
+int
+XUninstallColormap(
+    Display *display,
+    Colormap colormap)
+{
+    X11WasmResource *resourcePtr;
+
+    if (!BrowserColormapOrError(&display, colormap,
+	    X11_WASM_XREQ_UNINSTALL_COLORMAP, 0)) {
+	return Success;
+    }
+    resourcePtr = BrowserColormapResource(colormap);
+    if (resourcePtr != NULL) {
+	resourcePtr->colormapInstalled = 0;
+    }
+    BrowserNotifyColormapInstallState(colormap, ColormapUninstalled);
+    return Success;
+}
+
+Colormap *
+XListInstalledColormaps(
+    Display *display,
+    Window window,
+    int *countReturn)
+{
+    X11WasmResource *windowPtr;
+    X11WasmResource *colormapPtr;
+    Colormap colormap;
+    Colormap *colormaps;
+
+    windowPtr = BrowserWindowResourceOrError(&display, window,
+	    X11_WASM_XREQ_LIST_INSTALLED_COLORMAPS);
+    if (windowPtr == NULL) {
+	if (countReturn != NULL) {
+	    *countReturn = 0;
+	}
+	return NULL;
+    }
+    colormap = (windowPtr->atts.colormap != None)
+	    ? windowPtr->atts.colormap : browserDisplay.defaultColormap;
+    colormapPtr = BrowserColormapResource(colormap);
+    if ((colormapPtr != NULL) && !colormapPtr->colormapInstalled) {
+	colormap = browserDisplay.defaultColormap;
+    }
+    colormaps = (Colormap *)ckalloc(sizeof(Colormap));
+    colormaps[0] = colormap;
+    if (countReturn != NULL) {
+	*countReturn = 1;
+    }
+    return colormaps;
 }
 
 GC
