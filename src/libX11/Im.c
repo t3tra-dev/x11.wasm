@@ -2501,6 +2501,7 @@ XSetModifierMapping(
 	memcpy(browserDisplay.modifierMap, mapPtr->modifiermap, mapSize);
     }
     browserDisplay.modifierMapSerial++;
+    (void)BrowserQueueMappingNotify(MappingModifier, 0, 0);
     return XNoOp(display);
 }
 

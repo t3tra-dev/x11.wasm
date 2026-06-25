@@ -327,6 +327,21 @@ BrowserQueueEventWhenIdle(
 }
 
 int
+BrowserQueueMappingNotify(
+    int request,
+    int firstKeycode,
+    int count)
+{
+    XEvent event;
+
+    BrowserSetCommonEventFields(&event, MappingNotify, None, CurrentTime);
+    event.xmapping.request = request;
+    event.xmapping.first_keycode = firstKeycode;
+    event.xmapping.count = count;
+    return BrowserQueueEvent(&event);
+}
+
+int
 BrowserQueueNoExposeEvent(
     Drawable drawable,
     unsigned char requestCode)

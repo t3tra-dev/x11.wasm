@@ -1583,6 +1583,7 @@ XSetPointerMapping(
 	}
     }
     memcpy(browserDisplay.pointerMap, map, (size_t)nmap);
+    (void)BrowserQueueMappingNotify(MappingPointer, 0, 0);
     (void)XNoOp(display);
     return MappingSuccess;
 }

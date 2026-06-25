@@ -1272,6 +1272,10 @@ int BrowserQueueEventInternal(
     int internal);
 int BrowserQueueEventWhenIdle(
     const XEvent *eventPtr);
+int BrowserQueueMappingNotify(
+    int request,
+    int firstKeycode,
+    int count);
 int BrowserQueueExpose(
     X11WasmResource *resourcePtr,
     int x,

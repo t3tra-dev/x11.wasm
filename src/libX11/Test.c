@@ -396,6 +396,15 @@ X11WasmTestEventQueueAndKeycodeApis(void)
 	    != MappingSuccess) {
 	return 96;
     }
+    memset(&readEvent, 0, sizeof(readEvent));
+    if ((XNextEvent(display, &readEvent) != Success)
+	    || (readEvent.type != MappingNotify)
+	    || (readEvent.xmapping.request != MappingPointer)
+	    || (readEvent.xmapping.first_keycode != 0)
+	    || (readEvent.xmapping.count != 0)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	return 105;
+    }
     memset(pointerMap, 0, sizeof(pointerMap));
     if ((XGetPointerMapping(display, pointerMap, (int)sizeof(pointerMap))
 		    != 5)
@@ -423,6 +432,15 @@ X11WasmTestEventQueueAndKeycodeApis(void)
     pointerMap[4] = Button5;
     if (XSetPointerMapping(display, pointerMap, 5) != MappingSuccess) {
 	return 100;
+    }
+    memset(&readEvent, 0, sizeof(readEvent));
+    if ((XNextEvent(display, &readEvent) != Success)
+	    || (readEvent.type != MappingNotify)
+	    || (readEvent.xmapping.request != MappingPointer)
+	    || (readEvent.xmapping.first_keycode != 0)
+	    || (readEvent.xmapping.count != 0)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	return 106;
     }
     motionEvents = XGetMotionEvents(display, browserDisplay.rootWindow,
 	    CurrentTime, CurrentTime, &motionEventCount);
@@ -1511,6 +1529,7 @@ X11WasmTestXlibApis(void)
     int textDescent = 0;
     XKeyPressedEvent lookupEvent;
     XMappingEvent mappingEvent;
+    XEvent mappingNotifyEvent;
     XEvent filterEvent;
     KeySym lookupSym = NoSymbol;
     Status lookupStatus = 0;
@@ -2865,6 +2884,7 @@ X11WasmTestXlibApis(void)
     modifierMap = XDeleteModifiermapEntry(modifierMap,
 	    (KeyCode)X11_WASM_KEYCODE_SEMICOLON, Mod3MapIndex);
     oldModifierMapSerial = browserDisplay.modifierMapSerial;
+    BrowserClearEventQueue();
     if ((modifierMap == NULL) || (modifierMap->max_keypermod != 2)
 	    || (modifierMap->modifiermap[Mod3MapIndex
 		    * modifierMap->max_keypermod] != X11_WASM_KEYCODE_EQUAL)
@@ -2873,6 +2893,15 @@ X11WasmTestXlibApis(void)
 	    || (XSetModifierMapping(&browserDisplay.display, modifierMap)
 		    != MappingSuccess)
 	    || (browserDisplay.modifierMapSerial <= oldModifierMapSerial)) {
+	goto cleanup;
+    }
+    memset(&mappingNotifyEvent, 0, sizeof(mappingNotifyEvent));
+    if ((XNextEvent(&browserDisplay.display, &mappingNotifyEvent) != Success)
+	    || (mappingNotifyEvent.type != MappingNotify)
+	    || (mappingNotifyEvent.xmapping.request != MappingModifier)
+	    || (mappingNotifyEvent.xmapping.first_keycode != 0)
+	    || (mappingNotifyEvent.xmapping.count != 0)
+	    || (XEventsQueued(&browserDisplay.display, QueuedAlready) != 0)) {
 	goto cleanup;
     }
     XFreeModifiermap(modifierMap);
