@@ -536,10 +536,6 @@ unsigned short BrowserClampUShort(
     unsigned int value);
 short BrowserClampShort(
     int value);
-unsigned int BrowserClearAreaExtent(
-    int origin,
-    unsigned int requested,
-    unsigned int limit);
 void BrowserClearEventQueue(void);
 void BrowserClearExternalClipboardText(void);
 void BrowserClearHostAccessList(void);

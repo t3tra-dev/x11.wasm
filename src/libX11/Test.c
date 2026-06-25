@@ -724,6 +724,20 @@ X11WasmTestClearAreaApis(void)
 	    || (XEventsQueued(display, QueuedAlready) != 0)) {
 	goto cleanup;
     }
+    if (XClearArea(display, window, -2, -1, 4, 3, True) != Success) {
+	goto cleanup;
+    }
+    if (!BrowserPopEvent(&event, NULL)
+	    || (event.type != Expose)
+	    || (event.xexpose.window != window)
+	    || (event.xexpose.x != 0)
+	    || (event.xexpose.y != 0)
+	    || (event.xexpose.width != 2)
+	    || (event.xexpose.height != 2)
+	    || (event.xexpose.count != 0)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
     if (XClearArea(display, window, 2, 1, 4, 3, False) != Success) {
 	goto cleanup;
     }
@@ -762,6 +776,12 @@ X11WasmTestClearAreaApis(void)
 	goto cleanup;
     }
     if (XClearArea(display, window, 99, 0, 0, 0, True) != Success) {
+	goto cleanup;
+    }
+    if (XEventsQueued(display, QueuedAlready) != 0) {
+	goto cleanup;
+    }
+    if (XClearArea(display, window, 9, 0, 2, 1, True) != Success) {
 	goto cleanup;
     }
     if (XEventsQueued(display, QueuedAlready) != 0) {

@@ -1374,30 +1374,6 @@ BrowserQueueExpose(
     return BrowserQueueEvent(&event);
 }
 
-unsigned int
-BrowserClearAreaExtent(
-    int origin,
-    unsigned int requested,
-    unsigned int limit)
-{
-    long extent;
-
-    if (requested != 0U) {
-	return requested;
-    }
-    if (origin >= (int)limit) {
-	return 0U;
-    }
-    extent = (long)limit - (long)origin;
-    if (extent <= 0L) {
-	return 0U;
-    }
-    if ((unsigned long)extent > UINT_MAX) {
-	return UINT_MAX;
-    }
-    return (unsigned int)extent;
-}
-
 int
 BrowserQueueCreateNotify(
     X11WasmResource *resourcePtr)

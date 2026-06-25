@@ -2643,6 +2643,57 @@ XWithdrawWindow(
     }
     return status;
 }
+
+static int
+BrowserClipClearArea(
+    int x,
+    int y,
+    unsigned int width,
+    unsigned int height,
+    unsigned int windowWidth,
+    unsigned int windowHeight,
+    int *xReturn,
+    int *yReturn,
+    unsigned int *widthReturn,
+    unsigned int *heightReturn)
+{
+    long long left = (long long)x;
+    long long top = (long long)y;
+    long long right = (width == 0U) ? (long long)windowWidth
+	    : left + (long long)width;
+    long long bottom = (height == 0U) ? (long long)windowHeight
+	    : top + (long long)height;
+
+    if (left < 0) {
+	left = 0;
+    }
+    if (top < 0) {
+	top = 0;
+    }
+    if (right > (long long)windowWidth) {
+	right = (long long)windowWidth;
+    }
+    if (bottom > (long long)windowHeight) {
+	bottom = (long long)windowHeight;
+    }
+    if ((right <= left) || (bottom <= top)) {
+	return 0;
+    }
+    if (xReturn != NULL) {
+	*xReturn = (int)left;
+    }
+    if (yReturn != NULL) {
+	*yReturn = (int)top;
+    }
+    if (widthReturn != NULL) {
+	*widthReturn = (unsigned int)(right - left);
+    }
+    if (heightReturn != NULL) {
+	*heightReturn = (unsigned int)(bottom - top);
+    }
+    return 1;
+}
+
 int
 XClearArea(
     Display *display,
@@ -2655,6 +2706,8 @@ XClearArea(
 {
     X11WasmResource *resourcePtr = BrowserWindowResourceOrError(&display,
 	    window, X11_WASM_XREQ_CLEAR_AREA);
+    int clearX;
+    int clearY;
     unsigned int clearWidth;
     unsigned int clearHeight;
     int hasBackgroundPixel;
@@ -2678,26 +2731,28 @@ XClearArea(
 		X11_WASM_XREQ_CLEAR_AREA);
 	return Success;
     }
-    clearWidth = BrowserClearAreaExtent(x, width, resourcePtr->width);
-    clearHeight = BrowserClearAreaExtent(y, height, resourcePtr->height);
-    if ((clearWidth == 0U) || (clearHeight == 0U)) {
+    if (!BrowserClipClearArea(x, y, width, height, resourcePtr->width,
+	    resourcePtr->height, &clearX, &clearY, &clearWidth,
+	    &clearHeight)) {
 	return Success;
     }
     BrowserResolveWindowBackgroundStyle(resourcePtr, &hasBackgroundPixel, NULL,
 	    &backgroundPixmap);
     if (!hasBackgroundPixel && (backgroundPixmap == None)) {
 	if (exposures) {
-	    (void)BrowserQueueExpose(resourcePtr, x, y, clearWidth,
+	    (void)BrowserQueueExpose(resourcePtr, clearX, clearY, clearWidth,
 		    clearHeight);
 	}
 	return Success;
     }
-    (void)X11WasmJsClearArea(BrowserJsXId(window), x, y, clearWidth,
+    (void)X11WasmJsClearArea(BrowserJsXId(window), clearX, clearY, clearWidth,
 	    clearHeight);
     if (exposures) {
-	(void)BrowserQueueExpose(resourcePtr, x, y, clearWidth, clearHeight);
+	(void)BrowserQueueExpose(resourcePtr, clearX, clearY, clearWidth,
+		clearHeight);
     } else {
-	BrowserMarkResourceDamage(resourcePtr, x, y, clearWidth, clearHeight);
+	BrowserMarkResourceDamage(resourcePtr, clearX, clearY, clearWidth,
+		clearHeight);
     }
     return Success;
 }
