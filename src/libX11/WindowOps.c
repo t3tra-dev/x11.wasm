@@ -1,5 +1,7 @@
 #include "XlibInt.h"
 
+static char *browserDefaultValue = NULL;
+
 Display *
 XOpenDisplay(
     _Xconst char *displayName)
@@ -15,16 +17,171 @@ XDisplayName(
 	    ? displayName : "browser");
 }
 
+static const char *
+BrowserResourceManagerString(void)
+{
+    X11WasmProperty *propertyPtr;
+
+    BrowserInitDisplay();
+    propertyPtr = BrowserFindProperty(&browserDisplay.rootResource,
+	    XA_RESOURCE_MANAGER);
+    if ((propertyPtr == NULL) || (propertyPtr->type != XA_STRING)
+	    || (propertyPtr->format != 8) || (propertyPtr->data == NULL)) {
+	return NULL;
+    }
+    return (const char *)propertyPtr->data;
+}
+
+static const char *
+BrowserDefaultProgramName(
+    const char *program)
+{
+    const char *slash;
+    const char *backslash;
+
+    if (program == NULL) {
+	return NULL;
+    }
+    slash = strrchr(program, '/');
+    backslash = strrchr(program, '\\');
+    if ((backslash != NULL) && ((slash == NULL) || (backslash > slash))) {
+	slash = backslash;
+    }
+    return (slash != NULL) ? slash + 1 : program;
+}
+
+static const char *
+BrowserSkipDefaultSpaces(
+    const char *text,
+    const char *end)
+{
+    while ((text < end) && isspace(UCHAR(*text))) {
+	text++;
+    }
+    return text;
+}
+
+static const char *
+BrowserTrimDefaultSpaces(
+    const char *start,
+    const char *end)
+{
+    while ((end > start) && isspace(UCHAR(end[-1]))) {
+	end--;
+    }
+    return end;
+}
+
+static int
+BrowserResourceBindingScore(
+    const char *start,
+    const char *end,
+    const char *program,
+    const char *option)
+{
+    size_t optionLength = strlen(option);
+    size_t programLength = (program != NULL) ? strlen(program) : 0U;
+    size_t bindingLength = (size_t)(end - start);
+    const char *prefixEnd;
+    const char *prefixStart;
+    char separator;
+
+    if ((optionLength == 0U) || (bindingLength < optionLength)
+	    || (strncmp(end - optionLength, option, optionLength) != 0)) {
+	return 0;
+    }
+    if (bindingLength == optionLength) {
+	return 1;
+    }
+    separator = *(end - optionLength - 1U);
+    if ((separator != '.') && (separator != '*')) {
+	return 0;
+    }
+    prefixStart = start;
+    prefixEnd = end - optionLength - 1;
+    if ((prefixEnd == prefixStart)
+	    || ((prefixEnd == prefixStart + 1) && (*prefixStart == '*'))) {
+	return 2;
+    }
+    if ((programLength > 0U)
+	    && ((size_t)(prefixEnd - prefixStart) == programLength)
+	    && (strncmp(prefixStart, program, programLength) == 0)) {
+	return (separator == '.') ? 4 : 3;
+    }
+    return 0;
+}
+
+static char *
+BrowserRememberDefaultValue(
+    const char *start,
+    const char *end)
+{
+    size_t length = (size_t)(end - start);
+
+    if (browserDefaultValue != NULL) {
+	ckfree(browserDefaultValue);
+	browserDefaultValue = NULL;
+    }
+    browserDefaultValue = (char *)ckalloc(length + 1U);
+    if (length > 0U) {
+	memcpy(browserDefaultValue, start, length);
+    }
+    browserDefaultValue[length] = '\0';
+    return browserDefaultValue;
+}
+
 char *
 XGetDefault(
     Display *display,
     _Xconst char *program,
     _Xconst char *option)
 {
-    (void)display;
-    (void)program;
-    (void)option;
-    return NULL;
+    const char *resources = XResourceManagerString(display);
+    const char *programName = BrowserDefaultProgramName(program);
+    const char *lineStart;
+    const char *bestStart = NULL;
+    const char *bestEnd = NULL;
+    int bestScore = 0;
+
+    if ((resources == NULL) || (option == NULL) || (option[0] == '\0')) {
+	return NULL;
+    }
+    for (lineStart = resources; *lineStart != '\0'; ) {
+	const char *lineEnd = lineStart;
+	const char *colon;
+	const char *bindingStart;
+	const char *bindingEnd;
+	const char *valueStart;
+	const char *valueEnd;
+	int score;
+
+	while ((*lineEnd != '\0') && (*lineEnd != '\n')) {
+	    lineEnd++;
+	}
+	bindingStart = BrowserSkipDefaultSpaces(lineStart, lineEnd);
+	if ((bindingStart == lineEnd) || (*bindingStart == '!')) {
+	    lineStart = (*lineEnd == '\n') ? lineEnd + 1 : lineEnd;
+	    continue;
+	}
+	colon = memchr(bindingStart, ':', (size_t)(lineEnd - bindingStart));
+	if (colon == NULL) {
+	    lineStart = (*lineEnd == '\n') ? lineEnd + 1 : lineEnd;
+	    continue;
+	}
+	bindingEnd = BrowserTrimDefaultSpaces(bindingStart, colon);
+	valueStart = BrowserSkipDefaultSpaces(colon + 1, lineEnd);
+	valueEnd = BrowserTrimDefaultSpaces(valueStart, lineEnd);
+	score = BrowserResourceBindingScore(bindingStart, bindingEnd,
+		programName, option);
+	if (score >= bestScore) {
+	    bestScore = score;
+	    bestStart = valueStart;
+	    bestEnd = valueEnd;
+	}
+	lineStart = (*lineEnd == '\n') ? lineEnd + 1 : lineEnd;
+    }
+    return (bestScore > 0) ? BrowserRememberDefaultValue(bestStart, bestEnd)
+	    : NULL;
 }
 
 char *
@@ -32,7 +189,37 @@ XResourceManagerString(
     Display *display)
 {
     (void)display;
-    return NULL;
+    return (char *)BrowserResourceManagerString();
+}
+
+char *
+XScreenResourceString(
+    Screen *screen)
+{
+    Display *display;
+    X11WasmResource *rootPtr;
+    X11WasmProperty *propertyPtr;
+    Atom screenResourcesAtom;
+    char *copy;
+
+    if (screen == NULL) {
+	return NULL;
+    }
+    BrowserInitDisplay();
+    display = XDisplayOfScreen(screen);
+    screenResourcesAtom = XInternAtom(display, "SCREEN_RESOURCES", False);
+    rootPtr = X11WasmFindResource((XID)XRootWindowOfScreen(screen));
+    propertyPtr = BrowserFindProperty(rootPtr, screenResourcesAtom);
+    if ((propertyPtr == NULL) || (propertyPtr->type != XA_STRING)
+	    || (propertyPtr->format != 8) || (propertyPtr->data == NULL)) {
+	return NULL;
+    }
+    copy = (char *)ckalloc((size_t)propertyPtr->dataLength + 1U);
+    if (propertyPtr->dataLength > 0) {
+	memcpy(copy, propertyPtr->data, (size_t)propertyPtr->dataLength);
+    }
+    copy[propertyPtr->dataLength] = '\0';
+    return copy;
 }
 
 const char *

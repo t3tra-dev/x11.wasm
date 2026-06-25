@@ -5942,6 +5942,119 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestResourceManagerApis(void)
+{
+    Display *display;
+    const char resourceText[] =
+	    "! ignored comment\n"
+	    "*geometry: global-geometry\n"
+	    "wish*geometry: wildcard-geometry\n"
+	    "wish.geometry: exact-geometry\n"
+	    "wish.background: black\n"
+	    "*foreground: white\n"
+	    "standalone: bare-value\n"
+	    "wish.empty:\n";
+    const char replacementText[] =
+	    "wish.geometry: first\n"
+	    "wish.geometry: second\n";
+    const char screenResourceText[] = "screen.option: screen-value\n";
+    Atom screenResourcesAtom;
+    const char *resourceManagerString;
+    char *screenResourceString = NULL;
+    char *defaultValue;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screenResourcesAtom = XInternAtom(display, "SCREEN_RESOURCES", False);
+    (void)XDeleteProperty(display, browserDisplay.rootWindow,
+	    XA_RESOURCE_MANAGER);
+    (void)XDeleteProperty(display, browserDisplay.rootWindow,
+	    screenResourcesAtom);
+    if ((XResourceManagerString(display) != NULL)
+	    || (XScreenResourceString(DefaultScreenOfDisplay(display)) != NULL)
+	    || (XGetDefault(display, "wish", "geometry") != NULL)) {
+	return 0;
+    }
+
+    if (XChangeProperty(display, browserDisplay.rootWindow,
+	    XA_RESOURCE_MANAGER, XA_STRING, 8, PropModeReplace,
+	    (const unsigned char *)resourceText,
+	    (int)strlen(resourceText)) != Success) {
+	return 0;
+    }
+    resourceManagerString = XResourceManagerString(display);
+    if ((resourceManagerString == NULL)
+	    || (strcmp(resourceManagerString, resourceText) != 0)) {
+	return 0;
+    }
+    defaultValue = XGetDefault(display, "wish", "geometry");
+    if ((defaultValue == NULL)
+	    || (strcmp(defaultValue, "exact-geometry") != 0)) {
+	return 0;
+    }
+    defaultValue = XGetDefault(display, "/usr/bin/wish", "geometry");
+    if ((defaultValue == NULL)
+	    || (strcmp(defaultValue, "exact-geometry") != 0)) {
+	return 0;
+    }
+    defaultValue = XGetDefault(display, "wish", "background");
+    if ((defaultValue == NULL) || (strcmp(defaultValue, "black") != 0)) {
+	return 0;
+    }
+    defaultValue = XGetDefault(display, "other", "foreground");
+    if ((defaultValue == NULL) || (strcmp(defaultValue, "white") != 0)) {
+	return 0;
+    }
+    defaultValue = XGetDefault(display, "other", "standalone");
+    if ((defaultValue == NULL) || (strcmp(defaultValue, "bare-value") != 0)) {
+	return 0;
+    }
+    defaultValue = XGetDefault(display, "wish", "empty");
+    if ((defaultValue == NULL) || (strcmp(defaultValue, "") != 0)) {
+	return 0;
+    }
+    if ((XGetDefault(display, "other", "background") != NULL)
+	    || (XGetDefault(display, NULL, NULL) != NULL)) {
+	return 0;
+    }
+    if (XChangeProperty(display, browserDisplay.rootWindow,
+	    screenResourcesAtom, XA_STRING, 8, PropModeReplace,
+	    (const unsigned char *)screenResourceText,
+	    (int)strlen(screenResourceText)) != Success) {
+	return 0;
+    }
+    screenResourceString = XScreenResourceString(DefaultScreenOfDisplay(display));
+    if ((screenResourceString == NULL)
+	    || (strcmp(screenResourceString, screenResourceText) != 0)) {
+	return 0;
+    }
+    XFree(screenResourceString);
+    screenResourceString = NULL;
+
+    if (XChangeProperty(display, browserDisplay.rootWindow,
+	    XA_RESOURCE_MANAGER, XA_STRING, 8, PropModeReplace,
+	    (const unsigned char *)replacementText,
+	    (int)strlen(replacementText)) != Success) {
+	return 0;
+    }
+    defaultValue = XGetDefault(display, "wish", "geometry");
+    if ((defaultValue == NULL) || (strcmp(defaultValue, "second") != 0)) {
+	return 0;
+    }
+
+    (void)XDeleteProperty(display, browserDisplay.rootWindow,
+	    XA_RESOURCE_MANAGER);
+    (void)XDeleteProperty(display, browserDisplay.rootWindow,
+	    screenResourcesAtom);
+    if ((XResourceManagerString(display) != NULL)
+	    || (XScreenResourceString(DefaultScreenOfDisplay(display)) != NULL)
+	    || (XGetDefault(display, "wish", "geometry") != NULL)) {
+	return 0;
+    }
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestXErrorHandler(void)
 {
     XErrorHandler oldHandler;

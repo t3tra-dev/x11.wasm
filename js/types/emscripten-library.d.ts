@@ -509,6 +509,7 @@ declare const Module: {
   _X11WasmTestSubstructureNotifyApis?: () => number;
   _X11WasmTestXlibApis?: () => number;
   _X11WasmTestColormapApis?: () => number;
+  _X11WasmTestResourceManagerApis?: () => number;
   _X11WasmTestXSendEventTargets?: (
     focusWindow: number,
     pointerWindow: number,

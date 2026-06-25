@@ -628,6 +628,7 @@ EXTERN char *XDisplayName(_Xconst char *display_name);
 EXTERN char *XGetDefault(Display *display, _Xconst char *program,
 	_Xconst char *option);
 EXTERN char *XResourceManagerString(Display *display);
+EXTERN char *XScreenResourceString(Screen *screen);
 EXTERN const char *XDefaultString(void);
 EXTERN void XrmInitialize(void);
 EXTERN int XCloseDisplay(Display *display);

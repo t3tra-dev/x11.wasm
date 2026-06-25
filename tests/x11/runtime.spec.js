@@ -521,6 +521,26 @@ test("Xlib colormap compatibility APIs are stable", async ({ page }) => {
   expect(result).toBe(1);
 });
 
+test("X resource manager defaults are stable", async ({ page }) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestResourceManagerApis?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestResourceManagerApis) {
+      throw new Error("missing X resource manager test hooks");
+    }
+    return module._X11WasmTestResourceManagerApis();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XSendEvent resolves InputFocus and PointerWindow targets", async ({
   page,
 }) => {
