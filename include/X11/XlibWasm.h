@@ -179,6 +179,9 @@ EXTERN KeySym XLookupKeysym(XKeyEvent *key_event, int index);
 	EXTERN int XMapRaised(Display *d, Window w);
 	EXTERN int XMapSubwindows(Display *d, Window w);
 	EXTERN int XMapWindow(Display *d, Window w);
+EXTERN int XCirculateSubwindows(Display *d, Window w, int i);
+EXTERN int XCirculateSubwindowsDown(Display *d, Window w);
+EXTERN int XCirculateSubwindowsUp(Display *d, Window w);
 EXTERN int XMoveResizeWindow(Display *d, Window w, int i1, int i2,
 	unsigned int ui1, unsigned int ui2);
 EXTERN int XMoveWindow(Display *d, Window w, int i1, int i2);

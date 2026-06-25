@@ -81,6 +81,7 @@
 #define X11_WASM_XREQ_UNMAP_WINDOW 10
 #define X11_WASM_XREQ_UNMAP_SUBWINDOWS 11
 #define X11_WASM_XREQ_CONFIGURE_WINDOW 12
+#define X11_WASM_XREQ_CIRCULATE_WINDOW 13
 #define X11_WASM_XREQ_GET_GEOMETRY 14
 #define X11_WASM_XREQ_QUERY_TREE 15
 #define X11_WASM_XREQ_GET_ATOM_NAME 17
@@ -495,6 +496,10 @@ void BrowserClearKeycodeRange(
     unsigned int count);
 void BrowserClearRectangle(
     XRectangle *rectPtr);
+X11WasmResource *BrowserCirculateSubwindow(
+    X11WasmResource *parentPtr,
+    int direction,
+    int *placePtr);
 Atom BrowserClipboardSelectionAtom(void);
 int BrowserCollectVisualInfos(
     Display *display,
@@ -1166,6 +1171,9 @@ int BrowserQueueColormapNotify(
 int BrowserQueueConfigureNotify(
     X11WasmResource *resourcePtr,
     Window above);
+int BrowserQueueCirculateNotify(
+    X11WasmResource *resourcePtr,
+    int place);
 int BrowserQueueCopyExposureEvents(
     X11WasmResource *sourcePtr,
     X11WasmResource *targetPtr,

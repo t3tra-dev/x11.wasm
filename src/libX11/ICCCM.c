@@ -2111,6 +2111,49 @@ int XLowerWindow(Display *display, Window window)
     BrowserRestackWindow(resourcePtr, CWStackMode, &changes);
     return Success;
 }
+
+int
+XCirculateSubwindows(
+    Display *display,
+    Window window,
+    int direction)
+{
+    X11WasmResource *parentPtr = BrowserWindowResourceOrError(&display,
+	    window, X11_WASM_XREQ_CIRCULATE_WINDOW);
+    X11WasmResource *resourcePtr;
+    int place = PlaceOnTop;
+
+    if (parentPtr == NULL) {
+	return Success;
+    }
+    if (!BrowserValueOrError(&display, direction,
+	    (direction == RaiseLowest) || (direction == LowerHighest),
+	    X11_WASM_XREQ_CIRCULATE_WINDOW)) {
+	return Success;
+    }
+    resourcePtr = BrowserCirculateSubwindow(parentPtr, direction, &place);
+    if (resourcePtr != NULL) {
+	(void)BrowserQueueCirculateNotify(resourcePtr, place);
+    }
+    return Success;
+}
+
+int
+XCirculateSubwindowsUp(
+    Display *display,
+    Window window)
+{
+    return XCirculateSubwindows(display, window, RaiseLowest);
+}
+
+int
+XCirculateSubwindowsDown(
+    Display *display,
+    Window window)
+{
+    return XCirculateSubwindows(display, window, LowerHighest);
+}
+
 int
 XReparentWindow(
     Display *display,

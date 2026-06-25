@@ -362,6 +362,27 @@ BrowserTestPopConfigureEvent(
     return 1;
 }
 
+static int
+BrowserTestPopCirculateEvent(
+    Window eventWindow,
+    Window window,
+    int place)
+{
+    XEvent event;
+
+    memset(&event, 0, sizeof(event));
+    if (!BrowserPopMatchingEvent(eventWindow,
+	    (eventWindow == window) ? StructureNotifyMask
+	    : SubstructureNotifyMask, &event)
+	    || (event.type != CirculateNotify)
+	    || (event.xcirculate.event != eventWindow)
+	    || (event.xcirculate.window != window)
+	    || (event.xcirculate.place != place)) {
+	return 0;
+    }
+    return 1;
+}
+
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestConfigureStackingApis(void)
 {
@@ -503,6 +524,62 @@ X11WasmTestConfigureStackingApis(void)
 	goto cleanup;
     }
 
+    if (XSelectInput(display, parent, SubstructureNotifyMask) != Success) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+
+    if (XCirculateSubwindowsUp(display, parent) != Success) {
+	goto cleanup;
+    }
+    if (!BrowserTestPopCirculateEvent(bottom, bottom, PlaceOnTop)
+	    || !BrowserTestPopCirculateEvent(parent, bottom, PlaceOnTop)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    expected[0] = top;
+    expected[1] = far;
+    expected[2] = middle;
+    expected[3] = bottom;
+    if (!BrowserTestQueryTreeOrder(display, parent, expected, 4)) {
+	goto cleanup;
+    }
+
+    if (XCirculateSubwindowsDown(display, parent) != Success) {
+	goto cleanup;
+    }
+    if (!BrowserTestPopCirculateEvent(bottom, bottom, PlaceOnBottom)
+	    || !BrowserTestPopCirculateEvent(parent, bottom, PlaceOnBottom)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    expected[0] = bottom;
+    expected[1] = top;
+    expected[2] = far;
+    expected[3] = middle;
+    if (!BrowserTestQueryTreeOrder(display, parent, expected, 4)) {
+	goto cleanup;
+    }
+
+    if (XCirculateSubwindows(display, parent, RaiseLowest) != Success) {
+	goto cleanup;
+    }
+    if (!BrowserTestPopCirculateEvent(bottom, bottom, PlaceOnTop)
+	    || !BrowserTestPopCirculateEvent(parent, bottom, PlaceOnTop)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    expected[0] = top;
+    expected[1] = far;
+    expected[2] = middle;
+    expected[3] = bottom;
+    if (!BrowserTestQueryTreeOrder(display, parent, expected, 4)) {
+	goto cleanup;
+    }
+
+    if (XSelectInput(display, parent, NoEventMask) != Success) {
+	goto cleanup;
+    }
     BrowserClearEventQueue();
     memset(&changes, 0, sizeof(changes));
     changes.x = 5;

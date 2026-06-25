@@ -512,7 +512,8 @@ BrowserEventMask(
 	return (eventPtr->xgravity.event == eventPtr->xgravity.window)
 		? StructureNotifyMask : SubstructureNotifyMask;
     case CirculateNotify:
-	return StructureNotifyMask;
+	return (eventPtr->xcirculate.event == eventPtr->xcirculate.window)
+		? StructureNotifyMask : SubstructureNotifyMask;
     case CreateNotify:
 	return SubstructureNotifyMask;
     case ResizeRequest:
@@ -1149,6 +1150,55 @@ BrowserRestackWindow(
 	    BrowserJsXId(resourcePtr->prevSiblingPtr != NULL
 		    ? resourcePtr->prevSiblingPtr->id : None));
     BrowserSyncTransientStacking();
+}
+
+X11WasmResource *
+BrowserCirculateSubwindow(
+    X11WasmResource *parentPtr,
+    int direction,
+    int *placePtr)
+{
+    X11WasmResource *resourcePtr;
+
+    if ((parentPtr == NULL)
+	    || (parentPtr->type != X11_WASM_RESOURCE_WINDOW)) {
+	return NULL;
+    }
+    switch (direction) {
+    case RaiseLowest:
+	for (resourcePtr = parentPtr->firstChildPtr; resourcePtr != NULL;
+		resourcePtr = resourcePtr->nextSiblingPtr) {
+	    if (BrowserWindowIsObscuredBySibling(resourcePtr, NULL)) {
+		BrowserLinkChildAtTop(resourcePtr, (Window)parentPtr->id);
+		(void)X11WasmJsRestackWindow(BrowserJsXId(resourcePtr->id),
+			BrowserJsXId(resourcePtr->prevSiblingPtr != NULL
+				? resourcePtr->prevSiblingPtr->id : None));
+		BrowserSyncTransientStacking();
+		if (placePtr != NULL) {
+		    *placePtr = PlaceOnTop;
+		}
+		return resourcePtr;
+	    }
+	}
+	break;
+    case LowerHighest:
+	for (resourcePtr = parentPtr->lastChildPtr; resourcePtr != NULL;
+		resourcePtr = resourcePtr->prevSiblingPtr) {
+	    if (BrowserWindowObscuresSibling(resourcePtr, NULL)) {
+		BrowserLinkChildAtBottom(resourcePtr, (Window)parentPtr->id);
+		(void)X11WasmJsRestackWindow(BrowserJsXId(resourcePtr->id),
+			BrowserJsXId(resourcePtr->prevSiblingPtr != NULL
+				? resourcePtr->prevSiblingPtr->id : None));
+		BrowserSyncTransientStacking();
+		if (placePtr != NULL) {
+		    *placePtr = PlaceOnBottom;
+		}
+		return resourcePtr;
+	    }
+	}
+	break;
+    }
+    return NULL;
 }
 
 int

@@ -1499,6 +1499,39 @@ BrowserQueueConfigureNotify(
 }
 
 int
+BrowserQueueCirculateNotify(
+    X11WasmResource *resourcePtr,
+    int place)
+{
+    X11WasmResource *parentPtr;
+    XEvent event;
+    int queued = 0;
+
+    if ((resourcePtr == NULL)
+	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)) {
+	return 0;
+    }
+    if (BrowserResourceWantsEvent(resourcePtr, StructureNotifyMask)) {
+	BrowserSetCommonEventFields(&event, CirculateNotify,
+		(Window)resourcePtr->id, CurrentTime);
+	event.xcirculate.event = (Window)resourcePtr->id;
+	event.xcirculate.window = (Window)resourcePtr->id;
+	event.xcirculate.place = place;
+	queued += BrowserQueueEvent(&event);
+    }
+    parentPtr = BrowserWindowResource(resourcePtr->parent);
+    if (BrowserResourceWantsEvent(parentPtr, SubstructureNotifyMask)) {
+	BrowserSetCommonEventFields(&event, CirculateNotify,
+		(Window)parentPtr->id, CurrentTime);
+	event.xcirculate.event = (Window)parentPtr->id;
+	event.xcirculate.window = (Window)resourcePtr->id;
+	event.xcirculate.place = place;
+	queued += BrowserQueueEvent(&event);
+    }
+    return queued;
+}
+
+int
 BrowserQueueGravityNotify(
     X11WasmResource *resourcePtr)
 {
