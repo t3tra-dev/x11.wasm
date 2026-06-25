@@ -5997,6 +5997,7 @@ X11WasmTestColormapApis(void)
     XColor storedColor;
     XColor storedColors[2];
     unsigned long allocatedPixels[2];
+    unsigned long planeFreePixel;
     unsigned long planeMasks[2];
     unsigned long colorPlanePixels[2];
     unsigned long redMaskReturn = 0;
@@ -6097,6 +6098,28 @@ X11WasmTestColormapApis(void)
 	    || (redMaskReturn != 0x00ff0000UL)
 	    || (greenMaskReturn != 0x0000ff00UL)
 	    || (blueMaskReturn != 0x000000ffUL)) {
+	goto cleanup;
+    }
+
+    storedColors[0].pixel = 0x010220UL;
+    storedColors[0].red = 0x1111;
+    storedColors[0].green = 0x2222;
+    storedColors[0].blue = 0x3333;
+    storedColors[0].flags = DoRed | DoGreen | DoBlue;
+    storedColors[1].pixel = 0x010221UL;
+    storedColors[1].red = 0x4444;
+    storedColors[1].green = 0x5555;
+    storedColors[1].blue = 0x6666;
+    storedColors[1].flags = DoRed | DoGreen | DoBlue;
+    planeFreePixel = 0x010220UL;
+    storedColor.pixel = 0x010221UL;
+    if ((XStoreColors(display, colormap, storedColors, 2) != Success)
+	    || (XFreeColors(display, colormap, &planeFreePixel, 1, 0x1UL)
+		    != Success)
+	    || (XQueryColor(display, colormap, &storedColor) != Success)
+	    || (storedColor.red != 0x0101)
+	    || (storedColor.green != 0x0202)
+	    || (storedColor.blue != 0x2121)) {
 	goto cleanup;
     }
 

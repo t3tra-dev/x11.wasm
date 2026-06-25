@@ -881,7 +881,8 @@ X11WasmResource *BrowserFontableResourceOrError(
 void BrowserForgetColors(
     Colormap colormap,
     unsigned long *pixels,
-    int count);
+    int count,
+    unsigned long planes);
 void BrowserForgetHostAddress(
     const XHostAddress *hostPtr);
 void BrowserForgetIMInstantiateCallbacks(

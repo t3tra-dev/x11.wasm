@@ -442,7 +442,8 @@ void
 BrowserForgetColors(
     Colormap colormap,
     unsigned long *pixels,
-    int count)
+    int count,
+    unsigned long planes)
 {
     X11WasmResource *resourcePtr;
     int i;
@@ -456,14 +457,18 @@ BrowserForgetColors(
     }
     for (i = 0; i < count; i++) {
 	X11WasmColorEntry **linkPtr = &resourcePtr->colorList;
+	unsigned long basePixel = pixels[i] & ~planes;
+	unsigned long requiredPlaneBits = pixels[i] & planes;
 
 	while (*linkPtr != NULL) {
 	    X11WasmColorEntry *entryPtr = *linkPtr;
 
-	    if (entryPtr->pixel == pixels[i]) {
+	    if (((entryPtr->pixel & ~planes) == basePixel)
+		    && ((entryPtr->pixel & requiredPlaneBits)
+		    == requiredPlaneBits)) {
 		*linkPtr = entryPtr->nextPtr;
 		ckfree(entryPtr);
-		break;
+		continue;
 	    }
 	    linkPtr = &entryPtr->nextPtr;
 	}
