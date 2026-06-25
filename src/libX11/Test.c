@@ -6002,6 +6002,8 @@ X11WasmTestColormapApis(void)
     unsigned long planeFreePixel;
     unsigned long planeMasks[2];
     unsigned long colorPlanePixels[2];
+    unsigned long colorPlaneMask;
+    unsigned long colorPlaneCombination;
     unsigned long redMaskReturn = 0;
     unsigned long greenMaskReturn = 0;
     unsigned long blueMaskReturn = 0;
@@ -6017,6 +6019,8 @@ X11WasmTestColormapApis(void)
     allocatedPlaneMask = 0;
     memset(planeMasks, 0, sizeof(planeMasks));
     memset(colorPlanePixels, 0, sizeof(colorPlanePixels));
+    colorPlaneMask = 0;
+    colorPlaneCombination = 0;
 
     colormap = XCreateColormap(display, browserDisplay.rootWindow,
 	    DefaultVisual(display, screen), AllocNone);
@@ -6108,9 +6112,20 @@ X11WasmTestColormapApis(void)
     if (!XAllocColorPlanes(display, colormap, False, colorPlanePixels, 2, 1,
 	    1, 1, &redMaskReturn, &greenMaskReturn, &blueMaskReturn)
 	    || (colorPlanePixels[0] == colorPlanePixels[1])
-	    || (redMaskReturn != 0x00ff0000UL)
-	    || (greenMaskReturn != 0x0000ff00UL)
-	    || (blueMaskReturn != 0x000000ffUL)) {
+	    || (redMaskReturn != 0x00010000UL)
+	    || (greenMaskReturn != 0x00000100UL)
+	    || (blueMaskReturn != 0x00000001UL)) {
+	goto cleanup;
+    }
+    colorPlaneMask = redMaskReturn | greenMaskReturn | blueMaskReturn;
+    colorPlaneCombination = colorPlanePixels[0] | colorPlaneMask;
+    storedColor.pixel = colorPlaneCombination;
+    if (((colorPlanePixels[0] & colorPlaneMask) != 0)
+	    || ((colorPlanePixels[1] & colorPlaneMask) != 0)
+	    || (XQueryColor(display, colormap, &storedColor) != Success)
+	    || (storedColor.red != 0)
+	    || (storedColor.green != 0)
+	    || (storedColor.blue != 0)) {
 	goto cleanup;
     }
 

@@ -1,5 +1,11 @@
 #include "XlibInt.h"
 
+#define BROWSER_COLOR_CHANNEL_BITS 8U
+#define BROWSER_COLOR_RED_SHIFT 16U
+#define BROWSER_COLOR_GREEN_SHIFT 8U
+#define BROWSER_COLOR_BLUE_SHIFT 0U
+#define BROWSER_MAX_COLOR_CELL_COMBINATIONS 4096U
+
 static int
 BrowserValidateDrawableDimensions(
     Display **displayPtr,
@@ -96,6 +102,60 @@ BrowserColorCellPlaneBits(
 }
 
 static int
+BrowserAppendColorPlaneMasks(
+    unsigned long *planeMasks,
+    unsigned int planeMaskCapacity,
+    int planeCount,
+    unsigned int shift,
+    unsigned int *totalPlaneCountPtr,
+    unsigned long *maskReturn)
+{
+    unsigned long mask = 0;
+    unsigned int totalPlaneCount;
+    int i;
+
+    if ((planeCount < 0)
+	    || (planeCount > (int)BROWSER_COLOR_CHANNEL_BITS)
+	    || (shift + (unsigned int)planeCount
+	    > (unsigned int)(sizeof(unsigned long) * CHAR_BIT))) {
+	return 0;
+    }
+    totalPlaneCount = *totalPlaneCountPtr;
+    if (totalPlaneCount + (unsigned int)planeCount > planeMaskCapacity) {
+	return 0;
+    }
+    for (i = 0; i < planeCount; i++) {
+	unsigned long plane = 1UL << (shift + (unsigned int)i);
+
+	planeMasks[totalPlaneCount++] = plane;
+	mask |= plane;
+    }
+    *totalPlaneCountPtr = totalPlaneCount;
+    *maskReturn = mask;
+    return 1;
+}
+
+static int
+BrowserColorCellCombinationCount(
+    unsigned int nplanes,
+    size_t *combinationCountPtr)
+{
+    size_t combinationCount;
+
+    if (nplanes >= (unsigned int)(sizeof(size_t) * CHAR_BIT)) {
+	return 0;
+    }
+    combinationCount = ((size_t)1) << nplanes;
+    if (combinationCount > (size_t)BROWSER_MAX_COLOR_CELL_COMBINATIONS) {
+	return 0;
+    }
+    if (combinationCountPtr != NULL) {
+	*combinationCountPtr = combinationCount;
+    }
+    return 1;
+}
+
+static int
 BrowserColorCellBlockIsFree(
     Colormap colormap,
     unsigned long basePixel,
@@ -147,10 +207,9 @@ BrowserReserveColorCellBlock(
     size_t combinationCount;
     unsigned long basePixel;
 
-    if (nplanes >= (unsigned int)(sizeof(size_t) * CHAR_BIT)) {
+    if (!BrowserColorCellCombinationCount(nplanes, &combinationCount)) {
 	return 0;
     }
-    combinationCount = ((size_t)1) << nplanes;
     for (basePixel = 0; ; basePixel++) {
 	if ((basePixel & planeMaskUnion) != 0) {
 	    continue;
@@ -678,6 +737,9 @@ XAllocColorCells(
 		    (int)npixels, X11_WASM_XREQ_ALLOC_COLOR_CELLS)) {
 	return False;
     }
+    if (!BrowserColorCellCombinationCount(nplanes, NULL)) {
+	return False;
+    }
     for (i = 0; i < nplanes; i++) {
 	planeMasksReturn[i] = (i < (unsigned int)(sizeof(unsigned long)
 		* CHAR_BIT)) ? (1UL << i) : 0UL;
@@ -707,6 +769,12 @@ XAllocColorPlanes(
     unsigned long *bmaskReturn)
 {
     int i;
+    unsigned long planeMasks[sizeof(unsigned long) * CHAR_BIT];
+    unsigned int totalPlaneCount = 0;
+    unsigned long redMask = 0;
+    unsigned long greenMask = 0;
+    unsigned long blueMask = 0;
+    unsigned long planeMaskUnion;
 
     (void)contig;
     if (!BrowserColormapOrError(&display, colormap,
@@ -715,11 +783,16 @@ XAllocColorPlanes(
     }
     if (!BrowserValidateCountedList(&display, pixelsReturn, ncolors,
 	    X11_WASM_XREQ_ALLOC_COLOR_PLANES)
-	    || !BrowserValueOrError(&display, nreds, nreds >= 0,
+	    || !BrowserValueOrError(&display, nreds,
+		    (nreds >= 0) && (nreds <= (int)BROWSER_COLOR_CHANNEL_BITS),
 		    X11_WASM_XREQ_ALLOC_COLOR_PLANES)
-	    || !BrowserValueOrError(&display, ngreens, ngreens >= 0,
+	    || !BrowserValueOrError(&display, ngreens,
+		    (ngreens >= 0)
+		    && (ngreens <= (int)BROWSER_COLOR_CHANNEL_BITS),
 		    X11_WASM_XREQ_ALLOC_COLOR_PLANES)
-	    || !BrowserValueOrError(&display, nblues, nblues >= 0,
+	    || !BrowserValueOrError(&display, nblues,
+		    (nblues >= 0)
+		    && (nblues <= (int)BROWSER_COLOR_CHANNEL_BITS),
 		    X11_WASM_XREQ_ALLOC_COLOR_PLANES)
 	    || !BrowserValueOrError(&display, 0,
 		    (rmaskReturn != NULL) && (gmaskReturn != NULL)
@@ -727,17 +800,29 @@ XAllocColorPlanes(
 		    X11_WASM_XREQ_ALLOC_COLOR_PLANES)) {
 	return False;
     }
-    *rmaskReturn = (nreds > 0) ? 0x00ff0000UL : 0UL;
-    *gmaskReturn = (ngreens > 0) ? 0x0000ff00UL : 0UL;
-    *bmaskReturn = (nblues > 0) ? 0x000000ffUL : 0UL;
+    if (!BrowserAppendColorPlaneMasks(planeMasks,
+	    (unsigned int)(sizeof(planeMasks) / sizeof(planeMasks[0])),
+	    nreds, BROWSER_COLOR_RED_SHIFT, &totalPlaneCount, &redMask)
+	    || !BrowserAppendColorPlaneMasks(planeMasks,
+		    (unsigned int)(sizeof(planeMasks) / sizeof(planeMasks[0])),
+		    ngreens, BROWSER_COLOR_GREEN_SHIFT, &totalPlaneCount,
+		    &greenMask)
+	    || !BrowserAppendColorPlaneMasks(planeMasks,
+		    (unsigned int)(sizeof(planeMasks) / sizeof(planeMasks[0])),
+		    nblues, BROWSER_COLOR_BLUE_SHIFT, &totalPlaneCount,
+		    &blueMask)
+	    || !BrowserColorCellCombinationCount(totalPlaneCount, NULL)) {
+	return False;
+    }
+    *rmaskReturn = redMask;
+    *gmaskReturn = greenMask;
+    *bmaskReturn = blueMask;
+    planeMaskUnion = redMask | greenMask | blueMask;
     for (i = 0; i < ncolors; i++) {
-	XColor color;
-
-	pixelsReturn[i] = BrowserReserveColorPixel(colormap);
-	memset(&color, 0, sizeof(color));
-	color.pixel = pixelsReturn[i];
-	color.flags = DoRed | DoGreen | DoBlue;
-	BrowserRememberColor(colormap, &color);
+	if (!BrowserReserveColorCellBlock(colormap, planeMasks,
+		totalPlaneCount, planeMaskUnion, &pixelsReturn[i])) {
+	    return False;
+	}
     }
     return True;
 }
