@@ -2843,10 +2843,21 @@ XGetSubImage(
     int destX,
     int destY)
 {
+    X11WasmResource *resourcePtr;
     XImage *sourceImage;
     unsigned int ix, iy;
 
     if (destImage == NULL) {
+	return NULL;
+    }
+    resourcePtr = BrowserDrawableResourceOrError(&display, drawable,
+	    X11_WASM_XREQ_GET_IMAGE);
+    if (resourcePtr == NULL) {
+	return NULL;
+    }
+    if ((unsigned int)destImage->depth != resourcePtr->depth) {
+	(void)BrowserBadMatchOrError(&display, (XID)drawable,
+		X11_WASM_XREQ_GET_IMAGE);
 	return NULL;
     }
     sourceImage = XGetImage(display, drawable, x, y, width, height, planeMask,

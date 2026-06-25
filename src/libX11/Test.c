@@ -6718,6 +6718,7 @@ X11WasmTestXErrorHandler(void)
     int sawFetchBufferBadValue;
     int invalidAtomNamesResult;
     int sawGeometryBadDrawable;
+    int sawGetSubImageBadMatch;
     int sawWarpPointerBadValue;
     int warpPointerZeroWidthX;
     int warpPointerZeroWidthY;
@@ -6768,9 +6769,11 @@ X11WasmTestXErrorHandler(void)
     XImage *xyBitmapGetImageResult;
     XImage *oversizeGetImageResult;
     XImage *outOfBoundsGetImageResult;
+    XImage *getSubImageDepthMismatchResult;
     XImage *unviewableGetImageResult = NULL;
     XImage invalidFormatPutImage;
     XImage depthMismatchPutImage;
+    XImage depthMismatchSubImage;
     int invalidFormatPutImageResult;
     int depthMismatchPutImageResult;
     unsigned char *propertyData = NULL;
@@ -6855,6 +6858,7 @@ X11WasmTestXErrorHandler(void)
     memset(&event, 0, sizeof(event));
     memset(&invalidFormatPutImage, 0, sizeof(invalidFormatPutImage));
     memset(&depthMismatchPutImage, 0, sizeof(depthMismatchPutImage));
+    memset(&depthMismatchSubImage, 0, sizeof(depthMismatchSubImage));
     memset(points, 0, sizeof(points));
     memset(&segment, 0, sizeof(segment));
     memset(text16, 0, sizeof(text16));
@@ -6866,6 +6870,8 @@ X11WasmTestXErrorHandler(void)
     depthMismatchPutImage.format = ZPixmap;
     depthMismatchPutImage.depth = DefaultDepth(&browserDisplay.display,
 	    DefaultScreen(&browserDisplay.display));
+    depthMismatchSubImage.format = ZPixmap;
+    depthMismatchSubImage.depth = 1;
     points[1].x = 1;
     points[2].y = 1;
     segment.x2 = 1;
@@ -6898,6 +6904,7 @@ X11WasmTestXErrorHandler(void)
     sawStoreBufferBadValue = 0;
     validRootPixmapResultSum = Success;
     rootPixmapErrorCount = 0;
+    sawGetSubImageBadMatch = 0;
     warpPointerZeroWidthX = -1;
     warpPointerZeroWidthY = -1;
     warpPointerZeroHeightX = -1;
@@ -6939,6 +6946,12 @@ X11WasmTestXErrorHandler(void)
     outOfBoundsGetImageResult = XGetImage(&browserDisplay.display,
 	    (Drawable)browserDisplay.rootWindow, -1, 0, 1, 1, AllPlanes,
 	    ZPixmap);
+    getSubImageDepthMismatchResult = XGetSubImage(&browserDisplay.display,
+	    (Drawable)browserDisplay.rootWindow, 0, 0, 1, 1, AllPlanes,
+	    ZPixmap, &depthMismatchSubImage, 0, 0);
+    sawGetSubImageBadMatch = (browserTestLastErrorCode == BadMatch)
+	    && (browserTestLastRequestCode == X11_WASM_XREQ_GET_IMAGE)
+	    && (browserTestLastResourceId == (XID)browserDisplay.rootWindow);
     putImageResult = XPutImage(&browserDisplay.display,
 	    (Drawable)invalidWindow, NULL, NULL, 0, 0, 0, 0, 1, 1);
     invalidFormatPutImageResult = XPutImage(&browserDisplay.display,
@@ -7803,6 +7816,8 @@ X11WasmTestXErrorHandler(void)
 	    || (xyBitmapGetImageResult != NULL)
 	    || (oversizeGetImageResult != NULL)
 	    || (outOfBoundsGetImageResult != NULL)
+	    || (getSubImageDepthMismatchResult != NULL)
+	    || !sawGetSubImageBadMatch
 	    || (unviewableGetImageResult != NULL)
 	    || (putImageResult != Success)
 	    || (invalidFormatPutImageResult != Success)
@@ -7950,6 +7965,7 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_CREATE_PIXMAP
 	    + X11_WASM_XREQ_FREE_PIXMAP
 	    + X11_WASM_XREQ_CREATE_GC
+	    + X11_WASM_XREQ_GET_IMAGE
 	    + X11_WASM_XREQ_GET_IMAGE
 	    + X11_WASM_XREQ_GET_IMAGE
 	    + X11_WASM_XREQ_GET_IMAGE
@@ -8225,7 +8241,7 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 239)
+    if ((browserTestXErrorCount != 240)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
