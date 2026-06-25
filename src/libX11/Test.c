@@ -2657,6 +2657,51 @@ X11WasmTestXlibApis(void)
 	    || (metaModifierCount < 2) || (shiftModifierCount < 2)) {
 	goto cleanup;
     }
+    XFreeModifiermap(modifierMap);
+    modifierMap = XNewModifiermap(1);
+    if ((modifierMap == NULL) || (modifierMap->max_keypermod != 1)
+	    || (modifierMap->modifiermap == NULL)) {
+	goto cleanup;
+    }
+    modifierMap = XInsertModifiermapEntry(modifierMap,
+	    (KeyCode)X11_WASM_KEYCODE_SEMICOLON, Mod3MapIndex);
+    modifierMap = XInsertModifiermapEntry(modifierMap,
+	    (KeyCode)X11_WASM_KEYCODE_SEMICOLON, ShiftMapIndex);
+    oldModifierMapSerial = browserDisplay.modifierMapSerial;
+    if ((modifierMap == NULL)
+	    || (XSetModifierMapping(&browserDisplay.display, modifierMap)
+		    != MappingFailed)
+	    || (browserDisplay.modifierMapSerial != oldModifierMapSerial)) {
+	goto cleanup;
+    }
+    modifierMap = XDeleteModifiermapEntry(modifierMap,
+	    (KeyCode)X11_WASM_KEYCODE_SEMICOLON, ShiftMapIndex);
+    modifierMap = XInsertModifiermapEntry(modifierMap,
+	    (KeyCode)X11_WASM_KEYCODE_EQUAL, Mod3MapIndex);
+    modifierMap = XDeleteModifiermapEntry(modifierMap,
+	    (KeyCode)X11_WASM_KEYCODE_SEMICOLON, Mod3MapIndex);
+    oldModifierMapSerial = browserDisplay.modifierMapSerial;
+    if ((modifierMap == NULL) || (modifierMap->max_keypermod != 2)
+	    || (modifierMap->modifiermap[Mod3MapIndex
+		    * modifierMap->max_keypermod] != X11_WASM_KEYCODE_EQUAL)
+	    || (modifierMap->modifiermap[Mod3MapIndex
+		    * modifierMap->max_keypermod + 1] != 0)
+	    || (XSetModifierMapping(&browserDisplay.display, modifierMap)
+		    != MappingSuccess)
+	    || (browserDisplay.modifierMapSerial <= oldModifierMapSerial)) {
+	goto cleanup;
+    }
+    XFreeModifiermap(modifierMap);
+    modifierMap = XGetModifierMapping(&browserDisplay.display);
+    if ((modifierMap == NULL) || (modifierMap->max_keypermod != 2)
+	    || (modifierMap->modifiermap[ShiftMapIndex
+		    * modifierMap->max_keypermod] != 0)
+	    || (modifierMap->modifiermap[Mod3MapIndex
+		    * modifierMap->max_keypermod] != X11_WASM_KEYCODE_EQUAL)
+	    || (modifierMap->modifiermap[Mod3MapIndex
+		    * modifierMap->max_keypermod + 1] != 0)) {
+	goto cleanup;
+    }
     modifierMap->modifiermap[ShiftMapIndex * modifierMap->max_keypermod] = 0;
     XFreeModifiermap(modifierMap);
     modifierMap = NULL;

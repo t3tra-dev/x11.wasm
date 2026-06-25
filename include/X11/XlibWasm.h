@@ -28,7 +28,12 @@ extern "C" {
 
 EXTERN int XSetDashes(Display *display, GC gc, int dash_offset,
 	_Xconst char *dash_list, int n);
+EXTERN XModifierKeymap *XDeleteModifiermapEntry(XModifierKeymap *x,
+	KeyCode k, int i);
 EXTERN XModifierKeymap *XGetModifierMapping(Display *d);
+EXTERN XModifierKeymap *XInsertModifiermapEntry(XModifierKeymap *x,
+	KeyCode k, int i);
+EXTERN XModifierKeymap *XNewModifiermap(int i);
 EXTERN XImage *XCreateImage(Display *d, Visual *v, unsigned int ui1,
 	int i1, int i2, char *cp, unsigned int ui2, unsigned int ui3,
 	int i3, int i4);
@@ -316,6 +321,7 @@ EXTERN int XSetIconName(Display *d, Window w, _Xconst char *c);
 EXTERN int XSetIconSizes(Display *d, Window w, XIconSize *size_list,
 	int count);
 EXTERN int XSetInputFocus(Display *d, Window w, int i, Time t);
+EXTERN int XSetModifierMapping(Display *d, XModifierKeymap *x);
 EXTERN int XSetNormalHints(Display *d, Window w, XSizeHints *hints);
 EXTERN void XSetRGBColormaps(Display *d, Window w,
 	XStandardColormap *stdcmaps, int count, Atom property);

@@ -9,6 +9,9 @@
 
 #include <X11Wasm/Runtime.h>
 
+#define X11_WASM_MODIFIER_COUNT 8
+#define X11_WASM_MODIFIER_MAP_MAX_KEYPERMOD 8
+
 typedef enum {
     X11_WASM_RESOURCE_WINDOW,
     X11_WASM_RESOURCE_PIXMAP,
@@ -125,7 +128,8 @@ typedef struct X11WasmDisplayState {
     unsigned long keyboardMapSerial;
     unsigned long modifierMapSerial;
     int modifierMapMaxKeyPerMod;
-    KeyCode modifierMap[16];
+    KeyCode modifierMap[X11_WASM_MODIFIER_COUNT
+	    * X11_WASM_MODIFIER_MAP_MAX_KEYPERMOD];
     int hostAccessEnabled;
     int hostCount;
     X11WasmHostEntry *hosts;

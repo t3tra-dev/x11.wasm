@@ -2258,11 +2258,141 @@ Xutf8TextListToTextProperty(
 	    textPropReturn);
 }
 
+static XModifierKeymap *
+BrowserAllocModifierMap(
+    int maxKeyPerMod)
+{
+    XModifierKeymap *mapPtr;
+    size_t mapSize;
+
+    if (maxKeyPerMod < 0) {
+	return NULL;
+    }
+    mapPtr = (XModifierKeymap *)ckalloc(sizeof(XModifierKeymap));
+    mapPtr->max_keypermod = maxKeyPerMod;
+    if (maxKeyPerMod == 0) {
+	mapPtr->modifiermap = NULL;
+	return mapPtr;
+    }
+    mapSize = sizeof(KeyCode) * X11_WASM_MODIFIER_COUNT
+	    * (size_t)maxKeyPerMod;
+    mapPtr->modifiermap = (KeyCode *)ckalloc(mapSize);
+    memset(mapPtr->modifiermap, 0, mapSize);
+    return mapPtr;
+}
+
+static XModifierKeymap *
+BrowserResizeModifierMap(
+    XModifierKeymap *mapPtr,
+    int maxKeyPerMod)
+{
+    XModifierKeymap *newMapPtr;
+    int oldMaxKeyPerMod;
+    int modifier;
+    int copyCount;
+
+    if ((mapPtr == NULL) || (maxKeyPerMod < 0)) {
+	return mapPtr;
+    }
+    if (mapPtr->max_keypermod == maxKeyPerMod) {
+	return mapPtr;
+    }
+    newMapPtr = BrowserAllocModifierMap(maxKeyPerMod);
+    if (newMapPtr == NULL) {
+	return mapPtr;
+    }
+    oldMaxKeyPerMod = mapPtr->max_keypermod;
+    copyCount = (oldMaxKeyPerMod < maxKeyPerMod)
+	    ? oldMaxKeyPerMod : maxKeyPerMod;
+    if ((mapPtr->modifiermap != NULL) && (newMapPtr->modifiermap != NULL)
+	    && (copyCount > 0)) {
+	for (modifier = 0; modifier < X11_WASM_MODIFIER_COUNT; modifier++) {
+	    memcpy(newMapPtr->modifiermap + modifier * maxKeyPerMod,
+		    mapPtr->modifiermap + modifier * oldMaxKeyPerMod,
+		    sizeof(KeyCode) * (size_t)copyCount);
+	}
+    }
+    XFreeModifiermap(mapPtr);
+    return newMapPtr;
+}
+
+XModifierKeymap *
+XNewModifiermap(
+    int maxKeysPerMod)
+{
+    return BrowserAllocModifierMap(maxKeysPerMod);
+}
+
+XModifierKeymap *
+XInsertModifiermapEntry(
+    XModifierKeymap *mapPtr,
+    KeyCode keycode,
+    int modifier)
+{
+    KeyCode *row;
+    int i;
+    int maxKeyPerMod;
+
+    if ((mapPtr == NULL) || (keycode == 0)
+	    || (modifier < 0) || (modifier >= X11_WASM_MODIFIER_COUNT)) {
+	return mapPtr;
+    }
+    maxKeyPerMod = mapPtr->max_keypermod;
+    row = (maxKeyPerMod > 0) ? mapPtr->modifiermap
+	    + modifier * maxKeyPerMod : NULL;
+    for (i = 0; i < maxKeyPerMod; i++) {
+	if (row[i] == keycode) {
+	    return mapPtr;
+	}
+    }
+    for (i = 0; i < maxKeyPerMod; i++) {
+	if (row[i] == 0) {
+	    row[i] = keycode;
+	    return mapPtr;
+	}
+    }
+    mapPtr = BrowserResizeModifierMap(mapPtr, maxKeyPerMod + 1);
+    if ((mapPtr != NULL) && (mapPtr->modifiermap != NULL)
+	    && (mapPtr->max_keypermod > maxKeyPerMod)) {
+	mapPtr->modifiermap[modifier * mapPtr->max_keypermod
+		+ maxKeyPerMod] = keycode;
+    }
+    return mapPtr;
+}
+
+XModifierKeymap *
+XDeleteModifiermapEntry(
+    XModifierKeymap *mapPtr,
+    KeyCode keycode,
+    int modifier)
+{
+    KeyCode *row;
+    int i, out;
+    int maxKeyPerMod;
+
+    if ((mapPtr == NULL) || (mapPtr->modifiermap == NULL)
+	    || (modifier < 0) || (modifier >= X11_WASM_MODIFIER_COUNT)) {
+	return mapPtr;
+    }
+    maxKeyPerMod = mapPtr->max_keypermod;
+    row = mapPtr->modifiermap + modifier * maxKeyPerMod;
+    out = 0;
+    for (i = 0; i < maxKeyPerMod; i++) {
+	if (row[i] != keycode) {
+	    row[out++] = row[i];
+	}
+    }
+    while (out < maxKeyPerMod) {
+	row[out++] = 0;
+    }
+    return mapPtr;
+}
+
 XModifierKeymap *
 XGetModifierMapping(
     Display *display)
 {
-    XModifierKeymap *mapPtr = (XModifierKeymap *)ckalloc(sizeof(XModifierKeymap));
+    XModifierKeymap *mapPtr;
     X11WasmDisplayState *state = &browserDisplay;
     int maxKeyPerMod;
     size_t mapSize;
@@ -2275,10 +2405,15 @@ XGetModifierMapping(
     (void)display;
 
     maxKeyPerMod = state->modifierMapMaxKeyPerMod;
-    mapSize = sizeof(KeyCode) * 8 * (size_t)maxKeyPerMod;
-    mapPtr->max_keypermod = maxKeyPerMod;
-    mapPtr->modifiermap = (KeyCode *)ckalloc(mapSize);
-    memcpy(mapPtr->modifiermap, state->modifierMap, mapSize);
+    mapPtr = BrowserAllocModifierMap(maxKeyPerMod);
+    if (mapPtr == NULL) {
+	return NULL;
+    }
+    mapSize = sizeof(KeyCode) * X11_WASM_MODIFIER_COUNT
+	    * (size_t)maxKeyPerMod;
+    if (mapSize > 0) {
+	memcpy(mapPtr->modifiermap, state->modifierMap, mapSize);
+    }
     return mapPtr;
 }
 
@@ -2293,6 +2428,80 @@ XFreeModifiermap(
 	ckfree(mapPtr);
     }
     return Success;
+}
+
+int
+XSetModifierMapping(
+    Display *display,
+    XModifierKeymap *mapPtr)
+{
+    int maxKeyPerMod;
+    int modifier;
+    int slot;
+    size_t mapSize;
+
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    if ((display != &browserDisplay.display) || (mapPtr == NULL)
+	    || (mapPtr->max_keypermod < 0)) {
+	(void)XNoOp(display);
+	return MappingFailed;
+    }
+    maxKeyPerMod = mapPtr->max_keypermod;
+    if (maxKeyPerMod > X11_WASM_MODIFIER_MAP_MAX_KEYPERMOD) {
+	(void)BrowserReportXError(display, BadLength, 0,
+		X11_WASM_XREQ_SET_MODIFIER_MAPPING, 0);
+	return MappingFailed;
+    }
+    if ((maxKeyPerMod > 0) && (mapPtr->modifiermap == NULL)) {
+	(void)BrowserValueOrError(&display, 0, 0,
+		X11_WASM_XREQ_SET_MODIFIER_MAPPING);
+	return MappingFailed;
+    }
+    for (modifier = 0; modifier < X11_WASM_MODIFIER_COUNT; modifier++) {
+	for (slot = 0; slot < maxKeyPerMod; slot++) {
+	    KeyCode keycode = mapPtr->modifiermap[modifier * maxKeyPerMod
+		    + slot];
+	    int compareModifier;
+	    int compareSlot;
+
+	    if (keycode == 0) {
+		continue;
+	    }
+	    if (!BrowserValueOrError(&display, keycode,
+		    (keycode >= display->min_keycode)
+		    && (keycode <= display->max_keycode),
+		    X11_WASM_XREQ_SET_MODIFIER_MAPPING)) {
+		return MappingFailed;
+	    }
+	    for (compareModifier = modifier;
+		    compareModifier < X11_WASM_MODIFIER_COUNT;
+		    compareModifier++) {
+		int startSlot = (compareModifier == modifier) ? slot + 1 : 0;
+
+		for (compareSlot = startSlot; compareSlot < maxKeyPerMod;
+			compareSlot++) {
+		    if (mapPtr->modifiermap[compareModifier * maxKeyPerMod
+			    + compareSlot] == keycode) {
+			(void)XNoOp(display);
+			return MappingFailed;
+		    }
+		}
+	    }
+	}
+    }
+    browserDisplay.modifierMapMaxKeyPerMod = maxKeyPerMod;
+    memset(browserDisplay.modifierMap, 0, sizeof(browserDisplay.modifierMap));
+    mapSize = sizeof(KeyCode) * X11_WASM_MODIFIER_COUNT
+	    * (size_t)maxKeyPerMod;
+    if (mapSize > 0) {
+	memcpy(browserDisplay.modifierMap, mapPtr->modifiermap, mapSize);
+    }
+    browserDisplay.modifierMapSerial++;
+    return XNoOp(display);
 }
 
 int XDisplayKeycodes(Display *display, int *minReturn, int *maxReturn)
