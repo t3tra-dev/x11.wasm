@@ -4384,6 +4384,7 @@ X11WasmTestXErrorHandler(void)
     int translateDestinationResult;
     int queryPointerResult;
     int clearAreaExposuresResult;
+    int clearAreaSizeResult;
     int invalidSendEventTypeResult;
     int sendEventPropagateResult;
     int sendEventResult;
@@ -4445,6 +4446,7 @@ X11WasmTestXErrorHandler(void)
     int getNegativeLengthResult;
     int getDeletePropertyResult;
     int sawGeometryBadDrawable;
+    int sawClearAreaBadValue;
     int sawConfigureBadMatch;
     int sawReconfigureBadValue;
     int sawIconifyBadValue;
@@ -5105,6 +5107,11 @@ X11WasmTestXErrorHandler(void)
 	    invalidWindow, &root, &child, &x, &y, &x, &y, NULL);
     clearAreaExposuresResult = XClearArea(&browserDisplay.display,
 	    browserDisplay.rootWindow, 0, 0, 1, 1, 2);
+    clearAreaSizeResult = XClearArea(&browserDisplay.display,
+	    browserDisplay.rootWindow, 0, 0,
+	    (unsigned int)USHRT_MAX + 1U, 1, False);
+    sawClearAreaBadValue = (browserTestLastErrorCode == BadValue)
+	    && (browserTestLastRequestCode == X11_WASM_XREQ_CLEAR_AREA);
     event.type = LASTEvent + 1;
     invalidSendEventTypeResult = XSendEvent(&browserDisplay.display,
 	    browserDisplay.rootWindow, False, KeyPressMask, &event);
@@ -5268,6 +5275,7 @@ X11WasmTestXErrorHandler(void)
 	    || (translateDestinationResult != False)
 	    || (queryPointerResult != False)
 	    || (clearAreaExposuresResult != Success)
+	    || (clearAreaSizeResult != Success)
 	    || (invalidSendEventTypeResult != False)
 	    || (sendEventPropagateResult != False)
 	    || (sendEventResult != False)
@@ -5375,6 +5383,7 @@ X11WasmTestXErrorHandler(void)
 	    || (getDeletePropertyResult != BadValue)
 	    || (invalidAtomName != NULL)
 	    || !sawGeometryBadDrawable
+	    || !sawClearAreaBadValue
 	    || !sawConfigureBadMatch
 	    || !sawReconfigureBadValue
 	    || !sawIconifyBadValue
@@ -5542,6 +5551,7 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_WARP_POINTER
 	    + X11_WASM_XREQ_QUERY_POINTER
 	    + X11_WASM_XREQ_CLEAR_AREA
+	    + X11_WASM_XREQ_CLEAR_AREA
 	    + X11_WASM_XREQ_SEND_EVENT
 	    + X11_WASM_XREQ_SEND_EVENT
 	    + X11_WASM_XREQ_SEND_EVENT
@@ -5630,15 +5640,15 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 206)
+    if ((browserTestXErrorCount != 207)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
 	    || (browserTestRequestCodeSum != expectedRequestCodeSum)
 	    || (browserTestRequestCodeMask != expectedRequestCodeMask)
-	    || (browserTestLastSerial != initialSerial + 206)
+	    || (browserTestLastSerial != initialSerial + 207)
 	    || (LastKnownRequestProcessed(&browserDisplay.display)
-		    != initialSerial + 206)) {
+		    != initialSerial + 207)) {
 	return 0;
     }
     return 1;

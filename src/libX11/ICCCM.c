@@ -2359,6 +2359,12 @@ XClearArea(
 	    X11_WASM_XREQ_CLEAR_AREA)) {
 	return Success;
     }
+    if (!BrowserValidateCard16(&display, (long)width, 1,
+	    X11_WASM_XREQ_CLEAR_AREA)
+	    || !BrowserValidateCard16(&display, (long)height, 1,
+		    X11_WASM_XREQ_CLEAR_AREA)) {
+	return Success;
+    }
     if (resourcePtr->c_class == InputOnly) {
 	(void)BrowserBadMatchOrError(&display, (XID)window,
 		X11_WASM_XREQ_CLEAR_AREA);
