@@ -44,10 +44,7 @@ XSaveContext(
 	return Success;
     }
 
-    entryPtr = (X11WasmContextEntry *)calloc(1, sizeof(*entryPtr));
-    if (entryPtr == NULL) {
-	return XCNOMEM;
-    }
+    entryPtr = (X11WasmContextEntry *)ckalloc(sizeof(*entryPtr));
     entryPtr->rid = rid;
     entryPtr->context = context;
     entryPtr->data = (XPointer)data;

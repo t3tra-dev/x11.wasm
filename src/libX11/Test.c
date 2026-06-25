@@ -2108,6 +2108,18 @@ X11WasmTestXlibApis(void)
 		    contextOne) != XCNOENT)) {
 	goto cleanup;
     }
+    contextDataReturn = NULL;
+    if ((XSaveContext(&browserDisplay.display, contextRidOne, contextOne,
+	    contextDataOne) != Success)
+	    || (XFindContext(&browserDisplay.display, contextRidOne, contextOne,
+		    &contextDataReturn) != Success)
+	    || (contextDataReturn != (XPointer)contextDataOne)
+	    || (XDeleteContext(&browserDisplay.display, contextRidOne,
+		    contextOne) != Success)
+	    || (XFindContext(&browserDisplay.display, contextRidOne, contextOne,
+		    NULL) != XCNOENT)) {
+	goto cleanup;
+    }
     geometryX = 1;
     geometryY = 2;
     parsedWidth = 3;
