@@ -430,6 +430,21 @@ X11WasmTestEventQueueAndKeycodeApis(void)
     pointerMap[2] = Button3;
     pointerMap[3] = Button4;
     pointerMap[4] = Button5;
+    BrowserUpdatePointerState(browserDisplay.rootWindow, 5, 7, Button2Mask);
+    if ((XSetPointerMapping(display, pointerMap, 5) != MappingBusy)
+	    || (XEventsQueued(display, QueuedAlready) != 0)
+	    || (XGetPointerMapping(display, pointerMap, (int)sizeof(pointerMap))
+		    != 5)
+	    || (memcmp(pointerMap, remappedPointerMap,
+		    sizeof(pointerMap)) != 0)) {
+	return 107;
+    }
+    BrowserUpdatePointerState(browserDisplay.rootWindow, 5, 7, 0);
+    pointerMap[0] = Button1;
+    pointerMap[1] = Button2;
+    pointerMap[2] = Button3;
+    pointerMap[3] = Button4;
+    pointerMap[4] = Button5;
     if (XSetPointerMapping(display, pointerMap, 5) != MappingSuccess) {
 	return 100;
     }

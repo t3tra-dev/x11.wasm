@@ -1544,6 +1544,49 @@ XGetPointerMapping(
     return count;
 }
 
+static unsigned int
+BrowserPointerButtonMask(
+    unsigned char button)
+{
+    switch (button) {
+    case Button1:
+	return Button1Mask;
+    case Button2:
+	return Button2Mask;
+    case Button3:
+	return Button3Mask;
+    case Button4:
+	return Button4Mask;
+    case Button5:
+	return Button5Mask;
+    default:
+	return 0;
+    }
+}
+
+static int
+BrowserPointerMappingIsBusy(
+    const unsigned char *map,
+    int nmap)
+{
+    int i;
+
+    for (i = 0; i < nmap; i++) {
+	unsigned int oldMask;
+	unsigned int newMask;
+
+	if (map[i] == browserDisplay.pointerMap[i]) {
+	    continue;
+	}
+	oldMask = BrowserPointerButtonMask(browserDisplay.pointerMap[i]);
+	newMask = BrowserPointerButtonMask(map[i]);
+	if (browserDisplay.pointerState & (oldMask | newMask)) {
+	    return 1;
+	}
+    }
+    return 0;
+}
+
 int
 XSetPointerMapping(
     Display *display,
@@ -1581,6 +1624,10 @@ XSetPointerMapping(
 		return MappingFailed;
 	    }
 	}
+    }
+    if (BrowserPointerMappingIsBusy(map, nmap)) {
+	(void)XNoOp(display);
+	return MappingBusy;
     }
     memcpy(browserDisplay.pointerMap, map, (size_t)nmap);
     (void)BrowserQueueMappingNotify(MappingPointer, 0, 0);
