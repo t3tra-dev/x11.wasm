@@ -6395,6 +6395,7 @@ X11WasmTestXErrorHandler(void)
     int getInvalidAtomResult;
     int getNegativeOffsetResult;
     int getNegativeLengthResult;
+    int getLargeOffsetResult;
     int getDeletePropertyResult;
     int rotateWindowValidationResultSum;
     int sawRotateWindowBadMatch;
@@ -7264,6 +7265,9 @@ X11WasmTestXErrorHandler(void)
 	XFree(largeLengthPropertyData);
 	largeLengthPropertyData = NULL;
     }
+    getLargeOffsetResult = XGetWindowProperty(&browserDisplay.display,
+	    browserDisplay.rootWindow, validProperty, 1, 1, False,
+	    AnyPropertyType, NULL, NULL, NULL, NULL, NULL);
     rotateErrorAtoms[0] = validProperty;
     rotateErrorAtoms[1] = XInternAtom(&browserDisplay.display,
 	    "_X11_WASM_MISSING_ROTATE_PROPERTY", False);
@@ -7494,6 +7498,7 @@ X11WasmTestXErrorHandler(void)
 	    || (getInvalidAtomResult != BadAtom)
 	    || (getNegativeOffsetResult != BadValue)
 	    || (getNegativeLengthResult != BadValue)
+	    || (getLargeOffsetResult != BadValue)
 	    || (getDeletePropertyResult != BadValue)
 	    || (rotateWindowValidationResultSum != Success)
 	    || !sawRotateWindowBadMatch
@@ -7737,6 +7742,7 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
+	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_GET_ATOM_NAME
 	    + X11_WASM_XREQ_GET_ATOM_NAME
 	    + X11_WASM_XREQ_QUERY_TREE
@@ -7797,7 +7803,7 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 234)
+    if ((browserTestXErrorCount != 235)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)

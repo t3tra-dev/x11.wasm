@@ -1775,7 +1775,13 @@ XGetWindowProperty(
 	return Success;
     }
     if (offset > (long)(propertyPtr->dataLength / 4)) {
-	return Success;
+	if (propReturn && (*propReturn != NULL)) {
+	    ckfree(*propReturn);
+	    *propReturn = NULL;
+	}
+	(void)BrowserPropertyValueOrError(&display, (XID)offset,
+		X11_WASM_XREQ_GET_PROPERTY);
+	return BadValue;
     }
 
     elementBytes = BrowserPropertyElementBytes(propertyPtr->format);
