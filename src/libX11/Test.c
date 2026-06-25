@@ -1126,6 +1126,13 @@ X11WasmTestXlibApis(void)
     XID contextRidTwo = 0x01020305UL;
     XContext contextOne = 101;
     XContext contextTwo = 102;
+    XrmQuark quarkOne = NULLQUARK;
+    XrmQuark quarkAgain = NULLQUARK;
+    XrmQuark quarkTwo = NULLQUARK;
+    XrmQuark uniqueQuarkOne = NULLQUARK;
+    XrmQuark uniqueQuarkTwo = NULLQUARK;
+    XContext stringContext = 0;
+    XContext uniqueContext = 0;
     XSizeHints geometryHints;
     int geometryMask = 0;
     int geometryX = 0;
@@ -1390,6 +1397,32 @@ X11WasmTestXlibApis(void)
 	    || (XListHosts(&browserDisplay.display, &hostCount,
 		    &hostAccessEnabled) != NULL)
 	    || (hostCount != 0) || (hostAccessEnabled != True)) {
+	goto cleanup;
+    }
+    quarkOne = XrmStringToQuark("x11.wasm.context");
+    quarkAgain = XrmStringToQuark("x11.wasm.context");
+    quarkTwo = XrmPermStringToQuark("x11.wasm.other");
+    uniqueQuarkOne = XrmUniqueQuark();
+    uniqueQuarkTwo = XrmUniqueQuark();
+    stringContext = XStringToContext("x11.wasm.context");
+    uniqueContext = XUniqueContext();
+    if ((XrmStringToQuark(NULL) != NULLQUARK)
+	    || (XrmPermStringToQuark(NULL) != NULLQUARK)
+	    || (XrmQuarkToString(NULLQUARK) != NULLSTRING)
+	    || (quarkOne == NULLQUARK)
+	    || (quarkOne != quarkAgain)
+	    || (quarkTwo == NULLQUARK)
+	    || (quarkTwo == quarkOne)
+	    || (strcmp(XrmQuarkToString(quarkOne), "x11.wasm.context") != 0)
+	    || (strcmp(XrmQuarkToString(quarkTwo), "x11.wasm.other") != 0)
+	    || (stringContext != (XContext)quarkOne)
+	    || (uniqueQuarkOne == NULLQUARK)
+	    || (uniqueQuarkTwo == NULLQUARK)
+	    || (uniqueQuarkOne == uniqueQuarkTwo)
+	    || (uniqueContext == (XContext)uniqueQuarkOne)
+	    || (uniqueContext == (XContext)uniqueQuarkTwo)
+	    || (XrmQuarkToString(uniqueQuarkOne) != NULLSTRING)
+	    || (XrmQuarkToString(99999) != NULLSTRING)) {
 	goto cleanup;
     }
     if ((XFindContext(&browserDisplay.display, contextRidOne, contextOne,

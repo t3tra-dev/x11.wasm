@@ -360,6 +360,14 @@ typedef struct {
 
 typedef int XContext;
 
+#ifndef X11WASM_XRMQUARK_DEFINED
+#define X11WASM_XRMQUARK_DEFINED
+typedef int XrmQuark, *XrmQuarkList;
+#define NULLQUARK ((XrmQuark)0)
+typedef char *XrmString;
+#define NULLSTRING ((XrmString)0)
+#endif
+
 #define XUniqueContext()       ((XContext) XrmUniqueQuark())
 #define XStringToContext(string)   ((XContext) XrmStringToQuark(string))
 
@@ -568,6 +576,22 @@ extern int XRectInRegion(
     int			/* y */,
     unsigned int	/* width */,
     unsigned int	/* height */
+);
+
+extern XrmString XrmQuarkToString(
+    XrmQuark		/* quark */
+);
+
+extern XrmQuark XrmStringToQuark(
+    _Xconst char*	/* string */
+);
+
+extern XrmQuark XrmPermStringToQuark(
+    _Xconst char*	/* string */
+);
+
+extern XrmQuark XrmUniqueQuark(
+    void
 );
 
 extern int XSaveContext(
