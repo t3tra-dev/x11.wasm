@@ -2771,7 +2771,8 @@ XGetImage(
     if (resourcePtr == NULL) {
 	return NULL;
     }
-    if (!BrowserValueOrError(&display, format, BrowserImageFormatIsValid(format),
+    if (!BrowserValueOrError(&display, format,
+	    (format == XYPixmap) || (format == ZPixmap),
 	    X11_WASM_XREQ_GET_IMAGE)) {
 	return NULL;
     }

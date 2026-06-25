@@ -6447,6 +6447,7 @@ X11WasmTestXErrorHandler(void)
     Cursor invalidGlyphValueCursorResult;
     XImage *getImageResult;
     XImage *invalidFormatGetImageResult;
+    XImage *xyBitmapGetImageResult;
     XImage *oversizeGetImageResult;
     XImage *outOfBoundsGetImageResult;
     XImage *unviewableGetImageResult = NULL;
@@ -6593,6 +6594,9 @@ X11WasmTestXErrorHandler(void)
 	    (Drawable)invalidWindow, 0, 0, 1, 1, AllPlanes, ZPixmap);
     invalidFormatGetImageResult = XGetImage(&browserDisplay.display,
 	    (Drawable)browserDisplay.rootWindow, 0, 0, 1, 1, AllPlanes, 99);
+    xyBitmapGetImageResult = XGetImage(&browserDisplay.display,
+	    (Drawable)browserDisplay.rootWindow, 0, 0, 1, 1, AllPlanes,
+	    XYBitmap);
     oversizeGetImageResult = XGetImage(&browserDisplay.display,
 	    (Drawable)browserDisplay.rootWindow, 0, 0,
 	    (unsigned int)USHRT_MAX + 1U, 1, AllPlanes, ZPixmap);
@@ -7388,6 +7392,7 @@ X11WasmTestXErrorHandler(void)
 	    || (createGCResult != NULL)
 	    || (getImageResult != NULL)
 	    || (invalidFormatGetImageResult != NULL)
+	    || (xyBitmapGetImageResult != NULL)
 	    || (oversizeGetImageResult != NULL)
 	    || (outOfBoundsGetImageResult != NULL)
 	    || (unviewableGetImageResult != NULL)
@@ -7522,6 +7527,7 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_CREATE_PIXMAP
 	    + X11_WASM_XREQ_FREE_PIXMAP
 	    + X11_WASM_XREQ_CREATE_GC
+	    + X11_WASM_XREQ_GET_IMAGE
 	    + X11_WASM_XREQ_GET_IMAGE
 	    + X11_WASM_XREQ_GET_IMAGE
 	    + X11_WASM_XREQ_GET_IMAGE
@@ -7791,7 +7797,7 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 233)
+    if ((browserTestXErrorCount != 234)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
