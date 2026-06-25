@@ -794,6 +794,14 @@ extern int XUnionRegion(
     Region		/* dr_return */
 );
 
+extern int XParseGeometry(
+    _Xconst char*	/* parsestring */,
+    int*		/* x_return */,
+    int*		/* y_return */,
+    unsigned int*	/* width_return */,
+    unsigned int*	/* height_return */
+);
+
 extern int XWMGeometry(
     Display*		/* display */,
     int			/* screen_number */,

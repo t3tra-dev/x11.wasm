@@ -1126,6 +1126,15 @@ X11WasmTestXlibApis(void)
     XID contextRidTwo = 0x01020305UL;
     XContext contextOne = 101;
     XContext contextTwo = 102;
+    XSizeHints geometryHints;
+    int geometryMask = 0;
+    int geometryX = 0;
+    int geometryY = 0;
+    int geometryWidth = 0;
+    int geometryHeight = 0;
+    int geometryGravity = 0;
+    unsigned int parsedWidth = 0;
+    unsigned int parsedHeight = 0;
     XIOErrorHandler savedIOErrorHandler = ioErrorHandler;
     XAfterFunction oldAfterFunction = NULL;
     char *savedLocaleModifiers = NULL;
@@ -1423,6 +1432,111 @@ X11WasmTestXlibApis(void)
 		    NULL) != XCNOENT)
 	    || (XDeleteContext(&browserDisplay.display, contextRidOne,
 		    contextOne) != XCNOENT)) {
+	goto cleanup;
+    }
+    geometryX = 1;
+    geometryY = 2;
+    parsedWidth = 3;
+    parsedHeight = 4;
+    geometryMask = XParseGeometry("=80x24+300-49", &geometryX, &geometryY,
+	    &parsedWidth, &parsedHeight);
+    if ((geometryMask != (XValue | YValue | WidthValue | HeightValue
+		    | YNegative))
+	    || (geometryX != 300) || (geometryY != -49)
+	    || (parsedWidth != 80) || (parsedHeight != 24)) {
+	goto cleanup;
+    }
+    geometryMask = XParseGeometry("-0-0", &geometryX, &geometryY,
+	    &parsedWidth, &parsedHeight);
+    if ((geometryMask != (XValue | YValue | XNegative | YNegative))
+	    || (geometryX != 0) || (geometryY != 0)
+	    || (parsedWidth != 80) || (parsedHeight != 24)) {
+	goto cleanup;
+    }
+    geometryX = 7;
+    geometryY = 8;
+    parsedWidth = 9;
+    parsedHeight = 10;
+    geometryMask = XParseGeometry("bad", &geometryX, &geometryY,
+	    &parsedWidth, &parsedHeight);
+    if ((geometryMask != NoValue) || (geometryX != 7) || (geometryY != 8)
+	    || (parsedWidth != 9) || (parsedHeight != 10)) {
+	goto cleanup;
+    }
+
+    memset(&geometryHints, 0, sizeof(geometryHints));
+    geometryMask = XWMGeometry(&browserDisplay.display,
+	    DefaultScreen(&browserDisplay.display), "80x24+10-20", NULL, 2,
+	    &geometryHints, &geometryX, &geometryY, &geometryWidth,
+	    &geometryHeight, &geometryGravity);
+    if ((geometryMask != (XValue | YValue | WidthValue | HeightValue
+		    | YNegative))
+	    || (geometryX != 10)
+	    || (geometryY != (DisplayHeight(&browserDisplay.display,
+		    DefaultScreen(&browserDisplay.display)) - 20 - 24 - 4))
+	    || (geometryWidth != 80) || (geometryHeight != 24)
+	    || (geometryGravity != SouthWestGravity)) {
+	goto cleanup;
+    }
+
+    memset(&geometryHints, 0, sizeof(geometryHints));
+    geometryHints.flags = PBaseSize | PResizeInc | PMinSize | PMaxSize;
+    geometryHints.base_width = 10;
+    geometryHints.base_height = 20;
+    geometryHints.width_inc = 5;
+    geometryHints.height_inc = 10;
+    geometryHints.min_width = 15;
+    geometryHints.min_height = 25;
+    geometryHints.max_width = 70;
+    geometryHints.max_height = 90;
+    geometryMask = XWMGeometry(&browserDisplay.display,
+	    DefaultScreen(&browserDisplay.display), "4x3-10+12",
+	    "9x9+1-2", 1, &geometryHints, &geometryX, &geometryY,
+	    &geometryWidth, &geometryHeight, &geometryGravity);
+    if ((geometryMask != (XValue | YValue | WidthValue | HeightValue
+		    | XNegative))
+	    || (geometryX != (DisplayWidth(&browserDisplay.display,
+		    DefaultScreen(&browserDisplay.display)) - 10 - 30 - 2))
+	    || (geometryY != 12) || (geometryWidth != 30)
+	    || (geometryHeight != 50)
+	    || (geometryGravity != NorthEastGravity)) {
+	goto cleanup;
+    }
+
+    memset(&geometryHints, 0, sizeof(geometryHints));
+    geometryHints.flags = PMinSize | PResizeInc;
+    geometryHints.min_width = 20;
+    geometryHints.min_height = 30;
+    geometryHints.width_inc = 2;
+    geometryHints.height_inc = 3;
+    geometryMask = XWMGeometry(&browserDisplay.display,
+	    DefaultScreen(&browserDisplay.display), NULL, "8x6-4-5", 3,
+	    &geometryHints, &geometryX, &geometryY, &geometryWidth,
+	    &geometryHeight, &geometryGravity);
+    if ((geometryMask != (XNegative | YNegative))
+	    || (geometryX != (DisplayWidth(&browserDisplay.display,
+		    DefaultScreen(&browserDisplay.display)) - 4 - 36 - 6))
+	    || (geometryY != (DisplayHeight(&browserDisplay.display,
+		    DefaultScreen(&browserDisplay.display)) - 5 - 48 - 6))
+	    || (geometryWidth != 36) || (geometryHeight != 48)
+	    || (geometryGravity != SouthEastGravity)) {
+	goto cleanup;
+    }
+
+    memset(&geometryHints, 0, sizeof(geometryHints));
+    geometryHints.flags = PResizeInc | PMaxSize;
+    geometryHints.width_inc = 10;
+    geometryHints.height_inc = 10;
+    geometryHints.max_width = 50;
+    geometryHints.max_height = 60;
+    geometryMask = XWMGeometry(&browserDisplay.display,
+	    DefaultScreen(&browserDisplay.display), "9x9", NULL, 0,
+	    &geometryHints, &geometryX, &geometryY, &geometryWidth,
+	    &geometryHeight, &geometryGravity);
+    if ((geometryMask != (WidthValue | HeightValue))
+	    || (geometryX != 0) || (geometryY != 0)
+	    || (geometryWidth != 50) || (geometryHeight != 60)
+	    || (geometryGravity != NorthWestGravity)) {
 	goto cleanup;
     }
     keyboardMappingKeycode = XKeysymToKeycode(&browserDisplay.display, XK_a);
