@@ -1949,6 +1949,7 @@ int BrowserValidateScreenSaverPreferBlanking(
     unsigned char requestCode);
 int BrowserValidateWindowAttributeValues(
     Display **displayPtr,
+    Window window,
     unsigned int windowDepth,
     unsigned long mask,
     XSetWindowAttributes *atts,
@@ -1960,6 +1961,7 @@ int BrowserValidateWindowEventMask(
     unsigned char requestCode);
 int BrowserValidateWindowPixmapAttribute(
     Display **displayPtr,
+    Window window,
     unsigned int windowDepth,
     Pixmap pixmap,
     unsigned char requestCode,

@@ -366,7 +366,7 @@ XCreateWindow(
     windowDepth = (unsigned int)((depth == CopyFromParent)
 	    ? ((windowClass == InputOnly) ? 0U : parentPtr->depth)
 	    : depth);
-    if (!BrowserValidateWindowAttributeValues(&display, windowDepth,
+    if (!BrowserValidateWindowAttributeValues(&display, None, windowDepth,
 	    valueMask, attributes, X11_WASM_XREQ_CREATE_WINDOW)) {
 	return None;
     }
