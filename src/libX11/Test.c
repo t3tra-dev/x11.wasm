@@ -1029,6 +1029,7 @@ X11WasmTestXlibApis(void)
     char *fetchedName = NULL;
     char *fetchedIconName = NULL;
     char *fontAtomName = NULL;
+    char longText[5000];
     Font queryFont = None;
     Font cursorFont = None;
     Font cursorMaskFont = None;
@@ -3770,6 +3771,17 @@ X11WasmTestXlibApis(void)
 	    || (latin1TextExtents.rbearing != latin1TextWidth)
 	    || (latin1TextExtents.ascent != textAscent)
 	    || (latin1TextExtents.descent != textDescent)) {
+	goto cleanup;
+    }
+    memset(longText, 'W', sizeof(longText));
+    memset(&textExtents, 0, sizeof(textExtents));
+    if ((XQueryTextExtents(&browserDisplay.display, queryFontStruct->fid,
+		    longText, (int)sizeof(longText), &textDirection,
+		    &textAscent, &textDescent, &textExtents) != Success)
+	    || (textExtents.width != SHRT_MAX)
+	    || (textExtents.rbearing != SHRT_MAX)
+	    || (textExtents.ascent != textAscent)
+	    || (textExtents.descent != textDescent)) {
 	goto cleanup;
     }
     XFreeFont(&browserDisplay.display, queryFontStruct);

@@ -1135,10 +1135,10 @@ XQueryTextExtents(
     if (overallReturn != NULL) {
 	memset(overallReturn, 0, sizeof(*overallReturn));
 	overallReturn->lbearing = 0;
-	overallReturn->rbearing = (short)width;
-	overallReturn->width = (short)width;
-	overallReturn->ascent = (short)ascent;
-	overallReturn->descent = (short)descent;
+	overallReturn->rbearing = BrowserClampShort(width);
+	overallReturn->width = BrowserClampShort(width);
+	overallReturn->ascent = BrowserClampShort(ascent);
+	overallReturn->descent = BrowserClampShort(descent);
     }
     return Success;
 }

@@ -346,6 +346,19 @@ BrowserClampUShort(
     return (value > 0xffffU) ? 0xffffU : (unsigned short)value;
 }
 
+short
+BrowserClampShort(
+    int value)
+{
+    if (value > SHRT_MAX) {
+	return SHRT_MAX;
+    }
+    if (value < SHRT_MIN) {
+	return SHRT_MIN;
+    }
+    return (short)value;
+}
+
 void
 BrowserClearRectangle(
     XRectangle *rectPtr)

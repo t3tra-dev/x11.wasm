@@ -489,6 +489,8 @@ void BrowserClampPointerToGrabConfine(
     int *rootYPtr);
 unsigned short BrowserClampUShort(
     unsigned int value);
+short BrowserClampShort(
+    int value);
 unsigned int BrowserClearAreaExtent(
     int origin,
     unsigned int requested,
