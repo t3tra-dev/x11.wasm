@@ -859,6 +859,50 @@ XInternAtom(
     return atomPtr->atom;
 }
 
+Status
+XInternAtoms(
+    Display *display,
+    char **names,
+    int count,
+    Bool onlyIfExists,
+    Atom *atomsReturn)
+{
+    int i;
+    Status status = True;
+
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    }
+    if (!BrowserValidateBool(&display, onlyIfExists,
+	    X11_WASM_XREQ_INTERN_ATOM)) {
+	return False;
+    }
+    if (!BrowserValueOrError(&display, count, count >= 0,
+	    X11_WASM_XREQ_INTERN_ATOM)) {
+	return False;
+    }
+    if (count == 0) {
+	return True;
+    }
+    if ((names == NULL) || (atomsReturn == NULL)) {
+	return False;
+    }
+    for (i = 0; i < count; i++) {
+	atomsReturn[i] = None;
+    }
+    for (i = 0; i < count; i++) {
+	if (names[i] == NULL) {
+	    status = False;
+	    continue;
+	}
+	atomsReturn[i] = XInternAtom(display, names[i], onlyIfExists);
+	if ((atomsReturn[i] == None) && !onlyIfExists) {
+	    status = False;
+	}
+    }
+    return status;
+}
+
 char *
 XGetAtomName(
     Display *display,
@@ -882,6 +926,48 @@ XGetAtomName(
     (void)BrowserReportXError(display, BadAtom, (XID)atom,
 	    X11_WASM_XREQ_GET_ATOM_NAME, 0);
     return NULL;
+}
+
+Status
+XGetAtomNames(
+    Display *display,
+    Atom *atoms,
+    int count,
+    char **namesReturn)
+{
+    int i;
+
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    }
+    if (!BrowserValueOrError(&display, count, count >= 0,
+	    X11_WASM_XREQ_GET_ATOM_NAME)) {
+	return False;
+    }
+    if (count == 0) {
+	return True;
+    }
+    if ((atoms == NULL) || (namesReturn == NULL)) {
+	return False;
+    }
+    for (i = 0; i < count; i++) {
+	namesReturn[i] = NULL;
+    }
+    for (i = 0; i < count; i++) {
+	namesReturn[i] = XGetAtomName(display, atoms[i]);
+	if (namesReturn[i] == NULL) {
+	    int j;
+
+	    for (j = 0; j < i; j++) {
+		if (namesReturn[j] != NULL) {
+		    XFree(namesReturn[j]);
+		    namesReturn[j] = NULL;
+		}
+	    }
+	    return False;
+	}
+    }
+    return True;
 }
 
 static char *

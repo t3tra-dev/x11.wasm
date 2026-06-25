@@ -462,6 +462,10 @@ EXTERN GC XCreateGC(Display *display, Drawable d, unsigned long valuemask,
 EXTERN int XFreeGC(Display *display, GC gc);
 EXTERN Atom XInternAtom(Display *display, _Xconst char *atom_name,
 	Bool only_if_exists);
+EXTERN Status XInternAtoms(Display *display, char **names, int count,
+	Bool only_if_exists, Atom *atoms_return);
+EXTERN Status XGetAtomNames(Display *display, Atom *atoms, int count,
+	char **names_return);
 EXTERN int XSetBackground(Display *display, GC gc, unsigned long foreground);
 EXTERN int XSetForeground(Display *display, GC gc, unsigned long foreground);
 EXTERN int XSetClipMask(Display *display, GC gc, Pixmap pixmap);

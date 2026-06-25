@@ -1321,6 +1321,11 @@ X11WasmTestXlibApis(void)
     Atom netWmStateAtom = None;
     Atom maxVertAtom = None;
     Atom maxHorzAtom = None;
+    char *batchAtomNames[3];
+    Atom batchAtoms[3];
+    char *batchAtomNameReturns[3];
+    Atom missingBatchAtom = None;
+    int atomNameIndex;
     int netWmStateAddResult = False;
     int netWmStateRemoveResult = False;
     char *fetchedName = NULL;
@@ -1531,6 +1536,8 @@ X11WasmTestXlibApis(void)
     memset(xyBitmapData, 0, sizeof(xyBitmapData));
     memset(iconSizes, 0, sizeof(iconSizes));
     memset(standardColormaps, 0, sizeof(standardColormaps));
+    memset(batchAtoms, 0, sizeof(batchAtoms));
+    memset(batchAtomNameReturns, 0, sizeof(batchAtomNameReturns));
     memset(&standardColormapReturn, 0, sizeof(standardColormapReturn));
     memset(&visualTemplate, 0, sizeof(visualTemplate));
     memset(&regionRect, 0, sizeof(regionRect));
@@ -4512,6 +4519,30 @@ X11WasmTestXlibApis(void)
     }
     XFree(fontAtomName);
     fontAtomName = NULL;
+    batchAtomNames[0] = "FONT_NAME";
+    batchAtomNames[1] = "_X11_WASM_BATCH_ATOM";
+    batchAtomNames[2] = "_X11_WASM_BATCH_ATOM_DOES_NOT_EXIST";
+    if ((XInternAtoms(&browserDisplay.display, batchAtomNames, 2, False,
+		    batchAtoms) != True)
+	    || (batchAtoms[0] != XA_FONT_NAME)
+	    || (batchAtoms[1] == None)
+	    || (XInternAtom(&browserDisplay.display, batchAtomNames[1], True)
+		    != batchAtoms[1])
+	    || (XInternAtoms(&browserDisplay.display, &batchAtomNames[2], 1,
+		    True, &missingBatchAtom) != True)
+	    || (missingBatchAtom != None)
+	    || (XGetAtomNames(&browserDisplay.display, batchAtoms, 2,
+		    batchAtomNameReturns) != True)
+	    || (batchAtomNameReturns[0] == NULL)
+	    || (strcmp(batchAtomNameReturns[0], "FONT_NAME") != 0)
+	    || (batchAtomNameReturns[1] == NULL)
+	    || (strcmp(batchAtomNameReturns[1], batchAtomNames[1]) != 0)) {
+	goto cleanup;
+    }
+    for (atomNameIndex = 0; atomNameIndex < 2; atomNameIndex++) {
+	XFree(batchAtomNameReturns[atomNameIndex]);
+	batchAtomNameReturns[atomNameIndex] = NULL;
+    }
     pixelSizeAtom = XInternAtom(&browserDisplay.display, "PIXEL_SIZE", False);
     queryFontStruct = XLoadQueryFont(&browserDisplay.display,
 	    "-browser-Helvetica-medium-r-normal--18-180-96-96-p-90-iso8859-1");
@@ -5048,6 +5079,11 @@ cleanup:
     if (fontAtomName != NULL) {
 	XFree(fontAtomName);
     }
+    for (atomNameIndex = 0; atomNameIndex < 3; atomNameIndex++) {
+	if (batchAtomNameReturns[atomNameIndex] != NULL) {
+	    XFree(batchAtomNameReturns[atomNameIndex]);
+	}
+    }
     if (fontLongPerCharLogical != NULL) {
 	ckfree(fontLongPerCharLogical);
     }
@@ -5355,6 +5391,7 @@ X11WasmTestXErrorHandler(void)
     int getNegativeOffsetResult;
     int getNegativeLengthResult;
     int getDeletePropertyResult;
+    int invalidAtomNamesResult;
     int sawGeometryBadDrawable;
     int sawWarpPointerBadValue;
     int sawClearAreaBadValue;
@@ -5413,6 +5450,7 @@ X11WasmTestXErrorHandler(void)
     unsigned long bytesAfter = 1;
     unsigned long largeLengthBytesAfter = 1;
     char *invalidAtomName = NULL;
+    char *invalidAtomNames[2];
     Window root = None;
     Window child = None;
     Window configureWindow = None;
@@ -5443,6 +5481,7 @@ X11WasmTestXErrorHandler(void)
     Atom validProperty;
     Atom validSelection;
     Atom invalidAtom = (Atom)0x7fffffedUL;
+    Atom invalidAtomList[2];
     Atom atomPropertyValue = XA_WM_NAME;
     unsigned long colorPixel = 0;
     unsigned long invalidGCMask = 1UL << 30;
@@ -5475,6 +5514,9 @@ X11WasmTestXErrorHandler(void)
     memset(points, 0, sizeof(points));
     memset(&segment, 0, sizeof(segment));
     memset(text16, 0, sizeof(text16));
+    memset(invalidAtomNames, 0, sizeof(invalidAtomNames));
+    invalidAtomList[0] = XA_WM_NAME;
+    invalidAtomList[1] = invalidAtom;
     event.type = KeyPress;
     invalidFormatPutImage.format = 99;
     depthMismatchPutImage.format = ZPixmap;
@@ -6174,6 +6216,8 @@ X11WasmTestXErrorHandler(void)
 	    browserDisplay.rootWindow, validProperty, 0, 1, 2,
 	    AnyPropertyType, NULL, NULL, NULL, NULL, NULL);
     invalidAtomName = XGetAtomName(&browserDisplay.display, invalidAtom);
+    invalidAtomNamesResult = XGetAtomNames(&browserDisplay.display,
+	    invalidAtomList, 2, invalidAtomNames);
     result = XQueryTree(&browserDisplay.display, invalidWindow, NULL, NULL,
 	    NULL, NULL);
     (void)XChangeProperty(&browserDisplay.display, invalidWindow, XA_WM_NAME,
@@ -6317,6 +6361,9 @@ X11WasmTestXErrorHandler(void)
 	    || (getNegativeLengthResult != BadValue)
 	    || (getDeletePropertyResult != BadValue)
 	    || (invalidAtomName != NULL)
+	    || (invalidAtomNamesResult != False)
+	    || (invalidAtomNames[0] != NULL)
+	    || (invalidAtomNames[1] != NULL)
 	    || !sawGeometryBadDrawable
 	    || !sawWarpPointerBadValue
 	    || !sawClearAreaBadValue
@@ -6528,6 +6575,7 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_GET_ATOM_NAME
+	    + X11_WASM_XREQ_GET_ATOM_NAME
 	    + X11_WASM_XREQ_QUERY_TREE
 	    + X11_WASM_XREQ_CHANGE_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
@@ -6581,15 +6629,15 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 212)
+    if ((browserTestXErrorCount != 213)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
 	    || (browserTestRequestCodeSum != expectedRequestCodeSum)
 	    || (browserTestRequestCodeMask != expectedRequestCodeMask)
-	    || (browserTestLastSerial != initialSerial + 212)
+	    || (browserTestLastSerial != initialSerial + 213)
 	    || (LastKnownRequestProcessed(&browserDisplay.display)
-		    != initialSerial + 212)) {
+		    != initialSerial + 213)) {
 	return 0;
     }
     return 1;
