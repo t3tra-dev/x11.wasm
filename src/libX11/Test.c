@@ -6564,9 +6564,9 @@ X11WasmTestXErrorHandler(void)
     int invalidQueryColorsResultSum;
     int invalidFreeColorsResult;
     int invalidFreeColorsListResultSum;
+    int validRootPixmapResultSum;
+    int rootPixmapErrorCount;
     int invalidWindowAttributeResultSum;
-    int sawSetRootParentRelativeBadMatch;
-    int sawChangeRootParentRelativeBadMatch;
     int configureValidationResultSum;
     int reconfigureValidResult;
     int reconfigureInvalidScreenResult;
@@ -6796,8 +6796,8 @@ X11WasmTestXErrorHandler(void)
     duplicateModifierMapResult = MappingFailed;
     sawModifierMapDuplicateBadValue = 0;
     sawStoreBufferBadValue = 0;
-    sawSetRootParentRelativeBadMatch = 0;
-    sawChangeRootParentRelativeBadMatch = 0;
+    validRootPixmapResultSum = Success;
+    rootPixmapErrorCount = 0;
     warpPointerZeroWidthX = -1;
     warpPointerZeroWidthY = -1;
     warpPointerZeroHeightX = -1;
@@ -7145,32 +7145,38 @@ X11WasmTestXErrorHandler(void)
 	    validColormap, NULL, -1, 0);
     invalidFreeColorsListResultSum += XFreeColors(&browserDisplay.display,
 	    validColormap, NULL, 1, 0);
+    rootPixmapErrorCount = browserTestXErrorCount;
+    validRootPixmapResultSum +=
+	    XSetWindowBackgroundPixmap(&browserDisplay.display,
+		    browserDisplay.rootWindow, (Pixmap)ParentRelative);
+    validRootPixmapResultSum +=
+	    XSetWindowBackgroundPixmap(&browserDisplay.display,
+		    browserDisplay.rootWindow, None);
+    attributes.background_pixmap = (Pixmap)ParentRelative;
+    validRootPixmapResultSum += XChangeWindowAttributes(
+	    &browserDisplay.display, browserDisplay.rootWindow, CWBackPixmap,
+	    &attributes);
+    attributes.background_pixmap = None;
+    validRootPixmapResultSum += XChangeWindowAttributes(
+	    &browserDisplay.display, browserDisplay.rootWindow, CWBackPixmap,
+	    &attributes);
+    validRootPixmapResultSum +=
+	    XSetWindowBorderPixmap(&browserDisplay.display,
+		    browserDisplay.rootWindow, (Pixmap)CopyFromParent);
+    attributes.border_pixmap = (Pixmap)CopyFromParent;
+    validRootPixmapResultSum += XChangeWindowAttributes(
+	    &browserDisplay.display, browserDisplay.rootWindow, CWBorderPixmap,
+	    &attributes);
+    rootPixmapErrorCount = browserTestXErrorCount - rootPixmapErrorCount;
     invalidWindowAttributeResultSum =
 	    XSetWindowBackgroundPixmap(&browserDisplay.display,
 		    browserDisplay.rootWindow, (Pixmap)invalidWindow);
     invalidWindowAttributeResultSum +=
 	    XSetWindowBackgroundPixmap(&browserDisplay.display,
 		    browserDisplay.rootWindow, depthOnePixmap);
-    invalidWindowAttributeResultSum +=
-	    XSetWindowBackgroundPixmap(&browserDisplay.display,
-		    browserDisplay.rootWindow, (Pixmap)ParentRelative);
-    sawSetRootParentRelativeBadMatch =
-	    (browserTestLastErrorCode == BadMatch)
-	    && (browserTestLastRequestCode
-		    == X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES)
-	    && (browserTestLastResourceId == browserDisplay.rootWindow);
     invalidWindowAttributeResultSum += XSetWindowColormap(
 	    &browserDisplay.display, browserDisplay.rootWindow,
 	    (Colormap)invalidWindow);
-    attributes.background_pixmap = (Pixmap)ParentRelative;
-    invalidWindowAttributeResultSum += XChangeWindowAttributes(
-	    &browserDisplay.display, browserDisplay.rootWindow, CWBackPixmap,
-	    &attributes);
-    sawChangeRootParentRelativeBadMatch =
-	    (browserTestLastErrorCode == BadMatch)
-	    && (browserTestLastRequestCode
-		    == X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES)
-	    && (browserTestLastResourceId == browserDisplay.rootWindow);
     attributes.cursor = (Cursor)invalidWindow;
     invalidWindowAttributeResultSum += XChangeWindowAttributes(
 	    &browserDisplay.display, browserDisplay.rootWindow, CWCursor,
@@ -7749,9 +7755,9 @@ X11WasmTestXErrorHandler(void)
 	    || (invalidQueryColorsResultSum != Success)
 	    || (invalidFreeColorsResult != Success)
 	    || (invalidFreeColorsListResultSum != Success)
+	    || (validRootPixmapResultSum != Success)
+	    || (rootPixmapErrorCount != 0)
 	    || (invalidWindowAttributeResultSum != Success)
-	    || !sawSetRootParentRelativeBadMatch
-	    || !sawChangeRootParentRelativeBadMatch
 	    || (configureValidationResultSum != Success)
 	    || (reconfigureValidResult != True)
 	    || (reconfigureInvalidScreenResult != False)
@@ -7951,15 +7957,13 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_FREE_COLORS
 	    + X11_WASM_XREQ_FREE_COLORS
 	    + X11_WASM_XREQ_FREE_COLORS
-		    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
-		    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
-		    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
-		    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
-		    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
-		    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
-		    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
-		    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
-		    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
+	    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
+	    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
+	    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
+	    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
+	    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
+	    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
+	    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
 	    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
 	    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
 	    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
@@ -8113,7 +8117,7 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 240)
+    if ((browserTestXErrorCount != 238)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)

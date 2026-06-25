@@ -572,7 +572,6 @@ BrowserResourceWantsEvent(
 int
 BrowserValidateWindowPixmapAttribute(
     Display **displayPtr,
-    Window window,
     unsigned int windowDepth,
     Pixmap pixmap,
     unsigned char requestCode,
@@ -581,14 +580,7 @@ BrowserValidateWindowPixmapAttribute(
     X11WasmResource *pixmapPtr;
 
     if (isBackground) {
-	if (pixmap == None) {
-	    return 1;
-	}
-	if (pixmap == (Pixmap)ParentRelative) {
-	    if (window == browserDisplay.rootWindow) {
-		return BrowserBadMatchOrError(displayPtr, (XID)window,
-			requestCode);
-	    }
+	if ((pixmap == None) || (pixmap == (Pixmap)ParentRelative)) {
 	    return 1;
 	}
     } else if (pixmap == (Pixmap)CopyFromParent) {
@@ -725,7 +717,6 @@ BrowserValidateWindowEventMask(
 int
 BrowserValidateWindowAttributeValues(
     Display **displayPtr,
-    Window window,
     unsigned int windowDepth,
     unsigned long mask,
     XSetWindowAttributes *atts,
@@ -741,14 +732,12 @@ BrowserValidateWindowAttributeValues(
 	return 1;
     }
     if ((mask & CWBackPixmap)
-	    && !BrowserValidateWindowPixmapAttribute(displayPtr, window,
-		    windowDepth,
+	    && !BrowserValidateWindowPixmapAttribute(displayPtr, windowDepth,
 		    atts->background_pixmap, requestCode, 1)) {
 	return 0;
     }
     if ((mask & CWBorderPixmap)
-	    && !BrowserValidateWindowPixmapAttribute(displayPtr, window,
-		    windowDepth,
+	    && !BrowserValidateWindowPixmapAttribute(displayPtr, windowDepth,
 		    atts->border_pixmap, requestCode, 0)) {
 	return 0;
     }

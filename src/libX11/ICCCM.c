@@ -2342,8 +2342,8 @@ int XSetWindowBackgroundPixmap(Display *display, Window window, Pixmap pixmap)
 		    X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES);
 	    return Success;
 	}
-	if (BrowserValidateWindowPixmapAttribute(&display, window,
-		resourcePtr->depth, pixmap,
+	if (BrowserValidateWindowPixmapAttribute(&display, resourcePtr->depth,
+		pixmap,
 		X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES, 1)) {
 	    resourcePtr->atts.background_pixmap = pixmap;
 	    resourcePtr->hasBackgroundPixel = 0;
@@ -2383,8 +2383,8 @@ int XSetWindowBorderPixmap(Display *display, Window window, Pixmap pixmap)
 		    X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES);
 	    return Success;
 	}
-	if (BrowserValidateWindowPixmapAttribute(&display, window,
-		resourcePtr->depth, pixmap,
+	if (BrowserValidateWindowPixmapAttribute(&display, resourcePtr->depth,
+		pixmap,
 		X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES, 0)) {
 	    resourcePtr->atts.border_pixmap = pixmap;
 	    resourcePtr->hasBorderPixel = 0;
@@ -2436,8 +2436,8 @@ int XChangeWindowAttributes(Display *display, Window window, unsigned long mask,
 	    X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES)) {
 	return Success;
     }
-    if (!BrowserValidateWindowAttributeValues(&display, window, r->depth, mask,
-	    atts, X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES)) {
+    if (!BrowserValidateWindowAttributeValues(&display, r->depth, mask, atts,
+	    X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES)) {
 	return Success;
     }
     if (mask & CWColormap) {
