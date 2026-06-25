@@ -1529,6 +1529,15 @@ X11WasmTestXlibApis(void)
     hostAddresses[1].family = FamilyInternet6;
     hostAddresses[1].length = (int)sizeof(hostAddressTwo);
     hostAddresses[1].address = (char *)hostAddressTwo;
+    XrmInitialize();
+    if ((strcmp(XDisplayName(NULL), "browser") != 0)
+	    || (strcmp(XDisplayName("custom:1"), "custom:1") != 0)
+	    || (strcmp(XDefaultString(), "") != 0)
+	    || (XResourceManagerString(&browserDisplay.display) != NULL)
+	    || (XGetDefault(&browserDisplay.display, "wish", "geometry")
+		    != NULL)) {
+	return 0;
+    }
     if ((XGetErrorText(&browserDisplay.display, BadWindow, buffer,
 	    (int)sizeof(buffer)) != Success)
 	    || (strcmp(buffer, "BadWindow") != 0)) {

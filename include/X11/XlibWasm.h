@@ -485,6 +485,12 @@ EXTERN int XPutImage(Display *d, Drawable dr, GC gc, XImage *im, int sx,
 	int sy, int dx, int dy, unsigned int w, unsigned int h);
 
 EXTERN Display *XOpenDisplay(_Xconst char *display_name);
+EXTERN char *XDisplayName(_Xconst char *display_name);
+EXTERN char *XGetDefault(Display *display, _Xconst char *program,
+	_Xconst char *option);
+EXTERN char *XResourceManagerString(Display *display);
+EXTERN const char *XDefaultString(void);
+EXTERN void XrmInitialize(void);
 EXTERN int XCloseDisplay(Display *display);
 EXTERN int XEventsQueued(Display *display, int mode);
 EXTERN int XDisplayKeycodes(Display *display, int *min_keycodes_return,

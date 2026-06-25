@@ -7,6 +7,45 @@ XOpenDisplay(
     return X11WasmGetDisplay(displayName);
 }
 
+char *
+XDisplayName(
+    _Xconst char *displayName)
+{
+    return (char *)((displayName != NULL && displayName[0] != '\0')
+	    ? displayName : "browser");
+}
+
+char *
+XGetDefault(
+    Display *display,
+    _Xconst char *program,
+    _Xconst char *option)
+{
+    (void)display;
+    (void)program;
+    (void)option;
+    return NULL;
+}
+
+char *
+XResourceManagerString(
+    Display *display)
+{
+    (void)display;
+    return NULL;
+}
+
+const char *
+XDefaultString(void)
+{
+    return "";
+}
+
+void
+XrmInitialize(void)
+{
+}
+
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestOpenDisplayNames(void)
 {
