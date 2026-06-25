@@ -109,6 +109,11 @@ XCreateWindow(
 		    X11_WASM_XREQ_CREATE_WINDOW)) {
 	return None;
     }
+    if ((windowClass == InputOutput)
+	    && !BrowserValidateInputOutputCreateWindow(&display, parentPtr,
+		    depth, visual, X11_WASM_XREQ_CREATE_WINDOW)) {
+	return None;
+    }
     windowDepth = (unsigned int)((depth == CopyFromParent)
 	    ? ((windowClass == InputOnly) ? 0U : parentPtr->depth)
 	    : depth);

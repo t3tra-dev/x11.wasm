@@ -1816,6 +1816,12 @@ int BrowserValidateInputOnlyCreateWindow(
     unsigned int borderWidth,
     unsigned long valueMask,
     unsigned char requestCode);
+int BrowserValidateInputOutputCreateWindow(
+    Display **displayPtr,
+    X11WasmResource *parentPtr,
+    int depth,
+    Visual *visual,
+    unsigned char requestCode);
 int BrowserValidatePolygonShape(
     Display **displayPtr,
     int shape,

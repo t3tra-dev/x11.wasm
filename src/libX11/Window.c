@@ -646,6 +646,43 @@ BrowserValidateInputOnlyCreateWindow(
 }
 
 int
+BrowserValidateInputOutputCreateWindow(
+    Display **displayPtr,
+    X11WasmResource *parentPtr,
+    int depth,
+    Visual *visual,
+    unsigned char requestCode)
+{
+    Display *display = (displayPtr != NULL) ? *displayPtr : NULL;
+    Visual *defaultVisual;
+    int defaultDepth;
+
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+	if (displayPtr != NULL) {
+	    *displayPtr = display;
+	}
+    }
+    if ((parentPtr == NULL) || (parentPtr->c_class != InputOutput)) {
+	return BrowserBadMatchOrError(displayPtr,
+		(parentPtr != NULL) ? (XID)parentPtr->id : None, requestCode);
+    }
+    defaultVisual = DefaultVisual(display, DefaultScreen(display));
+    defaultDepth = DefaultDepth(display, DefaultScreen(display));
+    if ((depth != CopyFromParent) && (depth != defaultDepth)) {
+	return BrowserBadMatchOrError(displayPtr, (XID)parentPtr->id,
+		requestCode);
+    }
+    if ((visual != (Visual *)CopyFromParent)
+	    && ((visual == NULL) || (defaultVisual == NULL)
+	    || (visual->visualid != defaultVisual->visualid))) {
+	return BrowserBadMatchOrError(displayPtr, (XID)parentPtr->id,
+		requestCode);
+    }
+    return 1;
+}
+
+int
 BrowserValidateInputOnlyChangeWindowAttributes(
     Display **displayPtr,
     X11WasmResource *resourcePtr,

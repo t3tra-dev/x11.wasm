@@ -4477,6 +4477,7 @@ X11WasmTestXErrorHandler(void)
     Window root = None;
     Window child = None;
     Window configureWindow = None;
+    Window inputOnlyParentWindow = None;
     int x = -1;
     int y = -1;
     unsigned int width = 1;
@@ -4508,6 +4509,9 @@ X11WasmTestXErrorHandler(void)
     unsigned long long expectedRequestCodeMask;
     Window invalidCreateSizeResult;
     Window invalidCreateSimpleWindowResult;
+    Window invalidCreateDepthWindowResult;
+    Window invalidCreateVisualWindowResult;
+    Window invalidCreateParentClassWindowResult;
 
     BrowserInitDisplay();
     memset(&changes, 0, sizeof(changes));
@@ -4768,12 +4772,28 @@ X11WasmTestXErrorHandler(void)
     invalidCreateSimpleWindowResult = XCreateSimpleWindow(
 	    &browserDisplay.display, browserDisplay.rootWindow, 0, 0, 1, 0,
 	    0, 0, 0);
-    invalidCreateColormapResult = XCreateColormap(&browserDisplay.display,
-	    invalidWindow, DefaultVisual(&browserDisplay.display,
-		    DefaultScreen(&browserDisplay.display)), AllocNone);
     mismatchedVisual = *DefaultVisual(&browserDisplay.display,
 	    DefaultScreen(&browserDisplay.display));
     mismatchedVisual.visualid++;
+    invalidCreateDepthWindowResult = XCreateWindow(&browserDisplay.display,
+	    browserDisplay.rootWindow, 0, 0, 1, 1, 0,
+	    DefaultDepth(&browserDisplay.display,
+		    DefaultScreen(&browserDisplay.display)) + 1,
+	    InputOutput, DefaultVisual(&browserDisplay.display,
+		    DefaultScreen(&browserDisplay.display)), 0, NULL);
+    invalidCreateVisualWindowResult = XCreateWindow(&browserDisplay.display,
+	    browserDisplay.rootWindow, 0, 0, 1, 1, 0, CopyFromParent,
+	    InputOutput, &mismatchedVisual, 0, NULL);
+    inputOnlyParentWindow = XCreateWindow(&browserDisplay.display,
+	    browserDisplay.rootWindow, 0, 0, 1, 1, 0, CopyFromParent,
+	    InputOnly, (Visual *)CopyFromParent, 0, NULL);
+    invalidCreateParentClassWindowResult = XCreateWindow(
+	    &browserDisplay.display, inputOnlyParentWindow, 0, 0, 1, 1, 0,
+	    CopyFromParent, InputOutput, DefaultVisual(&browserDisplay.display,
+		    DefaultScreen(&browserDisplay.display)), 0, NULL);
+    invalidCreateColormapResult = XCreateColormap(&browserDisplay.display,
+	    invalidWindow, DefaultVisual(&browserDisplay.display,
+		    DefaultScreen(&browserDisplay.display)), AllocNone);
     invalidVisualColormapResult = XCreateColormap(&browserDisplay.display,
 	    browserDisplay.rootWindow, &mismatchedVisual, AllocNone);
     invalidFreeColormapResult = XFreeColormap(&browserDisplay.display,
@@ -4941,6 +4961,9 @@ X11WasmTestXErrorHandler(void)
     (void)XForceScreenSaver(&browserDisplay.display, ScreenSaverActive + 1);
     if (configureWindow != None) {
 	(void)XDestroyWindow(&browserDisplay.display, configureWindow);
+    }
+    if (inputOnlyParentWindow != None) {
+	(void)XDestroyWindow(&browserDisplay.display, inputOnlyParentWindow);
     }
     if (validCursor != None) {
 	(void)XFreeCursor(&browserDisplay.display, validCursor);
@@ -5136,6 +5159,10 @@ X11WasmTestXErrorHandler(void)
 	    || (invalidCreateWindowResult != None)
 	    || (invalidCreateSizeResult != None)
 	    || (invalidCreateSimpleWindowResult != None)
+	    || (invalidCreateDepthWindowResult != None)
+	    || (invalidCreateVisualWindowResult != None)
+	    || (inputOnlyParentWindow == None)
+	    || (invalidCreateParentClassWindowResult != None)
 	    || (invalidCreateColormapResult != None)
 	    || (invalidVisualColormapResult != None)
 	    || (invalidFreeColormapResult != Success)
@@ -5266,6 +5293,9 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_CREATE_WINDOW
 	    + X11_WASM_XREQ_CREATE_WINDOW
 	    + X11_WASM_XREQ_CREATE_WINDOW
+	    + X11_WASM_XREQ_CREATE_WINDOW
+	    + X11_WASM_XREQ_CREATE_WINDOW
+	    + X11_WASM_XREQ_CREATE_WINDOW
 	    + X11_WASM_XREQ_CREATE_COLORMAP
 	    + X11_WASM_XREQ_CREATE_COLORMAP
 	    + X11_WASM_XREQ_FREE_COLORMAP
@@ -5390,15 +5420,15 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 168)
+    if ((browserTestXErrorCount != 171)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
 	    || (browserTestRequestCodeSum != expectedRequestCodeSum)
 	    || (browserTestRequestCodeMask != expectedRequestCodeMask)
-	    || (browserTestLastSerial != initialSerial + 168)
+	    || (browserTestLastSerial != initialSerial + 171)
 	    || (LastKnownRequestProcessed(&browserDisplay.display)
-		    != initialSerial + 168)) {
+		    != initialSerial + 171)) {
 	return 0;
     }
     return 1;
