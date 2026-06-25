@@ -1736,6 +1736,10 @@ int BrowserValidateConfigureWindowValues(
     unsigned int valueMask,
     XWindowChanges *changes,
     unsigned char requestCode);
+int BrowserValidateBool(
+    Display **displayPtr,
+    int value,
+    unsigned char requestCode);
 int BrowserValidateCoordMode(
     Display **displayPtr,
     int coordMode,

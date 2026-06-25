@@ -4419,8 +4419,10 @@ X11WasmTestXErrorHandler(void)
     int withdrawInvalidScreenResult;
     int focusValidationResultSum;
     int grabKeyboardModeResult;
+    int grabKeyboardOwnerEventsResult;
     int grabKeyboardWindowResult;
     int grabPointerModeResult;
+    int grabPointerOwnerEventsResult;
     int grabPointerEventMaskResult;
     int grabPointerWindowResult;
     int grabPointerConfineResult;
@@ -4967,12 +4969,18 @@ X11WasmTestXErrorHandler(void)
     grabKeyboardModeResult = XGrabKeyboard(&browserDisplay.display,
 	    browserDisplay.rootWindow, False, GrabModeAsync + 1,
 	    GrabModeAsync, CurrentTime);
+    grabKeyboardOwnerEventsResult = XGrabKeyboard(&browserDisplay.display,
+	    browserDisplay.rootWindow, 2, GrabModeAsync, GrabModeAsync,
+	    CurrentTime);
     grabKeyboardWindowResult = XGrabKeyboard(&browserDisplay.display,
 	    invalidWindow, False, GrabModeAsync, GrabModeAsync,
 	    CurrentTime);
     grabPointerModeResult = XGrabPointer(&browserDisplay.display,
 	    browserDisplay.rootWindow, False, 0, GrabModeAsync + 1,
 	    GrabModeAsync, None, None, CurrentTime);
+    grabPointerOwnerEventsResult = XGrabPointer(&browserDisplay.display,
+	    browserDisplay.rootWindow, 2, 0, GrabModeAsync, GrabModeAsync,
+	    None, None, CurrentTime);
     grabPointerEventMaskResult = XGrabPointer(&browserDisplay.display,
 	    browserDisplay.rootWindow, False, ExposureMask, GrabModeAsync,
 	    GrabModeAsync, None, None, CurrentTime);
@@ -5236,8 +5244,10 @@ X11WasmTestXErrorHandler(void)
 	    || (focusAfterValidation != focusBeforeValidation)
 	    || (revertAfterValidation != revertBeforeValidation)
 	    || (grabKeyboardModeResult != BadValue)
+	    || (grabKeyboardOwnerEventsResult != BadValue)
 	    || (grabKeyboardWindowResult != GrabNotViewable)
 	    || (grabPointerModeResult != BadValue)
+	    || (grabPointerOwnerEventsResult != BadValue)
 	    || (grabPointerEventMaskResult != BadValue)
 	    || (grabPointerWindowResult != GrabNotViewable)
 	    || (grabPointerConfineResult != GrabNotViewable)
@@ -5394,6 +5404,8 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_SET_INPUT_FOCUS
 	    + X11_WASM_XREQ_GRAB_KEYBOARD
 	    + X11_WASM_XREQ_GRAB_KEYBOARD
+	    + X11_WASM_XREQ_GRAB_KEYBOARD
+	    + X11_WASM_XREQ_GRAB_POINTER
 	    + X11_WASM_XREQ_GRAB_POINTER
 	    + X11_WASM_XREQ_GRAB_POINTER
 	    + X11_WASM_XREQ_GRAB_POINTER
@@ -5490,15 +5502,15 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 185)
+    if ((browserTestXErrorCount != 187)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
 	    || (browserTestRequestCodeSum != expectedRequestCodeSum)
 	    || (browserTestRequestCodeMask != expectedRequestCodeMask)
-	    || (browserTestLastSerial != initialSerial + 185)
+	    || (browserTestLastSerial != initialSerial + 187)
 	    || (LastKnownRequestProcessed(&browserDisplay.display)
-		    != initialSerial + 185)) {
+		    != initialSerial + 187)) {
 	return 0;
     }
     return 1;

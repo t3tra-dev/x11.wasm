@@ -429,6 +429,10 @@ XGrabKeyboard(
 		X11_WASM_XREQ_GRAB_KEYBOARD, 0);
 	return BadValue;
     }
+    if (!BrowserValidateBool(&display, ownerEvents,
+	    X11_WASM_XREQ_GRAB_KEYBOARD)) {
+	return BadValue;
+    }
     resourcePtr = BrowserWindowResourceOrError(&display, window,
 	    X11_WASM_XREQ_GRAB_KEYBOARD);
     if (resourcePtr == NULL) {
@@ -479,6 +483,10 @@ XGrabPointer(
 		(XID)(!BrowserGrabModeIsValid(pointerMode)
 			? pointerMode : keyboardMode),
 		X11_WASM_XREQ_GRAB_POINTER, 0);
+	return BadValue;
+    }
+    if (!BrowserValidateBool(&display, ownerEvents,
+	    X11_WASM_XREQ_GRAB_POINTER)) {
 	return BadValue;
     }
     if (!BrowserPointerGrabEventMaskIsValid(eventMask)) {

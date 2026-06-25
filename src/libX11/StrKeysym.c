@@ -898,13 +898,22 @@ BrowserValidatePolygonShape(
 }
 
 int
-BrowserValidateGCBool(
+BrowserValidateBool(
     Display **displayPtr,
     int value,
     unsigned char requestCode)
 {
     return BrowserValueOrError(displayPtr, value,
 	    (value == False) || (value == True), requestCode);
+}
+
+int
+BrowserValidateGCBool(
+    Display **displayPtr,
+    int value,
+    unsigned char requestCode)
+{
+    return BrowserValidateBool(displayPtr, value, requestCode);
 }
 
 int
