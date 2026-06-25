@@ -1583,6 +1583,12 @@ X11WasmTestXlibApis(void)
 	    || !XEqualRegion(NULL, regionC)) {
 	goto cleanup;
     }
+    BrowserSetRectangleBounds(&regionRect, (int)SHRT_MAX + 1,
+	    (int)SHRT_MIN - 1, (int)SHRT_MAX + 4, (int)SHRT_MIN + 3);
+    if ((regionRect.x != SHRT_MAX) || (regionRect.y != SHRT_MIN)
+	    || (regionRect.width != 3) || (regionRect.height != 4)) {
+	goto cleanup;
+    }
     BrowserSetRectangleBounds(&regionRect, 2, 3, 12, 11);
     (void)XUnionRectWithRegion(&regionRect, regionA, regionA);
     if (XEmptyRegion(regionA)

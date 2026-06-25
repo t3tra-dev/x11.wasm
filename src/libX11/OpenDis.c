@@ -383,8 +383,8 @@ BrowserSetRectangleBounds(
 	BrowserClearRectangle(rectPtr);
 	return;
     }
-    rectPtr->x = (short)left;
-    rectPtr->y = (short)top;
+    rectPtr->x = BrowserClampShort(left);
+    rectPtr->y = BrowserClampShort(top);
     rectPtr->width = BrowserClampUShort((unsigned int)(right - left));
     rectPtr->height = BrowserClampUShort((unsigned int)(bottom - top));
 }
