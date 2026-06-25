@@ -1122,6 +1122,8 @@ XSetDashes(
     int n)
 {
     if ((BrowserGCOrError(&display, gc, X11_WASM_XREQ_SET_DASHES) != NULL)
+	    && BrowserValidateCard16(&display, (long)dashOffset, 1,
+		    X11_WASM_XREQ_SET_DASHES)
 	    && BrowserValidateGCDashList(&display, dashList, n,
 		    X11_WASM_XREQ_SET_DASHES)) {
 	gc->dash_offset = dashOffset;

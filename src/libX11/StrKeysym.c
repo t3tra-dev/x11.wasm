@@ -1052,6 +1052,11 @@ BrowserValidateGCValueEnums(
 		    requestCode)) {
 	return 0;
     }
+    if ((mask & GCDashOffset)
+	    && !BrowserValidateCard16(displayPtr, values->dash_offset, 1,
+		    requestCode)) {
+	return 0;
+    }
     if ((mask & GCArcMode)
 	    && !BrowserValidateGCArcMode(displayPtr, values->arc_mode,
 		    requestCode)) {

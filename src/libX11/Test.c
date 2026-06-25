@@ -4800,6 +4800,9 @@ X11WasmTestXErrorHandler(void)
     gcValues.graphics_exposures = 2;
     gcReferenceResultSum += XChangeGC(&browserDisplay.display, referenceGC,
 	    GCGraphicsExposures, &gcValues);
+    gcValues.dash_offset = -1;
+    gcReferenceResultSum += XChangeGC(&browserDisplay.display, referenceGC,
+	    GCDashOffset, &gcValues);
     gcValues.dashes = 0;
     gcReferenceResultSum += XChangeGC(&browserDisplay.display, referenceGC,
 	    GCDashList, &gcValues);
@@ -4816,6 +4819,8 @@ X11WasmTestXErrorHandler(void)
 	    JoinMiter);
     gcReferenceResultSum += XSetLineAttributes(&browserDisplay.display,
 	    referenceGC, 1, LineDoubleDash + 1, CapButt, JoinMiter);
+    gcReferenceResultSum += XSetDashes(&browserDisplay.display, referenceGC,
+	    (int)USHRT_MAX + 1, "\1", 1);
     gcReferenceResultSum += XSetDashes(&browserDisplay.display, referenceGC,
 	    0, NULL, 0);
     gcReferenceResultSum += XSetDashes(&browserDisplay.display, referenceGC,
@@ -5489,6 +5494,8 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_CHANGE_GC
 	    + X11_WASM_XREQ_CHANGE_GC
 	    + X11_WASM_XREQ_CHANGE_GC
+	    + X11_WASM_XREQ_CHANGE_GC
+	    + X11_WASM_XREQ_SET_DASHES
 	    + X11_WASM_XREQ_SET_DASHES
 	    + X11_WASM_XREQ_SET_DASHES
 	    + X11_WASM_XREQ_SET_CLIP_RECTANGLES
@@ -5657,15 +5664,15 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 210)
+    if ((browserTestXErrorCount != 212)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
 	    || (browserTestRequestCodeSum != expectedRequestCodeSum)
 	    || (browserTestRequestCodeMask != expectedRequestCodeMask)
-	    || (browserTestLastSerial != initialSerial + 210)
+	    || (browserTestLastSerial != initialSerial + 212)
 	    || (LastKnownRequestProcessed(&browserDisplay.display)
-		    != initialSerial + 210)) {
+		    != initialSerial + 212)) {
 	return 0;
     }
     return 1;
