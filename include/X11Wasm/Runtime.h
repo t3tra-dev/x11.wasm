@@ -17,20 +17,14 @@ typedef int (*XAfterFunction)(Display *display);
 #endif
 #include <X11/Xutil.h>
 
+#include <X11Wasm/Events.h>
+
 #ifndef MODULE_SCOPE
 #define MODULE_SCOPE extern
 #endif
 
 #ifndef X11_WASM_INTEGER_SPACE
 #define X11_WASM_INTEGER_SPACE 24
-#endif
-
-#ifndef MouseWheelEvent
-#define MouseWheelEvent (MappingNotify + 1)
-#endif
-
-#ifndef MouseWheelMask
-#define MouseWheelMask (1L << 28)
 #endif
 
 typedef struct X11WasmEncoding_ *X11WasmEncoding;

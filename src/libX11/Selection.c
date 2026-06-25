@@ -449,8 +449,8 @@ BrowserEventMask(
     case FocusIn:
     case FocusOut:
 	return FocusChangeMask;
-    case MouseWheelEvent:
-	return MouseWheelMask;
+    case X11_WASM_BROWSER_WHEEL_EVENT:
+	return X11_WASM_BROWSER_WHEEL_MASK;
     case KeymapNotify:
 	return KeymapStateMask;
     case Expose:

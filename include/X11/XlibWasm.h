@@ -11,6 +11,8 @@
 #include <X11/Xutil.h>
 #undef X11WASM_XLIBWASM_INCLUDES_XUTIL
 
+#include <X11Wasm/Events.h>
+
 #ifndef EXTERN
 #define EXTERN extern
 #endif

@@ -135,6 +135,37 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestWheelEventConstants(void)
+{
+    XEvent event;
+    int internal = 0;
+
+    BrowserInitDisplay();
+    BrowserClearEventQueue();
+    if ((X11_WASM_BROWSER_WHEEL_EVENT != (MappingNotify + 1))
+	    || (MouseWheelEvent != X11_WASM_BROWSER_WHEEL_EVENT)
+	    || (MouseWheelMask != X11_WASM_BROWSER_WHEEL_MASK)) {
+	return 10;
+    }
+    if (!X11WasmQueueWheelEvent((unsigned int)browserDisplay.rootWindow, 120,
+	    0, 12, 14, CurrentTime)) {
+	return 11;
+    }
+    if (!BrowserPopEvent(&event, &internal)) {
+	return 12;
+    }
+    BrowserClearEventQueue();
+    if ((event.type != X11_WASM_BROWSER_WHEEL_EVENT) || !internal
+	    || (event.xbutton.window != browserDisplay.rootWindow)
+	    || (event.xbutton.button != 120U)
+	    || (event.xbutton.x_root != 12)
+	    || (event.xbutton.y_root != 14)) {
+	return 13;
+    }
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestXlibApis(void)
 {
     char buffer[64];

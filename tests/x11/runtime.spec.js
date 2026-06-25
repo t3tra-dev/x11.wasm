@@ -90,6 +90,25 @@ test("browser harness reaches a terminal startup state", async ({ page }) => {
   expect(backendState.flushScheduled).toBe(false);
 });
 
+test("browser wheel events use the exported x11.wasm event constant", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestWheelEventConstants?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestWheelEventConstants) {
+      throw new Error("missing wheel event constant test hook");
+    }
+    return module._X11WasmTestWheelEventConstants();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("X11 keyboard mapping APIs resolve ASCII key events", async ({ page }) => {
   await waitForX11Runtime(page);
 

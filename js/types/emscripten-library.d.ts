@@ -483,6 +483,7 @@ declare const Module: {
   ) => number;
   _XListExtensions?: (display: number, nextensionsReturn: number) => number;
   _X11WasmTestUnixEventFileHandlers?: () => number;
+  _X11WasmTestWheelEventConstants?: () => number;
   _X11WasmTestXlibApis?: () => number;
   _X11WasmTestXSendEventTargets?: (
     focusWindow: number,

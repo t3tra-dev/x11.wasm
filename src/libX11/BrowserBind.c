@@ -382,7 +382,8 @@ X11WasmQueueWheelEvent(
     target = BrowserResolvePointerEventWindow((Window)window, &x, &y);
     BrowserUpdatePointerState(target, rootX, rootY, state);
 
-    BrowserSetCommonEventFields(&event, MouseWheelEvent, target, (Time)time);
+    BrowserSetCommonEventFields(&event, X11_WASM_BROWSER_WHEEL_EVENT, target,
+	    (Time)time);
     event.xbutton.root = browserDisplay.rootWindow;
     event.xbutton.subwindow = None;
     event.xbutton.time = eventTime;

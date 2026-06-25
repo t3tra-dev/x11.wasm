@@ -379,6 +379,13 @@ int X11WasmQueuePointerEvent(
     int x,
     int y,
     unsigned int time);
+int X11WasmQueueWheelEvent(
+    unsigned int window,
+    int delta,
+    unsigned int state,
+    int x,
+    int y,
+    unsigned int time);
 void BrowserAppendPolygonSpan(
     XRectangle **rectsPtr,
     int *countPtr,
