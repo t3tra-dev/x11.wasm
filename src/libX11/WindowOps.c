@@ -992,6 +992,36 @@ XImageByteOrder(
     return (display != NULL) ? ImageByteOrder(display) : 0;
 }
 
+long
+XMaxRequestSize(
+    Display *display)
+{
+    display = BrowserAccessorDisplay(display);
+    return (display != NULL) ? (long)display->max_request_size : 0L;
+}
+
+long
+XExtendedMaxRequestSize(
+    Display *display)
+{
+    (void)display;
+    return 0L;
+}
+
+unsigned long
+XDisplayMotionBufferSize(
+    Display *display)
+{
+    display = BrowserAccessorDisplay(display);
+    return (display != NULL) ? display->motion_buffer : 0UL;
+}
+
+unsigned long
+XAllPlanes(void)
+{
+    return AllPlanes;
+}
+
 unsigned long
 XNextRequest(
     Display *display)
@@ -1157,6 +1187,60 @@ XEventMaskOfScreen(
     return (screen != NULL) ? EventMaskOfScreen(screen) : 0L;
 }
 
+int
+XScreenNumberOfScreen(
+    Screen *screen)
+{
+    Display *display;
+    int i;
+
+    if (screen == NULL) {
+	return -1;
+    }
+    display = DisplayOfScreen(screen);
+    if (display == NULL) {
+	return -1;
+    }
+    for (i = 0; i < ScreenCount(display); i++) {
+	if (ScreenOfDisplay(display, i) == screen) {
+	    return i;
+	}
+    }
+    return -1;
+}
+
+Status
+XInitThreads(void)
+{
+    return True;
+}
+
+Status
+XFreeThreads(void)
+{
+    return True;
+}
+
+void
+XLockDisplay(
+    Display *display)
+{
+    (void)display;
+}
+
+void
+XUnlockDisplay(
+    Display *display)
+{
+    (void)display;
+}
+
+Bool
+XSupportsLocale(void)
+{
+    return True;
+}
+
 Pixmap
 XCreatePixmap(
     Display *display,
@@ -1311,6 +1395,15 @@ XFreeGC(
     BrowserDeleteGCDashes(gc);
     ckfree(gc);
     return Success;
+}
+
+void
+XFlushGC(
+    Display *display,
+    GC gc)
+{
+    (void)display;
+    (void)gc;
 }
 
 int

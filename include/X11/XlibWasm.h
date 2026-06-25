@@ -83,6 +83,10 @@ EXTERN int XBitmapUnit(Display *d);
 EXTERN int XBitmapBitOrder(Display *d);
 EXTERN int XBitmapPad(Display *d);
 EXTERN int XImageByteOrder(Display *d);
+EXTERN long XMaxRequestSize(Display *d);
+EXTERN long XExtendedMaxRequestSize(Display *d);
+EXTERN unsigned long XDisplayMotionBufferSize(Display *d);
+EXTERN unsigned long XAllPlanes(void);
 EXTERN unsigned long XNextRequest(Display *d);
 EXTERN unsigned long XLastKnownRequestProcessed(Display *d);
 EXTERN Screen *XScreenOfDisplay(Display *d, int i);
@@ -106,6 +110,12 @@ EXTERN int XMaxCmapsOfScreen(Screen *s);
 EXTERN Bool XDoesSaveUnders(Screen *s);
 EXTERN int XDoesBackingStore(Screen *s);
 EXTERN long XEventMaskOfScreen(Screen *s);
+EXTERN int XScreenNumberOfScreen(Screen *s);
+EXTERN Status XInitThreads(void);
+EXTERN Status XFreeThreads(void);
+EXTERN void XLockDisplay(Display *d);
+EXTERN void XUnlockDisplay(Display *d);
+EXTERN Bool XSupportsLocale(void);
 EXTERN XErrorHandler XSetErrorHandler(XErrorHandler x);
 EXTERN XIOErrorHandler XSetIOErrorHandler(XIOErrorHandler x);
 EXTERN Status XIconifyWindow(Display *d, Window w, int i);
@@ -460,6 +470,7 @@ EXTERN Status XParseColor(Display *display, Colormap map, _Xconst char *spec,
 EXTERN GC XCreateGC(Display *display, Drawable d, unsigned long valuemask,
 	XGCValues *values);
 EXTERN int XFreeGC(Display *display, GC gc);
+EXTERN void XFlushGC(Display *display, GC gc);
 EXTERN Atom XInternAtom(Display *display, _Xconst char *atom_name,
 	Bool only_if_exists);
 EXTERN Status XInternAtoms(Display *display, char **names, int count,

@@ -128,6 +128,7 @@ BrowserInitDisplay(void)
     state->display.bitmap_bit_order = LSBFirst;
     state->display.nformats = 2;
     state->display.pixmap_format = state->pixmapFormats;
+    state->display.max_request_size = 65535U;
     state->display.release = 1;
     state->display.display_name = (char *)"browser";
     state->display.default_screen = 0;

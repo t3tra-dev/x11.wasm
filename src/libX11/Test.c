@@ -1631,6 +1631,12 @@ X11WasmTestXlibApis(void)
 		    != BitmapPad(&browserDisplay.display))
 	    || (XImageByteOrder(&browserDisplay.display)
 		    != ImageByteOrder(&browserDisplay.display))
+	    || (browserDisplay.display.max_request_size != 65535U)
+	    || (XMaxRequestSize(&browserDisplay.display) != 65535L)
+	    || (XMaxRequestSize(NULL) != 65535L)
+	    || (XExtendedMaxRequestSize(&browserDisplay.display) != 0L)
+	    || (XDisplayMotionBufferSize(&browserDisplay.display) != 0UL)
+	    || (XAllPlanes() != AllPlanes)
 	    || (XNextRequest(&browserDisplay.display)
 		    != NextRequest(&browserDisplay.display))
 	    || (XLastKnownRequestProcessed(&browserDisplay.display)
@@ -1676,7 +1682,8 @@ X11WasmTestXlibApis(void)
 	    || (XDoesBackingStore(displayScreen)
 		    != DoesBackingStore(displayScreen))
 	    || (XEventMaskOfScreen(displayScreen)
-		    != EventMaskOfScreen(displayScreen))) {
+		    != EventMaskOfScreen(displayScreen))
+	    || (XScreenNumberOfScreen(displayScreen) != screen)) {
 	return 0;
     }
     if ((XRootWindow(&browserDisplay.display, -1) != None)
@@ -1701,7 +1708,19 @@ X11WasmTestXlibApis(void)
 	    || (XCellsOfScreen(NULL) != 0)
 	    || (XDoesSaveUnders(NULL) != False)
 	    || (XDoesBackingStore(NULL) != NotUseful)
-	    || (XEventMaskOfScreen(NULL) != 0L)) {
+	    || (XEventMaskOfScreen(NULL) != 0L)
+	    || (XScreenNumberOfScreen(NULL) != -1)) {
+	return 0;
+    }
+    XFlushGC(&browserDisplay.display,
+	    DefaultGC(&browserDisplay.display, screen));
+    XFlushGC(NULL, NULL);
+    XLockDisplay(&browserDisplay.display);
+    XUnlockDisplay(&browserDisplay.display);
+    XLockDisplay(NULL);
+    XUnlockDisplay(NULL);
+    if ((XInitThreads() != True) || (XFreeThreads() != True)
+	    || (XSupportsLocale() != True)) {
 	return 0;
     }
     if (LastKnownRequestProcessed(&browserDisplay.display) != accessorSerial) {
