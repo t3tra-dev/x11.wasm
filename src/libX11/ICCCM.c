@@ -1439,6 +1439,7 @@ XChangeProperty(
 {
     X11WasmResource *resourcePtr;
     X11WasmProperty *propertyPtr;
+    int propertyBytes;
     int changed;
 
     resourcePtr = BrowserWindowResourceOrError(&display, window,
@@ -1457,12 +1458,21 @@ XChangeProperty(
 		X11_WASM_XREQ_CHANGE_PROPERTY);
 	return Success;
     }
+    propertyBytes = BrowserPropertyByteLength(format, nelements);
+    if (propertyBytes < 0) {
+	if (display == NULL) {
+	    display = X11WasmGetDisplay(NULL);
+	}
+	(void)BrowserReportXError(display, BadLength, (XID)nelements,
+		X11_WASM_XREQ_CHANGE_PROPERTY, 0);
+	return Success;
+    }
     propertyPtr = BrowserFindProperty(resourcePtr, property);
     if (!BrowserPropertyChangeOrError(&display, propertyPtr, property, type,
 	    format, mode, X11_WASM_XREQ_CHANGE_PROPERTY)) {
 	return Success;
     }
-    if ((BrowserPropertyByteLength(format, nelements) > 0) && (data == NULL)) {
+    if ((propertyBytes > 0) && (data == NULL)) {
 	(void)BrowserPropertyValueOrError(&display, (XID)nelements,
 		X11_WASM_XREQ_CHANGE_PROPERTY);
 	return Success;

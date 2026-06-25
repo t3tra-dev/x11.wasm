@@ -5121,6 +5121,9 @@ X11WasmTestXErrorHandler(void)
 	    browserDisplay.rootWindow, validProperty, XA_STRING, 8, 99,
 	    value, 1);
     propertyValidationResultSum += XChangeProperty(&browserDisplay.display,
+	    browserDisplay.rootWindow, validProperty, XA_STRING, 32,
+	    PropModeReplace, value, INT_MAX);
+    propertyValidationResultSum += XChangeProperty(&browserDisplay.display,
 	    browserDisplay.rootWindow, validProperty, XA_STRING, 8,
 	    PropModeReplace, value, 1);
     propertyValidationResultSum += XChangeProperty(&browserDisplay.display,
@@ -5494,6 +5497,7 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_CHANGE_PROPERTY
 	    + X11_WASM_XREQ_CHANGE_PROPERTY
 	    + X11_WASM_XREQ_CHANGE_PROPERTY
+	    + X11_WASM_XREQ_CHANGE_PROPERTY
 	    + X11_WASM_XREQ_DELETE_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
@@ -5553,15 +5557,15 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 191)
+    if ((browserTestXErrorCount != 192)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
 	    || (browserTestRequestCodeSum != expectedRequestCodeSum)
 	    || (browserTestRequestCodeMask != expectedRequestCodeMask)
-	    || (browserTestLastSerial != initialSerial + 191)
+	    || (browserTestLastSerial != initialSerial + 192)
 	    || (LastKnownRequestProcessed(&browserDisplay.display)
-		    != initialSerial + 191)) {
+		    != initialSerial + 192)) {
 	return 0;
     }
     return 1;

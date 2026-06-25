@@ -129,6 +129,9 @@ BrowserPropertyByteLength(
     if ((elementBytes == 0) || (nelements <= 0)) {
 	return 0;
     }
+    if (nelements > (INT_MAX / elementBytes)) {
+	return -1;
+    }
     return elementBytes * nelements;
 }
 
@@ -281,6 +284,7 @@ BrowserSetProperty(
 
     if ((resourcePtr == NULL) || (atom == None)
 	    || (BrowserPropertyElementBytes(format) == 0) || (nelements < 0)
+	    || (newLength < 0)
 	    || ((mode != PropModeReplace) && (mode != PropModePrepend)
 		&& (mode != PropModeAppend))) {
 	return 0;
@@ -299,6 +303,9 @@ BrowserSetProperty(
     }
 
     oldLength = (mode == PropModeReplace) ? 0 : propertyPtr->dataLength;
+    if (oldLength > (INT_MAX - newLength)) {
+	return 0;
+    }
     newData = (unsigned char *)ckalloc((size_t)oldLength + (size_t)newLength + 1U);
     if (mode == PropModePrepend) {
 	if (newLength > 0) {
