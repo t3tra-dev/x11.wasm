@@ -42,7 +42,7 @@ BrowserResizeRoot(
     state->rootResource.height = height;
 
     if (queueEvents) {
-	(void)BrowserQueueConfigureNotify(&state->rootResource);
+	(void)BrowserQueueConfigureNotify(&state->rootResource, None);
 	(void)BrowserQueueExpose(&state->rootResource, 0, 0, width, height);
     }
     BrowserApplyChildWinGravity(&state->rootResource, oldWidth, oldHeight);

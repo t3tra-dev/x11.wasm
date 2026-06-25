@@ -1318,7 +1318,8 @@ BrowserQueueDestroyNotify(
 
 int
 BrowserQueueConfigureNotify(
-    X11WasmResource *resourcePtr)
+    X11WasmResource *resourcePtr,
+    Window above)
 {
     XEvent event;
 
@@ -1336,7 +1337,7 @@ BrowserQueueConfigureNotify(
     event.xconfigure.width = (int)resourcePtr->width;
     event.xconfigure.height = (int)resourcePtr->height;
     event.xconfigure.border_width = (int)resourcePtr->borderWidth;
-    event.xconfigure.above = None;
+    event.xconfigure.above = above;
     event.xconfigure.override_redirect = resourcePtr->atts.override_redirect;
     return BrowserQueueEvent(&event);
 }

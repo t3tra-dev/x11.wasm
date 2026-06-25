@@ -344,6 +344,24 @@ cleanup:
     return result;
 }
 
+static int
+BrowserTestPopConfigureEvent(
+    Window window,
+    Window above)
+{
+    XEvent event;
+
+    memset(&event, 0, sizeof(event));
+    if (!BrowserPopEvent(&event, NULL)
+	    || (event.type != ConfigureNotify)
+	    || (event.xconfigure.event != window)
+	    || (event.xconfigure.window != window)
+	    || (event.xconfigure.above != above)) {
+	return 0;
+    }
+    return 1;
+}
+
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestConfigureStackingApis(void)
 {
@@ -406,6 +424,9 @@ X11WasmTestConfigureStackingApis(void)
 	    != Success) {
 	goto cleanup;
     }
+    if (!BrowserTestPopConfigureEvent(bottom, None)) {
+	goto cleanup;
+    }
     if (!BrowserTestQueryTreeOrder(display, parent, expected, 4)) {
 	goto cleanup;
     }
@@ -414,6 +435,9 @@ X11WasmTestConfigureStackingApis(void)
     changes.stack_mode = TopIf;
     if (XConfigureWindow(display, bottom, CWSibling | CWStackMode, &changes)
 	    != Success) {
+	goto cleanup;
+    }
+    if (!BrowserTestPopConfigureEvent(bottom, middle)) {
 	goto cleanup;
     }
     expected[0] = middle;
@@ -430,6 +454,9 @@ X11WasmTestConfigureStackingApis(void)
 	    != Success) {
 	goto cleanup;
     }
+    if (!BrowserTestPopConfigureEvent(bottom, None)) {
+	goto cleanup;
+    }
     expected[0] = bottom;
     expected[1] = middle;
     expected[2] = top;
@@ -443,11 +470,17 @@ X11WasmTestConfigureStackingApis(void)
     if (XConfigureWindow(display, far, CWStackMode, &changes) != Success) {
 	goto cleanup;
     }
+    if (!BrowserTestPopConfigureEvent(far, top)) {
+	goto cleanup;
+    }
     if (!BrowserTestQueryTreeOrder(display, parent, expected, 4)) {
 	goto cleanup;
     }
 
     if (XConfigureWindow(display, bottom, CWStackMode, &changes) != Success) {
+	goto cleanup;
+    }
+    if (!BrowserTestPopConfigureEvent(bottom, far)) {
 	goto cleanup;
     }
     expected[0] = middle;

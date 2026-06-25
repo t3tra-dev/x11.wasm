@@ -350,6 +350,7 @@ XConfigureWindow(
     int sizeChanged;
     unsigned int oldWidth;
     unsigned int oldHeight;
+    Window above = None;
 
     if (resourcePtr == NULL) {
 	return Success;
@@ -376,11 +377,14 @@ XConfigureWindow(
     }
     if (valueMask & (CWSibling | CWStackMode)) {
 	BrowserRestackWindow(resourcePtr, valueMask, changes);
+	if (resourcePtr->prevSiblingPtr != NULL) {
+	    above = (Window)resourcePtr->prevSiblingPtr->id;
+	}
     }
     (void)X11WasmJsConfigureWindow(BrowserJsXId(window), resourcePtr->x,
 	    resourcePtr->y, resourcePtr->width, resourcePtr->height,
 	    resourcePtr->borderWidth, valueMask);
-    (void)BrowserQueueConfigureNotify(resourcePtr);
+    (void)BrowserQueueConfigureNotify(resourcePtr, above);
     if (sizeChanged) {
 	BrowserApplyChildWinGravity(resourcePtr, oldWidth, oldHeight);
     }

@@ -1162,7 +1162,8 @@ int BrowserQueueColormapNotify(
     Bool isNew,
     int state);
 int BrowserQueueConfigureNotify(
-    X11WasmResource *resourcePtr);
+    X11WasmResource *resourcePtr,
+    Window above);
 int BrowserQueueCopyExposureEvents(
     X11WasmResource *sourcePtr,
     X11WasmResource *targetPtr,
