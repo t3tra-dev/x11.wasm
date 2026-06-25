@@ -54,6 +54,7 @@ typedef struct X11WasmResource {
     int hasCursorImage;
     char *fontFamily;
     int fontPixelSize;
+    int fontPointSize;
     X11WasmProperty *propertyList;
     X11WasmColorEntry *colorList;
     Window metadataTarget;

@@ -884,29 +884,35 @@ XGetAtomName(
     return NULL;
 }
 
-Font
-XLoadFont(
-    Display *display,
-    _Xconst char *name)
+static char *
+BrowserFontXLFDForFamily(
+    const char *family,
+    int pixelSize)
 {
-    X11WasmResource *resourcePtr;
+    char buffer[256];
 
-    resourcePtr = X11WasmCreateResource(display, X11_WASM_RESOURCE_FONT);
-    resourcePtr->fontFamily = BrowserFontFamilyFromName(name);
-    resourcePtr->fontPixelSize = BrowserFontPixelSize(name);
-    return (Font)resourcePtr->id;
+    if ((family == NULL) || (family[0] == '\0')) {
+	family = "fixed";
+    }
+    if (pixelSize <= 0) {
+	pixelSize = 14;
+    }
+    snprintf(buffer, sizeof(buffer),
+	    "-browser-%.80s-medium-r-normal--%d-0-0-0-p-0-iso8859-1",
+	    family, pixelSize);
+    return BrowserDupString(buffer);
 }
 
-XFontStruct *
-XLoadQueryFont(
+static XFontStruct *
+BrowserAllocFontStruct(
     Display *display,
-    _Xconst char *name)
+    Font fid,
+    const char *fontName,
+    const char *familyName,
+    int pixelSize,
+    int pointSize)
 {
     XFontStruct *fontPtr = (XFontStruct *)ckalloc(sizeof(XFontStruct));
-    char *fontName = BrowserFontXLFD(name, 0);
-    char *familyName = BrowserFontFamilyFromName(fontName);
-    int pixelSize = BrowserFontPixelSize(name);
-    int pointSize = BrowserFontPointSize(name, pixelSize);
     int charWidth;
     int ascent;
     int descent;
@@ -914,7 +920,7 @@ XLoadQueryFont(
 
     BrowserFontMetricsForPixelSize(pixelSize, &charWidth, &ascent, &descent);
     memset(fontPtr, 0, sizeof(XFontStruct));
-    fontPtr->fid = XLoadFont(display, name);
+    fontPtr->fid = fid;
     fontPtr->direction = FontLeftToRight;
     fontPtr->min_char_or_byte2 = 0;
     fontPtr->max_char_or_byte2 = 255;
@@ -953,7 +959,83 @@ XLoadQueryFont(
     BrowserSetFontProperty(fontPtr, &propIndex, XA_CAP_HEIGHT,
 	    (unsigned long)ascent);
     fontPtr->n_properties = propIndex;
+    return fontPtr;
+}
+
+Font
+XLoadFont(
+    Display *display,
+    _Xconst char *name)
+{
+    X11WasmResource *resourcePtr;
+
+    resourcePtr = X11WasmCreateResource(display, X11_WASM_RESOURCE_FONT);
+    resourcePtr->fontFamily = BrowserFontFamilyFromName(name);
+    resourcePtr->fontPixelSize = BrowserFontPixelSize(name);
+    resourcePtr->fontPointSize = BrowserFontPointSize(name,
+	    resourcePtr->fontPixelSize);
+    return (Font)resourcePtr->id;
+}
+
+XFontStruct *
+XLoadQueryFont(
+    Display *display,
+    _Xconst char *name)
+{
+    Font font;
+    char *fontName = BrowserFontXLFD(name, 0);
+    char *familyName = BrowserFontFamilyFromName(fontName);
+    int pixelSize = BrowserFontPixelSize(name);
+    int pointSize = BrowserFontPointSize(name, pixelSize);
+    XFontStruct *fontPtr;
+
+    font = XLoadFont(display, name);
+    fontPtr = BrowserAllocFontStruct(display, font, fontName, familyName,
+	    pixelSize, pointSize);
     ckfree(familyName);
+    ckfree(fontName);
+    return fontPtr;
+}
+
+XFontStruct *
+XQueryFont(
+    Display *display,
+    XID fontId)
+{
+    int validFontable = 0;
+    X11WasmResource *resourcePtr = BrowserFontableResourceOrError(&display,
+	    fontId, X11_WASM_XREQ_QUERY_FONT, &validFontable);
+    GC gc = (GC)(uintptr_t)fontId;
+    Font fid = None;
+    const char *familyName = "fixed";
+    int pixelSize = 14;
+    int pointSize = 0;
+    char *fontName;
+    XFontStruct *fontPtr;
+
+    if (!validFontable) {
+	return NULL;
+    }
+    if (resourcePtr != NULL) {
+	fid = (Font)resourcePtr->id;
+	if (resourcePtr->fontFamily != NULL) {
+	    familyName = resourcePtr->fontFamily;
+	}
+	if (resourcePtr->fontPixelSize > 0) {
+	    pixelSize = resourcePtr->fontPixelSize;
+	}
+	if (resourcePtr->fontPointSize > 0) {
+	    pointSize = resourcePtr->fontPointSize;
+	}
+    } else if (BrowserIsKnownGC(gc)) {
+	fid = gc->font;
+    }
+    fontName = BrowserFontXLFDForFamily(familyName, pixelSize);
+    if (pointSize <= 0) {
+	pointSize = BrowserFontPointSize(fontName, pixelSize);
+    }
+    fontPtr = BrowserAllocFontStruct(display, fid, fontName, familyName,
+	    pixelSize, pointSize);
     ckfree(fontName);
     return fontPtr;
 }
@@ -1159,6 +1241,73 @@ XTextWidth16(
     return width;
 }
 
+static void
+BrowserSetTextExtents(
+    int width,
+    int ascent,
+    int descent,
+    int *directionReturn,
+    int *fontAscentReturn,
+    int *fontDescentReturn,
+    XCharStruct *overallReturn)
+{
+    if (directionReturn != NULL) {
+	*directionReturn = FontLeftToRight;
+    }
+    if (fontAscentReturn != NULL) {
+	*fontAscentReturn = ascent;
+    }
+    if (fontDescentReturn != NULL) {
+	*fontDescentReturn = descent;
+    }
+    if (overallReturn != NULL) {
+	memset(overallReturn, 0, sizeof(*overallReturn));
+	overallReturn->lbearing = 0;
+	overallReturn->rbearing = BrowserClampShort(width);
+	overallReturn->width = BrowserClampShort(width);
+	overallReturn->ascent = BrowserClampShort(ascent);
+	overallReturn->descent = BrowserClampShort(descent);
+    }
+}
+
+int
+XTextExtents(
+    XFontStruct *font,
+    _Xconst char *string,
+    int nchars,
+    int *directionReturn,
+    int *fontAscentReturn,
+    int *fontDescentReturn,
+    XCharStruct *overallReturn)
+{
+    int width = XTextWidth(font, string, nchars);
+    int ascent = (font != NULL) ? font->ascent : 11;
+    int descent = (font != NULL) ? font->descent : 3;
+
+    BrowserSetTextExtents(width, ascent, descent, directionReturn,
+	    fontAscentReturn, fontDescentReturn, overallReturn);
+    return Success;
+}
+
+int
+XTextExtents16(
+    XFontStruct *font,
+    _Xconst XChar2b *string,
+    int nchars,
+    int *directionReturn,
+    int *fontAscentReturn,
+    int *fontDescentReturn,
+    XCharStruct *overallReturn)
+{
+    int width = XTextWidth16(font, string, nchars);
+    int ascent = (font != NULL) ? font->ascent : 11;
+    int descent = (font != NULL) ? font->descent : 3;
+
+    BrowserSetTextExtents(width, ascent, descent, directionReturn,
+	    fontAscentReturn, fontDescentReturn, overallReturn);
+    return Success;
+}
+
 int
 XQueryTextExtents(
     Display *display,
@@ -1197,23 +1346,51 @@ XQueryTextExtents(
 	    ckfree(utf8);
 	}
     }
-    if (directionReturn != NULL) {
-	*directionReturn = FontLeftToRight;
+    BrowserSetTextExtents(width, ascent, descent, directionReturn,
+	    fontAscentReturn, fontDescentReturn, overallReturn);
+    return Success;
+}
+
+int
+XQueryTextExtents16(
+    Display *display,
+    XID fontId,
+    _Xconst XChar2b *string,
+    int nchars,
+    int *directionReturn,
+    int *fontAscentReturn,
+    int *fontDescentReturn,
+    XCharStruct *overallReturn)
+{
+    int validFontable = 0;
+    X11WasmResource *resourcePtr = BrowserFontableResourceOrError(&display,
+	    fontId, X11_WASM_XREQ_QUERY_TEXT_EXTENTS, &validFontable);
+    int pixelSize = 14;
+    int charWidth = 8;
+    int ascent = 11;
+    int descent = 3;
+    int width = 0;
+
+    if (!validFontable) {
+	return Success;
     }
-    if (fontAscentReturn != NULL) {
-	*fontAscentReturn = ascent;
+    if ((resourcePtr != NULL) && (resourcePtr->fontPixelSize > 0)) {
+	pixelSize = resourcePtr->fontPixelSize;
     }
-    if (fontDescentReturn != NULL) {
-	*fontDescentReturn = descent;
+    BrowserFontMetricsForPixelSize(pixelSize, &charWidth, &ascent, &descent);
+    {
+	char *utf8;
+	int utf8Length;
+
+	utf8 = BrowserUtf8FromXChar2bString(string, nchars, &utf8Length);
+	if (utf8 != NULL) {
+	    width = BrowserFontResourceTextWidth(resourcePtr, charWidth, utf8,
+		    utf8Length);
+	    ckfree(utf8);
+	}
     }
-    if (overallReturn != NULL) {
-	memset(overallReturn, 0, sizeof(*overallReturn));
-	overallReturn->lbearing = 0;
-	overallReturn->rbearing = BrowserClampShort(width);
-	overallReturn->width = BrowserClampShort(width);
-	overallReturn->ascent = BrowserClampShort(ascent);
-	overallReturn->descent = BrowserClampShort(descent);
-    }
+    BrowserSetTextExtents(width, ascent, descent, directionReturn,
+	    fontAscentReturn, fontDescentReturn, overallReturn);
     return Success;
 }
 

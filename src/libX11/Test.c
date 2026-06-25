@@ -1328,6 +1328,8 @@ X11WasmTestXlibApis(void)
     Font cursorFont = None;
     Font cursorMaskFont = None;
     XFontStruct *queryFontStruct = NULL;
+    XFontStruct *queryFontInfo = NULL;
+    XFontStruct *queryGCFontInfo = NULL;
     GC inputOnlyGC = NULL;
     GC queryGC = NULL;
     GC textGC = NULL;
@@ -1461,6 +1463,8 @@ X11WasmTestXlibApis(void)
     int latin1TextWidth = 0;
     int latin1TextWidth16 = 0;
     XCharStruct latin1TextExtents;
+    XCharStruct latin1TextExtents16;
+    XCharStruct fontStructTextExtents;
     unsigned char hostAddressOne[4] = {127, 0, 0, 1};
     unsigned char hostAddressTwo[16] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
@@ -4406,6 +4410,8 @@ X11WasmTestXlibApis(void)
     latin1TextWidth = XTextWidth(queryFontStruct, latin1Text, 4);
     latin1TextWidth16 = XTextWidth16(queryFontStruct, latin1Text16, 4);
     memset(&latin1TextExtents, 0, sizeof(latin1TextExtents));
+    memset(&latin1TextExtents16, 0, sizeof(latin1TextExtents16));
+    memset(&fontStructTextExtents, 0, sizeof(fontStructTextExtents));
     textDirection = 0;
     textAscent = 0;
     textDescent = 0;
@@ -4419,6 +4425,47 @@ X11WasmTestXlibApis(void)
 	    || (latin1TextExtents.rbearing != latin1TextWidth)
 	    || (latin1TextExtents.ascent != textAscent)
 	    || (latin1TextExtents.descent != textDescent)) {
+	goto cleanup;
+    }
+    if ((XTextExtents(queryFontStruct, latin1Text, 4, &textDirection,
+		    &textAscent, &textDescent, &fontStructTextExtents)
+		    != Success)
+	    || (textDirection != FontLeftToRight)
+	    || (fontStructTextExtents.width != latin1TextWidth)
+	    || (fontStructTextExtents.rbearing != latin1TextWidth)
+	    || (fontStructTextExtents.ascent != textAscent)
+	    || (fontStructTextExtents.descent != textDescent)
+	    || (XTextExtents16(queryFontStruct, latin1Text16, 4,
+		    &textDirection, &textAscent, &textDescent,
+		    &latin1TextExtents16) != Success)
+	    || (textDirection != FontLeftToRight)
+	    || (latin1TextExtents16.width != latin1TextWidth16)
+	    || (latin1TextExtents16.rbearing != latin1TextWidth16)
+	    || (latin1TextExtents16.ascent != textAscent)
+	    || (latin1TextExtents16.descent != textDescent)
+	    || (XQueryTextExtents16(&browserDisplay.display,
+		    queryFontStruct->fid, latin1Text16, 4, &textDirection,
+		    &textAscent, &textDescent, &latin1TextExtents16)
+		    != Success)
+	    || (textDirection != FontLeftToRight)
+	    || (latin1TextExtents16.width != latin1TextWidth16)
+	    || (latin1TextExtents16.rbearing != latin1TextWidth16)
+	    || (latin1TextExtents16.ascent != textAscent)
+	    || (latin1TextExtents16.descent != textDescent)) {
+	goto cleanup;
+    }
+    queryFontInfo = XQueryFont(&browserDisplay.display, queryFontStruct->fid);
+    if ((queryFontInfo == NULL)
+	    || (queryFontInfo->fid != queryFontStruct->fid)
+	    || (queryFontInfo->ascent != queryFontStruct->ascent)
+	    || (queryFontInfo->descent != queryFontStruct->descent)
+	    || !XGetFontProperty(queryFontInfo, pixelSizeAtom,
+		    &fontPropertyValue)
+	    || (fontPropertyValue != 18UL)
+	    || !XGetFontProperty(queryFontInfo, XA_POINT_SIZE,
+		    &fontPropertyValue)
+	    || (fontPropertyValue != 180UL)
+	    || (XTextWidth(queryFontInfo, latin1Text, 4) != latin1TextWidth)) {
 	goto cleanup;
     }
     memset(longText, 'W', sizeof(longText));
@@ -4476,6 +4523,15 @@ X11WasmTestXlibApis(void)
 	    || (textExtents.width <= 0)
 	    || (textExtents.ascent != textAscent)
 	    || (textExtents.descent != textDescent)) {
+	goto cleanup;
+    }
+    queryGCFontInfo = XQueryFont(&browserDisplay.display,
+	    (XID)(uintptr_t)queryGC);
+    if ((queryGCFontInfo == NULL)
+	    || (queryGCFontInfo->fid != queryFont)
+	    || (queryGCFontInfo->ascent != textAscent)
+	    || (queryGCFontInfo->descent != textDescent)
+	    || (XTextWidth(queryGCFontInfo, "gc", 2) != textExtents.width)) {
 	goto cleanup;
     }
     if (XCopyArea(&browserDisplay.display, (Drawable)pixmap,
@@ -4853,6 +4909,12 @@ cleanup:
     }
     if (queryFontStruct != NULL) {
 	XFreeFont(&browserDisplay.display, queryFontStruct);
+    }
+    if (queryFontInfo != NULL) {
+	XFreeFont(&browserDisplay.display, queryFontInfo);
+    }
+    if (queryGCFontInfo != NULL) {
+	XFreeFont(&browserDisplay.display, queryGCFontInfo);
     }
     if (keyboardMapping != NULL) {
 	XFree(keyboardMapping);

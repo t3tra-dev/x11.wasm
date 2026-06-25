@@ -213,9 +213,14 @@ EXTERN Bool XQueryPointer(Display *d, Window w1, Window *w2, Window *w3,
 	int *i1, int *i2, int *i3, int *i4, unsigned int *ui);
 	EXTERN Status XQueryTree(Display *d, Window w1, Window *w2, Window *w3,
 		Window **w4, unsigned int *ui);
+	EXTERN XFontStruct *XQueryFont(Display *d, XID font_ID);
 	EXTERN int XQueryTextExtents(Display *d, XID font_ID, _Xconst char *string,
 		int nchars, int *direction_return, int *font_ascent_return,
 		int *font_descent_return, XCharStruct *overall_return);
+	EXTERN int XQueryTextExtents16(Display *d, XID font_ID,
+		_Xconst XChar2b *string, int nchars, int *direction_return,
+		int *font_ascent_return, int *font_descent_return,
+		XCharStruct *overall_return);
 	EXTERN int XRaiseWindow(Display *d, Window w);
 EXTERN int XRefreshKeyboardMapping(XMappingEvent *x);
 EXTERN Status XReconfigureWMWindow(Display *d, Window w, int screen,
@@ -512,6 +517,13 @@ EXTERN int XTextWidth(XFontStruct *font_struct, _Xconst char *string,
 	int count);
 	EXTERN int XTextWidth16(XFontStruct *font_struct, _Xconst XChar2b *string,
 		int count);
+	EXTERN int XTextExtents(XFontStruct *font_struct, _Xconst char *string,
+		int nchars, int *direction_return, int *font_ascent_return,
+		int *font_descent_return, XCharStruct *overall_return);
+	EXTERN int XTextExtents16(XFontStruct *font_struct,
+		_Xconst XChar2b *string, int nchars, int *direction_return,
+		int *font_ascent_return, int *font_descent_return,
+		XCharStruct *overall_return);
 	EXTERN int XDrawString(Display *display, Drawable d, GC gc, int x, int y,
 		_Xconst char *string, int length);
 	EXTERN int XDrawString16(Display *display, Drawable d, GC gc, int x, int y,
