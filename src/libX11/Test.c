@@ -13,6 +13,18 @@ BrowserTestClientMessageDataPredicate(
 	    && (eventPtr->xclient.data.l[0] == value)) ? True : False;
 }
 
+static int browserTestAfterFunctionCount;
+
+static int
+BrowserTestAfterFunction(
+    Display *display)
+{
+    if (display == &browserDisplay.display) {
+	browserTestAfterFunctionCount++;
+    }
+    return Success;
+}
+
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestKeyboardAsciiMapping(void)
 {
@@ -4746,6 +4758,22 @@ X11WasmTestXlibApis(void)
 	    || (browserDisplay.synchronize != 0)
 	    || (browserDisplay.afterFunction != NULL)
 	    || (XSynchronize(&browserDisplay.display, False) != NULL)) {
+	goto cleanup;
+    }
+    browserTestAfterFunctionCount = 0;
+    oldAfterFunction = XSetAfterFunction(&browserDisplay.display,
+	    BrowserTestAfterFunction);
+    if ((oldAfterFunction != NULL) || (browserDisplay.synchronize != 0)
+	    || (browserDisplay.afterFunction != BrowserTestAfterFunction)
+	    || (XNoOp(&browserDisplay.display) != Success)
+	    || (browserTestAfterFunctionCount != 1)) {
+	goto cleanup;
+    }
+    oldAfterFunction = XSetAfterFunction(&browserDisplay.display, NULL);
+    if ((oldAfterFunction != BrowserTestAfterFunction)
+	    || (browserDisplay.synchronize != 0)
+	    || (browserDisplay.afterFunction != NULL)
+	    || (browserTestAfterFunctionCount != 1)) {
 	goto cleanup;
     }
     result = 1;

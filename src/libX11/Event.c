@@ -1493,9 +1493,9 @@ X11WasmTestSetScreenSaverWakeLock(int enabled)
 }
 
 XAfterFunction
-XSynchronize(
+XSetAfterFunction(
     Display *display,
-    Bool onoff)
+    XAfterFunction procedure)
 {
     XAfterFunction oldAfterFunction = NULL;
 
@@ -1505,11 +1505,23 @@ XSynchronize(
     BrowserInitDisplay();
     if (display == &browserDisplay.display) {
 	oldAfterFunction = browserDisplay.afterFunction;
-	browserDisplay.synchronize = onoff ? 1 : 0;
-	browserDisplay.afterFunction = onoff ? BrowserSynchronizedAfterFunction
-		: NULL;
+	browserDisplay.afterFunction = procedure;
+	browserDisplay.synchronize =
+		(procedure == BrowserSynchronizedAfterFunction) ? 1 : 0;
 	BrowserSyncSynchronizeState(display);
     }
+    return oldAfterFunction;
+}
+
+XAfterFunction
+XSynchronize(
+    Display *display,
+    Bool onoff)
+{
+    XAfterFunction oldAfterFunction;
+
+    oldAfterFunction = XSetAfterFunction(display,
+	    onoff ? BrowserSynchronizedAfterFunction : NULL);
     (void)XNoOp(display);
     return oldAfterFunction;
 }

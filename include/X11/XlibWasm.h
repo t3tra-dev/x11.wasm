@@ -451,6 +451,8 @@ EXTERN int XGrabServer(Display *display);
 EXTERN int XUngrabServer(Display *display);
 EXTERN int XFree(void *data);
 EXTERN int XNoOp(Display *display);
+EXTERN XAfterFunction XSetAfterFunction(Display *display,
+	XAfterFunction procedure);
 EXTERN XAfterFunction XSynchronize(Display *display, Bool onoff);
 EXTERN int XSync(Display *display, Bool discard);
 EXTERN VisualID XVisualIDFromVisual(Visual *visual);
