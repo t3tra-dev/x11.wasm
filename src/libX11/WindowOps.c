@@ -91,6 +91,14 @@ XCreateWindow(
     if (parentPtr == NULL) {
 	return None;
     }
+    if (!BrowserValueOrError(&display, width, width > 0,
+	    X11_WASM_XREQ_CREATE_WINDOW)) {
+	return None;
+    }
+    if (!BrowserValueOrError(&display, height, height > 0,
+	    X11_WASM_XREQ_CREATE_WINDOW)) {
+	return None;
+    }
     if (!BrowserWindowClassOrError(&display, clazz, parentPtr->c_class,
 	    X11_WASM_XREQ_CREATE_WINDOW, &windowClass)) {
 	return None;
@@ -128,6 +136,28 @@ XCreateWindow(
     BrowserSyncWindowStyle(resourcePtr);
     (void)BrowserQueueCreateNotify(resourcePtr);
     return (Window)resourcePtr->id;
+}
+
+Window
+XCreateSimpleWindow(
+    Display *display,
+    Window parent,
+    int x,
+    int y,
+    unsigned int width,
+    unsigned int height,
+    unsigned int borderWidth,
+    unsigned long border,
+    unsigned long background)
+{
+    XSetWindowAttributes attributes;
+
+    memset(&attributes, 0, sizeof(attributes));
+    attributes.background_pixel = background;
+    attributes.border_pixel = border;
+    return XCreateWindow(display, parent, x, y, width, height, borderWidth,
+	    CopyFromParent, InputOutput, (Visual *)CopyFromParent,
+	    CWBackPixel | CWBorderPixel, &attributes);
 }
 
 int

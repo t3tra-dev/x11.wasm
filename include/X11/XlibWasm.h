@@ -445,6 +445,10 @@ EXTERN Window XCreateWindow(Display *display, Window parent, int x, int y,
 	unsigned int width, unsigned int height, unsigned int border_width,
 	int depth, unsigned int clazz, Visual *visual, unsigned long value_mask,
 	XSetWindowAttributes *attributes);
+EXTERN Window XCreateSimpleWindow(Display *display, Window parent, int x,
+	int y, unsigned int width, unsigned int height,
+	unsigned int border_width, unsigned long border,
+	unsigned long background);
 EXTERN Pixmap XCreatePixmap(Display *display, Drawable d, unsigned int width,
 	unsigned int height, unsigned int depth);
 EXTERN int XLowerWindow(Display *d, Window w);
