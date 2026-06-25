@@ -166,6 +166,84 @@ X11WasmTestWheelEventConstants(void)
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestEventQueueAndKeycodeApis(void)
+{
+    Display *display;
+    XEvent firstEvent;
+    XEvent secondEvent;
+    XEvent readEvent;
+    int minKeycode = -1;
+    int maxKeycode = -1;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    BrowserClearEventQueue();
+
+    if (XDisplayKeycodes(display, &minKeycode, &maxKeycode) != Success) {
+	return 10;
+    }
+    if ((minKeycode != display->min_keycode)
+	    || (maxKeycode != display->max_keycode)
+	    || (minKeycode != 8) || (maxKeycode != 255)) {
+	return 11;
+    }
+    if (XDisplayKeycodes(display, NULL, NULL) != Success) {
+	return 12;
+    }
+
+    memset(&firstEvent, 0, sizeof(firstEvent));
+    firstEvent.type = ClientMessage;
+    firstEvent.xclient.display = display;
+    firstEvent.xclient.window = browserDisplay.rootWindow;
+    firstEvent.xclient.format = 32;
+    firstEvent.xclient.data.l[0] = 1001;
+
+    memset(&secondEvent, 0, sizeof(secondEvent));
+    secondEvent.type = ClientMessage;
+    secondEvent.xclient.display = display;
+    secondEvent.xclient.window = browserDisplay.rootWindow;
+    secondEvent.xclient.format = 32;
+    secondEvent.xclient.data.l[0] = 1002;
+
+    if (!BrowserQueueEvent(&firstEvent) || !BrowserQueueEvent(&secondEvent)) {
+	return 20;
+    }
+    if (XEventsQueued(display, QueuedAlready) != 2) {
+	return 21;
+    }
+    memset(&readEvent, 0, sizeof(readEvent));
+    if ((XNextEvent(display, &readEvent) != Success)
+	    || (readEvent.type != ClientMessage)
+	    || (readEvent.xclient.data.l[0] != 1001)
+	    || (XEventsQueued(display, QueuedAlready) != 1)) {
+	return 22;
+    }
+    if ((XPutBackEvent(display, &readEvent) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 2)) {
+	return 23;
+    }
+    memset(&readEvent, 0, sizeof(readEvent));
+    if ((XNextEvent(display, &readEvent) != Success)
+	    || (readEvent.type != ClientMessage)
+	    || (readEvent.xclient.data.l[0] != 1001)) {
+	return 24;
+    }
+    memset(&readEvent, 0, sizeof(readEvent));
+    if ((XNextEvent(display, &readEvent) != Success)
+	    || (readEvent.type != ClientMessage)
+	    || (readEvent.xclient.data.l[0] != 1002)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	return 25;
+    }
+    if ((XPutBackEvent(display, NULL) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	return 26;
+    }
+    BrowserClearEventQueue();
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestXlibApis(void)
 {
     char buffer[64];

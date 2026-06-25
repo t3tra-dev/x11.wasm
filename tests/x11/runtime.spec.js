@@ -126,6 +126,25 @@ test("X11 keyboard mapping APIs resolve ASCII key events", async ({ page }) => {
   expect(result).toBe(1);
 });
 
+test("X event queue and display keycode APIs preserve ordering", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestEventQueueAndKeycodeApis?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestEventQueueAndKeycodeApis) {
+      throw new Error("missing X event queue and keycode test export");
+    }
+    return module._X11WasmTestEventQueueAndKeycodeApis();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XIC spot location anchors the browser input context", async ({ page }) => {
   await waitForX11Runtime(page);
   const windowId = await createMappedWindow(page);
