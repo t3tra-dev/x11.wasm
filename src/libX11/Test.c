@@ -1612,6 +1612,7 @@ X11WasmTestXlibApis(void)
     int shiftModifierCount = 0;
     unsigned long oldKeyboardMapSerial = 0;
     unsigned long oldModifierMapSerial = 0;
+    int modifierBusyKeyPressed = 0;
     char *commandArgv[2];
     char **commandArgvReturn = NULL;
     int commandArgcReturn = -1;
@@ -2962,6 +2963,38 @@ X11WasmTestXlibApis(void)
     if ((modifierMap == NULL) || (modifierMap->max_keypermod != 2)
 	    || (modifierMap->modifiermap[ShiftMapIndex
 		    * modifierMap->max_keypermod] != 0)
+	    || (modifierMap->modifiermap[Mod3MapIndex
+		    * modifierMap->max_keypermod] != X11_WASM_KEYCODE_EQUAL)
+	    || (modifierMap->modifiermap[Mod3MapIndex
+		    * modifierMap->max_keypermod + 1] != 0)) {
+	goto cleanup;
+    }
+    if (!BrowserQueueKeyEventFields(KeyPress, browserDisplay.rootWindow,
+	    (KeyCode)X11_WASM_KEYCODE_EQUAL, XK_equal, 0, 0, 0,
+	    CurrentTime, 0)) {
+	goto cleanup;
+    }
+    modifierBusyKeyPressed = 1;
+    BrowserClearEventQueue();
+    oldModifierMapSerial = browserDisplay.modifierMapSerial;
+    modifierMap->modifiermap[Mod3MapIndex * modifierMap->max_keypermod] =
+	    X11_WASM_KEYCODE_SEMICOLON;
+    if ((XSetModifierMapping(&browserDisplay.display, modifierMap)
+		    != MappingBusy)
+	    || (browserDisplay.modifierMapSerial != oldModifierMapSerial)
+	    || (XEventsQueued(&browserDisplay.display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    if (!BrowserQueueKeyEventFields(KeyRelease, browserDisplay.rootWindow,
+	    (KeyCode)X11_WASM_KEYCODE_EQUAL, XK_equal, 0, 0, 0,
+	    CurrentTime, 0)) {
+	goto cleanup;
+    }
+    modifierBusyKeyPressed = 0;
+    BrowserClearEventQueue();
+    XFreeModifiermap(modifierMap);
+    modifierMap = XGetModifierMapping(&browserDisplay.display);
+    if ((modifierMap == NULL) || (modifierMap->max_keypermod != 2)
 	    || (modifierMap->modifiermap[Mod3MapIndex
 		    * modifierMap->max_keypermod] != X11_WASM_KEYCODE_EQUAL)
 	    || (modifierMap->modifiermap[Mod3MapIndex
@@ -5768,6 +5801,12 @@ X11WasmTestXlibApis(void)
     result = 1;
 
 cleanup:
+    if (modifierBusyKeyPressed) {
+	(void)BrowserQueueKeyEventFields(KeyRelease, browserDisplay.rootWindow,
+		(KeyCode)X11_WASM_KEYCODE_EQUAL, XK_equal, 0, 0, 0,
+		CurrentTime, 0);
+	BrowserClearEventQueue();
+    }
     (void)XDeleteContext(&browserDisplay.display, contextRidOne, contextOne);
     (void)XDeleteContext(&browserDisplay.display, contextRidOne, contextTwo);
     (void)XDeleteContext(&browserDisplay.display, contextRidTwo, contextOne);

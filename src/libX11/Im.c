@@ -2430,6 +2430,107 @@ XFreeModifiermap(
     return Success;
 }
 
+static int
+BrowserModifierRowHasKey(
+    const KeyCode *map,
+    int maxKeyPerMod,
+    KeyCode keycode)
+{
+    int slot;
+
+    for (slot = 0; slot < maxKeyPerMod; slot++) {
+	if (map[slot] == keycode) {
+	    return 1;
+	}
+    }
+    return 0;
+}
+
+static int
+BrowserModifierRowsDiffer(
+    const KeyCode *oldRow,
+    int oldMaxKeyPerMod,
+    const KeyCode *newRow,
+    int newMaxKeyPerMod)
+{
+    int slot;
+
+    for (slot = 0; slot < oldMaxKeyPerMod; slot++) {
+	KeyCode keycode = oldRow[slot];
+
+	if ((keycode != 0) && !BrowserModifierRowHasKey(newRow,
+		newMaxKeyPerMod, keycode)) {
+	    return 1;
+	}
+    }
+    for (slot = 0; slot < newMaxKeyPerMod; slot++) {
+	KeyCode keycode = newRow[slot];
+
+	if ((keycode != 0) && !BrowserModifierRowHasKey(oldRow,
+		oldMaxKeyPerMod, keycode)) {
+	    return 1;
+	}
+    }
+    return 0;
+}
+
+static int
+BrowserKeycodeIsDown(
+    KeyCode keycode)
+{
+    unsigned int index = ((unsigned int)keycode) >> 3;
+    unsigned int mask = 1U << (((unsigned int)keycode) & 7U);
+
+    if (index >= sizeof(browserDisplay.keymap)) {
+	return 0;
+    }
+    return (((unsigned char)browserDisplay.keymap[index] & mask) != 0);
+}
+
+static int
+BrowserModifierRowHasDownKey(
+    const KeyCode *row,
+    int maxKeyPerMod)
+{
+    int slot;
+
+    for (slot = 0; slot < maxKeyPerMod; slot++) {
+	KeyCode keycode = row[slot];
+
+	if ((keycode != 0) && BrowserKeycodeIsDown(keycode)) {
+	    return 1;
+	}
+    }
+    return 0;
+}
+
+static int
+BrowserModifierMappingIsBusy(
+    const XModifierKeymap *mapPtr)
+{
+    int modifier;
+    int oldMaxKeyPerMod = browserDisplay.modifierMapMaxKeyPerMod;
+    int newMaxKeyPerMod = mapPtr->max_keypermod;
+
+    for (modifier = 0; modifier < X11_WASM_MODIFIER_COUNT; modifier++) {
+	const KeyCode *oldRow = (oldMaxKeyPerMod > 0)
+		? browserDisplay.modifierMap + modifier * oldMaxKeyPerMod
+		: NULL;
+	const KeyCode *newRow = (newMaxKeyPerMod > 0)
+		? mapPtr->modifiermap + modifier * newMaxKeyPerMod : NULL;
+
+	if (!BrowserModifierRowsDiffer(oldRow, oldMaxKeyPerMod, newRow,
+		newMaxKeyPerMod)) {
+	    continue;
+	}
+	if (BrowserModifierRowHasDownKey(oldRow, oldMaxKeyPerMod)
+		|| BrowserModifierRowHasDownKey(newRow, newMaxKeyPerMod)) {
+	    return 1;
+	}
+    }
+    return 0;
+}
+
 int
 XSetModifierMapping(
     Display *display,
@@ -2492,6 +2593,10 @@ XSetModifierMapping(
 		}
 	    }
 	}
+    }
+    if (BrowserModifierMappingIsBusy(mapPtr)) {
+	(void)XNoOp(display);
+	return MappingBusy;
     }
     browserDisplay.modifierMapMaxKeyPerMod = maxKeyPerMod;
     memset(browserDisplay.modifierMap, 0, sizeof(browserDisplay.modifierMap));
