@@ -616,6 +616,13 @@ XWarpPointer(
     }
     (void)display;
 
+    if (!BrowserValidateCard16(&display, (long)srcW, 1,
+	    X11_WASM_XREQ_WARP_POINTER)
+	    || !BrowserValidateCard16(&display, (long)srcH, 1,
+		    X11_WASM_XREQ_WARP_POINTER)) {
+	return Success;
+    }
+
     if (src != None) {
 	int pointerX = 0;
 	int pointerY = 0;

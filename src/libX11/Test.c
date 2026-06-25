@@ -4382,6 +4382,7 @@ X11WasmTestXErrorHandler(void)
     int geometryResult;
     int translateSourceResult;
     int translateDestinationResult;
+    int warpPointerSizeResult;
     int queryPointerResult;
     int clearAreaExposuresResult;
     int clearAreaSizeResult;
@@ -4446,6 +4447,7 @@ X11WasmTestXErrorHandler(void)
     int getNegativeLengthResult;
     int getDeletePropertyResult;
     int sawGeometryBadDrawable;
+    int sawWarpPointerBadValue;
     int sawClearAreaBadValue;
     int sawConfigureBadMatch;
     int sawReconfigureBadValue;
@@ -5103,6 +5105,10 @@ X11WasmTestXErrorHandler(void)
 	    0, 0, 0, 0, 1, 2);
     (void)XWarpPointer(&browserDisplay.display, None, invalidWindow,
 	    0, 0, 0, 0, 1, 2);
+    warpPointerSizeResult = XWarpPointer(&browserDisplay.display, None, None,
+	    0, 0, (unsigned int)USHRT_MAX + 1U, 1, 1, 2);
+    sawWarpPointerBadValue = (browserTestLastErrorCode == BadValue)
+	    && (browserTestLastRequestCode == X11_WASM_XREQ_WARP_POINTER);
     queryPointerResult = XQueryPointer(&browserDisplay.display,
 	    invalidWindow, &root, &child, &x, &y, &x, &y, NULL);
     clearAreaExposuresResult = XClearArea(&browserDisplay.display,
@@ -5273,6 +5279,7 @@ X11WasmTestXErrorHandler(void)
     if ((attributesResult != False) || (geometryResult != False)
 	    || (translateSourceResult != False)
 	    || (translateDestinationResult != False)
+	    || (warpPointerSizeResult != Success)
 	    || (queryPointerResult != False)
 	    || (clearAreaExposuresResult != Success)
 	    || (clearAreaSizeResult != Success)
@@ -5383,6 +5390,7 @@ X11WasmTestXErrorHandler(void)
 	    || (getDeletePropertyResult != BadValue)
 	    || (invalidAtomName != NULL)
 	    || !sawGeometryBadDrawable
+	    || !sawWarpPointerBadValue
 	    || !sawClearAreaBadValue
 	    || !sawConfigureBadMatch
 	    || !sawReconfigureBadValue
@@ -5549,6 +5557,7 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_TRANSLATE_COORDINATES
 	    + X11_WASM_XREQ_WARP_POINTER
 	    + X11_WASM_XREQ_WARP_POINTER
+	    + X11_WASM_XREQ_WARP_POINTER
 	    + X11_WASM_XREQ_QUERY_POINTER
 	    + X11_WASM_XREQ_CLEAR_AREA
 	    + X11_WASM_XREQ_CLEAR_AREA
@@ -5640,15 +5649,15 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 207)
+    if ((browserTestXErrorCount != 208)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
 	    || (browserTestRequestCodeSum != expectedRequestCodeSum)
 	    || (browserTestRequestCodeMask != expectedRequestCodeMask)
-	    || (browserTestLastSerial != initialSerial + 207)
+	    || (browserTestLastSerial != initialSerial + 208)
 	    || (LastKnownRequestProcessed(&browserDisplay.display)
-		    != initialSerial + 207)) {
+		    != initialSerial + 208)) {
 	return 0;
     }
     return 1;
