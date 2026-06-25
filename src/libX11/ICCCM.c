@@ -1590,6 +1590,10 @@ XGetWindowProperty(
 		X11_WASM_XREQ_GET_PROPERTY);
 	return BadValue;
     }
+    if (!BrowserValidateBool(&display, deleteProperty,
+	    X11_WASM_XREQ_GET_PROPERTY)) {
+	return BadValue;
+    }
     propertyPtr = BrowserFindProperty(resourcePtr, property);
     if (propReturn) {
 	*propReturn = (unsigned char *)ckalloc(1);
@@ -2288,6 +2292,10 @@ XClearArea(
     unsigned int clearHeight;
 
     if (resourcePtr == NULL) {
+	return Success;
+    }
+    if (!BrowserValidateBool(&display, exposures,
+	    X11_WASM_XREQ_CLEAR_AREA)) {
 	return Success;
     }
     if (resourcePtr->c_class == InputOnly) {

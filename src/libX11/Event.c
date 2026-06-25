@@ -112,6 +112,10 @@ XSendEvent(
 		X11_WASM_XREQ_SEND_EVENT, 0);
 	return False;
     }
+    if (!BrowserValidateBool(&display, propagate,
+	    X11_WASM_XREQ_SEND_EVENT)) {
+	return False;
+    }
     if ((window != PointerWindow) && (window != InputFocus)) {
 	resourcePtr = BrowserWindowResourceOrError(&display, window,
 		X11_WASM_XREQ_SEND_EVENT);

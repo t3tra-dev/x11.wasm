@@ -4383,7 +4383,9 @@ X11WasmTestXErrorHandler(void)
     int translateSourceResult;
     int translateDestinationResult;
     int queryPointerResult;
+    int clearAreaExposuresResult;
     int invalidSendEventTypeResult;
+    int sendEventPropagateResult;
     int sendEventResult;
     int selectionValidationResultSum;
     int freePixmapResult;
@@ -4438,6 +4440,7 @@ X11WasmTestXErrorHandler(void)
     int getInvalidAtomResult;
     int getNegativeOffsetResult;
     int getNegativeLengthResult;
+    int getDeletePropertyResult;
     int sawGeometryBadDrawable;
     int sawConfigureBadMatch;
     int sawReconfigureBadValue;
@@ -5042,10 +5045,14 @@ X11WasmTestXErrorHandler(void)
 	    0, 0, 0, 0, 1, 2);
     queryPointerResult = XQueryPointer(&browserDisplay.display,
 	    invalidWindow, &root, &child, &x, &y, &x, &y, NULL);
+    clearAreaExposuresResult = XClearArea(&browserDisplay.display,
+	    browserDisplay.rootWindow, 0, 0, 1, 1, 2);
     event.type = LASTEvent + 1;
     invalidSendEventTypeResult = XSendEvent(&browserDisplay.display,
 	    browserDisplay.rootWindow, False, KeyPressMask, &event);
     event.type = KeyPress;
+    sendEventPropagateResult = XSendEvent(&browserDisplay.display,
+	    browserDisplay.rootWindow, 2, KeyPressMask, &event);
     sendEventResult = XSendEvent(&browserDisplay.display, invalidWindow,
 	    False, KeyPressMask, &event);
     validSelection = XInternAtom(&browserDisplay.display,
@@ -5134,6 +5141,9 @@ X11WasmTestXErrorHandler(void)
     getNegativeLengthResult = XGetWindowProperty(&browserDisplay.display,
 	    browserDisplay.rootWindow, validProperty, 0, -1, False,
 	    AnyPropertyType, NULL, NULL, NULL, NULL, NULL);
+    getDeletePropertyResult = XGetWindowProperty(&browserDisplay.display,
+	    browserDisplay.rootWindow, validProperty, 0, 1, 2,
+	    AnyPropertyType, NULL, NULL, NULL, NULL, NULL);
     invalidAtomName = XGetAtomName(&browserDisplay.display, invalidAtom);
     result = XQueryTree(&browserDisplay.display, invalidWindow, NULL, NULL,
 	    NULL, NULL);
@@ -5169,7 +5179,9 @@ X11WasmTestXErrorHandler(void)
 	    || (translateSourceResult != False)
 	    || (translateDestinationResult != False)
 	    || (queryPointerResult != False)
+	    || (clearAreaExposuresResult != Success)
 	    || (invalidSendEventTypeResult != False)
+	    || (sendEventPropagateResult != False)
 	    || (sendEventResult != False)
 	    || (validSelection == None)
 	    || (invalidSelectionOwnerResult != None)
@@ -5265,6 +5277,7 @@ X11WasmTestXErrorHandler(void)
 	    || (getInvalidAtomResult != BadAtom)
 	    || (getNegativeOffsetResult != BadValue)
 	    || (getNegativeLengthResult != BadValue)
+	    || (getDeletePropertyResult != BadValue)
 	    || (invalidAtomName != NULL)
 	    || !sawGeometryBadDrawable
 	    || !sawConfigureBadMatch
@@ -5421,6 +5434,8 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_WARP_POINTER
 	    + X11_WASM_XREQ_WARP_POINTER
 	    + X11_WASM_XREQ_QUERY_POINTER
+	    + X11_WASM_XREQ_CLEAR_AREA
+	    + X11_WASM_XREQ_SEND_EVENT
 	    + X11_WASM_XREQ_SEND_EVENT
 	    + X11_WASM_XREQ_SEND_EVENT
 	    + X11_WASM_XREQ_GET_SELECTION_OWNER
@@ -5446,6 +5461,7 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_CHANGE_PROPERTY
 	    + X11_WASM_XREQ_CHANGE_PROPERTY
 	    + X11_WASM_XREQ_DELETE_PROPERTY
+	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
@@ -5502,15 +5518,15 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 187)
+    if ((browserTestXErrorCount != 190)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
 	    || (browserTestRequestCodeSum != expectedRequestCodeSum)
 	    || (browserTestRequestCodeMask != expectedRequestCodeMask)
-	    || (browserTestLastSerial != initialSerial + 187)
+	    || (browserTestLastSerial != initialSerial + 190)
 	    || (LastKnownRequestProcessed(&browserDisplay.display)
-		    != initialSerial + 187)) {
+		    != initialSerial + 190)) {
 	return 0;
     }
     return 1;
