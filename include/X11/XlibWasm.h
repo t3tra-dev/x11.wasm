@@ -186,7 +186,23 @@ EXTERN int XCirculateSubwindowsUp(Display *d, Window w);
 EXTERN int XMoveResizeWindow(Display *d, Window w, int i1, int i2,
 	unsigned int ui1, unsigned int ui2);
 EXTERN int XMoveWindow(Display *d, Window w, int i1, int i2);
+EXTERN Bool XCheckIfEvent(Display *d, XEvent *x,
+	Bool (*predicate)(Display *display, XEvent *event, XPointer arg),
+	XPointer arg);
+EXTERN Bool XCheckMaskEvent(Display *d, long l, XEvent *x);
+EXTERN Bool XCheckTypedEvent(Display *d, int i, XEvent *x);
+EXTERN Bool XCheckTypedWindowEvent(Display *d, Window w, int i, XEvent *x);
+EXTERN Bool XCheckWindowEvent(Display *d, Window w, long l, XEvent *x);
+EXTERN int XIfEvent(Display *d, XEvent *x,
+	Bool (*predicate)(Display *display, XEvent *event, XPointer arg),
+	XPointer arg);
+EXTERN int XMaskEvent(Display *d, long l, XEvent *x);
 EXTERN int XNextEvent(Display *d, XEvent *x);
+EXTERN int XPeekEvent(Display *d, XEvent *x);
+EXTERN int XPeekIfEvent(Display *d, XEvent *x,
+	Bool (*predicate)(Display *display, XEvent *event, XPointer arg),
+	XPointer arg);
+EXTERN int XPending(Display *d);
 EXTERN int XPutBackEvent(Display *d, XEvent *x);
 EXTERN int XQueryColors(Display *d, Colormap c, XColor *x, int i);
 EXTERN int XQueryColor(Display *d, Colormap c, XColor *def_in_out);

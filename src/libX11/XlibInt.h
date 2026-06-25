@@ -255,6 +255,11 @@ typedef struct X11WasmTrackedGC {
     struct X11WasmTrackedGC *nextPtr;
 } X11WasmTrackedGC;
 
+typedef int (*X11WasmQueuedEventPredicate)(
+    Display *display,
+    XEvent *eventPtr,
+    XPointer arg);
+
 typedef struct X11WasmIMInstantiateCallback {
     Display *display;
     XIDProc callback;
@@ -1137,6 +1142,17 @@ int BrowserPopMatchingEventAfterPump(
     Window window,
     long mask,
     XEvent *event);
+int BrowserTakeQueuedEvent(
+    Display *display,
+    X11WasmQueuedEventPredicate predicate,
+    XPointer arg,
+    int remove,
+    XEvent *eventPtr,
+    int *internalPtr);
+int BrowserWindowMaskQueuedEvent(
+    Display *display,
+    XEvent *eventPtr,
+    XPointer arg);
 Atom BrowserPredefinedAtom(
     const char *name);
 const char *BrowserPredefinedAtomName(

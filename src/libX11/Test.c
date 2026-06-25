@@ -1,5 +1,18 @@
 #include "XlibInt.h"
 
+static Bool
+BrowserTestClientMessageDataPredicate(
+    Display *display,
+    XEvent *eventPtr,
+    XPointer arg)
+{
+    long value = *((long *)arg);
+
+    (void)display;
+    return ((eventPtr != NULL) && (eventPtr->type == ClientMessage)
+	    && (eventPtr->xclient.data.l[0] == value)) ? True : False;
+}
+
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestKeyboardAsciiMapping(void)
 {
@@ -171,7 +184,10 @@ X11WasmTestEventQueueAndKeycodeApis(void)
     Display *display;
     XEvent firstEvent;
     XEvent secondEvent;
+    XEvent exposeEvent;
+    XEvent mapEvent;
     XEvent readEvent;
+    long predicateValue = 0;
     int minKeycode = -1;
     int maxKeycode = -1;
 
@@ -208,36 +224,175 @@ X11WasmTestEventQueueAndKeycodeApis(void)
     if (!BrowserQueueEvent(&firstEvent) || !BrowserQueueEvent(&secondEvent)) {
 	return 20;
     }
-    if (XEventsQueued(display, QueuedAlready) != 2) {
+    if ((XEventsQueued(display, QueuedAlready) != 2)
+	    || (XPending(display) != 2)) {
 	return 21;
+    }
+    memset(&readEvent, 0, sizeof(readEvent));
+    if ((XPeekEvent(display, &readEvent) != Success)
+	    || (readEvent.type != ClientMessage)
+	    || (readEvent.xclient.data.l[0] != 1001)
+	    || (XEventsQueued(display, QueuedAlready) != 2)) {
+	return 22;
     }
     memset(&readEvent, 0, sizeof(readEvent));
     if ((XNextEvent(display, &readEvent) != Success)
 	    || (readEvent.type != ClientMessage)
 	    || (readEvent.xclient.data.l[0] != 1001)
 	    || (XEventsQueued(display, QueuedAlready) != 1)) {
-	return 22;
+	return 23;
     }
     if ((XPutBackEvent(display, &readEvent) != Success)
 	    || (XEventsQueued(display, QueuedAlready) != 2)) {
-	return 23;
+	return 24;
     }
     memset(&readEvent, 0, sizeof(readEvent));
     if ((XNextEvent(display, &readEvent) != Success)
 	    || (readEvent.type != ClientMessage)
 	    || (readEvent.xclient.data.l[0] != 1001)) {
-	return 24;
+	return 25;
     }
     memset(&readEvent, 0, sizeof(readEvent));
     if ((XNextEvent(display, &readEvent) != Success)
 	    || (readEvent.type != ClientMessage)
 	    || (readEvent.xclient.data.l[0] != 1002)
 	    || (XEventsQueued(display, QueuedAlready) != 0)) {
-	return 25;
+	return 26;
     }
     if ((XPutBackEvent(display, NULL) != Success)
 	    || (XEventsQueued(display, QueuedAlready) != 0)) {
-	return 26;
+	return 27;
+    }
+
+    if (!BrowserQueueEvent(&firstEvent) || !BrowserQueueEvent(&secondEvent)) {
+	return 30;
+    }
+    memset(&readEvent, 0, sizeof(readEvent));
+    if ((XCheckTypedEvent(display, ClientMessage, &readEvent) != True)
+	    || (readEvent.xclient.data.l[0] != 1001)
+	    || (XEventsQueued(display, QueuedAlready) != 1)) {
+	return 31;
+    }
+    predicateValue = 1002;
+    memset(&readEvent, 0, sizeof(readEvent));
+    if ((XCheckIfEvent(display, &readEvent,
+		    BrowserTestClientMessageDataPredicate,
+		    (XPointer)&predicateValue) != True)
+	    || (readEvent.xclient.data.l[0] != 1002)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	return 32;
+    }
+    predicateValue = 9999;
+    memset(&readEvent, 0x7f, sizeof(readEvent));
+    if ((XCheckIfEvent(display, &readEvent,
+		    BrowserTestClientMessageDataPredicate,
+		    (XPointer)&predicateValue) != False)
+	    || (readEvent.type != 0)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	return 33;
+    }
+
+    firstEvent.xclient.window = browserDisplay.rootWindow;
+    secondEvent.xclient.window = browserDisplay.rootWindow + 100;
+    if (!BrowserQueueEvent(&firstEvent) || !BrowserQueueEvent(&secondEvent)) {
+	return 40;
+    }
+    memset(&readEvent, 0, sizeof(readEvent));
+    if ((XCheckTypedWindowEvent(display, browserDisplay.rootWindow + 100,
+		    ClientMessage, &readEvent) != True)
+	    || (readEvent.xclient.data.l[0] != 1002)
+	    || (XEventsQueued(display, QueuedAlready) != 1)) {
+	return 41;
+    }
+    memset(&readEvent, 0, sizeof(readEvent));
+    if ((XCheckTypedWindowEvent(display, browserDisplay.rootWindow + 100,
+		    ClientMessage, &readEvent) != False)
+	    || (readEvent.type != 0)
+	    || (XNextEvent(display, &readEvent) != Success)
+	    || (readEvent.xclient.data.l[0] != 1001)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	return 42;
+    }
+
+    firstEvent.xclient.window = browserDisplay.rootWindow;
+    secondEvent.xclient.window = browserDisplay.rootWindow;
+    if (!BrowserQueueEvent(&firstEvent) || !BrowserQueueEvent(&secondEvent)) {
+	return 50;
+    }
+    predicateValue = 1002;
+    memset(&readEvent, 0, sizeof(readEvent));
+    if ((XPeekIfEvent(display, &readEvent,
+		    BrowserTestClientMessageDataPredicate,
+		    (XPointer)&predicateValue) != Success)
+	    || (readEvent.xclient.data.l[0] != 1002)
+	    || (XEventsQueued(display, QueuedAlready) != 2)) {
+	return 51;
+    }
+    memset(&readEvent, 0, sizeof(readEvent));
+    if ((XIfEvent(display, &readEvent,
+		    BrowserTestClientMessageDataPredicate,
+		    (XPointer)&predicateValue) != Success)
+	    || (readEvent.xclient.data.l[0] != 1002)
+	    || (XEventsQueued(display, QueuedAlready) != 1)) {
+	return 52;
+    }
+    memset(&readEvent, 0, sizeof(readEvent));
+    if ((XNextEvent(display, &readEvent) != Success)
+	    || (readEvent.xclient.data.l[0] != 1001)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	return 53;
+    }
+
+    memset(&exposeEvent, 0, sizeof(exposeEvent));
+    BrowserSetCommonEventFields(&exposeEvent, Expose,
+	    browserDisplay.rootWindow, CurrentTime);
+    exposeEvent.xexpose.window = browserDisplay.rootWindow;
+    exposeEvent.xexpose.width = 5;
+    exposeEvent.xexpose.height = 7;
+    memset(&mapEvent, 0, sizeof(mapEvent));
+    BrowserSetCommonEventFields(&mapEvent, MapNotify,
+	    browserDisplay.rootWindow, CurrentTime);
+    mapEvent.xmap.event = browserDisplay.rootWindow;
+    mapEvent.xmap.window = browserDisplay.rootWindow;
+    if (!BrowserQueueEvent(&firstEvent) || !BrowserQueueEvent(&exposeEvent)
+	    || !BrowserQueueEvent(&mapEvent)) {
+	return 60;
+    }
+    memset(&readEvent, 0, sizeof(readEvent));
+    if ((XCheckMaskEvent(display, ExposureMask, &readEvent) != True)
+	    || (readEvent.type != Expose)
+	    || (readEvent.xexpose.width != 5)
+	    || (XEventsQueued(display, QueuedAlready) != 2)) {
+	return 61;
+    }
+    memset(&readEvent, 0, sizeof(readEvent));
+    if ((XCheckWindowEvent(display, browserDisplay.rootWindow,
+		    StructureNotifyMask, &readEvent) != True)
+	    || (readEvent.type != MapNotify)
+	    || (XEventsQueued(display, QueuedAlready) != 1)) {
+	return 62;
+    }
+    memset(&readEvent, 0, sizeof(readEvent));
+    if ((XCheckWindowEvent(display, browserDisplay.rootWindow,
+		    StructureNotifyMask, &readEvent) != False)
+	    || (readEvent.type != 0)
+	    || (XEventsQueued(display, QueuedAlready) != 1)) {
+	return 63;
+    }
+    memset(&readEvent, 0, sizeof(readEvent));
+    if ((XNextEvent(display, &readEvent) != Success)
+	    || (readEvent.type != ClientMessage)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	return 64;
+    }
+    if (!BrowserQueueEvent(&exposeEvent)) {
+	return 65;
+    }
+    memset(&readEvent, 0, sizeof(readEvent));
+    if ((XMaskEvent(display, ExposureMask, &readEvent) != Success)
+	    || (readEvent.type != Expose)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	return 66;
     }
     BrowserClearEventQueue();
     return 1;

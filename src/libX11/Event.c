@@ -1,5 +1,74 @@
 #include "XlibInt.h"
 
+typedef struct BrowserTypedEventMatch {
+    Window window;
+    int type;
+    int matchWindow;
+} BrowserTypedEventMatch;
+
+typedef struct BrowserUserEventPredicate {
+    Bool (*predicate)(Display *display, XEvent *eventPtr, XPointer arg);
+    XPointer arg;
+} BrowserUserEventPredicate;
+
+static int
+BrowserTypedQueuedEvent(
+    Display *display,
+    XEvent *eventPtr,
+    XPointer arg)
+{
+    BrowserTypedEventMatch *matchPtr = (BrowserTypedEventMatch *)arg;
+
+    (void)display;
+    if ((eventPtr == NULL) || (matchPtr == NULL)) {
+	return 0;
+    }
+    if (eventPtr->type != matchPtr->type) {
+	return 0;
+    }
+    if (matchPtr->matchWindow
+	    && (BrowserEventWindow(eventPtr) != matchPtr->window)) {
+	return 0;
+    }
+    return 1;
+}
+
+static int
+BrowserUserQueuedEvent(
+    Display *display,
+    XEvent *eventPtr,
+    XPointer arg)
+{
+    BrowserUserEventPredicate *predicatePtr =
+	    (BrowserUserEventPredicate *)arg;
+
+    if ((predicatePtr == NULL) || (predicatePtr->predicate == NULL)) {
+	return 0;
+    }
+    return predicatePtr->predicate(display, eventPtr, predicatePtr->arg)
+	    ? 1 : 0;
+}
+
+static int
+BrowserTakeQueuedEventAfterPump(
+    Display *display,
+    X11WasmQueuedEventPredicate predicate,
+    XPointer arg,
+    int remove,
+    XEvent *event)
+{
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    }
+    if (BrowserTakeQueuedEvent(display, predicate, arg, remove, event,
+	    NULL)) {
+	return 1;
+    }
+    (void)XFlush(display);
+    return BrowserTakeQueuedEvent(display, predicate, arg, remove, event,
+	    NULL);
+}
+
 EMSCRIPTEN_KEEPALIVE int
 XEventsQueued(
     Display *display,
@@ -13,6 +82,13 @@ XEventsQueued(
     }
     BrowserUpdateQueueLength();
     return eventQueueCount;
+}
+
+int
+XPending(
+    Display *display)
+{
+    return XEventsQueued(display, QueuedAfterFlush);
 }
 
 int
@@ -42,6 +118,15 @@ BrowserPopMatchingEventAfterPump(
 }
 
 int
+XPeekEvent(
+    Display *display,
+    XEvent *event)
+{
+    (void)BrowserTakeQueuedEventAfterPump(display, NULL, NULL, 0, event);
+    return Success;
+}
+
+int
 XNextEvent(
     Display *display,
     XEvent *event)
@@ -51,6 +136,130 @@ XNextEvent(
     }
     BrowserInitDisplay();
     (void)BrowserPopEventAfterPump(display, event);
+    return Success;
+}
+
+int
+XMaskEvent(
+    Display *display,
+    long mask,
+    XEvent *event)
+{
+    long match[2];
+
+    match[0] = (long)None;
+    match[1] = mask;
+    (void)BrowserTakeQueuedEventAfterPump(display, BrowserWindowMaskQueuedEvent,
+	    (XPointer)match, 1, event);
+    return Success;
+}
+
+Bool
+XCheckMaskEvent(
+    Display *display,
+    long mask,
+    XEvent *event)
+{
+    long match[2];
+
+    match[0] = (long)None;
+    match[1] = mask;
+    return BrowserTakeQueuedEventAfterPump(display,
+	    BrowserWindowMaskQueuedEvent, (XPointer)match, 1, event)
+	    ? True : False;
+}
+
+Bool
+XCheckWindowEvent(
+    Display *display,
+    Window window,
+    long mask,
+    XEvent *event)
+{
+    long match[2];
+
+    match[0] = (long)window;
+    match[1] = mask;
+    return BrowserTakeQueuedEventAfterPump(display,
+	    BrowserWindowMaskQueuedEvent, (XPointer)match, 1, event)
+	    ? True : False;
+}
+
+Bool
+XCheckTypedEvent(
+    Display *display,
+    int eventType,
+    XEvent *event)
+{
+    BrowserTypedEventMatch match;
+
+    match.window = None;
+    match.type = eventType;
+    match.matchWindow = 0;
+    return BrowserTakeQueuedEventAfterPump(display, BrowserTypedQueuedEvent,
+	    (XPointer)&match, 1, event) ? True : False;
+}
+
+Bool
+XCheckTypedWindowEvent(
+    Display *display,
+    Window window,
+    int eventType,
+    XEvent *event)
+{
+    BrowserTypedEventMatch match;
+
+    match.window = window;
+    match.type = eventType;
+    match.matchWindow = 1;
+    return BrowserTakeQueuedEventAfterPump(display, BrowserTypedQueuedEvent,
+	    (XPointer)&match, 1, event) ? True : False;
+}
+
+int
+XIfEvent(
+    Display *display,
+    XEvent *event,
+    Bool (*predicate)(Display *display, XEvent *eventPtr, XPointer arg),
+    XPointer arg)
+{
+    BrowserUserEventPredicate userPredicate;
+
+    userPredicate.predicate = predicate;
+    userPredicate.arg = arg;
+    (void)BrowserTakeQueuedEventAfterPump(display, BrowserUserQueuedEvent,
+	    (XPointer)&userPredicate, 1, event);
+    return Success;
+}
+
+Bool
+XCheckIfEvent(
+    Display *display,
+    XEvent *event,
+    Bool (*predicate)(Display *display, XEvent *eventPtr, XPointer arg),
+    XPointer arg)
+{
+    BrowserUserEventPredicate userPredicate;
+
+    userPredicate.predicate = predicate;
+    userPredicate.arg = arg;
+    return BrowserTakeQueuedEventAfterPump(display, BrowserUserQueuedEvent,
+	    (XPointer)&userPredicate, 1, event) ? True : False;
+}
+
+int
+XPeekIfEvent(
+    Display *display,
+    XEvent *event,
+    Bool (*predicate)(Display *display, XEvent *eventPtr, XPointer arg),
+    XPointer arg)
+{
+    BrowserUserEventPredicate userPredicate;
+
+    userPredicate.predicate = predicate;
+    userPredicate.arg = arg;
+    (void)BrowserTakeQueuedEventAfterPump(display, BrowserUserQueuedEvent,
+	    (XPointer)&userPredicate, 0, event);
     return Success;
 }
 

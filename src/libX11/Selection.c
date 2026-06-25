@@ -371,26 +371,8 @@ BrowserPopEvent(
     XEvent *eventPtr,
     int *internalPtr)
 {
-    BrowserInitDisplay();
-    if (eventQueueCount <= 0) {
-	if (eventPtr != NULL) {
-	    memset(eventPtr, 0, sizeof(XEvent));
-	}
-	if (internalPtr != NULL) {
-	    *internalPtr = 0;
-	}
-	return 0;
-    }
-    if (eventPtr != NULL) {
-	*eventPtr = eventQueue[eventQueueHead].event;
-    }
-    if (internalPtr != NULL) {
-	*internalPtr = eventQueue[eventQueueHead].internal;
-    }
-    eventQueueHead = (eventQueueHead + 1) % X11_WASM_EVENT_QUEUE_LIMIT;
-    eventQueueCount--;
-    BrowserUpdateQueueLength();
-    return 1;
+    return BrowserTakeQueuedEvent(&browserDisplay.display, NULL, NULL, 1,
+	    eventPtr, internalPtr);
 }
 
 void
@@ -644,41 +626,84 @@ BrowserSendEventTarget(
 }
 
 int
-BrowserPopMatchingEvent(
-    Window window,
-    long mask,
-    XEvent *eventPtr)
+BrowserWindowMaskQueuedEvent(
+    Display *display,
+    XEvent *eventPtr,
+    XPointer arg)
+{
+    const long *matchPtr = (const long *)arg;
+    Window window = (Window)matchPtr[0];
+    long mask = matchPtr[1];
+
+    (void)display;
+    return BrowserEventMatchesWindowMask(eventPtr, window, mask);
+}
+
+int
+BrowserTakeQueuedEvent(
+    Display *display,
+    X11WasmQueuedEventPredicate predicate,
+    XPointer arg,
+    int remove,
+    XEvent *eventPtr,
+    int *internalPtr)
 {
     int offset;
 
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    }
     BrowserInitDisplay();
     for (offset = 0; offset < eventQueueCount; offset++) {
 	int index = (eventQueueHead + offset) % X11_WASM_EVENT_QUEUE_LIMIT;
 
-	if (!BrowserEventMatchesWindowMask(&eventQueue[index].event, window,
-		mask)) {
+	if ((predicate != NULL)
+		&& !predicate(display, &eventQueue[index].event, arg)) {
 	    continue;
 	}
 	if (eventPtr != NULL) {
 	    *eventPtr = eventQueue[index].event;
 	}
-	while (offset < eventQueueCount - 1) {
-	    int dest = (eventQueueHead + offset) % X11_WASM_EVENT_QUEUE_LIMIT;
-	    int src = (eventQueueHead + offset + 1)
-		    % X11_WASM_EVENT_QUEUE_LIMIT;
-
-	    eventQueue[dest] = eventQueue[src];
-	    offset++;
+	if (internalPtr != NULL) {
+	    *internalPtr = eventQueue[index].internal;
 	}
-	eventQueueCount--;
+	if (remove) {
+	    while (offset < eventQueueCount - 1) {
+		int dest = (eventQueueHead + offset)
+			% X11_WASM_EVENT_QUEUE_LIMIT;
+		int src = (eventQueueHead + offset + 1)
+			% X11_WASM_EVENT_QUEUE_LIMIT;
+
+		eventQueue[dest] = eventQueue[src];
+		offset++;
+	    }
+	    eventQueueCount--;
+	}
 	BrowserUpdateQueueLength();
 	return 1;
     }
     if (eventPtr != NULL) {
 	memset(eventPtr, 0, sizeof(XEvent));
     }
+    if (internalPtr != NULL) {
+	*internalPtr = 0;
+    }
     BrowserUpdateQueueLength();
     return 0;
+}
+
+int
+BrowserPopMatchingEvent(
+    Window window,
+    long mask,
+    XEvent *eventPtr)
+{
+    long match[2];
+
+    match[0] = (long)window;
+    match[1] = mask;
+    return BrowserTakeQueuedEvent(&browserDisplay.display,
+	    BrowserWindowMaskQueuedEvent, (XPointer)match, 1, eventPtr, NULL);
 }
 
 void
