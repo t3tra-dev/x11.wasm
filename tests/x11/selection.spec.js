@@ -66,6 +66,60 @@ test("X11WasmSetClipboardText updates browser clipboard bridge", async ({
   });
 });
 
+test("CLIPBOARD text property updates browser clipboard bridge", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const clipboard = {
+      writes: /** @type {string[]} */ ([]),
+      writeText(text) {
+        this.writes.push(String(text));
+        return Promise.resolve();
+      },
+    };
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: clipboard,
+    });
+  });
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(async () => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestSyncClipboardSelectionProperty?: Function, x11WasmBackend?: { clipboardText?: string, clipboardWriteStatus?: string } } }} */ (
+        window
+      ).Module;
+    const nativeClipboard =
+      /** @type {Navigator & { clipboard?: { writes?: string[] } }} */ (
+        navigator
+      ).clipboard;
+    if (
+      !module?._X11WasmTestSyncClipboardSelectionProperty ||
+      !module.x11WasmBackend
+    ) {
+      throw new Error("missing clipboard selection sync test hooks");
+    }
+
+    const syncResult = module._X11WasmTestSyncClipboardSelectionProperty();
+    await Promise.resolve();
+
+    return {
+      status: module.x11WasmBackend.clipboardWriteStatus,
+      stored: module.x11WasmBackend.clipboardText,
+      syncResult,
+      writes: nativeClipboard?.writes || [],
+    };
+  });
+
+  expect(result).toEqual({
+    status: "written",
+    stored: "x11.wasm selection clipboard",
+    syncResult: 1,
+    writes: ["x11.wasm selection clipboard"],
+  });
+});
+
 test("XSetSelectionOwner updates browser selection metadata", async ({
   page,
 }) => {

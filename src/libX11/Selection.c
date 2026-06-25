@@ -160,6 +160,40 @@ BrowserSelectionTargetIsText(
 	    || (target == BrowserCompoundTextAtom());
 }
 
+void
+BrowserSyncClipboardProperty(
+    Atom property,
+    const X11WasmProperty *propertyPtr)
+{
+    XTextProperty textProp;
+    char **list = NULL;
+    int count = 0;
+    const char *text = "";
+
+    if ((property != BrowserClipboardSelectionAtom()) || (propertyPtr == NULL)
+	    || (BrowserSelectionOwnerWindow(BrowserClipboardSelectionAtom())
+		== None)
+	    || (propertyPtr->format != 8)
+	    || !BrowserPropertyIsTextEncoding(propertyPtr->type)) {
+	return;
+    }
+    memset(&textProp, 0, sizeof(textProp));
+    textProp.value = propertyPtr->data;
+    textProp.encoding = propertyPtr->type;
+    textProp.format = propertyPtr->format;
+    textProp.nitems = propertyPtr->nitems;
+    if (!BrowserTextPropertyToUtf8StringList(&textProp, &list, &count)) {
+	return;
+    }
+    if ((count > 0) && (list != NULL) && (list[0] != NULL)) {
+	text = list[0];
+    }
+    (void)X11WasmJsSetClipboardText(text, (int)strlen(text));
+    if (list != NULL) {
+	XFreeStringList(list);
+    }
+}
+
 int
 BrowserExternalClipboardTextProperty(
     Atom target,

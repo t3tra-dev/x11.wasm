@@ -1575,6 +1575,9 @@ void BrowserSyncPointerGrabState(void);
 void BrowserSyncPointerState(void);
 void BrowserSyncRequestState(
     Display *display);
+void BrowserSyncClipboardProperty(
+    Atom property,
+    const X11WasmProperty *propertyPtr);
 void BrowserSyncSelectionOwner(
     Atom selection,
     Window owner,

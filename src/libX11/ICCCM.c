@@ -1345,8 +1345,9 @@ XChangeProperty(
     changed = BrowserSetProperty(resourcePtr, property, type, format, mode,
 	    data, nelements);
     if (changed) {
-	BrowserApplyWindowMetadataProperty(window, property,
-		BrowserFindProperty(resourcePtr, property));
+	propertyPtr = BrowserFindProperty(resourcePtr, property);
+	BrowserApplyWindowMetadataProperty(window, property, propertyPtr);
+	BrowserSyncClipboardProperty(property, propertyPtr);
     }
     return Success;
 }
@@ -1790,6 +1791,27 @@ X11WasmTestSetClipboardText(int clear)
     static const char clipboardText[] = "x11.wasm clipboard api";
 
     return X11WasmSetClipboardText(clear ? "" : clipboardText, clear ? 0 : -1);
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestSyncClipboardSelectionProperty(void)
+{
+    static const char clipboardText[] = "x11.wasm selection clipboard";
+    Atom clipboardAtom;
+
+    BrowserInitDisplay();
+    clipboardAtom = BrowserClipboardSelectionAtom();
+    if (XSetSelectionOwner(&browserDisplay.display, clipboardAtom,
+	    browserDisplay.rootWindow, CurrentTime) != Success) {
+	return 0;
+    }
+    if (XChangeProperty(&browserDisplay.display, browserDisplay.rootWindow,
+	    clipboardAtom, BrowserUtf8StringAtom(), 8, PropModeReplace,
+	    (const unsigned char *)clipboardText,
+	    (int)strlen(clipboardText)) != Success) {
+	return 0;
+    }
+    return 1;
 }
 
 EMSCRIPTEN_KEEPALIVE int

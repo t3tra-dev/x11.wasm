@@ -427,6 +427,7 @@ declare const Module: {
     enabled: number,
   ) => number;
   _X11WasmTestSetClipboardText?: (clear: number) => number;
+  _X11WasmTestSyncClipboardSelectionProperty?: () => number;
   _X11WasmTestSetStandardColormaps?: (
     window: number,
     enabled: number,
