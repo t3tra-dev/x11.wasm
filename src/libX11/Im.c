@@ -2587,6 +2587,8 @@ XSetModifierMapping(
 			compareSlot++) {
 		    if (mapPtr->modifiermap[compareModifier * maxKeyPerMod
 			    + compareSlot] == keycode) {
+			(void)BrowserValueOrError(&display, keycode, 0,
+				X11_WASM_XREQ_SET_MODIFIER_MAPPING);
 			(void)XNoOp(display);
 			return MappingFailed;
 		    }

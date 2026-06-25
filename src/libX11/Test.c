@@ -6554,6 +6554,9 @@ X11WasmTestXErrorHandler(void)
     int duplicatePointerMapResult;
     int sawPointerMapLengthBadValue;
     int sawPointerMapDuplicateBadValue;
+    XModifierKeymap *duplicateModifierMap = NULL;
+    int duplicateModifierMapResult;
+    int sawModifierMapDuplicateBadValue;
     int bellValidationResult;
     int propertyValidationResultSum;
     int invalidWMColormapCountResult;
@@ -6748,6 +6751,8 @@ X11WasmTestXErrorHandler(void)
     sawWithdrawBadValue = 0;
     sawPointerMapLengthBadValue = 0;
     sawPointerMapDuplicateBadValue = 0;
+    duplicateModifierMapResult = MappingFailed;
+    sawModifierMapDuplicateBadValue = 0;
     sawStoreBufferBadValue = 0;
     warpPointerZeroWidthX = -1;
     warpPointerZeroWidthY = -1;
@@ -7313,6 +7318,23 @@ X11WasmTestXErrorHandler(void)
 	    && (browserTestLastRequestCode
 		    == X11_WASM_XREQ_SET_POINTER_MAPPING)
 	    && (browserTestLastResourceId == (XID)Button2);
+    duplicateModifierMap = XNewModifiermap(1);
+    if (duplicateModifierMap != NULL) {
+	duplicateModifierMap->modifiermap[ShiftMapIndex] =
+		X11_WASM_KEYCODE_SHIFT;
+	duplicateModifierMap->modifiermap[ControlMapIndex] =
+		X11_WASM_KEYCODE_SHIFT;
+	duplicateModifierMapResult = XSetModifierMapping(
+		&browserDisplay.display, duplicateModifierMap);
+	sawModifierMapDuplicateBadValue =
+		(browserTestLastErrorCode == BadValue)
+		&& (browserTestLastRequestCode
+			== X11_WASM_XREQ_SET_MODIFIER_MAPPING)
+		&& (browserTestLastResourceId
+			== (XID)X11_WASM_KEYCODE_SHIFT);
+	XFreeModifiermap(duplicateModifierMap);
+	duplicateModifierMap = NULL;
+    }
     bellValidationResult = XBell(&browserDisplay.display, 101);
     (void)XSetScreenSaver(&browserDisplay.display, -1, 30,
 	    PreferBlanking, AllowExposures);
@@ -7698,6 +7720,8 @@ X11WasmTestXErrorHandler(void)
 	    || (duplicatePointerMapResult != MappingFailed)
 	    || !sawPointerMapLengthBadValue
 	    || !sawPointerMapDuplicateBadValue
+	    || (duplicateModifierMapResult != MappingFailed)
+	    || !sawModifierMapDuplicateBadValue
 	    || (bellValidationResult != Success)
 	    || (validProperty == None)
 	    || (propertyPixmap == None)
@@ -7911,6 +7935,7 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_CHANGE_ACTIVE_POINTER_GRAB
 	    + X11_WASM_XREQ_SET_POINTER_MAPPING
 	    + X11_WASM_XREQ_SET_POINTER_MAPPING
+	    + X11_WASM_XREQ_SET_MODIFIER_MAPPING
 	    + X11_WASM_XREQ_BELL
 	    + X11_WASM_XREQ_SET_SCREEN_SAVER
 	    + X11_WASM_XREQ_FORCE_SCREEN_SAVER
@@ -8023,7 +8048,7 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 237)
+    if ((browserTestXErrorCount != 238)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
