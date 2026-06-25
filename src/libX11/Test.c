@@ -307,6 +307,215 @@ cleanup:
     return result;
 }
 
+static int
+BrowserTestQueryTreeOrder(
+    Display *display,
+    Window parent,
+    const Window *expected,
+    unsigned int expectedCount)
+{
+    Window rootReturn = None;
+    Window parentReturn = None;
+    Window *children = NULL;
+    unsigned int childCount = 0;
+    unsigned int i;
+    int result = 0;
+
+    if (!XQueryTree(display, parent, &rootReturn, &parentReturn, &children,
+	    &childCount)) {
+	goto cleanup;
+    }
+    if ((rootReturn != browserDisplay.rootWindow)
+	    || (parentReturn != browserDisplay.rootWindow)
+	    || (childCount != expectedCount)) {
+	goto cleanup;
+    }
+    for (i = 0; i < expectedCount; i++) {
+	if ((children == NULL) || (children[i] != expected[i])) {
+	    goto cleanup;
+	}
+    }
+    result = 1;
+
+cleanup:
+    if (children != NULL) {
+	XFree(children);
+    }
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestConfigureStackingApis(void)
+{
+    Display *display;
+    XSetWindowAttributes attributes;
+    XWindowChanges changes;
+    XWindowAttributes returnedAttributes;
+    XEvent event;
+    Window parent = None;
+    Window bottom = None;
+    Window middle = None;
+    Window top = None;
+    Window far = None;
+    Window expected[4];
+    int result = 0;
+    int screen;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+    memset(&attributes, 0, sizeof(attributes));
+    attributes.event_mask = StructureNotifyMask;
+    parent = XCreateWindow(display, browserDisplay.rootWindow, 0, 0, 100, 40, 0,
+	    CopyFromParent, InputOutput, DefaultVisual(display, screen), 0, NULL);
+    bottom = XCreateWindow(display, parent, 0, 0, 20, 20, 0, CopyFromParent,
+	    InputOutput, DefaultVisual(display, screen), CWEventMask,
+	    &attributes);
+    middle = XCreateWindow(display, parent, 0, 0, 20, 20, 0, CopyFromParent,
+	    InputOutput, DefaultVisual(display, screen), CWEventMask,
+	    &attributes);
+    top = XCreateWindow(display, parent, 0, 0, 20, 20, 0, CopyFromParent,
+	    InputOutput, DefaultVisual(display, screen), CWEventMask,
+	    &attributes);
+    far = XCreateWindow(display, parent, 60, 0, 10, 10, 0, CopyFromParent,
+	    InputOutput, DefaultVisual(display, screen), CWEventMask,
+	    &attributes);
+    if ((parent == None) || (bottom == None) || (middle == None)
+	    || (top == None) || (far == None)
+	    || (XMapWindow(display, parent) != Success)
+	    || (XMapWindow(display, bottom) != Success)
+	    || (XMapWindow(display, middle) != Success)
+	    || (XMapWindow(display, top) != Success)
+	    || (XMapWindow(display, far) != Success)) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+
+    expected[0] = bottom;
+    expected[1] = middle;
+    expected[2] = top;
+    expected[3] = far;
+    if (!BrowserTestQueryTreeOrder(display, parent, expected, 4)) {
+	goto cleanup;
+    }
+
+    memset(&changes, 0, sizeof(changes));
+    changes.sibling = far;
+    changes.stack_mode = TopIf;
+    if (XConfigureWindow(display, bottom, CWSibling | CWStackMode, &changes)
+	    != Success) {
+	goto cleanup;
+    }
+    if (!BrowserTestQueryTreeOrder(display, parent, expected, 4)) {
+	goto cleanup;
+    }
+
+    changes.sibling = middle;
+    changes.stack_mode = TopIf;
+    if (XConfigureWindow(display, bottom, CWSibling | CWStackMode, &changes)
+	    != Success) {
+	goto cleanup;
+    }
+    expected[0] = middle;
+    expected[1] = bottom;
+    expected[2] = top;
+    expected[3] = far;
+    if (!BrowserTestQueryTreeOrder(display, parent, expected, 4)) {
+	goto cleanup;
+    }
+
+    changes.sibling = middle;
+    changes.stack_mode = BottomIf;
+    if (XConfigureWindow(display, bottom, CWSibling | CWStackMode, &changes)
+	    != Success) {
+	goto cleanup;
+    }
+    expected[0] = bottom;
+    expected[1] = middle;
+    expected[2] = top;
+    expected[3] = far;
+    if (!BrowserTestQueryTreeOrder(display, parent, expected, 4)) {
+	goto cleanup;
+    }
+
+    memset(&changes, 0, sizeof(changes));
+    changes.stack_mode = Opposite;
+    if (XConfigureWindow(display, far, CWStackMode, &changes) != Success) {
+	goto cleanup;
+    }
+    if (!BrowserTestQueryTreeOrder(display, parent, expected, 4)) {
+	goto cleanup;
+    }
+
+    if (XConfigureWindow(display, bottom, CWStackMode, &changes) != Success) {
+	goto cleanup;
+    }
+    expected[0] = middle;
+    expected[1] = top;
+    expected[2] = far;
+    expected[3] = bottom;
+    if (!BrowserTestQueryTreeOrder(display, parent, expected, 4)) {
+	goto cleanup;
+    }
+
+    if ((XLowerWindow(display, bottom) != Success)
+	    || (XRaiseWindow(display, middle) != Success)) {
+	goto cleanup;
+    }
+    expected[0] = bottom;
+    expected[1] = top;
+    expected[2] = far;
+    expected[3] = middle;
+    if (!BrowserTestQueryTreeOrder(display, parent, expected, 4)) {
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    memset(&changes, 0, sizeof(changes));
+    changes.x = 5;
+    changes.y = 7;
+    changes.width = 21;
+    changes.height = 13;
+    changes.border_width = 2;
+    if (XConfigureWindow(display, top,
+	    CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &changes)
+	    != Success) {
+	goto cleanup;
+    }
+    memset(&event, 0, sizeof(event));
+    if (!BrowserPopEvent(&event, NULL)
+	    || (event.type != ConfigureNotify)
+	    || (event.xconfigure.event != top)
+	    || (event.xconfigure.window != top)
+	    || (event.xconfigure.x != 5)
+	    || (event.xconfigure.y != 7)
+	    || (event.xconfigure.width != 21)
+	    || (event.xconfigure.height != 13)
+	    || (event.xconfigure.border_width != 2)
+	    || (event.xconfigure.above != None)
+	    || (event.xconfigure.override_redirect != False)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    memset(&returnedAttributes, 0, sizeof(returnedAttributes));
+    if (!XGetWindowAttributes(display, top, &returnedAttributes)
+	    || (returnedAttributes.x != 5)
+	    || (returnedAttributes.y != 7)
+	    || (returnedAttributes.width != 21)
+	    || (returnedAttributes.height != 13)
+	    || (returnedAttributes.border_width != 2)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    BrowserClearEventQueue();
+    if (parent != None) {
+	(void)XDestroyWindow(display, parent);
+    }
+    return result;
+}
+
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestXlibApis(void)
 {

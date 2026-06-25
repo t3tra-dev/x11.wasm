@@ -907,6 +907,80 @@ BrowserSiblingPrecedes(
     return 0;
 }
 
+static int
+BrowserWindowRectanglesOverlap(
+    X11WasmResource *firstPtr,
+    X11WasmResource *secondPtr)
+{
+    long firstRight, firstBottom;
+    long secondRight, secondBottom;
+
+    if ((firstPtr == NULL) || (secondPtr == NULL)
+	    || (firstPtr->type != X11_WASM_RESOURCE_WINDOW)
+	    || (secondPtr->type != X11_WASM_RESOURCE_WINDOW)
+	    || (firstPtr->parentPtr != secondPtr->parentPtr)
+	    || !BrowserResourceIsVisible(firstPtr)
+	    || !BrowserResourceIsVisible(secondPtr)
+	    || (firstPtr->width == 0) || (firstPtr->height == 0)
+	    || (secondPtr->width == 0) || (secondPtr->height == 0)) {
+	return 0;
+    }
+    firstRight = (long)firstPtr->x + (long)firstPtr->width;
+    firstBottom = (long)firstPtr->y + (long)firstPtr->height;
+    secondRight = (long)secondPtr->x + (long)secondPtr->width;
+    secondBottom = (long)secondPtr->y + (long)secondPtr->height;
+    return ((long)firstPtr->x < secondRight)
+	    && (firstRight > (long)secondPtr->x)
+	    && ((long)firstPtr->y < secondBottom)
+	    && (firstBottom > (long)secondPtr->y);
+}
+
+static int
+BrowserWindowIsObscuredBySibling(
+    X11WasmResource *resourcePtr,
+    X11WasmResource *siblingPtr)
+{
+    X11WasmResource *scanPtr;
+
+    if ((resourcePtr == NULL) || !BrowserResourceIsVisible(resourcePtr)) {
+	return 0;
+    }
+    if (siblingPtr != NULL) {
+	return BrowserSiblingPrecedes(resourcePtr, siblingPtr)
+		&& BrowserWindowRectanglesOverlap(resourcePtr, siblingPtr);
+    }
+    for (scanPtr = resourcePtr->nextSiblingPtr; scanPtr != NULL;
+	    scanPtr = scanPtr->nextSiblingPtr) {
+	if (BrowserWindowRectanglesOverlap(resourcePtr, scanPtr)) {
+	    return 1;
+	}
+    }
+    return 0;
+}
+
+static int
+BrowserWindowObscuresSibling(
+    X11WasmResource *resourcePtr,
+    X11WasmResource *siblingPtr)
+{
+    X11WasmResource *scanPtr;
+
+    if ((resourcePtr == NULL) || !BrowserResourceIsVisible(resourcePtr)) {
+	return 0;
+    }
+    if (siblingPtr != NULL) {
+	return BrowserSiblingPrecedes(siblingPtr, resourcePtr)
+		&& BrowserWindowRectanglesOverlap(resourcePtr, siblingPtr);
+    }
+    for (scanPtr = resourcePtr->prevSiblingPtr; scanPtr != NULL;
+	    scanPtr = scanPtr->prevSiblingPtr) {
+	if (BrowserWindowRectanglesOverlap(resourcePtr, scanPtr)) {
+	    return 1;
+	}
+    }
+    return 0;
+}
+
 void
 BrowserSyncTransientStacking(void)
 {
@@ -971,6 +1045,7 @@ BrowserRestackWindow(
     X11WasmResource *siblingPtr = NULL;
     X11WasmResource *parentPtr;
     int mode = Above;
+    int restack = 1;
 
     if ((resourcePtr == NULL)
 	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)
@@ -995,22 +1070,58 @@ BrowserRestackWindow(
 
     switch (mode) {
     case Below:
-    case BottomIf:
 	if (siblingPtr != NULL) {
 	    BrowserLinkChildBefore(resourcePtr, parentPtr, siblingPtr);
 	} else {
 	    BrowserLinkChildAtBottom(resourcePtr, (Window)parentPtr->id);
 	}
 	break;
+    case BottomIf:
+	if (BrowserWindowObscuresSibling(resourcePtr, siblingPtr)) {
+	    if (siblingPtr != NULL) {
+		BrowserLinkChildBefore(resourcePtr, parentPtr, siblingPtr);
+	    } else {
+		BrowserLinkChildAtBottom(resourcePtr, (Window)parentPtr->id);
+	    }
+	} else {
+	    restack = 0;
+	}
+	break;
     case Opposite:
-	if (resourcePtr->nextSiblingPtr == NULL) {
-	    BrowserLinkChildAtBottom(resourcePtr, (Window)parentPtr->id);
+	if (BrowserWindowIsObscuredBySibling(resourcePtr, siblingPtr)) {
+	    if (siblingPtr != NULL) {
+		BrowserLinkChildAfter(resourcePtr, parentPtr, siblingPtr);
+	    } else {
+		BrowserLinkChildAtTop(resourcePtr, (Window)parentPtr->id);
+	    }
+	} else if (BrowserWindowObscuresSibling(resourcePtr, siblingPtr)) {
+	    if (siblingPtr != NULL) {
+		BrowserLinkChildBefore(resourcePtr, parentPtr, siblingPtr);
+	    } else {
+		BrowserLinkChildAtBottom(resourcePtr, (Window)parentPtr->id);
+	    }
+	} else {
+	    restack = 0;
+	}
+	break;
+    case Above:
+	if (siblingPtr != NULL) {
+	    BrowserLinkChildAfter(resourcePtr, parentPtr, siblingPtr);
 	} else {
 	    BrowserLinkChildAtTop(resourcePtr, (Window)parentPtr->id);
 	}
 	break;
-    case Above:
     case TopIf:
+	if (BrowserWindowIsObscuredBySibling(resourcePtr, siblingPtr)) {
+	    if (siblingPtr != NULL) {
+		BrowserLinkChildAfter(resourcePtr, parentPtr, siblingPtr);
+	    } else {
+		BrowserLinkChildAtTop(resourcePtr, (Window)parentPtr->id);
+	    }
+	} else {
+	    restack = 0;
+	}
+	break;
     default:
 	if (siblingPtr != NULL) {
 	    BrowserLinkChildAfter(resourcePtr, parentPtr, siblingPtr);
@@ -1018,6 +1129,9 @@ BrowserRestackWindow(
 	    BrowserLinkChildAtTop(resourcePtr, (Window)parentPtr->id);
 	}
 	break;
+    }
+    if (!restack) {
+	return;
     }
     (void)X11WasmJsRestackWindow(BrowserJsXId(resourcePtr->id),
 	    BrowserJsXId(resourcePtr->prevSiblingPtr != NULL

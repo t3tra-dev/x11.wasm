@@ -11,6 +11,23 @@ const {
   X11_WASM_JS_LIBRARY_SOURCES,
 } = require("../support/x11");
 
+test("XConfigureWindow honors conditional stacking modes", async ({ page }) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestConfigureStackingApis?: () => number } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestConfigureStackingApis) {
+      throw new Error("missing XConfigureWindow stacking test export");
+    }
+    return module._X11WasmTestConfigureStackingApis();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XSetIconSizes updates browser WM_ICON_SIZE metadata", async ({ page }) => {
   await waitForX11Runtime(page);
   const windowId = await createMappedWindow(page);
