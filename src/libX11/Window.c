@@ -1265,8 +1265,8 @@ BrowserMarkResourceDamage(
     }
 
     resourcePtr->damaged = 1;
-    resourcePtr->damage.x = (short)x1;
-    resourcePtr->damage.y = (short)y1;
+    resourcePtr->damage.x = BrowserClampShort(x1);
+    resourcePtr->damage.y = BrowserClampShort(y1);
     resourcePtr->damage.width = BrowserClampUShort((unsigned int)(x2 - x1));
     resourcePtr->damage.height = BrowserClampUShort((unsigned int)(y2 - y1));
     resourcePtr->damageSerial = damageSerial++;

@@ -915,6 +915,7 @@ X11WasmTestXlibApis(void)
     unsigned int reparentChildCount = 0;
     Pixmap pixmap = None;
     Pixmap copyExposurePixmap = None;
+    Pixmap widePixmap = None;
     Pixmap textPixmap = None;
     XIM inputMethod = NULL;
     XIC inputContext = NULL;
@@ -2075,6 +2076,23 @@ X11WasmTestXlibApis(void)
     }
     X11WasmSetPixmapColormap(pixmap, secondColormap);
     if (pixmapPtr->atts.colormap != secondColormap) {
+	goto cleanup;
+    }
+    widePixmap = XCreatePixmap(&browserDisplay.display, (Drawable)window,
+	    40000, 2, (unsigned int)DefaultDepth(&browserDisplay.display,
+		    screen));
+    pixmapPtr = X11WasmFindResource((XID)widePixmap);
+    if ((widePixmap == None) || (pixmapPtr == NULL)
+	    || (pixmapPtr->type != X11_WASM_RESOURCE_PIXMAP)
+	    || (pixmapPtr->width != 40000)
+	    || (pixmapPtr->height != 2)
+	    || (XFillRectangle(&browserDisplay.display, (Drawable)widePixmap,
+		    xyBitmapGC, 35000, 1, 1, 1) != Success)
+	    || !pixmapPtr->damaged
+	    || (pixmapPtr->damage.x != SHRT_MAX)
+	    || (pixmapPtr->damage.y != 1)
+	    || (pixmapPtr->damage.width != 1)
+	    || (pixmapPtr->damage.height != 1)) {
 	goto cleanup;
     }
     X11WasmSetPixmapColormap((Pixmap)window, firstColormap);
@@ -4359,6 +4377,9 @@ cleanup:
     BrowserResetHostAccessControl();
     if (copyExposurePixmap != None) {
 	(void)XFreePixmap(&browserDisplay.display, copyExposurePixmap);
+    }
+    if (widePixmap != None) {
+	(void)XFreePixmap(&browserDisplay.display, widePixmap);
     }
     if (pixmap != None) {
 	(void)XFreePixmap(&browserDisplay.display, pixmap);
