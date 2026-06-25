@@ -4378,6 +4378,7 @@ X11WasmTestXErrorHandler(void)
     int translateSourceResult;
     int translateDestinationResult;
     int queryPointerResult;
+    int invalidSendEventTypeResult;
     int sendEventResult;
     int selectionValidationResultSum;
     int freePixmapResult;
@@ -5016,6 +5017,10 @@ X11WasmTestXErrorHandler(void)
 	    0, 0, 0, 0, 1, 2);
     queryPointerResult = XQueryPointer(&browserDisplay.display,
 	    invalidWindow, &root, &child, &x, &y, &x, &y, NULL);
+    event.type = LASTEvent + 1;
+    invalidSendEventTypeResult = XSendEvent(&browserDisplay.display,
+	    browserDisplay.rootWindow, False, KeyPressMask, &event);
+    event.type = KeyPress;
     sendEventResult = XSendEvent(&browserDisplay.display, invalidWindow,
 	    False, KeyPressMask, &event);
     validSelection = XInternAtom(&browserDisplay.display,
@@ -5127,6 +5132,7 @@ X11WasmTestXErrorHandler(void)
 	    || (translateSourceResult != False)
 	    || (translateDestinationResult != False)
 	    || (queryPointerResult != False)
+	    || (invalidSendEventTypeResult != False)
 	    || (sendEventResult != False)
 	    || (validSelection == None)
 	    || (invalidSelectionOwnerResult != None)
@@ -5367,6 +5373,7 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_WARP_POINTER
 	    + X11_WASM_XREQ_QUERY_POINTER
 	    + X11_WASM_XREQ_SEND_EVENT
+	    + X11_WASM_XREQ_SEND_EVENT
 	    + X11_WASM_XREQ_GET_SELECTION_OWNER
 	    + X11_WASM_XREQ_SET_SELECTION_OWNER
 	    + X11_WASM_XREQ_SET_SELECTION_OWNER
@@ -5440,15 +5447,15 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 174)
+    if ((browserTestXErrorCount != 175)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
 	    || (browserTestRequestCodeSum != expectedRequestCodeSum)
 	    || (browserTestRequestCodeMask != expectedRequestCodeMask)
-	    || (browserTestLastSerial != initialSerial + 174)
+	    || (browserTestLastSerial != initialSerial + 175)
 	    || (LastKnownRequestProcessed(&browserDisplay.display)
-		    != initialSerial + 174)) {
+		    != initialSerial + 175)) {
 	return 0;
     }
     return 1;

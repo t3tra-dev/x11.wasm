@@ -103,6 +103,15 @@ XSendEvent(
     if (event == NULL) {
 	return False;
     }
+    if (((event->type < KeyPress) || (event->type >= LASTEvent))
+	    && (event->type != X11_WASM_BROWSER_WHEEL_EVENT)) {
+	if (display == NULL) {
+	    display = X11WasmGetDisplay(NULL);
+	}
+	(void)BrowserReportXError(display, BadValue, (XID)event->type,
+		X11_WASM_XREQ_SEND_EVENT, 0);
+	return False;
+    }
     if ((window != PointerWindow) && (window != InputFocus)) {
 	resourcePtr = BrowserWindowResourceOrError(&display, window,
 		X11_WASM_XREQ_SEND_EVENT);
