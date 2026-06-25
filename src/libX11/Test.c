@@ -1416,6 +1416,7 @@ X11WasmTestXlibApis(void)
     char *fontAtomName = NULL;
     char longText[40000];
     Font queryFont = None;
+    Font textItemFont = None;
     Font cursorFont = None;
     Font cursorMaskFont = None;
     XFontStruct *queryFontStruct = NULL;
@@ -1426,6 +1427,8 @@ X11WasmTestXlibApis(void)
     GC textGC = NULL;
     Cursor testCursor = None;
     XCharStruct textExtents;
+    XTextItem textItems[3];
+    XTextItem16 textItems16[2];
     XEvent exposureEvent;
     XColor parsedColor;
     XColor exactColor;
@@ -4810,6 +4813,42 @@ X11WasmTestXlibApis(void)
 		    queryGC, 0, textAscent * 2, latin1Text16, 4) != Success)) {
 	goto cleanup;
     }
+    textItemFont = XLoadFont(&browserDisplay.display, "Helvetica 12");
+    if (textItemFont == None) {
+	goto cleanup;
+    }
+    memset(textItems, 0, sizeof(textItems));
+    textItems[0].chars = (char *)latin1Text;
+    textItems[0].nchars = 2;
+    textItems[0].delta = 0;
+    textItems[0].font = None;
+    textItems[1].chars = NULL;
+    textItems[1].nchars = 0;
+    textItems[1].delta = 3;
+    textItems[1].font = textItemFont;
+    textItems[2].chars = (char *)latin1Text + 2;
+    textItems[2].nchars = 2;
+    textItems[2].delta = 4;
+    textItems[2].font = None;
+    memset(textItems16, 0, sizeof(textItems16));
+    textItems16[0].chars = latin1Text16;
+    textItems16[0].nchars = 2;
+    textItems16[0].delta = 0;
+    textItems16[0].font = textItemFont;
+    textItems16[1].chars = latin1Text16 + 2;
+    textItems16[1].nchars = 2;
+    textItems16[1].delta = 2;
+    textItems16[1].font = None;
+    if ((XDrawText(&browserDisplay.display, (Drawable)pixmap, queryGC,
+		    0, textAscent * 3, textItems, 3) != Success)
+	    || (queryGC->font != queryFont)
+	    || (XDrawText16(&browserDisplay.display, (Drawable)pixmap, queryGC,
+		    0, textAscent * 4, textItems16, 2) != Success)
+	    || (queryGC->font != queryFont)) {
+	goto cleanup;
+    }
+    (void)XUnloadFont(&browserDisplay.display, textItemFont);
+    textItemFont = None;
     memset(&textExtents, 0, sizeof(textExtents));
     textDirection = 0;
     textAscent = 0;
@@ -5238,6 +5277,9 @@ cleanup:
     if (queryFont != None) {
 	(void)XUnloadFont(&browserDisplay.display, queryFont);
     }
+    if (textItemFont != None) {
+	(void)XUnloadFont(&browserDisplay.display, textItemFont);
+    }
     if (cursorFont != None) {
 	(void)XUnloadFont(&browserDisplay.display, cursorFont);
     }
@@ -5601,6 +5643,8 @@ X11WasmTestXErrorHandler(void)
     XPoint points[3];
     XSegment segment;
     XChar2b text16[1];
+    XTextItem textItems[1];
+    XTextItem16 textItems16[1];
     const char zeroDash[] = {'\0'};
     Atom validProperty;
     Atom validSelection;
@@ -5751,6 +5795,16 @@ X11WasmTestXErrorHandler(void)
 	    (Drawable)invalidWindow, NULL, 0, 0, "x", 1);
     drawResultSum += XDrawString16(&browserDisplay.display,
 	    (Drawable)invalidWindow, NULL, 0, 0, text16, 1);
+    memset(textItems, 0, sizeof(textItems));
+    textItems[0].chars = (char *)"x";
+    textItems[0].nchars = 1;
+    memset(textItems16, 0, sizeof(textItems16));
+    textItems16[0].chars = text16;
+    textItems16[0].nchars = 1;
+    drawResultSum += XDrawText(&browserDisplay.display,
+	    (Drawable)invalidWindow, NULL, 0, 0, textItems, 1);
+    drawResultSum += XDrawText16(&browserDisplay.display,
+	    (Drawable)invalidWindow, NULL, 0, 0, textItems16, 1);
     drawResultSum += XDrawImageString(&browserDisplay.display,
 	    (Drawable)invalidWindow, NULL, 0, 0, "x", 1);
     drawResultSum += XDrawImageString16(&browserDisplay.display,
@@ -6539,6 +6593,8 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_POLY_FILL_ARC
 	    + X11_WASM_XREQ_POLY_TEXT_8
 	    + X11_WASM_XREQ_POLY_TEXT_16
+	    + X11_WASM_XREQ_POLY_TEXT_8
+	    + X11_WASM_XREQ_POLY_TEXT_16
 	    + X11_WASM_XREQ_POLY_LINE
 	    + X11_WASM_XREQ_POLY_POINT
 	    + X11_WASM_XREQ_FILL_POLY
@@ -6762,15 +6818,15 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 216)
+    if ((browserTestXErrorCount != 218)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
 	    || (browserTestRequestCodeSum != expectedRequestCodeSum)
 	    || (browserTestRequestCodeMask != expectedRequestCodeMask)
-	    || (browserTestLastSerial != initialSerial + 216)
+	    || (browserTestLastSerial != initialSerial + 218)
 	    || (LastKnownRequestProcessed(&browserDisplay.display)
-		    != initialSerial + 216)) {
+		    != initialSerial + 218)) {
 	return 0;
     }
     return 1;

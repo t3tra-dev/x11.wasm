@@ -610,6 +610,10 @@ EXTERN int XTextWidth(XFontStruct *font_struct, _Xconst char *string,
 		_Xconst char *string, int length);
 	EXTERN int XDrawString16(Display *display, Drawable d, GC gc, int x, int y,
 		_Xconst XChar2b *string, int length);
+	EXTERN int XDrawText(Display *display, Drawable d, GC gc, int x, int y,
+		XTextItem *items, int nitems);
+	EXTERN int XDrawText16(Display *display, Drawable d, GC gc, int x, int y,
+		XTextItem16 *items, int nitems);
 EXTERN int XDrawImageString(Display *display, Drawable d, GC gc, int x, int y,
 	_Xconst char *string, int length);
 EXTERN int XDrawImageString16(Display *display, Drawable d, GC gc, int x,

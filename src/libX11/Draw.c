@@ -1638,6 +1638,144 @@ XDrawString16(
     return result;
 }
 
+static int
+BrowserDrawTextItemUtf8(
+    Display *display,
+    Drawable drawable,
+    GC gc,
+    int *xPtr,
+    int y,
+    int delta,
+    Font activeFont,
+    char *utf8,
+    int utf8Length,
+    unsigned char requestCode)
+{
+    Font savedFont = None;
+    int result;
+
+    if ((gc != NULL) && (activeFont != None)) {
+	savedFont = gc->font;
+	gc->font = activeFont;
+    }
+    *xPtr += delta;
+    result = BrowserDrawUtf8Text(display, drawable, gc, *xPtr, y, utf8,
+	    utf8Length, requestCode);
+    *xPtr += BrowserFontResourceTextWidth(
+	    (gc != NULL) ? X11WasmFindResource(gc->font) : NULL, 8,
+	    utf8, utf8Length);
+    if ((gc != NULL) && (activeFont != None)) {
+	gc->font = savedFont;
+    }
+    return result;
+}
+
+int
+XDrawText(
+    Display *display,
+    Drawable drawable,
+    GC gc,
+    int x,
+    int y,
+    XTextItem *items,
+    int nitems)
+{
+    Font activeFont = None;
+    int i;
+
+    if ((items == NULL) || (nitems <= 0)) {
+	return Success;
+    }
+    if (BrowserDrawableResourceOrError(&display, drawable,
+	    X11_WASM_XREQ_POLY_TEXT_8) == NULL) {
+	return Success;
+    }
+    if (!BrowserOptionalGCOrError(&display, gc, X11_WASM_XREQ_POLY_TEXT_8)) {
+	return Success;
+    }
+    activeFont = (gc != NULL) ? gc->font : None;
+    for (i = 0; i < nitems; i++) {
+	char *utf8;
+	int utf8Length;
+	int result;
+
+	if (items[i].font != None) {
+	    if (BrowserFontResourceOrError(&display, items[i].font,
+		    X11_WASM_XREQ_POLY_TEXT_8) == NULL) {
+		return Success;
+	    }
+	    activeFont = items[i].font;
+	}
+	utf8 = BrowserUtf8FromLatin1String(items[i].chars, items[i].nchars,
+		&utf8Length);
+	if (utf8 == NULL) {
+	    x += items[i].delta;
+	    continue;
+	}
+	result = BrowserDrawTextItemUtf8(display, drawable, gc, &x, y,
+		items[i].delta, activeFont, utf8, utf8Length,
+		X11_WASM_XREQ_POLY_TEXT_8);
+	ckfree(utf8);
+	if (result != Success) {
+	    return result;
+	}
+    }
+    return Success;
+}
+
+int
+XDrawText16(
+    Display *display,
+    Drawable drawable,
+    GC gc,
+    int x,
+    int y,
+    XTextItem16 *items,
+    int nitems)
+{
+    Font activeFont = None;
+    int i;
+
+    if ((items == NULL) || (nitems <= 0)) {
+	return Success;
+    }
+    if (BrowserDrawableResourceOrError(&display, drawable,
+	    X11_WASM_XREQ_POLY_TEXT_16) == NULL) {
+	return Success;
+    }
+    if (!BrowserOptionalGCOrError(&display, gc, X11_WASM_XREQ_POLY_TEXT_16)) {
+	return Success;
+    }
+    activeFont = (gc != NULL) ? gc->font : None;
+    for (i = 0; i < nitems; i++) {
+	char *utf8;
+	int utf8Length;
+	int result;
+
+	if (items[i].font != None) {
+	    if (BrowserFontResourceOrError(&display, items[i].font,
+		    X11_WASM_XREQ_POLY_TEXT_16) == NULL) {
+		return Success;
+	    }
+	    activeFont = items[i].font;
+	}
+	utf8 = BrowserUtf8FromXChar2bString(items[i].chars, items[i].nchars,
+		&utf8Length);
+	if (utf8 == NULL) {
+	    x += items[i].delta;
+	    continue;
+	}
+	result = BrowserDrawTextItemUtf8(display, drawable, gc, &x, y,
+		items[i].delta, activeFont, utf8, utf8Length,
+		X11_WASM_XREQ_POLY_TEXT_16);
+	ckfree(utf8);
+	if (result != Success) {
+	    return result;
+	}
+    }
+    return Success;
+}
+
 int
 XDrawImageString16(
     Display *d,
