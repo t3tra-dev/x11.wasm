@@ -1559,8 +1559,13 @@ XSetPointerMapping(
 	BrowserInitDisplay();
     }
     if ((display != &browserDisplay.display)
-	    || (nmap != browserDisplay.pointerMapCount)
 	    || ((nmap > 0) && (map == NULL))) {
+	(void)XNoOp(display);
+	return MappingFailed;
+    }
+    if (!BrowserValueOrError(&display, nmap,
+	    nmap == browserDisplay.pointerMapCount,
+	    X11_WASM_XREQ_SET_POINTER_MAPPING)) {
 	(void)XNoOp(display);
 	return MappingFailed;
     }
@@ -1570,6 +1575,8 @@ XSetPointerMapping(
 	}
 	for (j = i + 1; j < nmap; j++) {
 	    if (map[i] == map[j]) {
+		(void)BrowserValueOrError(&display, (long)map[i], 0,
+			X11_WASM_XREQ_SET_POINTER_MAPPING);
 		(void)XNoOp(display);
 		return MappingFailed;
 	    }

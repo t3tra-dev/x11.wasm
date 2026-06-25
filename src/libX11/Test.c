@@ -6429,6 +6429,10 @@ X11WasmTestXErrorHandler(void)
     int sawAllowEventsBadValue;
     int sawChangeActivePointerGrabBadValue;
     int sawChangeActivePointerGrabBadCursor;
+    int invalidPointerMapLengthResult;
+    int duplicatePointerMapResult;
+    int sawPointerMapLengthBadValue;
+    int sawPointerMapDuplicateBadValue;
     int bellValidationResult;
     int propertyValidationResultSum;
     int invalidWMColormapCountResult;
@@ -6547,6 +6551,12 @@ X11WasmTestXErrorHandler(void)
     XTextItem textItems[1];
     XTextItem16 textItems16[1];
     const char zeroDash[] = {'\0'};
+    const unsigned char pointerMap[5] = {
+	Button1, Button2, Button3, Button4, Button5
+    };
+    const unsigned char duplicatePointerMap[5] = {
+	Button1, Button2, Button2, Button4, Button5
+    };
     Atom validProperty;
     Atom validSelection;
     Atom invalidAtom = (Atom)0x7fffffedUL;
@@ -6615,6 +6625,8 @@ X11WasmTestXErrorHandler(void)
     sawReconfigureBadValue = 0;
     sawIconifyBadValue = 0;
     sawWithdrawBadValue = 0;
+    sawPointerMapLengthBadValue = 0;
+    sawPointerMapDuplicateBadValue = 0;
     sawStoreBufferBadValue = 0;
     warpPointerZeroWidthX = -1;
     warpPointerZeroWidthY = -1;
@@ -7168,6 +7180,18 @@ X11WasmTestXErrorHandler(void)
 	    && (browserTestLastRequestCode
 		    == X11_WASM_XREQ_CHANGE_ACTIVE_POINTER_GRAB)
 	    && (browserTestLastResourceId == (XID)invalidWindow);
+    invalidPointerMapLengthResult = XSetPointerMapping(&browserDisplay.display,
+	    pointerMap, 4);
+    sawPointerMapLengthBadValue = (browserTestLastErrorCode == BadValue)
+	    && (browserTestLastRequestCode
+		    == X11_WASM_XREQ_SET_POINTER_MAPPING)
+	    && (browserTestLastResourceId == (XID)4);
+    duplicatePointerMapResult = XSetPointerMapping(&browserDisplay.display,
+	    duplicatePointerMap, 5);
+    sawPointerMapDuplicateBadValue = (browserTestLastErrorCode == BadValue)
+	    && (browserTestLastRequestCode
+		    == X11_WASM_XREQ_SET_POINTER_MAPPING)
+	    && (browserTestLastResourceId == (XID)Button2);
     bellValidationResult = XBell(&browserDisplay.display, 101);
     (void)XSetScreenSaver(&browserDisplay.display, -1, 30,
 	    PreferBlanking, AllowExposures);
@@ -7549,6 +7573,10 @@ X11WasmTestXErrorHandler(void)
 	    || !sawAllowEventsBadValue
 	    || !sawChangeActivePointerGrabBadValue
 	    || !sawChangeActivePointerGrabBadCursor
+	    || (invalidPointerMapLengthResult != MappingFailed)
+	    || (duplicatePointerMapResult != MappingFailed)
+	    || !sawPointerMapLengthBadValue
+	    || !sawPointerMapDuplicateBadValue
 	    || (bellValidationResult != Success)
 	    || (validProperty == None)
 	    || (propertyPixmap == None)
@@ -7760,6 +7788,8 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_ALLOW_EVENTS
 	    + X11_WASM_XREQ_CHANGE_ACTIVE_POINTER_GRAB
 	    + X11_WASM_XREQ_CHANGE_ACTIVE_POINTER_GRAB
+	    + X11_WASM_XREQ_SET_POINTER_MAPPING
+	    + X11_WASM_XREQ_SET_POINTER_MAPPING
 	    + X11_WASM_XREQ_BELL
 	    + X11_WASM_XREQ_SET_SCREEN_SAVER
 	    + X11_WASM_XREQ_FORCE_SCREEN_SAVER
@@ -7872,7 +7902,7 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 235)
+    if ((browserTestXErrorCount != 237)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
