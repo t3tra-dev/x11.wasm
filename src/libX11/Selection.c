@@ -1464,6 +1464,28 @@ BrowserUpdatePointerState(
     BrowserSyncPointerState();
 }
 
+static void
+BrowserUpdateKeymapState(
+    unsigned int keycode,
+    int pressed)
+{
+    unsigned int index;
+    unsigned char mask;
+
+    if (keycode > X11_WASM_MAX_KEYCODE) {
+	return;
+    }
+    index = keycode >> 3;
+    mask = (unsigned char)(1U << (keycode & 7U));
+    if (pressed) {
+	browserDisplay.keymap[index] =
+		(char)((unsigned char)browserDisplay.keymap[index] | mask);
+    } else {
+	browserDisplay.keymap[index] =
+		(char)((unsigned char)browserDisplay.keymap[index] & ~mask);
+    }
+}
+
 int
 BrowserQueueKeyEventFields(
     int type,
@@ -1505,5 +1527,6 @@ BrowserQueueKeyEventFields(
     }
     event.xkey.keycode = resolvedKeycode;
     event.xkey.same_screen = True;
+    BrowserUpdateKeymapState(resolvedKeycode, type == KeyPress);
     return BrowserQueueEvent(&event);
 }

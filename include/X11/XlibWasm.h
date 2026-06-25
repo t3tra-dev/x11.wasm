@@ -485,6 +485,13 @@ EXTERN int XCloseDisplay(Display *display);
 EXTERN int XEventsQueued(Display *display, int mode);
 EXTERN int XDisplayKeycodes(Display *display, int *min_keycodes_return,
 	int *max_keycodes_return);
+EXTERN int XAutoRepeatOff(Display *display);
+EXTERN int XAutoRepeatOn(Display *display);
+EXTERN int XChangeKeyboardControl(Display *display, unsigned long value_mask,
+	XKeyboardControl *values);
+EXTERN int XGetKeyboardControl(Display *display,
+	XKeyboardState *values_return);
+EXTERN int XQueryKeymap(Display *display, char keys_return[32]);
 EXTERN Font XLoadFont(Display *display, _Xconst char *name);
 EXTERN XFontStruct *XLoadQueryFont(Display *display, _Xconst char *name);
 EXTERN char **XListFonts(Display *display, _Xconst char *pattern,

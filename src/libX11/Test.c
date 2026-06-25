@@ -187,7 +187,13 @@ X11WasmTestEventQueueAndKeycodeApis(void)
     XEvent exposeEvent;
     XEvent mapEvent;
     XEvent readEvent;
+    XKeyboardControl keyboardControl;
+    XKeyboardState keyboardState;
+    char keymap[32];
     long predicateValue = 0;
+    KeyCode testKeycode;
+    unsigned int keyMask;
+    unsigned int i;
     int minKeycode = -1;
     int maxKeycode = -1;
 
@@ -205,6 +211,119 @@ X11WasmTestEventQueueAndKeycodeApis(void)
     }
     if (XDisplayKeycodes(display, NULL, NULL) != Success) {
 	return 12;
+    }
+    testKeycode = XKeysymToKeycode(display, XK_a);
+    keyMask = 1U << (testKeycode & 7U);
+    if (testKeycode == 0) {
+	return 13;
+    }
+
+    memset(&keyboardState, 0, sizeof(keyboardState));
+    if (XGetKeyboardControl(display, &keyboardState) != Success) {
+	return 14;
+    }
+    if ((keyboardState.key_click_percent != 0)
+	    || (keyboardState.bell_percent != 50)
+	    || (keyboardState.bell_pitch != 400)
+	    || (keyboardState.bell_duration != 100)
+	    || (keyboardState.led_mask != 0)
+	    || (keyboardState.global_auto_repeat != AutoRepeatModeOn)
+	    || (((unsigned char)keyboardState.auto_repeats[testKeycode >> 3]
+		    & keyMask) == 0)) {
+	return 15;
+    }
+
+    memset(&keyboardControl, 0, sizeof(keyboardControl));
+    keyboardControl.key_click_percent = 7;
+    keyboardControl.bell_percent = 25;
+    keyboardControl.bell_pitch = 880;
+    keyboardControl.bell_duration = 120;
+    keyboardControl.led = 3;
+    keyboardControl.led_mode = LedModeOn;
+    keyboardControl.auto_repeat_mode = AutoRepeatModeOff;
+    if (XChangeKeyboardControl(display, KBKeyClickPercent | KBBellPercent
+	    | KBBellPitch | KBBellDuration | KBLed | KBLedMode
+	    | KBAutoRepeatMode, &keyboardControl) != Success) {
+	return 16;
+    }
+    memset(&keyboardState, 0, sizeof(keyboardState));
+    if ((XGetKeyboardControl(display, &keyboardState) != Success)
+	    || (keyboardState.key_click_percent != 7)
+	    || (keyboardState.bell_percent != 25)
+	    || (keyboardState.bell_pitch != 880)
+	    || (keyboardState.bell_duration != 120)
+	    || (keyboardState.led_mask != (1UL << 2))
+	    || (keyboardState.global_auto_repeat != AutoRepeatModeOff)) {
+	return 17;
+    }
+
+    keyboardControl.key = testKeycode;
+    keyboardControl.auto_repeat_mode = AutoRepeatModeOff;
+    if (XChangeKeyboardControl(display, KBKey | KBAutoRepeatMode,
+	    &keyboardControl) != Success) {
+	return 18;
+    }
+    memset(&keyboardState, 0, sizeof(keyboardState));
+    if ((XGetKeyboardControl(display, &keyboardState) != Success)
+	    || (((unsigned char)keyboardState.auto_repeats[testKeycode >> 3]
+		    & keyMask) != 0)) {
+	return 19;
+    }
+    keyboardControl.auto_repeat_mode = AutoRepeatModeOn;
+    if ((XChangeKeyboardControl(display, KBKey | KBAutoRepeatMode,
+		    &keyboardControl) != Success)
+	    || (XAutoRepeatOn(display) != Success)) {
+	return 20;
+    }
+    memset(&keyboardState, 0, sizeof(keyboardState));
+    if ((XGetKeyboardControl(display, &keyboardState) != Success)
+	    || (((unsigned char)keyboardState.auto_repeats[testKeycode >> 3]
+		    & keyMask) == 0)
+	    || (keyboardState.global_auto_repeat != AutoRepeatModeOn)) {
+	return 21;
+    }
+
+    memset(keymap, 0x7f, sizeof(keymap));
+    if (XQueryKeymap(display, keymap) != Success) {
+	return 22;
+    }
+    for (i = 0; i < sizeof(keymap); i++) {
+	if (keymap[i] != 0) {
+	    return 23;
+	}
+    }
+    if (!BrowserQueueKeyEventFields(KeyPress, browserDisplay.rootWindow,
+	    testKeycode, XK_a, 0, 1, 2, CurrentTime, 0)) {
+	return 24;
+    }
+    memset(keymap, 0, sizeof(keymap));
+    if ((XQueryKeymap(display, keymap) != Success)
+	    || (((unsigned char)keymap[testKeycode >> 3] & keyMask) == 0)) {
+	return 25;
+    }
+    if (!BrowserQueueKeyEventFields(KeyRelease, browserDisplay.rootWindow,
+	    testKeycode, XK_a, 0, 1, 2, CurrentTime, 0)) {
+	return 26;
+    }
+    memset(keymap, 0, sizeof(keymap));
+    if ((XQueryKeymap(display, keymap) != Success)
+	    || (((unsigned char)keymap[testKeycode >> 3] & keyMask) != 0)) {
+	return 27;
+    }
+    BrowserClearEventQueue();
+
+    memset(&keyboardControl, 0, sizeof(keyboardControl));
+    keyboardControl.key_click_percent = 0;
+    keyboardControl.bell_percent = 50;
+    keyboardControl.bell_pitch = 400;
+    keyboardControl.bell_duration = 100;
+    keyboardControl.led = 3;
+    keyboardControl.led_mode = LedModeOff;
+    keyboardControl.auto_repeat_mode = AutoRepeatModeOn;
+    if (XChangeKeyboardControl(display, KBKeyClickPercent | KBBellPercent
+	    | KBBellPitch | KBBellDuration | KBLed | KBLedMode
+	    | KBAutoRepeatMode, &keyboardControl) != Success) {
+	return 28;
     }
 
     memset(&firstEvent, 0, sizeof(firstEvent));

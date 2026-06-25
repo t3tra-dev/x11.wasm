@@ -111,6 +111,14 @@ typedef struct X11WasmDisplayState {
     int screenSaverInterval;
     int screenSaverPreferBlanking;
     int screenSaverAllowExposures;
+    int keyClickPercent;
+    int bellPercent;
+    unsigned int bellPitch;
+    unsigned int bellDuration;
+    unsigned long ledMask;
+    int globalAutoRepeat;
+    char autoRepeats[32];
+    char keymap[32];
     KeySym keycodeMap[256];
     unsigned int nextSyntheticKeycode;
     unsigned long keyboardMapSerial;

@@ -71,6 +71,13 @@ BrowserInitDisplay(void)
     state->screenSaverInterval = 600;
     state->screenSaverPreferBlanking = DefaultBlanking;
     state->screenSaverAllowExposures = DefaultExposures;
+    state->keyClickPercent = 0;
+    state->bellPercent = 50;
+    state->bellPitch = 400;
+    state->bellDuration = 100;
+    state->ledMask = 0;
+    state->globalAutoRepeat = AutoRepeatModeOn;
+    memset(state->autoRepeats, 0xff, sizeof(state->autoRepeats));
     state->hostAccessEnabled = True;
 
     state->visual.visualid = 1;

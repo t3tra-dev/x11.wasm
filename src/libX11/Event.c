@@ -12,6 +12,42 @@ typedef struct BrowserUserEventPredicate {
 } BrowserUserEventPredicate;
 
 static int
+BrowserKeyboardPercentIsValid(
+    int value)
+{
+    return (value == -1) || ((value >= 0) && (value <= 100));
+}
+
+static int
+BrowserKeyboardAutoRepeatModeIsValid(
+    int mode)
+{
+    return (mode == AutoRepeatModeOff) || (mode == AutoRepeatModeOn)
+	    || (mode == AutoRepeatModeDefault);
+}
+
+static void
+BrowserSetKeyBit(
+    char bits[32],
+    unsigned int keycode,
+    int enabled)
+{
+    unsigned int index;
+    unsigned char mask;
+
+    if (keycode > X11_WASM_MAX_KEYCODE) {
+	return;
+    }
+    index = keycode >> 3;
+    mask = (unsigned char)(1U << (keycode & 7U));
+    if (enabled) {
+	bits[index] = (char)((unsigned char)bits[index] | mask);
+    } else {
+	bits[index] = (char)((unsigned char)bits[index] & ~mask);
+    }
+}
+
+static int
 BrowserTypedQueuedEvent(
     Display *display,
     XEvent *eventPtr,
@@ -897,6 +933,195 @@ XBell(
 	return X11WasmJsBell(percent);
     }
     return Success;
+}
+
+int
+XChangeKeyboardControl(
+    Display *display,
+    unsigned long valueMask,
+    XKeyboardControl *values)
+{
+    unsigned long validMask = KBKeyClickPercent | KBBellPercent | KBBellPitch
+	    | KBBellDuration | KBLed | KBLedMode | KBKey
+	    | KBAutoRepeatMode;
+
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    if (!BrowserValueOrError(&display, (long)(valueMask & ~validMask),
+	    (valueMask & ~validMask) == 0UL,
+	    X11_WASM_XREQ_CHANGE_KEYBOARD_CONTROL)) {
+	return Success;
+    }
+    if ((valueMask != 0UL) && (values == NULL)) {
+	(void)BrowserValueOrError(&display, 0, 0,
+		X11_WASM_XREQ_CHANGE_KEYBOARD_CONTROL);
+	return Success;
+    }
+    if (valueMask == 0UL) {
+	return XNoOp(display);
+    }
+    if ((valueMask & KBKeyClickPercent)
+	    && !BrowserValueOrError(&display, values->key_click_percent,
+		    BrowserKeyboardPercentIsValid(values->key_click_percent),
+		    X11_WASM_XREQ_CHANGE_KEYBOARD_CONTROL)) {
+	return Success;
+    }
+    if ((valueMask & KBBellPercent)
+	    && !BrowserValueOrError(&display, values->bell_percent,
+		    BrowserKeyboardPercentIsValid(values->bell_percent),
+		    X11_WASM_XREQ_CHANGE_KEYBOARD_CONTROL)) {
+	return Success;
+    }
+    if ((valueMask & KBBellPitch)
+	    && !BrowserValueOrError(&display, values->bell_pitch,
+		    values->bell_pitch >= -1,
+		    X11_WASM_XREQ_CHANGE_KEYBOARD_CONTROL)) {
+	return Success;
+    }
+    if ((valueMask & KBBellDuration)
+	    && !BrowserValueOrError(&display, values->bell_duration,
+		    values->bell_duration >= -1,
+		    X11_WASM_XREQ_CHANGE_KEYBOARD_CONTROL)) {
+	return Success;
+    }
+    if ((valueMask & (KBLed | KBLedMode))
+	    && !BrowserValueOrError(&display, values->led,
+		    (values->led >= 1) && (values->led <= 32),
+		    X11_WASM_XREQ_CHANGE_KEYBOARD_CONTROL)) {
+	return Success;
+    }
+    if ((valueMask & KBLedMode)
+	    && !BrowserValueOrError(&display, values->led_mode,
+		    (values->led_mode == LedModeOff)
+		    || (values->led_mode == LedModeOn),
+		    X11_WASM_XREQ_CHANGE_KEYBOARD_CONTROL)) {
+	return Success;
+    }
+    if ((valueMask & KBKey)
+	    && !BrowserValueOrError(&display, values->key,
+		    (values->key >= display->min_keycode)
+		    && (values->key <= display->max_keycode),
+		    X11_WASM_XREQ_CHANGE_KEYBOARD_CONTROL)) {
+	return Success;
+    }
+    if ((valueMask & KBAutoRepeatMode)
+	    && !BrowserValueOrError(&display, values->auto_repeat_mode,
+		    BrowserKeyboardAutoRepeatModeIsValid(
+			    values->auto_repeat_mode),
+		    X11_WASM_XREQ_CHANGE_KEYBOARD_CONTROL)) {
+	return Success;
+    }
+
+    if (display == &browserDisplay.display) {
+	if (valueMask & KBKeyClickPercent) {
+	    browserDisplay.keyClickPercent =
+		    (values->key_click_percent == -1) ? 0
+		    : values->key_click_percent;
+	}
+	if (valueMask & KBBellPercent) {
+	    browserDisplay.bellPercent =
+		    (values->bell_percent == -1) ? 50 : values->bell_percent;
+	}
+	if (valueMask & KBBellPitch) {
+	    browserDisplay.bellPitch =
+		    (values->bell_pitch == -1) ? 400
+		    : (unsigned int)values->bell_pitch;
+	}
+	if (valueMask & KBBellDuration) {
+	    browserDisplay.bellDuration =
+		    (values->bell_duration == -1) ? 100
+		    : (unsigned int)values->bell_duration;
+	}
+	if (valueMask & KBLedMode) {
+	    unsigned long ledMask = 1UL << (values->led - 1);
+
+	    if (values->led_mode == LedModeOn) {
+		browserDisplay.ledMask |= ledMask;
+	    } else {
+		browserDisplay.ledMask &= ~ledMask;
+	    }
+	}
+	if (valueMask & KBAutoRepeatMode) {
+	    int repeatOn = values->auto_repeat_mode != AutoRepeatModeOff;
+
+	    if (valueMask & KBKey) {
+		BrowserSetKeyBit(browserDisplay.autoRepeats,
+			(unsigned int)values->key, repeatOn);
+	    } else {
+		browserDisplay.globalAutoRepeat = repeatOn
+			? AutoRepeatModeOn : AutoRepeatModeOff;
+	    }
+	}
+    }
+    return XNoOp(display);
+}
+
+int
+XAutoRepeatOff(
+    Display *display)
+{
+    XKeyboardControl values;
+
+    memset(&values, 0, sizeof(values));
+    values.auto_repeat_mode = AutoRepeatModeOff;
+    return XChangeKeyboardControl(display, KBAutoRepeatMode, &values);
+}
+
+int
+XAutoRepeatOn(
+    Display *display)
+{
+    XKeyboardControl values;
+
+    memset(&values, 0, sizeof(values));
+    values.auto_repeat_mode = AutoRepeatModeOn;
+    return XChangeKeyboardControl(display, KBAutoRepeatMode, &values);
+}
+
+int
+XGetKeyboardControl(
+    Display *display,
+    XKeyboardState *valuesReturn)
+{
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    if ((display == &browserDisplay.display) && (valuesReturn != NULL)) {
+	valuesReturn->key_click_percent = browserDisplay.keyClickPercent;
+	valuesReturn->bell_percent = browserDisplay.bellPercent;
+	valuesReturn->bell_pitch = browserDisplay.bellPitch;
+	valuesReturn->bell_duration = browserDisplay.bellDuration;
+	valuesReturn->led_mask = browserDisplay.ledMask;
+	valuesReturn->global_auto_repeat = browserDisplay.globalAutoRepeat;
+	memcpy(valuesReturn->auto_repeats, browserDisplay.autoRepeats,
+		sizeof(valuesReturn->auto_repeats));
+    } else if (valuesReturn != NULL) {
+	memset(valuesReturn, 0, sizeof(*valuesReturn));
+    }
+    return XNoOp(display);
+}
+
+int
+XQueryKeymap(
+    Display *display,
+    char keysReturn[32])
+{
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    if ((display == &browserDisplay.display) && (keysReturn != NULL)) {
+	memcpy(keysReturn, browserDisplay.keymap, sizeof(browserDisplay.keymap));
+    } else if (keysReturn != NULL) {
+	memset(keysReturn, 0, 32);
+    }
+    return XNoOp(display);
 }
 
 int
