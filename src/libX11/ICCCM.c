@@ -1275,21 +1275,27 @@ XGetWMColormapWindows(
 	    &actualFormat, &nitems, &bytesAfter, &data);
     if ((status != Success) || (actualType != XA_WINDOW)
 	    || (actualFormat != 32) || (bytesAfter != 0)
-	    || (nitems == 0) || (data == NULL)) {
+	    || ((nitems > 0) && (data == NULL))) {
 	if (data != NULL) {
 	    XFree(data);
 	}
 	return False;
     }
-    copyPtr = (Window *)ckalloc((size_t)nitems * sizeof(Window));
-    for (i = 0; i < nitems; i++) {
-	copyPtr[i] = (Window)BrowserPropertyAtomAt(data, i);
+    if (nitems > 0) {
+	copyPtr = (Window *)ckalloc((size_t)nitems * sizeof(Window));
+	for (i = 0; i < nitems; i++) {
+	    copyPtr[i] = (Window)BrowserPropertyAtomAt(data, i);
+	}
     }
-    XFree(data);
+    if (data != NULL) {
+	XFree(data);
+    }
     if (windows != NULL) {
 	*windows = copyPtr;
     } else {
-	XFree(copyPtr);
+	if (copyPtr != NULL) {
+	    XFree(copyPtr);
+	}
     }
     if (count != NULL) {
 	*count = (int)nitems;
@@ -1310,10 +1316,6 @@ XSetWMColormapWindows(
 	    X11_WASM_XREQ_CHANGE_PROPERTY)) {
 	return False;
     }
-    if (count == 0) {
-	(void)XDeleteProperty(display, window, property);
-	return True;
-    }
     (void)XChangeProperty(display, window, property, XA_WINDOW, 32,
 	    PropModeReplace, (const unsigned char *)windows, count);
     return True;
@@ -1326,24 +1328,8 @@ XSetWMProtocols(
     Atom *protocols,
     int count)
 {
-    if (count < 0) {
-	if (display == NULL) {
-	    display = X11WasmGetDisplay(NULL);
-	}
-	(void)BrowserValueOrError(&display, count, 0,
-		X11_WASM_XREQ_CHANGE_PROPERTY);
-	return False;
-    }
-    if (count == 0) {
-	(void)XDeleteProperty(display, window, BrowserWmProtocolsAtom());
-	return True;
-    }
-    if (protocols == NULL) {
-	if (display == NULL) {
-	    display = X11WasmGetDisplay(NULL);
-	}
-	(void)BrowserPropertyValueOrError(&display, (XID)count,
-		X11_WASM_XREQ_CHANGE_PROPERTY);
+    if (!BrowserValidatePropertyList(&display, protocols, count,
+	    X11_WASM_XREQ_CHANGE_PROPERTY)) {
 	return False;
     }
     (void)XChangeProperty(display, window, BrowserWmProtocolsAtom(), XA_ATOM,

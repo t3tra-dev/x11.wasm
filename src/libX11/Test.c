@@ -4703,6 +4703,14 @@ X11WasmTestXlibApis(void)
     XFree(colormapWindowsReturn);
     colormapWindowsReturn = NULL;
     colormapWindowCount = -1;
+    if ((XSetWMColormapWindows(&browserDisplay.display, window, NULL, 0)
+	    != True)
+	    || !XGetWMColormapWindows(&browserDisplay.display, window,
+		    &colormapWindowsReturn, &colormapWindowCount)
+	    || (colormapWindowCount != 0)
+	    || (colormapWindowsReturn != NULL)) {
+	goto cleanup;
+    }
 
     protocolAtoms[0] = XInternAtom(&browserDisplay.display,
 	    "X11_WASM_TEST_PROTOCOL_ONE", False);
@@ -4723,7 +4731,7 @@ X11WasmTestXlibApis(void)
     protocolAtomCount = -1;
     if ((XSetWMProtocols(&browserDisplay.display, window, NULL, 0)
 	    != True)
-	    || XGetWMProtocols(&browserDisplay.display, window,
+	    || !XGetWMProtocols(&browserDisplay.display, window,
 		    &protocolAtomsReturn, &protocolAtomCount)
 	    || (protocolAtomCount != 0)
 	    || (protocolAtomsReturn != NULL)) {
