@@ -2657,6 +2657,8 @@ XClearArea(
 	    window, X11_WASM_XREQ_CLEAR_AREA);
     unsigned int clearWidth;
     unsigned int clearHeight;
+    int hasBackgroundPixel;
+    Pixmap backgroundPixmap;
 
     if (resourcePtr == NULL) {
 	return Success;
@@ -2679,6 +2681,15 @@ XClearArea(
     clearWidth = BrowserClearAreaExtent(x, width, resourcePtr->width);
     clearHeight = BrowserClearAreaExtent(y, height, resourcePtr->height);
     if ((clearWidth == 0U) || (clearHeight == 0U)) {
+	return Success;
+    }
+    BrowserResolveWindowBackgroundStyle(resourcePtr, &hasBackgroundPixel, NULL,
+	    &backgroundPixmap);
+    if (!hasBackgroundPixel && (backgroundPixmap == None)) {
+	if (exposures) {
+	    (void)BrowserQueueExpose(resourcePtr, x, y, clearWidth,
+		    clearHeight);
+	}
 	return Success;
     }
     (void)X11WasmJsClearArea(BrowserJsXId(window), x, y, clearWidth,

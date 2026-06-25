@@ -693,6 +693,8 @@ X11WasmTestClearAreaApis(void)
     XSetWindowAttributes attributes;
     XEvent event;
     Window window = None;
+    GC gc = NULL;
+    XImage *readback = NULL;
     int result = 0;
     int screen;
 
@@ -728,6 +730,31 @@ X11WasmTestClearAreaApis(void)
     if (XEventsQueued(display, QueuedAlready) != 0) {
 	goto cleanup;
     }
+    gc = XCreateGC(display, (Drawable)window, 0, NULL);
+    if (gc == NULL) {
+	goto cleanup;
+    }
+    XSetForeground(display, gc, 0x112233UL);
+    if (XFillRectangle(display, (Drawable)window, gc, 0, 0, 8, 6)
+	    != Success) {
+	goto cleanup;
+    }
+    if (XClearArea(display, window, 2, 1, 4, 3, False) != Success) {
+	goto cleanup;
+    }
+    readback = XGetImage(display, (Drawable)window, 2, 1, 1, 1, AllPlanes,
+	    ZPixmap);
+    if (readback == NULL) {
+	goto cleanup;
+    }
+    if ((XGetPixel(readback, 0, 0) & 0x00ffffffUL) != 0x112233UL) {
+	goto cleanup;
+    }
+    if (XEventsQueued(display, QueuedAlready) != 0) {
+	goto cleanup;
+    }
+    XDestroyImage(readback);
+    readback = NULL;
     if (XClearWindow(display, window) != Success) {
 	goto cleanup;
     }
@@ -744,6 +771,12 @@ X11WasmTestClearAreaApis(void)
 
 cleanup:
     BrowserClearEventQueue();
+    if (readback != NULL) {
+	XDestroyImage(readback);
+    }
+    if (gc != NULL) {
+	XFreeGC(display, gc);
+    }
     if (window != None) {
 	(void)XDestroyWindow(display, window);
     }
