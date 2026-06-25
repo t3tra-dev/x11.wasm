@@ -5119,6 +5119,11 @@ X11WasmTestXErrorHandler(void)
     propertyValidationResultSum += XChangeProperty(&browserDisplay.display,
 	    browserDisplay.rootWindow, validProperty, XA_ATOM, 32,
 	    PropModeAppend, (const unsigned char *)&atomPropertyValue, 1);
+    propertyValidationResultSum += XChangeProperty(&browserDisplay.display,
+	    browserDisplay.rootWindow, BrowserWmProtocolsAtom(), XA_ATOM, 32,
+	    PropModeReplace, (const unsigned char *)&invalidAtom, 1);
+    propertyValidationResultSum += XDeleteProperty(&browserDisplay.display,
+	    browserDisplay.rootWindow, BrowserWmProtocolsAtom());
     propertyValidationResultSum += XDeleteProperty(&browserDisplay.display,
 	    browserDisplay.rootWindow, validProperty);
     propertyValidationResultSum += XDeleteProperty(&browserDisplay.display,

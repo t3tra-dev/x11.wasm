@@ -944,6 +944,9 @@ BrowserSetWindowProtocols(
 	Atom protocol = BrowserPropertyAtomAt(data, i);
 	char *name;
 
+	if (!BrowserAtomIsValid(protocol)) {
+	    continue;
+	}
 	name = XGetAtomName(display, protocol);
 	if ((name != NULL) && (name[0] != '\0')) {
 	    X11WasmDStringAppendElement(&protocols, name);
