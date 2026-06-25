@@ -1818,6 +1818,12 @@ XGetImage(
 	    X11_WASM_XREQ_GET_IMAGE)) {
 	return NULL;
     }
+    if (!BrowserValidateCard16(&display, (long)width, 1,
+	    X11_WASM_XREQ_GET_IMAGE)
+	    || !BrowserValidateCard16(&display, (long)height, 1,
+		    X11_WASM_XREQ_GET_IMAGE)) {
+	return NULL;
+    }
     if (!BrowserGetImageDrawableMatches(&display, resourcePtr, drawable,
 	    x, y, width, height)) {
 	return NULL;
