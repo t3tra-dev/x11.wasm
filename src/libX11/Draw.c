@@ -533,6 +533,10 @@ XQueryColors(
 	    X11_WASM_XREQ_QUERY_COLORS, 0)) {
 	return Success;
     }
+    if (!BrowserValidateCountedList(&display, defs, ncolors,
+	    X11_WASM_XREQ_QUERY_COLORS)) {
+	return Success;
+    }
     for (i = 0; i < ncolors; i++) {
 	XQueryColor(display, colormap, &defs[i]);
     }

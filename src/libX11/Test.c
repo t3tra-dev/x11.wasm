@@ -4406,7 +4406,9 @@ X11WasmTestXErrorHandler(void)
     int invalidAllocNamedColorResult;
     int invalidLookupColorResult;
     int invalidQueryColorResult;
+    int invalidQueryColorsResultSum;
     int invalidFreeColorsResult;
+    int invalidFreeColorsListResultSum;
     int invalidWindowAttributeResultSum;
     int configureValidationResultSum;
     int reconfigureValidResult;
@@ -4823,8 +4825,16 @@ X11WasmTestXErrorHandler(void)
 	    (Colormap)invalidWindow, "red", &exactColor, &screenColor);
     invalidQueryColorResult = XQueryColor(&browserDisplay.display,
 	    (Colormap)invalidWindow, &color);
+    invalidQueryColorsResultSum = XQueryColors(&browserDisplay.display,
+	    validColormap, NULL, -1);
+    invalidQueryColorsResultSum += XQueryColors(&browserDisplay.display,
+	    validColormap, NULL, 1);
     invalidFreeColorsResult = XFreeColors(&browserDisplay.display,
 	    (Colormap)invalidWindow, &colorPixel, 1, 0);
+    invalidFreeColorsListResultSum = XFreeColors(&browserDisplay.display,
+	    validColormap, NULL, -1, 0);
+    invalidFreeColorsListResultSum += XFreeColors(&browserDisplay.display,
+	    validColormap, NULL, 1, 0);
     invalidWindowAttributeResultSum =
 	    XSetWindowBackgroundPixmap(&browserDisplay.display,
 		    browserDisplay.rootWindow, (Pixmap)invalidWindow);
@@ -5211,7 +5221,9 @@ X11WasmTestXErrorHandler(void)
 	    || (invalidAllocNamedColorResult != False)
 	    || (invalidLookupColorResult != False)
 	    || (invalidQueryColorResult != Success)
+	    || (invalidQueryColorsResultSum != Success)
 	    || (invalidFreeColorsResult != Success)
+	    || (invalidFreeColorsListResultSum != Success)
 	    || (invalidWindowAttributeResultSum != Success)
 	    || (configureValidationResultSum != Success)
 	    || (reconfigureValidResult != True)
@@ -5348,6 +5360,10 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_ALLOC_NAMED_COLOR
 	    + X11_WASM_XREQ_LOOKUP_COLOR
 	    + X11_WASM_XREQ_QUERY_COLORS
+	    + X11_WASM_XREQ_QUERY_COLORS
+	    + X11_WASM_XREQ_QUERY_COLORS
+	    + X11_WASM_XREQ_FREE_COLORS
+	    + X11_WASM_XREQ_FREE_COLORS
 	    + X11_WASM_XREQ_FREE_COLORS
 	    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
 	    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
@@ -5474,15 +5490,15 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 181)
+    if ((browserTestXErrorCount != 185)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
 	    || (browserTestRequestCodeSum != expectedRequestCodeSum)
 	    || (browserTestRequestCodeMask != expectedRequestCodeMask)
-	    || (browserTestLastSerial != initialSerial + 181)
+	    || (browserTestLastSerial != initialSerial + 185)
 	    || (LastKnownRequestProcessed(&browserDisplay.display)
-		    != initialSerial + 181)) {
+		    != initialSerial + 185)) {
 	return 0;
     }
     return 1;

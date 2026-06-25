@@ -2527,6 +2527,10 @@ XFreeColors(
 	    X11_WASM_XREQ_FREE_COLORS, 0)) {
 	return Success;
     }
+    if (!BrowserValidateCountedList(&display, pixels, npixels,
+	    X11_WASM_XREQ_FREE_COLORS)) {
+	return Success;
+    }
     BrowserForgetColors(colormap, pixels, npixels);
     return Success;
 }

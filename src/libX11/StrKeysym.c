@@ -930,6 +930,22 @@ BrowserValidateScreenSaverAllowExposures(
 }
 
 int
+BrowserValidateCountedList(
+    Display **displayPtr,
+    const void *items,
+    int count,
+    unsigned char requestCode)
+{
+    if (count < 0) {
+	return BrowserValueOrError(displayPtr, count, 0, requestCode);
+    }
+    if ((count > 0) && (items == NULL)) {
+	return BrowserValueOrError(displayPtr, count, 0, requestCode);
+    }
+    return 1;
+}
+
+int
 BrowserValidateGCDashList(
     Display **displayPtr,
     const char *dashList,

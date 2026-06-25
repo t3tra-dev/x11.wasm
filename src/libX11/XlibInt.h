@@ -1740,6 +1740,11 @@ int BrowserValidateCoordMode(
     Display **displayPtr,
     int coordMode,
     unsigned char requestCode);
+int BrowserValidateCountedList(
+    Display **displayPtr,
+    const void *items,
+    int count,
+    unsigned char requestCode);
 int BrowserValidateGCArcMode(
     Display **displayPtr,
     int arcMode,
