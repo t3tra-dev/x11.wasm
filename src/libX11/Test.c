@@ -770,7 +770,14 @@ X11WasmTestXlibApis(void)
     Window mapSubBottomWindow = None;
     Window mapSubMiddleWindow = None;
     Window mapSubTopWindow = None;
+    Window reparentOldParentWindow = None;
+    Window reparentNewParentWindow = None;
+    Window reparentChildWindow = None;
+    Window reparentRootReturn = None;
+    Window reparentParentReturn = None;
+    Window *reparentChildrenReturn = NULL;
     Window expectedSubwindowOrder[3];
+    unsigned int reparentChildCount = 0;
     Pixmap pixmap = None;
     Pixmap copyExposurePixmap = None;
     Pixmap textPixmap = None;
@@ -839,6 +846,7 @@ X11WasmTestXlibApis(void)
     XWindowAttributes inputOnlyAttributesReturn;
     XWindowAttributes gravityAttributesReturn;
     XWindowAttributes subwindowAttributesReturn;
+    XWindowAttributes reparentAttributesReturn;
     Window colormapWindowList[2];
     Window *colormapWindowsReturn = NULL;
     int colormapWindowCount = -1;
@@ -2069,6 +2077,127 @@ X11WasmTestXlibApis(void)
 	    || (subwindowAttributesReturn.map_state != IsUnmapped)) {
 	goto cleanup;
     }
+    BrowserClearEventQueue();
+
+    reparentOldParentWindow = XCreateWindow(&browserDisplay.display,
+	    browserDisplay.rootWindow, 0, 0, 20, 20, 0, CopyFromParent,
+	    InputOutput, DefaultVisual(&browserDisplay.display, screen), 0,
+	    NULL);
+    reparentNewParentWindow = XCreateWindow(&browserDisplay.display,
+	    browserDisplay.rootWindow, 30, 0, 20, 20, 0, CopyFromParent,
+	    InputOutput, DefaultVisual(&browserDisplay.display, screen), 0,
+	    NULL);
+    reparentChildWindow = XCreateWindow(&browserDisplay.display,
+	    reparentOldParentWindow, 1, 2, 5, 6, 0, CopyFromParent,
+	    InputOutput, DefaultVisual(&browserDisplay.display, screen), 0,
+	    NULL);
+    if ((reparentOldParentWindow == None)
+	    || (reparentNewParentWindow == None)
+	    || (reparentChildWindow == None)
+	    || (XSelectInput(&browserDisplay.display, reparentChildWindow,
+		    StructureNotifyMask) != Success)
+	    || (XSelectInput(&browserDisplay.display, reparentOldParentWindow,
+		    SubstructureNotifyMask) != Success)
+	    || (XSelectInput(&browserDisplay.display, reparentNewParentWindow,
+		    SubstructureNotifyMask) != Success)
+	    || (XMapWindow(&browserDisplay.display, reparentOldParentWindow)
+		    != Success)
+	    || (XMapWindow(&browserDisplay.display, reparentNewParentWindow)
+		    != Success)
+	    || (XMapWindow(&browserDisplay.display, reparentChildWindow)
+		    != Success)) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+    if (XReparentWindow(&browserDisplay.display, reparentChildWindow,
+	    reparentNewParentWindow, 7, 9) != Success) {
+	goto cleanup;
+    }
+    memset(&structureEvent, 0, sizeof(structureEvent));
+    if ((XNextEvent(&browserDisplay.display, &structureEvent) != Success)
+	    || (structureEvent.type != UnmapNotify)
+	    || (structureEvent.xunmap.event != reparentChildWindow)
+	    || (structureEvent.xunmap.window != reparentChildWindow)
+	    || (structureEvent.xunmap.from_configure != False)) {
+	goto cleanup;
+    }
+    memset(&structureEvent, 0, sizeof(structureEvent));
+    if ((XNextEvent(&browserDisplay.display, &structureEvent) != Success)
+	    || (structureEvent.type != UnmapNotify)
+	    || (structureEvent.xunmap.event != reparentOldParentWindow)
+	    || (structureEvent.xunmap.window != reparentChildWindow)
+	    || (structureEvent.xunmap.from_configure != False)) {
+	goto cleanup;
+    }
+    memset(&structureEvent, 0, sizeof(structureEvent));
+    if ((XNextEvent(&browserDisplay.display, &structureEvent) != Success)
+	    || (structureEvent.type != ReparentNotify)
+	    || (structureEvent.xreparent.event != reparentChildWindow)
+	    || (structureEvent.xreparent.window != reparentChildWindow)
+	    || (structureEvent.xreparent.parent != reparentNewParentWindow)
+	    || (structureEvent.xreparent.x != 7)
+	    || (structureEvent.xreparent.y != 9)) {
+	goto cleanup;
+    }
+    memset(&structureEvent, 0, sizeof(structureEvent));
+    if ((XNextEvent(&browserDisplay.display, &structureEvent) != Success)
+	    || (structureEvent.type != ReparentNotify)
+	    || (structureEvent.xreparent.event != reparentOldParentWindow)
+	    || (structureEvent.xreparent.window != reparentChildWindow)
+	    || (structureEvent.xreparent.parent != reparentNewParentWindow)
+	    || (structureEvent.xreparent.x != 7)
+	    || (structureEvent.xreparent.y != 9)) {
+	goto cleanup;
+    }
+    memset(&structureEvent, 0, sizeof(structureEvent));
+    if ((XNextEvent(&browserDisplay.display, &structureEvent) != Success)
+	    || (structureEvent.type != ReparentNotify)
+	    || (structureEvent.xreparent.event != reparentNewParentWindow)
+	    || (structureEvent.xreparent.window != reparentChildWindow)
+	    || (structureEvent.xreparent.parent != reparentNewParentWindow)
+	    || (structureEvent.xreparent.x != 7)
+	    || (structureEvent.xreparent.y != 9)) {
+	goto cleanup;
+    }
+    memset(&structureEvent, 0, sizeof(structureEvent));
+    if ((XNextEvent(&browserDisplay.display, &structureEvent) != Success)
+	    || (structureEvent.type != MapNotify)
+	    || (structureEvent.xmap.event != reparentChildWindow)
+	    || (structureEvent.xmap.window != reparentChildWindow)) {
+	goto cleanup;
+    }
+    memset(&structureEvent, 0, sizeof(structureEvent));
+    if ((XNextEvent(&browserDisplay.display, &structureEvent) != Success)
+	    || (structureEvent.type != MapNotify)
+	    || (structureEvent.xmap.event != reparentNewParentWindow)
+	    || (structureEvent.xmap.window != reparentChildWindow)
+	    || (XEventsQueued(&browserDisplay.display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    if (!XGetWindowAttributes(&browserDisplay.display, reparentChildWindow,
+	    &reparentAttributesReturn)
+	    || (reparentAttributesReturn.x != 7)
+	    || (reparentAttributesReturn.y != 9)
+	    || (reparentAttributesReturn.map_state != IsViewable)) {
+	goto cleanup;
+    }
+    if (!XQueryTree(&browserDisplay.display, reparentOldParentWindow,
+	    &reparentRootReturn, &reparentParentReturn,
+	    &reparentChildrenReturn, &reparentChildCount)
+	    || (reparentChildCount != 0)
+	    || (reparentChildrenReturn != NULL)) {
+	goto cleanup;
+    }
+    if (!XQueryTree(&browserDisplay.display, reparentNewParentWindow,
+	    &reparentRootReturn, &reparentParentReturn,
+	    &reparentChildrenReturn, &reparentChildCount)
+	    || (reparentChildCount != 1)
+	    || (reparentChildrenReturn == NULL)
+	    || (reparentChildrenReturn[0] != reparentChildWindow)) {
+	goto cleanup;
+    }
+    XFree(reparentChildrenReturn);
+    reparentChildrenReturn = NULL;
     BrowserClearEventQueue();
 
     memset(&structureEvent, 0x7f, sizeof(structureEvent));
@@ -3929,6 +4058,9 @@ cleanup:
     if (protocolAtomsReturn != NULL) {
 	XFree(protocolAtomsReturn);
     }
+    if (reparentChildrenReturn != NULL) {
+	XFree(reparentChildrenReturn);
+    }
     if (image16 != NULL) {
 	(void)XDestroyImage(image16);
     }
@@ -4051,6 +4183,15 @@ cleanup:
     }
     if (mapSubParentWindow != None) {
 	(void)XDestroyWindow(&browserDisplay.display, mapSubParentWindow);
+    }
+    if (reparentChildWindow != None) {
+	(void)XDestroyWindow(&browserDisplay.display, reparentChildWindow);
+    }
+    if (reparentNewParentWindow != None) {
+	(void)XDestroyWindow(&browserDisplay.display, reparentNewParentWindow);
+    }
+    if (reparentOldParentWindow != None) {
+	(void)XDestroyWindow(&browserDisplay.display, reparentOldParentWindow);
     }
     if (firstColormap != None) {
 	(void)XFreeColormap(&browserDisplay.display, firstColormap);

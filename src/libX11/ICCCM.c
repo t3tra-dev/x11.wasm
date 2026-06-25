@@ -2121,14 +2121,30 @@ XReparentWindow(
 {
     X11WasmResource *resourcePtr = BrowserWindowResourceOrError(&display,
 	    window, X11_WASM_XREQ_REPARENT_WINDOW);
-    XEvent event;
+    X11WasmResource *parentPtr;
+    Window oldParent;
+    int wasMapped;
 
     if (resourcePtr == NULL) {
 	return Success;
     }
-    if (BrowserWindowResourceOrError(&display, parent,
-	    X11_WASM_XREQ_REPARENT_WINDOW) == NULL) {
+    parentPtr = BrowserWindowResourceOrError(&display, parent,
+	    X11_WASM_XREQ_REPARENT_WINDOW);
+    if (parentPtr == NULL) {
 	return Success;
+    }
+    if (((Window)resourcePtr->id == browserDisplay.rootWindow)
+	    || BrowserWindowInTree(parent, window)) {
+	(void)BrowserBadMatchOrError(&display, (XID)window,
+		X11_WASM_XREQ_REPARENT_WINDOW);
+	return Success;
+    }
+    oldParent = resourcePtr->parent;
+    wasMapped = resourcePtr->mapped;
+    if (wasMapped) {
+	resourcePtr->mapped = 0;
+	(void)X11WasmJsUnmapWindow(BrowserJsXId(window));
+	(void)BrowserQueueUnmapNotify(resourcePtr, False);
     }
     BrowserUnlinkChild(resourcePtr);
     resourcePtr->parent = parent;
@@ -2138,16 +2154,17 @@ XReparentWindow(
     (void)X11WasmJsReparentWindow(BrowserJsXId(window),
 	    BrowserJsXId(parent), x, y);
     BrowserSyncTransientStacking();
-    BrowserSetCommonEventFields(&event, ReparentNotify, window,
-	    CurrentTime);
-    event.xreparent.event = window;
-    event.xreparent.window = window;
-    event.xreparent.parent = parent;
-    event.xreparent.x = x;
-    event.xreparent.y = y;
-    event.xreparent.override_redirect =
-	    resourcePtr->atts.override_redirect;
-    (void)BrowserQueueEvent(&event);
+    (void)BrowserQueueReparentNotify(resourcePtr, oldParent, parent, x, y);
+    if (wasMapped) {
+	resourcePtr->mapped = 1;
+	(void)X11WasmJsMapWindow(BrowserJsXId(window));
+	(void)BrowserQueueMapNotify(resourcePtr);
+	BrowserNotifyVisibilityTree(resourcePtr, VisibilityUnobscured);
+	if (resourcePtr->c_class != InputOnly) {
+	    (void)BrowserQueueExpose(resourcePtr, 0, 0, resourcePtr->width,
+		    resourcePtr->height);
+	}
+    }
     return Success;
 }
 Status

@@ -1217,6 +1217,12 @@ int BrowserQueueKeyEventFields(
 int BrowserQueueNoExposeEvent(
     Drawable drawable,
     unsigned char requestCode);
+int BrowserQueueReparentNotify(
+    X11WasmResource *resourcePtr,
+    Window oldParent,
+    Window newParent,
+    int x,
+    int y);
 int BrowserQueueUnmapNotify(
     X11WasmResource *resourcePtr,
     Bool fromConfigure);

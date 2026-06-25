@@ -1365,6 +1365,65 @@ BrowserQueueUnmapNotify(
 }
 
 int
+BrowserQueueReparentNotify(
+    X11WasmResource *resourcePtr,
+    Window oldParent,
+    Window newParent,
+    int x,
+    int y)
+{
+    X11WasmResource *oldParentPtr;
+    X11WasmResource *newParentPtr;
+    XEvent event;
+    int queued = 0;
+
+    if ((resourcePtr == NULL)
+	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)) {
+	return 0;
+    }
+    if (BrowserResourceWantsEvent(resourcePtr, StructureNotifyMask)) {
+	BrowserSetCommonEventFields(&event, ReparentNotify,
+		(Window)resourcePtr->id, CurrentTime);
+	event.xreparent.event = (Window)resourcePtr->id;
+	event.xreparent.window = (Window)resourcePtr->id;
+	event.xreparent.parent = newParent;
+	event.xreparent.x = x;
+	event.xreparent.y = y;
+	event.xreparent.override_redirect =
+		resourcePtr->atts.override_redirect;
+	queued += BrowserQueueEvent(&event);
+    }
+    oldParentPtr = BrowserWindowResource(oldParent);
+    if (BrowserResourceWantsEvent(oldParentPtr, SubstructureNotifyMask)) {
+	BrowserSetCommonEventFields(&event, ReparentNotify, oldParent,
+		CurrentTime);
+	event.xreparent.event = oldParent;
+	event.xreparent.window = (Window)resourcePtr->id;
+	event.xreparent.parent = newParent;
+	event.xreparent.x = x;
+	event.xreparent.y = y;
+	event.xreparent.override_redirect =
+		resourcePtr->atts.override_redirect;
+	queued += BrowserQueueEvent(&event);
+    }
+    newParentPtr = BrowserWindowResource(newParent);
+    if ((newParent != oldParent)
+	    && BrowserResourceWantsEvent(newParentPtr, SubstructureNotifyMask)) {
+	BrowserSetCommonEventFields(&event, ReparentNotify, newParent,
+		CurrentTime);
+	event.xreparent.event = newParent;
+	event.xreparent.window = (Window)resourcePtr->id;
+	event.xreparent.parent = newParent;
+	event.xreparent.x = x;
+	event.xreparent.y = y;
+	event.xreparent.override_redirect =
+		resourcePtr->atts.override_redirect;
+	queued += BrowserQueueEvent(&event);
+    }
+    return queued;
+}
+
+int
 BrowserQueueDestroyNotify(
     X11WasmResource *resourcePtr)
 {
