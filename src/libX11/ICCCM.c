@@ -326,7 +326,7 @@ XSetTransientForHint(
     Window propWindow)
 {
     int result = XChangeProperty(display, window, XA_WM_TRANSIENT_FOR,
-	    XA_WM_TRANSIENT_FOR, 32, PropModeReplace,
+	    XA_WINDOW, 32, PropModeReplace,
 	    (const unsigned char *)&propWindow, 1);
 
     return result;

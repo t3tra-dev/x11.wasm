@@ -1408,6 +1408,11 @@ X11WasmTestXlibApis(void)
     Window *colormapWindowsReturn = NULL;
     int colormapWindowCount = -1;
     Window transientForReturn = None;
+    Atom transientForActualType = None;
+    int transientForActualFormat = 0;
+    unsigned long transientForItemCount = 0;
+    unsigned long transientForBytesAfter = 0;
+    unsigned char *transientForData = NULL;
     Atom protocolAtoms[2];
     Atom *protocolAtomsReturn = NULL;
     int protocolAtomCount = -1;
@@ -4824,6 +4829,22 @@ X11WasmTestXlibApis(void)
 	    || (transientForReturn != browserDisplay.rootWindow)) {
 	goto cleanup;
     }
+    if ((XGetWindowProperty(&browserDisplay.display, window,
+		    XA_WM_TRANSIENT_FOR, 0, 1, False, XA_WINDOW,
+		    &transientForActualType, &transientForActualFormat,
+		    &transientForItemCount, &transientForBytesAfter,
+		    &transientForData) != Success)
+	    || (transientForActualType != XA_WINDOW)
+	    || (transientForActualFormat != 32)
+	    || (transientForItemCount != 1)
+	    || (transientForBytesAfter != 0)
+	    || (transientForData == NULL)
+	    || ((Window)BrowserPropertyAtomAt(transientForData, 0)
+		    != browserDisplay.rootWindow)) {
+	goto cleanup;
+    }
+    XFree(transientForData);
+    transientForData = NULL;
     (void)XDeleteProperty(&browserDisplay.display, window,
 	    XA_WM_TRANSIENT_FOR);
     transientForReturn = None;
@@ -5792,6 +5813,9 @@ cleanup:
     }
     if (protocolAtomsReturn != NULL) {
 	XFree(protocolAtomsReturn);
+    }
+    if (transientForData != NULL) {
+	XFree(transientForData);
     }
     if (reparentChildrenReturn != NULL) {
 	XFree(reparentChildrenReturn);
