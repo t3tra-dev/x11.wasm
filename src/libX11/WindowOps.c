@@ -146,6 +146,23 @@ XDestroyWindow(
 }
 
 int
+XDestroySubwindows(
+    Display *display,
+    Window window)
+{
+    X11WasmResource *parentPtr = BrowserWindowResourceOrError(&display,
+	    window, X11_WASM_XREQ_DESTROY_SUBWINDOWS);
+
+    if (parentPtr == NULL) {
+	return Success;
+    }
+    while (parentPtr->firstChildPtr != NULL) {
+	(void)BrowserDestroyWindowResource(parentPtr->firstChildPtr);
+    }
+    return Success;
+}
+
+int
 BrowserDestroyWindowResource(
     X11WasmResource *resourcePtr)
 {

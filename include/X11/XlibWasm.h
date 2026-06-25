@@ -118,6 +118,7 @@ EXTERN Pixmap XCreateBitmapFromData(Display *display, Drawable d,
 	_Xconst char *data, unsigned int width, unsigned int height);
 EXTERN int XDefineCursor(Display *d, Window w, Cursor c);
 EXTERN int XDeleteProperty(Display *d, Window w, Atom a);
+EXTERN int XDestroySubwindows(Display *d, Window w);
 EXTERN int XDestroyWindow(Display *d, Window w);
 	EXTERN int XDrawArc(Display *d, Drawable dr, GC g, int i1, int i2,
 		unsigned int ui1, unsigned int ui2, int i3, int i4);

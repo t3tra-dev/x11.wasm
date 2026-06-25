@@ -788,6 +788,37 @@ X11WasmTestSubstructureNotifyApis(void)
 	goto cleanup;
     }
 
+    child = XCreateWindow(display, parent, 7, 8, 9, 10, 0, CopyFromParent,
+	    InputOutput, DefaultVisual(display, screen), 0, NULL);
+    if ((child == None)
+	    || (XSelectInput(display, child, StructureNotifyMask)
+		    != Success)) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+    destroyedChild = child;
+    if (XDestroySubwindows(display, parent) != Success) {
+	goto cleanup;
+    }
+    child = None;
+    memset(&event, 0, sizeof(event));
+    if (!BrowserPopMatchingEvent(destroyedChild, StructureNotifyMask,
+	    &event)
+	    || (event.type != DestroyNotify)
+	    || (event.xdestroywindow.event != destroyedChild)
+	    || (event.xdestroywindow.window != destroyedChild)) {
+	goto cleanup;
+    }
+    memset(&event, 0, sizeof(event));
+    if (!BrowserPopMatchingEvent(parent, SubstructureNotifyMask, &event)
+	    || (event.type != DestroyNotify)
+	    || (event.xdestroywindow.event != parent)
+	    || (event.xdestroywindow.window != destroyedChild)
+	    || (XEventsQueued(display, QueuedAlready) != 0)
+	    || !BrowserTestQueryTreeOrder(display, parent, NULL, 0)) {
+	goto cleanup;
+    }
+
     memset(&attributes, 0, sizeof(attributes));
     attributes.event_mask = NoEventMask;
     if (XChangeWindowAttributes(display, parent, CWEventMask, &attributes)
