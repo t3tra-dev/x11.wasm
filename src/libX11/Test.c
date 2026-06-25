@@ -962,13 +962,16 @@ X11WasmTestXlibApis(void)
     int fontSetFontCount = 0;
     int fontUtf8Width = 0;
     int fontWideWidth = 0;
+    int fontLongWidth = 0;
     int fontCharCount = 0;
+    unsigned short fontLongClampedWidth = 0;
     XRectangle fontInkExtent;
     XRectangle fontLogicalExtent;
     XRectangle fontOverallInkExtent;
     XRectangle fontOverallLogicalExtent;
     XRectangle fontPerCharInk[4];
     XRectangle fontPerCharLogical[4];
+    XRectangle *fontLongPerCharLogical = NULL;
     Atom customTextAtom = None;
     Atom timestampSelection = None;
     XClassHint classHint;
@@ -1029,7 +1032,7 @@ X11WasmTestXlibApis(void)
     char *fetchedName = NULL;
     char *fetchedIconName = NULL;
     char *fontAtomName = NULL;
-    char longText[5000];
+    char longText[40000];
     Font queryFont = None;
     Font cursorFont = None;
     Font cursorMaskFont = None;
@@ -3034,6 +3037,28 @@ X11WasmTestXlibApis(void)
 		    != (unsigned short)fontWideWidth)) {
 	goto cleanup;
     }
+    memset(longText, 'W', sizeof(longText));
+    fontLongPerCharLogical = (XRectangle *)ckalloc(sizeof(XRectangle)
+	    * sizeof(longText));
+    memset(fontLongPerCharLogical, 0, sizeof(XRectangle) * sizeof(longText));
+    fontLongWidth = Xutf8TextEscapement(fontSet, longText,
+	    (int)sizeof(longText));
+    fontLongClampedWidth = (fontLongWidth > (int)USHRT_MAX)
+	    ? USHRT_MAX : (unsigned short)fontLongWidth;
+    if ((fontLongWidth <= SHRT_MAX)
+	    || (Xutf8TextExtents(fontSet, longText, (int)sizeof(longText),
+		    &fontInkExtent, &fontLogicalExtent) != fontLongWidth)
+	    || (fontLogicalExtent.width != fontLongClampedWidth)
+	    || (Xutf8TextPerCharExtents(fontSet, longText,
+		    (int)sizeof(longText), NULL, fontLongPerCharLogical,
+		    (int)sizeof(longText), &fontCharCount,
+		    &fontOverallInkExtent, &fontOverallLogicalExtent) != True)
+	    || (fontCharCount != (int)sizeof(longText))
+	    || (fontOverallLogicalExtent.width != fontLongClampedWidth)
+	    || (fontLongPerCharLogical[sizeof(longText) - 1U].x
+		    != SHRT_MAX)) {
+	goto cleanup;
+    }
     textPixmap = XCreatePixmap(&browserDisplay.display,
 	    (Drawable)browserDisplay.rootWindow, 96, 32,
 	    (unsigned int)DefaultDepth(&browserDisplay.display, screen));
@@ -4174,6 +4199,9 @@ cleanup:
     }
     if (fontAtomName != NULL) {
 	XFree(fontAtomName);
+    }
+    if (fontLongPerCharLogical != NULL) {
+	ckfree(fontLongPerCharLogical);
     }
     if (queryFontStruct != NULL) {
 	XFreeFont(&browserDisplay.display, queryFontStruct);

@@ -1248,13 +1248,13 @@ BrowserFontSetTextExtents(
     rectHeight = BrowserClampUShort((unsigned int)(ascent + descent));
     if (overallInkReturn != NULL) {
 	overallInkReturn->x = 0;
-	overallInkReturn->y = (short)-ascent;
+	overallInkReturn->y = BrowserClampShort(-ascent);
 	overallInkReturn->width = rectWidth;
 	overallInkReturn->height = rectHeight;
     }
     if (overallLogicalReturn != NULL) {
 	overallLogicalReturn->x = 0;
-	overallLogicalReturn->y = (short)-ascent;
+	overallLogicalReturn->y = BrowserClampShort(-ascent);
 	overallLogicalReturn->width = rectWidth;
 	overallLogicalReturn->height = rectHeight;
     }
@@ -1294,8 +1294,8 @@ BrowserFontSetTextPerCharExtents(
 		charLength);
 	XRectangle rect;
 
-	rect.x = (short)x;
-	rect.y = (short)-ascent;
+	rect.x = BrowserClampShort(x);
+	rect.y = BrowserClampShort(-ascent);
 	rect.width = BrowserClampUShort((unsigned int)width);
 	rect.height = BrowserClampUShort((unsigned int)(ascent + descent));
 	if (inkExtentsBuffer != NULL) {
