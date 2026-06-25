@@ -2822,6 +2822,50 @@ KeySym XLookupKeysym(XKeyEvent *event, int index)
 	    index) : NoSymbol;
 }
 
+int
+XChangeKeyboardMapping(
+    Display *display,
+    int firstKeycode,
+    int keysymsPerKeycode,
+    KeySym *keysyms,
+    int numCodes)
+{
+    int i;
+    size_t total;
+    int changed = 0;
+
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    if ((keysymsPerKeycode <= 0) || (numCodes <= 0)
+	    || (firstKeycode < display->min_keycode)
+	    || (numCodes > display->max_keycode - firstKeycode + 1)
+	    || (keysyms == NULL)) {
+	(void)BrowserReportXError(display, BadValue, (XID)firstKeycode,
+		X11_WASM_XREQ_CHANGE_KEYBOARD_MAPPING, 0);
+	return Success;
+    }
+    total = (size_t)keysymsPerKeycode * (size_t)numCodes;
+    if ((keysymsPerKeycode > INT_MAX / numCodes)
+	    || (total > (size_t)INT_MAX / sizeof(KeySym))) {
+	(void)BrowserReportXError(display, BadAlloc, (XID)firstKeycode,
+		X11_WASM_XREQ_CHANGE_KEYBOARD_MAPPING, 0);
+	return Success;
+    }
+    for (i = 0; i < numCodes; i++) {
+	changed += BrowserSetKeycodeMapping((unsigned int)firstKeycode
+		+ (unsigned int)i, keysyms + i * keysymsPerKeycode,
+		keysymsPerKeycode);
+    }
+    if (changed > 0) {
+	browserDisplay.keyboardMapSerial++;
+    }
+    (void)BrowserQueueMappingNotify(MappingKeyboard, firstKeycode, numCodes);
+    return XNoOp(display);
+}
+
 KeySym *
 XGetKeyboardMapping(
     Display *display,

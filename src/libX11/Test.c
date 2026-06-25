@@ -1558,6 +1558,7 @@ X11WasmTestXlibApis(void)
     int preeditLineSpaceReturn = 0;
     Cursor preeditCursorReturn = None;
     KeyCode keyboardMappingKeycode = 0;
+    KeyCode changedMappingKeycode = 230;
     KeyCode unicodeSnowmanKeycode = 0;
     KeySym *keyboardMapping = NULL;
     XImage *image16 = NULL;
@@ -1583,6 +1584,7 @@ X11WasmTestXlibApis(void)
     unsigned char xyBitmapData[1];
     unsigned char xyBitmapSubImageData[16];
     int keysymsPerKeycode = -1;
+    KeySym changedKeyboardMapping[2] = {XK_F13, XK_F14};
     KeySym unicodeSnowman =
 	    (KeySym)(X11_WASM_UNICODE_KEYSYM_BASE | 0x2603U);
     KeySym lowerKeySym = NoSymbol;
@@ -2286,6 +2288,42 @@ X11WasmTestXlibApis(void)
 		    keyboardMappingKeycode, 1, 0) != NoSymbol)) {
 	goto cleanup;
     }
+    BrowserClearEventQueue();
+    oldKeyboardMapSerial = browserDisplay.keyboardMapSerial;
+    if ((XChangeKeyboardMapping(&browserDisplay.display,
+		    changedMappingKeycode, 2, changedKeyboardMapping, 1)
+		    != Success)
+	    || (browserDisplay.keyboardMapSerial <= oldKeyboardMapSerial)) {
+	goto cleanup;
+    }
+    memset(&mappingNotifyEvent, 0, sizeof(mappingNotifyEvent));
+    if ((XNextEvent(&browserDisplay.display, &mappingNotifyEvent) != Success)
+	    || (mappingNotifyEvent.type != MappingNotify)
+	    || (mappingNotifyEvent.xmapping.request != MappingKeyboard)
+	    || (mappingNotifyEvent.xmapping.first_keycode
+		    != changedMappingKeycode)
+	    || (mappingNotifyEvent.xmapping.count != 1)
+	    || (XEventsQueued(&browserDisplay.display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    keyboardMapping = XGetKeyboardMapping(&browserDisplay.display,
+	    changedMappingKeycode, 1, &keysymsPerKeycode);
+    lookupEvent.keycode = changedMappingKeycode;
+    if ((keyboardMapping == NULL) || (keysymsPerKeycode < 2)
+	    || (keyboardMapping[0] != XK_F13)
+	    || (keyboardMapping[1] != XK_F14)
+	    || (XKeycodeToKeysym(&browserDisplay.display,
+		    changedMappingKeycode, 0) != XK_F13)
+	    || (XKeycodeToKeysym(&browserDisplay.display,
+		    changedMappingKeycode, 1) != XK_F14)
+	    || (XLookupKeysym(&lookupEvent, 0) != XK_F13)
+	    || (XLookupKeysym(&lookupEvent, 1) != XK_F14)
+	    || (XKeysymToKeycode(&browserDisplay.display, XK_F13)
+		    != changedMappingKeycode)) {
+	goto cleanup;
+    }
+    XFree(keyboardMapping);
+    keyboardMapping = NULL;
     unicodeSnowmanKeycode = XKeysymToKeycode(&browserDisplay.display,
 	    unicodeSnowman);
     keyboardMapping = XGetKeyboardMapping(&browserDisplay.display,

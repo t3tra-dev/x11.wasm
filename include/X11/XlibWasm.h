@@ -239,6 +239,8 @@ EXTERN Status XGetGeometry(Display *d, Drawable dr, Window *w, int *i1,
 	int *i2, unsigned int *ui1, unsigned int *ui2, unsigned int *ui3,
 	unsigned int *ui4);
 EXTERN int XGetInputFocus(Display *d, Window *w, int *i);
+EXTERN int XChangeKeyboardMapping(Display *d, int first_keycode,
+	int keysyms_per_keycode, KeySym *keysyms, int num_codes);
 EXTERN KeySym *XGetKeyboardMapping(Display *d, KeyCode first_keycode,
 	int keycode_count, int *keysyms_per_keycode_return);
 EXTERN Window XGetSelectionOwner(Display *d, Atom a);

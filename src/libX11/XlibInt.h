@@ -159,6 +159,7 @@
 #define X11_WASM_XREQ_CREATE_GLYPH_CURSOR 94
 #define X11_WASM_XREQ_FREE_CURSOR 95
 #define X11_WASM_XREQ_QUERY_BEST_SIZE 97
+#define X11_WASM_XREQ_CHANGE_KEYBOARD_MAPPING 100
 #define X11_WASM_XREQ_GET_KEYBOARD_MAPPING 101
 #define X11_WASM_XREQ_CHANGE_KEYBOARD_CONTROL 102
 #define X11_WASM_XREQ_GET_KEYBOARD_CONTROL 103
@@ -1385,6 +1386,10 @@ void BrowserRememberHostAddress(
 void BrowserRememberKeycode(
     unsigned int keycode,
     KeySym keySym);
+int BrowserSetKeycodeMapping(
+    unsigned int keycode,
+    const KeySym *keysyms,
+    int keysymsPerKeycode);
 int BrowserReportXError(
     Display *display,
     int errorCode,

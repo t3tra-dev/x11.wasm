@@ -133,7 +133,8 @@ typedef struct X11WasmDisplayState {
     int globalAutoRepeat;
     char autoRepeats[32];
     char keymap[32];
-    KeySym keycodeMap[256];
+    KeySym keycodeMap[256][2];
+    unsigned char keycodeMapExplicit[256];
     unsigned int nextSyntheticKeycode;
     unsigned long keyboardMapSerial;
     unsigned long modifierMapSerial;

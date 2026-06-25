@@ -1398,6 +1398,7 @@ BrowserInitKeyboardMap(
     X11WasmDisplayState *state)
 {
     memset(state->keycodeMap, 0, sizeof(state->keycodeMap));
+    memset(state->keycodeMapExplicit, 0, sizeof(state->keycodeMapExplicit));
     state->nextSyntheticKeycode = X11_WASM_SYNTHETIC_KEYCODE_START;
     state->keyboardMapSerial++;
     BrowserInitModifierMap(state);
@@ -1417,12 +1418,45 @@ BrowserRememberKeycode(
     KeySym keySym)
 {
     if ((keycode <= X11_WASM_MAX_KEYCODE) && (keySym != NoSymbol)) {
-	if (browserDisplay.keycodeMap[keycode] == keySym) {
+	if (browserDisplay.keycodeMapExplicit[keycode]) {
 	    return;
 	}
-	browserDisplay.keycodeMap[keycode] = keySym;
+	if (browserDisplay.keycodeMap[keycode][0] == keySym) {
+	    return;
+	}
+	browserDisplay.keycodeMap[keycode][0] = keySym;
+	browserDisplay.keycodeMap[keycode][1] = NoSymbol;
 	browserDisplay.keyboardMapSerial++;
     }
+}
+
+int
+BrowserSetKeycodeMapping(
+    unsigned int keycode,
+    const KeySym *keysyms,
+    int keysymsPerKeycode)
+{
+    int level;
+    int changed = 0;
+
+    if ((keycode < X11_WASM_MIN_KEYCODE) || (keycode > X11_WASM_MAX_KEYCODE)
+	    || (keysyms == NULL) || (keysymsPerKeycode <= 0)) {
+	return 0;
+    }
+    for (level = 0; level < X11_WASM_KEYSYMS_PER_KEYCODE; level++) {
+	KeySym keySym = (level < keysymsPerKeycode)
+		? keysyms[level] : NoSymbol;
+
+	if (browserDisplay.keycodeMap[keycode][level] != keySym) {
+	    browserDisplay.keycodeMap[keycode][level] = keySym;
+	    changed = 1;
+	}
+    }
+    if (!browserDisplay.keycodeMapExplicit[keycode]) {
+	browserDisplay.keycodeMapExplicit[keycode] = 1;
+	changed = 1;
+    }
+    return changed;
 }
 
 void
@@ -1447,7 +1481,10 @@ BrowserClearKeycodeRange(
 	last = X11_WASM_MAX_KEYCODE;
     }
     for (keycode = first; keycode <= last; keycode++) {
-	browserDisplay.keycodeMap[keycode] = NoSymbol;
+	if (!browserDisplay.keycodeMapExplicit[keycode]) {
+	    browserDisplay.keycodeMap[keycode][0] = NoSymbol;
+	    browserDisplay.keycodeMap[keycode][1] = NoSymbol;
+	}
     }
     browserDisplay.keyboardMapSerial++;
 }
@@ -1729,6 +1766,10 @@ BrowserKeySymForKeycodeLevel(
     if ((index < 0) || (index >= X11_WASM_KEYSYMS_PER_KEYCODE)) {
 	return NoSymbol;
     }
+    if ((keycode <= X11_WASM_MAX_KEYCODE)
+	    && browserDisplay.keycodeMapExplicit[keycode]) {
+	return browserDisplay.keycodeMap[keycode][index];
+    }
     if (baseKeySym != NoSymbol) {
 	if (index & 1) {
 	    KeySym shiftedKeySym = BrowserShiftedAsciiKeySym(baseKeySym);
@@ -1744,8 +1785,9 @@ BrowserKeySymForKeycodeLevel(
 	return knownKeySym;
     }
     if ((keycode <= X11_WASM_MAX_KEYCODE)
-	    && (browserDisplay.keycodeMap[keycode] != NoSymbol)) {
-	return browserDisplay.keycodeMap[keycode];
+	    && (index == 0)
+	    && (browserDisplay.keycodeMap[keycode][0] != NoSymbol)) {
+	return browserDisplay.keycodeMap[keycode][0];
     }
     if ((keycode >= X11_WASM_MIN_KEYCODE)
 	    && (keycode <= X11_WASM_MAX_KEYCODE)) {
@@ -1759,17 +1801,44 @@ BrowserKeycodeFromKeySym(
     KeySym keySym)
 {
     unsigned int keycode;
+    int level;
 
     if (keySym == NoSymbol) {
 	return 0;
     }
+    for (keycode = X11_WASM_MIN_KEYCODE; keycode <= X11_WASM_MAX_KEYCODE;
+	    keycode++) {
+	if (!browserDisplay.keycodeMapExplicit[keycode]) {
+	    continue;
+	}
+	for (level = 0; level < X11_WASM_KEYSYMS_PER_KEYCODE; level++) {
+	    if (browserDisplay.keycodeMap[keycode][level] == keySym) {
+		return keycode;
+	    }
+	}
+    }
+    for (keycode = X11_WASM_MIN_KEYCODE; keycode <= X11_WASM_MAX_KEYCODE;
+	    keycode++) {
+	if (browserDisplay.keycodeMapExplicit[keycode]) {
+	    continue;
+	}
+	if (browserDisplay.keycodeMap[keycode][0] == keySym) {
+	    return keycode;
+	}
+    }
     keycode = BrowserKnownKeycodeForKeySym(keySym);
     if (keycode != 0) {
+	if (browserDisplay.keycodeMapExplicit[keycode]) {
+	    return 0;
+	}
 	BrowserRememberKeycode(keycode, keySym);
 	return keycode;
     }
     keycode = BrowserAsciiKeycodeFromKeySym(keySym);
     if (keycode != 0) {
+	if (browserDisplay.keycodeMapExplicit[keycode]) {
+	    return 0;
+	}
 	BrowserRememberKeycode(keycode, keySym);
 	return keycode;
     }
@@ -1778,6 +1847,9 @@ BrowserKeycodeFromKeySym(
 	    || (keycode < X11_WASM_MIN_KEYCODE)
 	    || (keycode > X11_WASM_MAX_KEYCODE)) {
 	keycode = BrowserNextSyntheticKeycode();
+    }
+    if (browserDisplay.keycodeMapExplicit[keycode]) {
+	return 0;
     }
     BrowserRememberKeycode(keycode, keySym);
     return keycode;
