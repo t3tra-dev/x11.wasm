@@ -1,0 +1,1503 @@
+// @ts-check
+
+const {
+  createMappedWindow,
+  createMappedWindows,
+  expect,
+  fs,
+  test,
+  waitForX11Runtime,
+  X11_WASM_DOM_SOURCES,
+  X11_WASM_JS_LIBRARY_SOURCES,
+} = require("../support/x11");
+
+test("XSetIconSizes updates browser WM_ICON_SIZE metadata", async ({ page }) => {
+  await waitForX11Runtime(page);
+  const windowId = await createMappedWindow(page);
+
+  const iconSizes = await page.evaluate((windowId) => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestSetWindowIconSizes?: Function, x11WasmBackend?: X11WasmBackendSnapshot } }} */ (
+        window
+      ).Module;
+    const backend =
+      /** @type {Window & { Module?: { x11WasmBackend?: X11WasmBackendSnapshot } }} */ (
+        window
+      ).Module?.x11WasmBackend;
+    if (!module?._X11WasmTestSetWindowIconSizes || !backend) {
+      throw new Error("missing XSetIconSizes test hooks");
+    }
+
+    const setResult = module._X11WasmTestSetWindowIconSizes(windowId, 1);
+    const resource = backend.resources.get(windowId);
+    const element = resource?.element;
+    if (!(element instanceof HTMLElement) || !resource) {
+      throw new Error("missing icon size test element");
+    }
+    const afterSet = {
+      attrCount: element.getAttribute("data-x11-wasm-icon-size-count"),
+      attrSizes: element.getAttribute("data-x11-wasm-icon-sizes"),
+      resourceCount: resource.iconSizeCount,
+      resourceSizes: resource.iconSizes,
+    };
+    const clearResult = module._X11WasmTestSetWindowIconSizes(windowId, 0);
+    const afterClear = {
+      attrCount: element.getAttribute("data-x11-wasm-icon-size-count"),
+      attrSizes: element.getAttribute("data-x11-wasm-icon-sizes"),
+      resourceCount: resource.iconSizeCount,
+      resourceSizes: resource.iconSizes,
+    };
+    return { afterClear, afterSet, clearResult, setResult };
+  }, windowId);
+
+  expect(iconSizes).toEqual({
+    setResult: 0,
+    clearResult: 0,
+    afterSet: {
+      attrCount: "2",
+      attrSizes: "16x16-64x64+8+8 32x32-128x128+16+16",
+      resourceCount: 2,
+      resourceSizes: "16x16-64x64+8+8 32x32-128x128+16+16",
+    },
+    afterClear: {
+      attrCount: null,
+      attrSizes: null,
+      resourceCount: 0,
+      resourceSizes: "",
+    },
+  });
+});
+
+test("_NET_WM_ICON honors root WM_ICON_SIZE when choosing favicon", async ({
+  page,
+}) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const icon = await page.evaluate(async () => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestSetRootIconSizeAndWindowIcon?: Function, x11WasmBackend?: X11WasmBackendSnapshot } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    if (!module?._X11WasmTestSetRootIconSizeAndWindowIcon || !backend) {
+      throw new Error("missing root icon size test hook");
+    }
+
+    const windowId = module._X11WasmTestSetRootIconSizeAndWindowIcon();
+    const resource = backend.resources.get(windowId);
+    const element = resource?.element;
+    if (!(element instanceof HTMLElement) || !resource) {
+      throw new Error("missing root icon size test element");
+    }
+    const href = element.getAttribute("data-x11-wasm-icon-photo-href") || "";
+    const image = new Image();
+    image.src = href;
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = reject;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("missing root icon size canvas context");
+    }
+    context.drawImage(image, 0, 0);
+    const center = Array.from(
+      context.getImageData(
+        Math.floor(image.naturalWidth / 2),
+        Math.floor(image.naturalHeight / 2),
+        1,
+        1,
+      ).data,
+    );
+    const documentIcon = document.querySelector("link[data-x11-wasm-icon]");
+    return {
+      count: element.getAttribute("data-x11-wasm-icon-photo-count"),
+      documentHref: documentIcon?.getAttribute("href") || "",
+      href,
+      naturalHeight: image.naturalHeight,
+      naturalWidth: image.naturalWidth,
+      sizes: element.getAttribute("data-x11-wasm-icon-photo-sizes"),
+      windowId,
+      center,
+    };
+  });
+
+  expect(icon.windowId).toBeGreaterThan(0);
+  expect(icon.count).toBe("2");
+  expect(icon.sizes).toBe("16x16 32x32");
+  expect(icon.href).toContain("data:image/png");
+  expect(icon.documentHref).toBe(icon.href);
+  expect(icon.naturalWidth).toBe(16);
+  expect(icon.naturalHeight).toBe(16);
+  expect(icon.center).toEqual([255, 0, 0, 255]);
+});
+
+test("browser backend reflects WM_HINTS relationships in DOM state", async ({
+  page,
+}) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const hints = await page.evaluate(() => {
+    const backend =
+      /** @type {Window & { Module?: { x11WasmBackend?: X11WasmBackendSnapshot & { createWindow?: Function, setWindowWMHints?: Function } } }} */ (
+        window
+      ).Module?.x11WasmBackend;
+    if (!backend?.createWindow || !backend.setWindowWMHints) {
+      throw new Error("missing X11 wasm backend WM_HINTS methods");
+    }
+    const rootWindow = backend.rootWindow || 1;
+    const ownerId = 0x710201;
+    const iconId = 0x710202;
+    const groupId = 0x710203;
+    const inputHint = 1 << 0;
+    const stateHint = 1 << 1;
+    const iconWindowHint = 1 << 3;
+    const windowGroupHint = 1 << 6;
+    const iconicState = 3;
+
+    backend.createWindow(ownerId, rootWindow, 0, 0, 80, 60, 24, 0);
+    backend.createWindow(iconId, rootWindow, 0, 0, 24, 24, 24, 0);
+    backend.createWindow(groupId, rootWindow, 0, 0, 10, 10, 24, 0);
+    backend.setWindowWMHints(
+      ownerId,
+      inputHint | stateHint | iconWindowHint | windowGroupHint,
+      0,
+      iconicState,
+      0,
+      iconId,
+      0,
+      0,
+      0,
+      groupId,
+    );
+
+    const owner = backend.resources.get(ownerId);
+    const icon = backend.resources.get(iconId);
+    const group = backend.resources.get(groupId);
+    if (
+      !(owner?.element instanceof HTMLElement) ||
+      !(icon?.element instanceof HTMLElement) ||
+      !(group?.element instanceof HTMLElement)
+    ) {
+      throw new Error("missing WM_HINTS test elements");
+    }
+    const beforeClear = {
+      iconOwner: icon.element.getAttribute("data-x11-wasm-icon-owner"),
+      initialStateName: owner.element.getAttribute(
+        "data-x11-wasm-initial-state-name",
+      ),
+      inputEligible: owner.element.getAttribute("data-x11-wasm-input-eligible"),
+      ownerIconWindow: owner.element.getAttribute("data-x11-wasm-icon-window"),
+      ownerWindowGroup: owner.element.getAttribute("data-x11-wasm-window-group"),
+      groupMembers: group.element.getAttribute(
+        "data-x11-wasm-window-group-members",
+      ),
+      resourceIconWindow: owner.wmHints?.iconWindow,
+      resourceWindowGroup: owner.wmHints?.windowGroup,
+    };
+
+    backend.setWindowWMHints(ownerId, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    const afterClear = {
+      iconOwner: icon.element.getAttribute("data-x11-wasm-icon-owner"),
+      ownerFlags: owner.element.getAttribute("data-x11-wasm-wm-hints-flags"),
+      groupMembers: group.element.getAttribute(
+        "data-x11-wasm-window-group-members",
+      ),
+      resourceHints: owner.wmHints,
+    };
+
+    return { afterClear, beforeClear };
+  });
+
+  expect(hints).toEqual({
+    beforeClear: {
+      iconOwner: String(0x710201),
+      initialStateName: "iconic",
+      inputEligible: "0",
+      ownerIconWindow: String(0x710202),
+      ownerWindowGroup: String(0x710203),
+      groupMembers: String(0x710201),
+      resourceIconWindow: 0x710202,
+      resourceWindowGroup: 0x710203,
+    },
+    afterClear: {
+      iconOwner: null,
+      ownerFlags: null,
+      groupMembers: null,
+      resourceHints: null,
+    },
+  });
+});
+
+test("browser backend honors WM_HINTS initialState on first map", async ({
+  page,
+}) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const states = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestMapWindowWithInitialState?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { rootWindow?: number, createWindow?: Function, mapWindow?: Function, setWindowWMHints?: Function, flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    if (
+      !module?._X11WasmTestMapWindowWithInitialState ||
+      !backend?.createWindow ||
+      !backend.mapWindow ||
+      !backend.setWindowWMHints ||
+      !backend.flush
+    ) {
+      throw new Error("missing WM_HINTS initial state test hooks");
+    }
+    const rootWindow = backend.rootWindow || 1;
+    const ownerId = 0x710204;
+    const iconId = 0x710207;
+    const stateHint = 1 << 1;
+    const iconWindowHint = 1 << 3;
+    const iconPositionHint = 1 << 4;
+    const iconicState = 3;
+
+    backend.createWindow(ownerId, rootWindow, 40, 50, 80, 60, 24, 0);
+    backend.createWindow(iconId, rootWindow, 5, 6, 24, 20, 24, 0);
+    backend.setWindowWMHints(
+      ownerId,
+      stateHint | iconWindowHint | iconPositionHint,
+      0,
+      iconicState,
+      0,
+      iconId,
+      17,
+      29,
+      0,
+      0,
+    );
+    backend.mapWindow(ownerId);
+    backend.flush();
+
+    const owner = backend.resources.get(ownerId);
+    const icon = backend.resources.get(iconId);
+    const cWindowId =
+      module._X11WasmTestMapWindowWithInitialState(iconicState);
+    backend.flush();
+    const cWindow = backend.resources.get(cWindowId);
+    if (
+      !(owner?.element instanceof HTMLElement) ||
+      !(icon?.element instanceof HTMLElement) ||
+      !(cWindow?.element instanceof HTMLElement)
+    ) {
+      throw new Error("missing WM_HINTS initial state elements");
+    }
+
+    return {
+      cPath: {
+        display: cWindow.element.style.display,
+        mapped: cWindow.mapped,
+        state: cWindow.element.getAttribute("data-x11-wasm-wm-state"),
+        viewable: cWindow.element.getAttribute("data-x11-wasm-viewable"),
+        windowId: cWindowId,
+      },
+      jsPath: {
+        iconDisplay: icon.element.style.display,
+        iconLeft: icon.element.style.left,
+        iconProxyActive: icon.element.getAttribute(
+          "data-x11-wasm-icon-proxy-active",
+        ),
+        iconProxyOwner: icon.element.getAttribute("data-x11-wasm-icon-proxy-owner"),
+        iconTop: icon.element.style.top,
+        iconViewable: icon.element.getAttribute("data-x11-wasm-viewable"),
+        ownerDisplay: owner.element.style.display,
+        ownerMapped: owner.mapped,
+        ownerState: owner.element.getAttribute("data-x11-wasm-wm-state"),
+        ownerViewable: owner.element.getAttribute("data-x11-wasm-viewable"),
+      },
+    };
+  });
+
+  expect(states.jsPath).toEqual({
+    iconDisplay: "",
+    iconLeft: "17px",
+    iconProxyActive: "1",
+    iconProxyOwner: String(0x710204),
+    iconTop: "29px",
+    iconViewable: "1",
+    ownerDisplay: "none",
+    ownerMapped: true,
+    ownerState: "iconic",
+    ownerViewable: "0",
+  });
+  expect(states.cPath).toEqual({
+    display: "none",
+    mapped: true,
+    state: "iconic",
+    viewable: "0",
+    windowId: expect.any(Number),
+  });
+  expect(states.cPath.windowId).toBeGreaterThan(0);
+});
+
+test("browser backend displays WM_HINTS icon window while owner is iconic", async ({
+  page,
+}) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const states = await page.evaluate(() => {
+    const backend =
+      /** @type {Window & { Module?: { x11WasmBackend?: X11WasmBackendSnapshot & { rootWindow?: number, createWindow?: Function, mapWindow?: Function, unmapWindow?: Function, setWindowWMHints?: Function, setWindowWmState?: Function, flush?: Function } } }} */ (
+        window
+      ).Module?.x11WasmBackend;
+    if (
+      !backend?.createWindow ||
+      !backend.mapWindow ||
+      !backend.unmapWindow ||
+      !backend.setWindowWMHints ||
+      !backend.setWindowWmState ||
+      !backend.flush
+    ) {
+      throw new Error("missing X11 wasm backend WM_HINTS icon methods");
+    }
+    const rootWindow = backend.rootWindow || 1;
+    const ownerId = 0x710205;
+    const iconId = 0x710206;
+    const normalState = 1;
+    const iconicState = 3;
+    const iconWindowHint = 1 << 3;
+    const iconPositionHint = 1 << 4;
+
+    backend.createWindow(ownerId, rootWindow, 40, 50, 80, 60, 24, 0);
+    backend.createWindow(iconId, rootWindow, 5, 6, 24, 20, 24, 0);
+    backend.mapWindow(ownerId);
+    backend.flush();
+    backend.setWindowWMHints(
+      ownerId,
+      iconWindowHint | iconPositionHint,
+      0,
+      0,
+      0,
+      iconId,
+      17,
+      29,
+      0,
+      0,
+    );
+
+    const owner = backend.resources.get(ownerId);
+    const icon = backend.resources.get(iconId);
+    if (
+      !(owner?.element instanceof HTMLElement) ||
+      !(icon?.element instanceof HTMLElement)
+    ) {
+      throw new Error("missing WM_HINTS icon window elements");
+    }
+    const ownerElement = owner.element;
+    const iconElement = icon.element;
+    const snapshot = () => ({
+      iconDisplay: iconElement.style.display,
+      iconLeft: iconElement.style.left,
+      iconMapped: icon.mapped,
+      iconOwner: iconElement.getAttribute("data-x11-wasm-icon-owner"),
+      iconProxyActive: iconElement.getAttribute(
+        "data-x11-wasm-icon-proxy-active",
+      ),
+      iconProxyOwner: iconElement.getAttribute("data-x11-wasm-icon-proxy-owner"),
+      iconProxyX: iconElement.getAttribute("data-x11-wasm-icon-proxy-x"),
+      iconProxyY: iconElement.getAttribute("data-x11-wasm-icon-proxy-y"),
+      iconTop: iconElement.style.top,
+      iconViewable: iconElement.getAttribute("data-x11-wasm-viewable"),
+      ownerDisplay: ownerElement.style.display,
+      ownerState: ownerElement.getAttribute("data-x11-wasm-wm-state"),
+      ownerViewable: ownerElement.getAttribute("data-x11-wasm-viewable"),
+    });
+
+    backend.setWindowWmState(ownerId, iconicState);
+    const iconic = snapshot();
+    backend.setWindowWmState(ownerId, normalState);
+    const normal = snapshot();
+    backend.mapWindow(iconId);
+    backend.flush();
+    const mappedIcon = snapshot();
+    backend.unmapWindow(iconId);
+    backend.flush();
+    backend.setWindowWmState(ownerId, iconicState);
+    backend.setWindowWMHints(ownerId, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    const cleared = snapshot();
+
+    return { cleared, iconic, mappedIcon, normal };
+  });
+
+  expect(states.iconic).toEqual({
+    iconDisplay: "",
+    iconLeft: "17px",
+    iconMapped: false,
+    iconOwner: String(0x710205),
+    iconProxyActive: "1",
+    iconProxyOwner: String(0x710205),
+    iconProxyX: "17",
+    iconProxyY: "29",
+    iconTop: "29px",
+    iconViewable: "1",
+    ownerDisplay: "none",
+    ownerState: "iconic",
+    ownerViewable: "0",
+  });
+  expect(states.normal).toEqual({
+    iconDisplay: "none",
+    iconLeft: "5px",
+    iconMapped: false,
+    iconOwner: String(0x710205),
+    iconProxyActive: null,
+    iconProxyOwner: null,
+    iconProxyX: null,
+    iconProxyY: null,
+    iconTop: "6px",
+    iconViewable: "0",
+    ownerDisplay: "",
+    ownerState: "normal",
+    ownerViewable: "1",
+  });
+  expect(states.mappedIcon).toEqual({
+    iconDisplay: "",
+    iconLeft: "5px",
+    iconMapped: true,
+    iconOwner: String(0x710205),
+    iconProxyActive: null,
+    iconProxyOwner: null,
+    iconProxyX: null,
+    iconProxyY: null,
+    iconTop: "6px",
+    iconViewable: "1",
+    ownerDisplay: "",
+    ownerState: "normal",
+    ownerViewable: "1",
+  });
+  expect(states.cleared).toEqual({
+    iconDisplay: "none",
+    iconLeft: "5px",
+    iconMapped: false,
+    iconOwner: null,
+    iconProxyActive: null,
+    iconProxyOwner: null,
+    iconProxyX: null,
+    iconProxyY: null,
+    iconTop: "6px",
+    iconViewable: "0",
+    ownerDisplay: "none",
+    ownerState: "iconic",
+    ownerViewable: "0",
+  });
+});
+
+test("browser backend honors WM_INPUT_HINT for pointer input focus", async ({
+  page,
+}) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const ids = await page.evaluate(async () => {
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
+    const backend =
+      /** @type {Window & { Module?: { x11WasmBackend?: X11WasmBackendSnapshot & { rootWindow?: number, createWindow?: Function, mapWindow?: Function, setWindowWMHints?: Function, flush?: Function } } }} */ (
+        window
+      ).Module?.x11WasmBackend;
+    if (
+      !backend?.createWindow ||
+      !backend.mapWindow ||
+      !backend.setWindowWMHints ||
+      !backend.flush
+    ) {
+      throw new Error("missing X11 wasm backend WM input hint methods");
+    }
+    const rootWindow = backend.rootWindow || 1;
+    const noInputWindow = 0x710401;
+    const inputWindow = 0x710402;
+    const inputHint = 1;
+    backend.createWindow(noInputWindow, rootWindow, 0, 0, 24, 24, 24, 0);
+    backend.createWindow(inputWindow, rootWindow, 32, 0, 24, 24, 24, 0);
+    backend.setWindowWMHints(
+      noInputWindow,
+      inputHint,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+    );
+    backend.setWindowWMHints(
+      inputWindow,
+      inputHint,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+    );
+    backend.mapWindow(noInputWindow);
+    backend.mapWindow(inputWindow);
+    backend.flush();
+    return { noInputWindow, inputWindow };
+  });
+
+  const noInput = page.locator(`[data-x11-wasm-xid="${ids.noInputWindow}"]`);
+  const input = page.locator(`[data-x11-wasm-xid="${ids.inputWindow}"]`);
+  await expect(noInput).toHaveAttribute("data-x11-wasm-input-eligible", "0");
+  await expect(input).toHaveAttribute("data-x11-wasm-input-eligible", "1");
+
+  await page.evaluate(() => {
+    const inputElement = document.querySelector(".x11-wasm-input");
+    if (inputElement instanceof HTMLElement) {
+      inputElement.blur();
+    }
+  });
+  await noInput.click({ position: { x: 8, y: 8 } });
+  expect(
+    await page.evaluate(() =>
+      document.activeElement?.classList.contains("x11-wasm-input"),
+    ),
+  ).toBe(false);
+
+  await input.click({ position: { x: 8, y: 8 } });
+  expect(
+    await page.evaluate(() =>
+      document.activeElement?.classList.contains("x11-wasm-input"),
+    ),
+  ).toBe(true);
+});
+
+test("browser backend refreshes icon bitmap when source pixmap changes", async ({
+  page,
+}) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const icon = await page.evaluate(async () => {
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
+    const backend =
+      /** @type {Window & { Module?: { x11WasmBackend?: X11WasmBackendSnapshot & { rootWindow?: number, createPixmap?: Function, createWindow?: Function, mapWindow?: Function, drawRectangle?: Function, setWindowWMHints?: Function, flush?: Function } } }} */ (
+        window
+      ).Module?.x11WasmBackend;
+    if (
+      !backend?.createPixmap ||
+      !backend.createWindow ||
+      !backend.mapWindow ||
+      !backend.drawRectangle ||
+      !backend.setWindowWMHints ||
+      !backend.flush
+    ) {
+      throw new Error("missing X11 wasm backend icon bitmap methods");
+    }
+    const rootWindow = backend.rootWindow || 1;
+    const pixmapId = 0x710301;
+    const windowId = 0x710302;
+    const iconPixmapHint = 1 << 2;
+    backend.createPixmap(pixmapId, rootWindow, 4, 4, 24);
+    backend.drawRectangle(pixmapId, 0xff0000, 0, 0, 4, 4, true);
+    backend.createWindow(windowId, rootWindow, 0, 0, 16, 12, 24, 0);
+    backend.mapWindow(windowId);
+    backend.setWindowWMHints(
+      windowId,
+      iconPixmapHint,
+      0,
+      0,
+      pixmapId,
+      0,
+      0,
+      0,
+      0,
+      0,
+    );
+    backend.flush();
+
+    const resource = backend.resources.get(windowId);
+    const element = resource?.element;
+    if (!(element instanceof HTMLElement)) {
+      throw new Error("missing icon bitmap refresh element");
+    }
+    const readIcon = () => {
+      const documentIcon = document.querySelector("link[data-x11-wasm-icon]");
+      return {
+        href: element.getAttribute("data-x11-wasm-icon-bitmap-href") || "",
+        documentHref: documentIcon?.getAttribute("href") || "",
+      };
+    };
+    const initial = readIcon();
+    backend.drawRectangle(pixmapId, 0x00ff00, 0, 0, 4, 4, true);
+    backend.flush();
+    const updated = readIcon();
+    return { initial, updated };
+  });
+
+  expect(icon.initial.href).toContain("data:image/png");
+  expect(icon.initial.documentHref).toBe(icon.initial.href);
+  expect(icon.updated.href).toContain("data:image/png");
+  expect(icon.updated.documentHref).toBe(icon.updated.href);
+  expect(icon.updated.href).not.toBe(icon.initial.href);
+});
+
+test("XSetZoomHints updates browser zoom hint metadata", async ({ page }) => {
+  await waitForX11Runtime(page);
+  const windowId = await createMappedWindow(page);
+
+  const metadata = await page.evaluate((id) => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestSetZoomHints?: Function, x11WasmBackend?: X11WasmBackendSnapshot } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    const resource = backend?.resources.get(id);
+    const element = resource?.element;
+    const root = backend?.rootWindow
+      ? backend.resources.get(backend.rootWindow)
+      : null;
+    const stateBackend =
+      /** @type {X11WasmBackendSnapshot & { setWindowState?: Function }} */ (
+        backend
+      );
+    if (
+      !module?._X11WasmTestSetZoomHints ||
+      !resource ||
+      !element ||
+      !root ||
+      typeof stateBackend?.setWindowState !== "function"
+    ) {
+      throw new Error("missing zoom hint test hooks");
+    }
+
+    const attrs = () => ({
+      flags: element.getAttribute("data-x11-wasm-zoom-hints-flags"),
+      x: element.getAttribute("data-x11-wasm-zoom-hint-x"),
+      y: element.getAttribute("data-x11-wasm-zoom-hint-y"),
+      width: element.getAttribute("data-x11-wasm-zoom-hint-width"),
+      height: element.getAttribute("data-x11-wasm-zoom-hint-height"),
+      minWidth: element.getAttribute("data-x11-wasm-zoom-min-width"),
+      minHeight: element.getAttribute("data-x11-wasm-zoom-min-height"),
+      maxWidth: element.getAttribute("data-x11-wasm-zoom-max-width"),
+      maxHeight: element.getAttribute("data-x11-wasm-zoom-max-height"),
+      widthInc: element.getAttribute("data-x11-wasm-zoom-width-inc"),
+      heightInc: element.getAttribute("data-x11-wasm-zoom-height-inc"),
+      minAspectX: element.getAttribute("data-x11-wasm-zoom-min-aspect-x"),
+      minAspectY: element.getAttribute("data-x11-wasm-zoom-min-aspect-y"),
+      maxAspectX: element.getAttribute("data-x11-wasm-zoom-max-aspect-x"),
+      maxAspectY: element.getAttribute("data-x11-wasm-zoom-max-aspect-y"),
+      baseWidth: element.getAttribute("data-x11-wasm-zoom-base-width"),
+      baseHeight: element.getAttribute("data-x11-wasm-zoom-base-height"),
+      winGravity: element.getAttribute("data-x11-wasm-zoom-win-gravity"),
+    });
+    const normalState = () => ({
+      flags: element.getAttribute("data-x11-wasm-size-hints-flags"),
+      minWidth: element.getAttribute("data-x11-wasm-min-width"),
+      maxWidth: element.getAttribute("data-x11-wasm-max-width"),
+      styleMinWidth: getComputedStyle(element).minWidth,
+      styleMaxWidth: getComputedStyle(element).maxWidth,
+    });
+    const plainHints = () =>
+      resource.zoomHints ? JSON.parse(JSON.stringify(resource.zoomHints)) : null;
+    const geometry = () => ({
+      fullscreen: resource.fullscreen,
+      height: element.style.height,
+      left: element.style.left,
+      rootHeight: root.height,
+      rootWidth: root.width,
+      top: element.style.top,
+      width: element.style.width,
+      zoomed: resource.zoomed,
+    });
+
+    const beforeSet = normalState();
+    stateBackend.setWindowState(id, 0, 1, 0);
+    const beforeZoomHintGeometry = geometry();
+    const setResult = module._X11WasmTestSetZoomHints(id, 1);
+    const afterSet = {
+      attrs: attrs(),
+      geometry: geometry(),
+      normalState: normalState(),
+      resourceHints: plainHints(),
+    };
+    const clearResult = module._X11WasmTestSetZoomHints(id, 0);
+    const afterClear = {
+      attrs: attrs(),
+      geometry: geometry(),
+      normalState: normalState(),
+      resourceHints: plainHints(),
+    };
+    return {
+      afterClear,
+      afterSet,
+      beforeSet,
+      beforeZoomHintGeometry,
+      clearResult,
+      setResult,
+    };
+  }, windowId);
+
+  const expectedHints = {
+    baseHeight: 45,
+    baseWidth: 80,
+    flags: 1020,
+    height: 180,
+    heightInc: 6,
+    maxAspectX: 4,
+    maxAspectY: 3,
+    maxHeight: 360,
+    maxWidth: 640,
+    minAspectX: 16,
+    minAspectY: 9,
+    minHeight: 90,
+    minWidth: 160,
+    width: 320,
+    widthInc: 8,
+    winGravity: 9,
+    x: 11,
+    y: 13,
+  };
+  const expectedAttrs = {
+    baseHeight: "45",
+    baseWidth: "80",
+    flags: "1020",
+    height: "180",
+    heightInc: "6",
+    maxAspectX: "4",
+    maxAspectY: "3",
+    maxHeight: "360",
+    maxWidth: "640",
+    minAspectX: "16",
+    minAspectY: "9",
+    minHeight: "90",
+    minWidth: "160",
+    width: "320",
+    widthInc: "8",
+    winGravity: "9",
+    x: "11",
+    y: "13",
+  };
+  const clearedAttrs = Object.fromEntries(
+    Object.keys(expectedAttrs).map((name) => [name, null]),
+  );
+
+  expect(metadata.setResult).toBe(0);
+  expect(metadata.clearResult).toBe(0);
+  expect(metadata.afterSet.attrs).toEqual(expectedAttrs);
+  expect(metadata.afterSet.geometry).toMatchObject({
+    fullscreen: false,
+    height: "177px",
+    left: "11px",
+    top: "13px",
+    width: "312px",
+    zoomed: true,
+  });
+  expect(metadata.afterSet.resourceHints).toEqual(expectedHints);
+  expect(metadata.afterSet.normalState).toEqual(metadata.beforeSet);
+  expect(metadata.afterClear.attrs).toEqual(clearedAttrs);
+  expect(metadata.afterClear.geometry).toMatchObject({
+    fullscreen: false,
+    zoomed: true,
+  });
+  expect(metadata.afterClear.geometry).toEqual(
+    metadata.beforeZoomHintGeometry,
+  );
+  expect(metadata.afterClear.resourceHints).toBeNull();
+  expect(metadata.afterClear.normalState).toEqual(metadata.beforeSet);
+});
+
+test("browser backend clears window size hints metadata and CSS", async ({
+  page,
+}) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const hints = await page.evaluate(async () => {
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
+    const backend =
+      /** @type {Window & { Module?: { x11WasmBackend?: X11WasmBackendSnapshot & { rootWindow?: number, createWindow?: Function, mapWindow?: Function, setWindowAttributes?: Function, setWindowSizeHints?: Function, flush?: Function } } }} */ (
+        window
+      ).Module?.x11WasmBackend;
+    if (
+      !backend?.createWindow ||
+      !backend.mapWindow ||
+      !backend.setWindowAttributes ||
+      !backend.setWindowSizeHints ||
+      !backend.flush
+    ) {
+      throw new Error("missing X11 wasm backend size hints methods");
+    }
+    const rootWindow = backend.rootWindow || 1;
+    const windowId = 0x710101;
+    const pMinSize = 1 << 4;
+    const pMaxSize = 1 << 5;
+    const pResizeInc = 1 << 6;
+    const pAspect = 1 << 7;
+    backend.createWindow(windowId, rootWindow, 0, 0, 80, 40, 24, 0);
+    backend.mapWindow(windowId);
+    backend.setWindowAttributes(windowId, 0, 0, 1, 1, 0, 0xffffffff, 0);
+    backend.setWindowSizeHints(
+      windowId,
+      pMinSize | pMaxSize | pResizeInc | pAspect,
+      0,
+      0,
+      0,
+      0,
+      100,
+      50,
+      200,
+      120,
+      4,
+      5,
+      16,
+      9,
+      16,
+      9,
+      0,
+      0,
+      9,
+    );
+    backend.setWindowSizeHints(
+      windowId,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+    );
+    backend.flush();
+
+    const resource = backend.resources.get(windowId);
+    const element = resource?.element;
+    if (!(element instanceof HTMLElement)) {
+      throw new Error("missing size hints clear test element");
+    }
+    const computed = getComputedStyle(element);
+    return {
+      flags: element.getAttribute("data-x11-wasm-size-hints-flags"),
+      minWidth: element.getAttribute("data-x11-wasm-min-width"),
+      maxWidth: element.getAttribute("data-x11-wasm-max-width"),
+      widthInc: element.getAttribute("data-x11-wasm-width-inc"),
+      winGravity: element.getAttribute("data-x11-wasm-win-gravity"),
+      styleMinWidth: computed.minWidth,
+      styleMaxWidth: computed.maxWidth,
+      styleAspectRatio: element.style.aspectRatio,
+    };
+  });
+
+  expect(hints.flags).toBeNull();
+  expect(hints.minWidth).toBeNull();
+  expect(hints.maxWidth).toBeNull();
+  expect(hints.widthInc).toBeNull();
+  expect(hints.winGravity).toBe("1");
+  expect(hints.styleMinWidth).toBe("0px");
+  expect(hints.styleMaxWidth).toBe("none");
+  expect(hints.styleAspectRatio).toBe("");
+});
+
+test("browser backend applies resize increment size hints to configured windows", async ({
+  page,
+}) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const geometry = await page.evaluate(async () => {
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
+    const backend =
+      /** @type {Window & { Module?: { x11WasmBackend?: X11WasmBackendSnapshot & { rootWindow?: number, createWindow?: Function, configureWindow?: Function, mapWindow?: Function, setWindowSizeHints?: Function, flush?: Function } } }} */ (
+        window
+      ).Module?.x11WasmBackend;
+    if (
+      !backend?.createWindow ||
+      !backend.configureWindow ||
+      !backend.mapWindow ||
+      !backend.setWindowSizeHints ||
+      !backend.flush
+    ) {
+      throw new Error("missing X11 wasm backend size hint geometry methods");
+    }
+    const rootWindow = backend.rootWindow || 1;
+    const windowId = 0x710102;
+    const pMinSize = 1 << 4;
+    const pMaxSize = 1 << 5;
+    const pResizeInc = 1 << 6;
+    const pBaseSize = 1 << 8;
+    backend.createWindow(windowId, rootWindow, 0, 0, 80, 40, 24, 0);
+    backend.mapWindow(windowId);
+    backend.setWindowSizeHints(
+      windowId,
+      pMinSize | pMaxSize | pResizeInc | pBaseSize,
+      0,
+      0,
+      0,
+      0,
+      100,
+      50,
+      220,
+      160,
+      16,
+      10,
+      0,
+      0,
+      0,
+      0,
+      10,
+      5,
+      1,
+    );
+    backend.configureWindow(windowId, 0, 0, 137, 88, 0, 0);
+    backend.flush();
+
+    const resource = backend.resources.get(windowId);
+    const element = resource?.element;
+    if (!(element instanceof HTMLElement) || !resource) {
+      throw new Error("missing size hint geometry test element");
+    }
+    const rect = element.getBoundingClientRect();
+    return {
+      baseWidth: element.getAttribute("data-x11-wasm-base-width"),
+      height: resource.height,
+      heightInc: element.getAttribute("data-x11-wasm-height-inc"),
+      pendingHeight: resource.pendingHeight,
+      pendingWidth: resource.pendingWidth,
+      rectHeight: Math.round(rect.height),
+      rectWidth: Math.round(rect.width),
+      styleHeight: element.style.height,
+      styleWidth: element.style.width,
+      width: resource.width,
+      widthInc: element.getAttribute("data-x11-wasm-width-inc"),
+    };
+  });
+
+  expect(geometry).toEqual({
+    baseWidth: "10",
+    height: 85,
+    heightInc: "10",
+    pendingHeight: 85,
+    pendingWidth: 122,
+    rectHeight: 85,
+    rectWidth: 122,
+    styleHeight: "85px",
+    styleWidth: "122px",
+    width: 122,
+    widthInc: "16",
+  });
+});
+
+test("browser backend constrains configured windows to aspect size hints", async ({
+  page,
+}) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const geometry = await page.evaluate(async () => {
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
+    const backend =
+      /** @type {Window & { Module?: { x11WasmBackend?: X11WasmBackendSnapshot & { rootWindow?: number, createWindow?: Function, configureWindow?: Function, mapWindow?: Function, setWindowSizeHints?: Function, flush?: Function } } }} */ (
+        window
+      ).Module?.x11WasmBackend;
+    if (
+      !backend?.createWindow ||
+      !backend.configureWindow ||
+      !backend.mapWindow ||
+      !backend.setWindowSizeHints ||
+      !backend.flush
+    ) {
+      throw new Error("missing X11 wasm backend aspect hint methods");
+    }
+    const rootWindow = backend.rootWindow || 1;
+    const windowId = 0x710103;
+    const pAspect = 1 << 7;
+    backend.createWindow(windowId, rootWindow, 0, 0, 80, 80, 24, 0);
+    backend.mapWindow(windowId);
+    backend.setWindowSizeHints(
+      windowId,
+      pAspect,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      4,
+      3,
+      16,
+      9,
+      0,
+      0,
+      1,
+    );
+    backend.configureWindow(windowId, 0, 0, 120, 300, 0, 0);
+    backend.flush();
+    const tallResource = backend.resources.get(windowId);
+    const element = tallResource?.element;
+    if (!(element instanceof HTMLElement) || !tallResource) {
+      throw new Error("missing aspect hint test element");
+    }
+    const tallRect = element.getBoundingClientRect();
+    const tallSnapshot = {
+      height: tallResource.height,
+      pendingHeight: tallResource.pendingHeight,
+      pendingWidth: tallResource.pendingWidth,
+      rectHeight: Math.round(tallRect.height),
+      rectWidth: Math.round(tallRect.width),
+      width: tallResource.width,
+    };
+
+    backend.configureWindow(windowId, 0, 0, 400, 100, 0, 0);
+    backend.flush();
+    const wideResource = backend.resources.get(windowId);
+    if (!wideResource) {
+      throw new Error("missing aspect hint test resource after resize");
+    }
+    const wideRect = element.getBoundingClientRect();
+    const wideSnapshot = {
+      height: wideResource.height,
+      pendingHeight: wideResource.pendingHeight,
+      pendingWidth: wideResource.pendingWidth,
+      rectHeight: Math.round(wideRect.height),
+      rectWidth: Math.round(wideRect.width),
+      width: wideResource.width,
+    };
+
+    return {
+      maxAspectX: element.getAttribute("data-x11-wasm-max-aspect-x"),
+      maxAspectY: element.getAttribute("data-x11-wasm-max-aspect-y"),
+      minAspectX: element.getAttribute("data-x11-wasm-min-aspect-x"),
+      minAspectY: element.getAttribute("data-x11-wasm-min-aspect-y"),
+      tallHeight: tallSnapshot.height,
+      tallPendingHeight: tallSnapshot.pendingHeight,
+      tallPendingWidth: tallSnapshot.pendingWidth,
+      tallRectHeight: tallSnapshot.rectHeight,
+      tallRectWidth: tallSnapshot.rectWidth,
+      tallWidth: tallSnapshot.width,
+      wideHeight: wideSnapshot.height,
+      widePendingHeight: wideSnapshot.pendingHeight,
+      widePendingWidth: wideSnapshot.pendingWidth,
+      wideRectHeight: wideSnapshot.rectHeight,
+      wideRectWidth: wideSnapshot.rectWidth,
+      wideWidth: wideSnapshot.width,
+    };
+  });
+
+  expect(geometry).toEqual({
+    maxAspectX: "16",
+    maxAspectY: "9",
+    minAspectX: "4",
+    minAspectY: "3",
+    tallHeight: 300,
+    tallPendingHeight: 300,
+    tallPendingWidth: 400,
+    tallRectHeight: 300,
+    tallRectWidth: 400,
+    tallWidth: 400,
+    wideHeight: 225,
+    widePendingHeight: 225,
+    widePendingWidth: 400,
+    wideRectHeight: 225,
+    wideRectWidth: 400,
+    wideWidth: 400,
+  });
+});
+
+test("browser backend applies configure window value masks", async ({ page }) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const snapshots = await page.evaluate(async () => {
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
+    const backend =
+      /** @type {Window & { Module?: { x11WasmBackend?: X11WasmBackendSnapshot & { rootWindow?: number, createWindow?: Function, configureWindow?: Function, mapWindow?: Function, flush?: Function } } }} */ (
+        window
+      ).Module?.x11WasmBackend;
+    if (
+      !backend?.createWindow ||
+      !backend.configureWindow ||
+      !backend.mapWindow ||
+      !backend.flush
+    ) {
+      throw new Error("missing X11 wasm backend configure methods");
+    }
+
+    const rootWindow = backend.rootWindow || 1;
+    const windowId = 0x710103;
+    const cwX = 1 << 0;
+    const cwY = 1 << 1;
+    const cwWidth = 1 << 2;
+    const cwHeight = 1 << 3;
+    const cwBorderWidth = 1 << 4;
+
+    backend.createWindow(windowId, rootWindow, 0, 0, 11, 13, 24, 0);
+    backend.mapWindow(windowId);
+
+    const snapshot = () => {
+      backend.flush();
+      const resource = backend.resources.get(windowId);
+      const element = resource?.element;
+      if (!(element instanceof HTMLElement) || !resource) {
+        throw new Error("missing configure mask test element");
+      }
+      return {
+        borderWidth: resource.borderWidth,
+        height: resource.height,
+        left: element.style.left,
+        pendingBorderWidth: resource.pendingBorderWidth,
+        pendingHeight: resource.pendingHeight,
+        pendingWidth: resource.pendingWidth,
+        pendingX: resource.pendingX,
+        pendingY: resource.pendingY,
+        styleBorderWidth: element.style.borderWidth,
+        styleHeight: element.style.height,
+        styleWidth: element.style.width,
+        top: element.style.top,
+        width: resource.width,
+        x: resource.x,
+        y: resource.y,
+      };
+    };
+
+    const initial = snapshot();
+    backend.configureWindow(windowId, 7, 9, 99, 88, 5, cwX | cwY);
+    const positionOnly = snapshot();
+    backend.configureWindow(windowId, 1, 2, 17, 99, 7, cwWidth);
+    const widthOnly = snapshot();
+    backend.configureWindow(
+      windowId,
+      3,
+      4,
+      200,
+      21,
+      6,
+      cwHeight | cwBorderWidth,
+    );
+    const heightAndBorder = snapshot();
+
+    return { heightAndBorder, initial, positionOnly, widthOnly };
+  });
+
+  expect(snapshots.initial).toEqual(
+    expect.objectContaining({
+      borderWidth: 0,
+      height: 13,
+      left: "0px",
+      top: "0px",
+      width: 11,
+      x: 0,
+      y: 0,
+    }),
+  );
+  expect(snapshots.positionOnly).toEqual(
+    expect.objectContaining({
+      borderWidth: 0,
+      height: 13,
+      left: "7px",
+      pendingHeight: 13,
+      pendingWidth: 11,
+      top: "9px",
+      width: 11,
+      x: 7,
+      y: 9,
+    }),
+  );
+  expect(snapshots.widthOnly).toEqual(
+    expect.objectContaining({
+      borderWidth: 0,
+      height: 13,
+      left: "7px",
+      pendingWidth: 17,
+      styleWidth: "17px",
+      top: "9px",
+      width: 17,
+      x: 7,
+      y: 9,
+    }),
+  );
+  expect(snapshots.heightAndBorder).toEqual(
+    expect.objectContaining({
+      borderWidth: 6,
+      height: 21,
+      left: "7px",
+      pendingBorderWidth: 6,
+      pendingHeight: 21,
+      styleBorderWidth: "6px",
+      styleHeight: "21px",
+      styleWidth: "17px",
+      top: "9px",
+      width: 17,
+      x: 7,
+      y: 9,
+    }),
+  );
+});
+
+test("browser backend overrides window cursors during pointer grab", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+
+  const cursors = await page.evaluate(async () => {
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
+    const backend =
+      /** @type {Window & { Module?: { x11WasmBackend?: X11WasmBackendSnapshot & { rootWindow?: number, createWindow?: Function, mapWindow?: Function, setWindowStyle?: Function, setPointerGrabCursor?: Function, flush?: Function } } }} */ (
+        window
+      ).Module?.x11WasmBackend;
+    if (
+      !backend?.createWindow ||
+      !backend.mapWindow ||
+      !backend.setWindowStyle ||
+      !backend.setPointerGrabCursor ||
+      !backend.flush
+    ) {
+      throw new Error("missing pointer grab cursor backend methods");
+    }
+    const targetId = 0x710801;
+    backend.createWindow(targetId, backend.rootWindow || 1, 0, 0, 72, 48, 24, 0);
+    backend.mapWindow(targetId);
+    backend.setWindowStyle(targetId, false, 0, 0, false, 0, 0, true, 152);
+    const root = document.querySelector("#x11-wasm-root");
+    const target = document.querySelector(`[data-x11-wasm-xid="${targetId}"]`);
+    if (!(root instanceof HTMLElement) || !(target instanceof HTMLElement)) {
+      throw new Error("missing pointer grab cursor elements");
+    }
+    backend.flush();
+    const before = getComputedStyle(target).cursor;
+    backend.setPointerGrabCursor(true, 150);
+    const grabbed = getComputedStyle(target).cursor;
+    const classDuringGrab = root.classList.contains("x11-wasm-pointer-grab");
+    backend.setPointerGrabCursor(false, 0);
+    const after = getComputedStyle(target).cursor;
+    const classAfterGrab = root.classList.contains("x11-wasm-pointer-grab");
+    return { before, grabbed, after, classDuringGrab, classAfterGrab };
+  });
+
+  expect(cursors).toEqual({
+    before: "text",
+    grabbed: "wait",
+    after: "text",
+    classDuringGrab: true,
+    classAfterGrab: false,
+  });
+});
+
+test("browser backend applies WM_STATE visibility without remapping", async ({
+  page,
+}) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const states = await page.evaluate(() => {
+    const backend =
+      /** @type {Window & { Module?: { x11WasmBackend?: X11WasmBackendSnapshot & { createWindow?: Function, mapWindow?: Function, setWindowWmState?: Function } } }} */ (
+        window
+      ).Module?.x11WasmBackend;
+    if (
+      !backend?.createWindow ||
+      !backend.mapWindow ||
+      !backend.setWindowWmState
+    ) {
+      throw new Error("missing X11 wasm backend WM_STATE methods");
+    }
+    const rootWindow = backend.rootWindow || 1;
+    const windowId = 0x710204;
+    const withdrawnState = 0;
+    const normalState = 1;
+    const iconicState = 3;
+
+    backend.createWindow(windowId, rootWindow, 12, 18, 96, 72, 24, 0);
+    backend.mapWindow(windowId);
+    backend.flush();
+    const resource = backend.resources.get(windowId);
+    const element = resource?.element;
+    if (!(element instanceof HTMLElement) || !resource) {
+      throw new Error("missing WM_STATE test element");
+    }
+    const snapshot = () => ({
+      ariaHidden: element.getAttribute("aria-hidden"),
+      display: element.style.display,
+      mapped: resource.mapped,
+      state: element.getAttribute("data-x11-wasm-wm-state"),
+      viewable: element.getAttribute("data-x11-wasm-viewable"),
+    });
+
+    const mapped = snapshot();
+    backend.setWindowWmState(windowId, iconicState);
+    const iconic = snapshot();
+    backend.setWindowWmState(windowId, withdrawnState);
+    const withdrawn = snapshot();
+    backend.setWindowWmState(windowId, normalState);
+    const normal = snapshot();
+
+    return { iconic, mapped, normal, withdrawn };
+  });
+
+  expect(states).toEqual({
+    mapped: {
+      ariaHidden: null,
+      display: "",
+      mapped: true,
+      state: null,
+      viewable: "1",
+    },
+    iconic: {
+      ariaHidden: "true",
+      display: "none",
+      mapped: true,
+      state: "iconic",
+      viewable: "0",
+    },
+    withdrawn: {
+      ariaHidden: "true",
+      display: "none",
+      mapped: true,
+      state: "withdrawn",
+      viewable: "0",
+    },
+    normal: {
+      ariaHidden: null,
+      display: "",
+      mapped: true,
+      state: "normal",
+      viewable: "1",
+    },
+  });
+});
+
+test("XSetRGBColormaps updates browser standard colormap metadata", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+  const windowId = await createMappedWindow(page);
+
+  const metadata = await page.evaluate((id) => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestSetStandardColormaps?: Function, x11WasmBackend?: X11WasmBackendSnapshot } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    const resource = backend?.resources.get(id);
+    const element = resource?.element;
+    if (
+      !module?._X11WasmTestSetStandardColormaps ||
+      !resource?.standardColormaps ||
+      !element
+    ) {
+      throw new Error("missing standard colormap test hooks");
+    }
+
+	    const setResult = module._X11WasmTestSetStandardColormaps(id, 1);
+	    const afterSet = {
+	      attrCount: element.getAttribute("data-x11-wasm-standard-colormap-count"),
+	      attrMaps: JSON.parse(
+	        element.getAttribute("data-x11-wasm-standard-colormaps") || "{}",
+	      ),
+	      resourceMaps: JSON.parse(JSON.stringify(resource.standardColormaps)),
+	    };
+	    const clearResult = module._X11WasmTestSetStandardColormaps(id, 0);
+	    const afterClear = {
+	      attrCount: element.getAttribute("data-x11-wasm-standard-colormap-count"),
+	      attrMaps: element.getAttribute("data-x11-wasm-standard-colormaps"),
+	      resourceMaps: JSON.parse(JSON.stringify(resource.standardColormaps)),
+	    };
+    return { afterClear, afterSet, clearResult, setResult };
+  }, windowId);
+
+  const expectedMaps = {
+    _X11_WASM_TEST_RGB_MAP: [
+      {
+        basePixel: 0,
+        blueMax: 255,
+        blueMult: 1,
+        colormap: 2,
+        greenMax: 255,
+        greenMult: 256,
+        killid: 1,
+        redMax: 255,
+        redMult: 65536,
+        visualid: 1,
+      },
+      {
+        basePixel: 16,
+        blueMax: 31,
+        blueMult: 1,
+        colormap: 2,
+        greenMax: 63,
+        greenMult: 256,
+        killid: 1,
+        redMax: 31,
+        redMult: 65536,
+        visualid: 1,
+      },
+    ],
+  };
+
+  expect(metadata).toEqual({
+    setResult: 0,
+    clearResult: 0,
+    afterSet: {
+      attrCount: "1",
+      attrMaps: expectedMaps,
+      resourceMaps: expectedMaps,
+    },
+    afterClear: {
+      attrCount: null,
+      attrMaps: null,
+      resourceMaps: {},
+    },
+  });
+});

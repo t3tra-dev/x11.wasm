@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "scripts": {
+    "build:browser": "ninja -f build.ninja browser",
+    "typecheck:js": "tsc -p tsconfig.json",
+    "test:browser": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.0"
+  }
+}

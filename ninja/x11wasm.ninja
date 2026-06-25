@@ -1,0 +1,152 @@
+# Reusable build fragment for the x11.wasm browser X11 archive.
+#
+# The including build file must define:
+#   x11wasm_root
+#   x11wasm_builddir
+#   x11wasm_emcache
+
+x11wasm_xlib_common_deps = $x11wasm_builddir/xlib-common-deps
+x11wasm_xlib_objects = $x11wasm_builddir/xlib-objects
+x11wasm_objs = $
+  $x11wasm_builddir/Alloc.o $
+  $x11wasm_builddir/XlibInt.o $
+  $x11wasm_builddir/StrKeysym.o $
+  $x11wasm_builddir/ImUtil.o $
+  $x11wasm_builddir/OpenDis.o $
+  $x11wasm_builddir/Region.o $
+  $x11wasm_builddir/Window.o $
+  $x11wasm_builddir/Prop.o $
+  $x11wasm_builddir/Selection.o $
+  $x11wasm_builddir/BrowserBind.o $
+  $x11wasm_builddir/Runtime.o $
+  $x11wasm_builddir/WindowOps.o $
+  $x11wasm_builddir/Draw.o $
+  $x11wasm_builddir/Im.o $
+  $x11wasm_builddir/Event.o $
+  $x11wasm_builddir/Test.o $
+  $x11wasm_builddir/ICCCM.o
+x11wasm_lib = $x11wasm_builddir/libx11wasm.a
+x11wasm_js_library = $x11wasm_builddir/js/emscripten/library.js
+x11wasm_js_pre = $x11wasm_builddir/js/browser/dom.js
+x11wasm_js_types = $x11wasm_root/js/types/emscripten-library.d.ts
+x11wasm_js_library_bridge = $x11wasm_root/js/emscripten/library/bridge.js
+x11wasm_js_library_window = $x11wasm_root/js/emscripten/library/window.js
+x11wasm_js_library_draw = $x11wasm_root/js/emscripten/library/draw.js
+x11wasm_js_library_runtime = $x11wasm_root/js/emscripten/library/runtime.js
+x11wasm_js_library_wm = $x11wasm_root/js/emscripten/library/wm.js
+x11wasm_js_library_sources = $x11wasm_js_library_bridge $x11wasm_js_library_window $x11wasm_js_library_draw $x11wasm_js_library_runtime $x11wasm_js_library_wm
+x11wasm_js_dom_private = $x11wasm_root/js/browser/dom/private.js
+x11wasm_js_dom_types = $x11wasm_root/js/browser/dom/types.js
+x11wasm_js_dom_constants = $x11wasm_root/js/browser/dom/constants.js
+x11wasm_js_dom_helpers = $x11wasm_root/js/browser/dom/helpers.js
+x11wasm_js_dom_backend_core = $x11wasm_root/js/browser/dom/backend.js
+x11wasm_js_dom_backend_window = $x11wasm_root/js/browser/dom/window.js
+x11wasm_js_dom_backend_runtime = $x11wasm_root/js/browser/dom/runtime.js
+x11wasm_js_dom_backend_draw = $x11wasm_root/js/browser/dom/draw.js
+x11wasm_js_dom_backend_wm = $x11wasm_root/js/browser/dom/wm.js
+x11wasm_js_dom_backend_input = $x11wasm_root/js/browser/dom/input.js
+x11wasm_js_dom_backend_render = $x11wasm_root/js/browser/dom/render.js
+x11wasm_js_dom_backend_export = $x11wasm_root/js/browser/dom/export.js
+x11wasm_js_pre_sources = $x11wasm_js_dom_private $x11wasm_js_dom_types $x11wasm_js_dom_constants $x11wasm_js_dom_helpers $x11wasm_js_dom_backend_core $x11wasm_js_dom_backend_window $x11wasm_js_dom_backend_runtime $x11wasm_js_dom_backend_draw $x11wasm_js_dom_backend_wm $x11wasm_js_dom_backend_input $x11wasm_js_dom_backend_render $x11wasm_js_dom_backend_export
+
+build $x11wasm_xlib_common_deps: phony $
+  $x11wasm_root/src/libX11/XlibInt.h $
+  $x11wasm_root/src/libX11/tables/KeySyms.inc $
+  $x11wasm_root/src/libX11/tables/XColors.inc $
+  $x11wasm_root/include/X11/X.h $
+  $x11wasm_root/include/X11/Xatom.h $
+  $x11wasm_root/include/X11/Xfuncproto.h $
+  $x11wasm_root/include/X11/Xlib.h $
+  $x11wasm_root/include/X11/XlibWasm.h $
+  $x11wasm_root/include/X11/Xutil.h $
+  $x11wasm_root/include/X11/cursorfont.h $
+  $x11wasm_root/include/X11/keysym.h $
+  $x11wasm_root/include/X11/keysymdef.h $
+  $x11wasm_root/include/X11Wasm/Browser.h $
+  $x11wasm_root/include/X11Wasm/Runtime.h $
+  $x11wasm_root/src/libX11/bitmaps/error.xbm $
+  $x11wasm_root/src/libX11/bitmaps/info.xbm $
+  $x11wasm_root/src/libX11/bitmaps/questhead.xbm $
+  $x11wasm_root/src/libX11/bitmaps/question.xbm $
+  $x11wasm_root/src/libX11/bitmaps/warning.xbm
+
+build $x11wasm_xlib_objects: phony $
+  $x11wasm_builddir/Alloc.o $
+  $x11wasm_builddir/XlibInt.o $
+  $x11wasm_builddir/StrKeysym.o $
+  $x11wasm_builddir/ImUtil.o $
+  $x11wasm_builddir/OpenDis.o $
+  $x11wasm_builddir/Region.o $
+  $x11wasm_builddir/Window.o $
+  $x11wasm_builddir/Prop.o $
+  $x11wasm_builddir/Selection.o $
+  $x11wasm_builddir/BrowserBind.o $
+  $x11wasm_builddir/Runtime.o $
+  $x11wasm_builddir/WindowOps.o $
+  $x11wasm_builddir/Draw.o $
+  $x11wasm_builddir/Im.o $
+  $x11wasm_builddir/Event.o $
+  $x11wasm_builddir/Test.o $
+  $x11wasm_builddir/ICCCM.o
+
+rule x11wasm_compile_c
+  command = emcache="$x11wasm_emcache" && case "$$emcache" in /*) ;; *) emcache="$$(pwd)/$$emcache";; esac && mkdir -p "$x11wasm_builddir" "$$emcache" && $
+    EM_CACHE="$$emcache" emcc -c $
+    -I"$x11wasm_root/include" $
+    -DSTATIC_BUILD=1 $
+    "$in" -o "$out"
+  description = compile x11.wasm $in
+
+rule x11wasm_archive
+  command = mkdir -p "$x11wasm_builddir" && rm -f "$x11wasm_lib" && emar rcs "$x11wasm_lib" $x11wasm_objs
+  description = archive x11.wasm libX11
+
+rule x11wasm_bundle_dom_js
+  command = mkdir -p "$x11wasm_builddir/js/browser" && cat $x11wasm_js_pre_sources > "$x11wasm_js_pre"
+  description = bundle x11.wasm DOM backend
+
+rule x11wasm_bundle_library_js
+  command = mkdir -p "$x11wasm_builddir/js/emscripten" && cat $x11wasm_js_library_sources > "$x11wasm_js_library"
+  description = bundle x11.wasm Emscripten js-library
+
+build $x11wasm_builddir/XlibInt.o: x11wasm_compile_c $x11wasm_root/src/libX11/XlibInt.c | $x11wasm_xlib_common_deps
+build $x11wasm_builddir/Alloc.o: x11wasm_compile_c $x11wasm_root/src/libX11/Alloc.c | $x11wasm_xlib_common_deps
+build $x11wasm_builddir/StrKeysym.o: x11wasm_compile_c $x11wasm_root/src/libX11/StrKeysym.c | $x11wasm_xlib_common_deps
+build $x11wasm_builddir/ImUtil.o: x11wasm_compile_c $x11wasm_root/src/libX11/ImUtil.c | $x11wasm_xlib_common_deps
+build $x11wasm_builddir/OpenDis.o: x11wasm_compile_c $x11wasm_root/src/libX11/OpenDis.c | $x11wasm_xlib_common_deps
+build $x11wasm_builddir/Region.o: x11wasm_compile_c $x11wasm_root/src/libX11/Region.c | $x11wasm_xlib_common_deps
+build $x11wasm_builddir/Window.o: x11wasm_compile_c $x11wasm_root/src/libX11/Window.c | $x11wasm_xlib_common_deps
+build $x11wasm_builddir/Prop.o: x11wasm_compile_c $x11wasm_root/src/libX11/Prop.c | $x11wasm_xlib_common_deps
+build $x11wasm_builddir/Selection.o: x11wasm_compile_c $x11wasm_root/src/libX11/Selection.c | $x11wasm_xlib_common_deps
+build $x11wasm_builddir/BrowserBind.o: x11wasm_compile_c $x11wasm_root/src/libX11/BrowserBind.c | $x11wasm_xlib_common_deps
+build $x11wasm_builddir/Runtime.o: x11wasm_compile_c $x11wasm_root/src/libX11/Runtime.c | $x11wasm_xlib_common_deps
+build $x11wasm_builddir/WindowOps.o: x11wasm_compile_c $x11wasm_root/src/libX11/WindowOps.c | $x11wasm_xlib_common_deps
+build $x11wasm_builddir/Draw.o: x11wasm_compile_c $x11wasm_root/src/libX11/Draw.c | $x11wasm_xlib_common_deps
+build $x11wasm_builddir/Im.o: x11wasm_compile_c $x11wasm_root/src/libX11/Im.c | $x11wasm_xlib_common_deps
+build $x11wasm_builddir/Event.o: x11wasm_compile_c $x11wasm_root/src/libX11/Event.c | $x11wasm_xlib_common_deps
+build $x11wasm_builddir/Test.o: x11wasm_compile_c $x11wasm_root/src/libX11/Test.c | $x11wasm_xlib_common_deps
+build $x11wasm_builddir/ICCCM.o: x11wasm_compile_c $x11wasm_root/src/libX11/ICCCM.c | $x11wasm_xlib_common_deps
+build $x11wasm_lib: x11wasm_archive $x11wasm_xlib_objects
+build $x11wasm_js_library: x11wasm_bundle_library_js $
+  $x11wasm_js_library_bridge $
+  $x11wasm_js_library_window $
+  $x11wasm_js_library_draw $
+  $x11wasm_js_library_runtime $
+  $x11wasm_js_library_wm
+build $x11wasm_js_pre: x11wasm_bundle_dom_js $
+  $x11wasm_js_dom_private $
+  $x11wasm_js_dom_types $
+  $x11wasm_js_dom_constants $
+  $x11wasm_js_dom_helpers $
+  $x11wasm_js_dom_backend_core $
+  $x11wasm_js_dom_backend_window $
+  $x11wasm_js_dom_backend_runtime $
+  $x11wasm_js_dom_backend_draw $
+  $x11wasm_js_dom_backend_wm $
+  $x11wasm_js_dom_backend_input $
+  $x11wasm_js_dom_backend_render $
+  $x11wasm_js_dom_backend_export
+
+build x11wasm_lib: phony $x11wasm_lib
+build x11wasm_js: phony $x11wasm_js_library $x11wasm_js_pre
+build x11wasm: phony $x11wasm_lib $x11wasm_js_library $x11wasm_js_pre
