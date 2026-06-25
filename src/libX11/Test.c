@@ -4422,6 +4422,7 @@ X11WasmTestXErrorHandler(void)
     int changePixmapPropertyResult;
     int getPixmapPropertyResult;
     int deletePixmapPropertyResult;
+    int queryPixmapResult;
     int getInvalidAtomResult;
     int getNegativeOffsetResult;
     int getNegativeLengthResult;
@@ -5024,6 +5025,7 @@ X11WasmTestXErrorHandler(void)
     changePixmapPropertyResult = !Success;
     getPixmapPropertyResult = !BadWindow;
     deletePixmapPropertyResult = !Success;
+    queryPixmapResult = !False;
     propertyPixmap = XCreatePixmap(&browserDisplay.display,
 	    (Drawable)browserDisplay.rootWindow, 1, 1,
 	    (unsigned int)DefaultDepth(&browserDisplay.display,
@@ -5037,6 +5039,8 @@ X11WasmTestXErrorHandler(void)
 		AnyPropertyType, NULL, NULL, NULL, NULL, NULL);
 	deletePixmapPropertyResult = XDeleteProperty(&browserDisplay.display,
 		(Window)propertyPixmap, validProperty);
+	queryPixmapResult = XQueryTree(&browserDisplay.display,
+		(Window)propertyPixmap, NULL, NULL, NULL, NULL);
 	(void)XFreePixmap(&browserDisplay.display, propertyPixmap);
     }
     invalidSelectionOwnerResult = XGetSelectionOwner(&browserDisplay.display,
@@ -5207,6 +5211,7 @@ X11WasmTestXErrorHandler(void)
 	    || (changePixmapPropertyResult != Success)
 	    || (getPixmapPropertyResult != BadWindow)
 	    || (deletePixmapPropertyResult != Success)
+	    || (queryPixmapResult != False)
 	    || (propertyValidationResultSum != Success)
 	    || (getInvalidAtomResult != BadAtom)
 	    || (getNegativeOffsetResult != BadValue)
@@ -5372,6 +5377,7 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_CHANGE_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_DELETE_PROPERTY
+	    + X11_WASM_XREQ_QUERY_TREE
 	    + X11_WASM_XREQ_CHANGE_PROPERTY
 	    + X11_WASM_XREQ_CHANGE_PROPERTY
 	    + X11_WASM_XREQ_CHANGE_PROPERTY
@@ -5434,15 +5440,15 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 173)
+    if ((browserTestXErrorCount != 174)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
 	    || (browserTestRequestCodeSum != expectedRequestCodeSum)
 	    || (browserTestRequestCodeMask != expectedRequestCodeMask)
-	    || (browserTestLastSerial != initialSerial + 173)
+	    || (browserTestLastSerial != initialSerial + 174)
 	    || (LastKnownRequestProcessed(&browserDisplay.display)
-		    != initialSerial + 173)) {
+		    != initialSerial + 174)) {
 	return 0;
     }
     return 1;

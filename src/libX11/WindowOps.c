@@ -639,15 +639,11 @@ XQueryTree(
     unsigned int count = 0;
     unsigned int index = 0;
 
-    if (display == NULL) {
-	display = X11WasmGetDisplay(NULL);
-    }
-    resourcePtr = X11WasmFindResource(window);
+    resourcePtr = BrowserWindowResourceOrError(&display, window,
+	    X11_WASM_XREQ_QUERY_TREE);
     if (resourcePtr == NULL) {
 	if (childrenReturn != NULL) *childrenReturn = NULL;
 	if (nchildrenReturn != NULL) *nchildrenReturn = 0;
-	(void)BrowserReportXError(display, BadWindow, (XID)window,
-		X11_WASM_XREQ_QUERY_TREE, 0);
 	return False;
     }
     for (childPtr = resourcePtr->firstChildPtr; childPtr != NULL;
