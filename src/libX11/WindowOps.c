@@ -91,11 +91,15 @@ XCreateWindow(
     if (parentPtr == NULL) {
 	return None;
     }
-    if (!BrowserValueOrError(&display, width, width > 0,
+    if (!BrowserValidateCard16(&display, (long)width, 0,
 	    X11_WASM_XREQ_CREATE_WINDOW)) {
 	return None;
     }
-    if (!BrowserValueOrError(&display, height, height > 0,
+    if (!BrowserValidateCard16(&display, (long)height, 0,
+	    X11_WASM_XREQ_CREATE_WINDOW)) {
+	return None;
+    }
+    if (!BrowserValidateCard16(&display, (long)borderWidth, 1,
 	    X11_WASM_XREQ_CREATE_WINDOW)) {
 	return None;
     }
@@ -702,11 +706,11 @@ XCreatePixmap(
     if (drawablePtr == NULL) {
 	return None;
     }
-    if (!BrowserValueOrError(&display, width, width > 0,
+    if (!BrowserValidateCard16(&display, (long)width, 0,
 	    X11_WASM_XREQ_CREATE_PIXMAP)) {
 	return None;
     }
-    if (!BrowserValueOrError(&display, height, height > 0,
+    if (!BrowserValidateCard16(&display, (long)height, 0,
 	    X11_WASM_XREQ_CREATE_PIXMAP)) {
 	return None;
     }

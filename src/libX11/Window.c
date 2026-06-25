@@ -796,6 +796,19 @@ BrowserValidateWindowAttributeValues(
 }
 
 int
+BrowserValidateCard16(
+    Display **displayPtr,
+    long value,
+    int allowZero,
+    unsigned char requestCode)
+{
+    int lowerBoundOk = allowZero ? (value >= 0) : (value > 0);
+
+    return BrowserValueOrError(displayPtr, value,
+	    lowerBoundOk && (value <= USHRT_MAX), requestCode);
+}
+
+int
 BrowserValidateConfigureWindowValues(
     Display **displayPtr,
     X11WasmResource *resourcePtr,
@@ -815,18 +828,18 @@ BrowserValidateConfigureWindowValues(
 	return 1;
     }
     if ((valueMask & CWWidth)
-	    && !BrowserValueOrError(displayPtr, changes->width,
-		    changes->width > 0, requestCode)) {
+	    && !BrowserValidateCard16(displayPtr, changes->width, 0,
+		    requestCode)) {
 	return 0;
     }
     if ((valueMask & CWHeight)
-	    && !BrowserValueOrError(displayPtr, changes->height,
-		    changes->height > 0, requestCode)) {
+	    && !BrowserValidateCard16(displayPtr, changes->height, 0,
+		    requestCode)) {
 	return 0;
     }
     if ((valueMask & CWBorderWidth)
-	    && !BrowserValueOrError(displayPtr, changes->border_width,
-		    changes->border_width >= 0, requestCode)) {
+	    && !BrowserValidateCard16(displayPtr, changes->border_width, 1,
+		    requestCode)) {
 	return 0;
     }
     if ((resourcePtr != NULL) && (resourcePtr->c_class == InputOnly)

@@ -1737,6 +1737,11 @@ int BrowserValidateConfigureWindowValues(
     unsigned int valueMask,
     XWindowChanges *changes,
     unsigned char requestCode);
+int BrowserValidateCard16(
+    Display **displayPtr,
+    long value,
+    int allowZero,
+    unsigned char requestCode);
 int BrowserValidateBool(
     Display **displayPtr,
     int value,
