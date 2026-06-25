@@ -1,6 +1,12 @@
 #include "XlibInt.h"
 
 #define X11_WASM_CUT_BUFFER_COUNT 8
+#define X11_WASM_OLD_SIZE_HINTS_ELEMENTS 15UL
+#define X11_WASM_SIZE_HINTS_ELEMENTS ((unsigned long)(sizeof(XSizeHints) / 4U))
+#define X11_WASM_OLD_SIZE_HINTS_SUPPLIED \
+	(USPosition | USSize | PAllHints)
+#define X11_WASM_SIZE_HINTS_SUPPLIED \
+	(X11_WASM_OLD_SIZE_HINTS_SUPPLIED | PBaseSize | PWinGravity)
 
 typedef struct BrowserPropertySnapshot {
     Atom type;
@@ -566,6 +572,42 @@ XSetWMSizeHints(
 }
 
 int
+BrowserDecodeSizeHintsProperty(
+    const unsigned char *data,
+    unsigned long nitems,
+    XSizeHints *hintsReturn,
+    long *suppliedReturn)
+{
+    unsigned long copyItems;
+    unsigned long copyBytes;
+    long supplied = X11_WASM_OLD_SIZE_HINTS_SUPPLIED;
+
+    if (hintsReturn != NULL) {
+	memset(hintsReturn, 0, sizeof(*hintsReturn));
+    }
+    if (suppliedReturn != NULL) {
+	*suppliedReturn = 0;
+    }
+    if ((data == NULL) || (hintsReturn == NULL)
+	    || (nitems < X11_WASM_OLD_SIZE_HINTS_ELEMENTS)) {
+	return 0;
+    }
+
+    copyItems = (nitems < X11_WASM_SIZE_HINTS_ELEMENTS)
+	    ? nitems : X11_WASM_SIZE_HINTS_ELEMENTS;
+    copyBytes = copyItems * 4UL;
+    memcpy(hintsReturn, data, (size_t)copyBytes);
+    if (nitems >= X11_WASM_SIZE_HINTS_ELEMENTS) {
+	supplied = X11_WASM_SIZE_HINTS_SUPPLIED;
+    }
+    hintsReturn->flags &= supplied;
+    if (suppliedReturn != NULL) {
+	*suppliedReturn = supplied;
+    }
+    return 1;
+}
+
+int
 XSetSizeHints(
     Display *display,
     Window window,
@@ -632,16 +674,12 @@ XGetWMSizeHints(
 	    &actualFormat, &nitems, &bytesAfter, &data);
     if ((status != Success) || (actualType != XA_WM_SIZE_HINTS)
 	    || (actualFormat != 32) || (bytesAfter != 0)
-	    || (data == NULL)
-	    || (nitems * 4UL < (unsigned long)sizeof(XSizeHints))) {
+	    || !BrowserDecodeSizeHintsProperty(data, nitems, hintsReturn,
+		    suppliedReturn)) {
 	if (data != NULL) {
 	    XFree(data);
 	}
 	return False;
-    }
-    memcpy(hintsReturn, data, sizeof(XSizeHints));
-    if (suppliedReturn != NULL) {
-	*suppliedReturn = hintsReturn->flags;
     }
     XFree(data);
     return True;

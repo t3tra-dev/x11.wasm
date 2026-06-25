@@ -1396,6 +1396,7 @@ X11WasmTestXlibApis(void)
     XSizeHints normalHintsReturn;
     XSizeHints customHints;
     XSizeHints customHintsReturn;
+    unsigned int oldSizeHints[15];
     XWMHints wmHints;
     XWMHints *wmHintsReturn = NULL;
     XWindowAttributes inputOnlyAttributesReturn;
@@ -1411,6 +1412,10 @@ X11WasmTestXlibApis(void)
     Atom *protocolAtomsReturn = NULL;
     int protocolAtomCount = -1;
     long suppliedHints = 0;
+    long oldSizeHintsSupplied = USPosition | USSize | PAllHints;
+    long allSizeHintsSupplied = oldSizeHintsSupplied | PBaseSize
+	    | PWinGravity;
+    long oldSizeHintsFlags = 0;
     Atom customHintsAtom = None;
     XIconSize iconSizes[2];
     XIconSize *iconSizesReturn = NULL;
@@ -4423,7 +4428,8 @@ X11WasmTestXlibApis(void)
     wmHintsReturn = NULL;
     if (!XGetWMNormalHints(&browserDisplay.display, window,
 	    &normalHintsReturn, &suppliedHints)
-	    || (suppliedHints != normalHints.flags)
+	    || (suppliedHints != allSizeHintsSupplied)
+	    || (normalHintsReturn.flags != normalHints.flags)
 	    || (normalHintsReturn.min_width != 12)
 	    || (normalHintsReturn.min_height != 13)
 	    || (normalHintsReturn.max_width != 240)
@@ -4432,6 +4438,45 @@ X11WasmTestXlibApis(void)
 	    || (normalHintsReturn.height_inc != 3)
 	    || (normalHintsReturn.base_width != 10)
 	    || (normalHintsReturn.base_height != 11)) {
+	goto cleanup;
+    }
+    memset(oldSizeHints, 0, sizeof(oldSizeHints));
+    oldSizeHintsFlags = USPosition | USSize | PMinSize | PMaxSize
+	    | PResizeInc | PAspect | PBaseSize | PWinGravity | (1L << 30);
+    oldSizeHints[0] = (unsigned int)oldSizeHintsFlags;
+    oldSizeHints[5] = 21;
+    oldSizeHints[6] = 22;
+    oldSizeHints[7] = 421;
+    oldSizeHints[8] = 422;
+    oldSizeHints[9] = 4;
+    oldSizeHints[10] = 5;
+    oldSizeHints[11] = 3;
+    oldSizeHints[12] = 2;
+    oldSizeHints[13] = 16;
+    oldSizeHints[14] = 9;
+    suppliedHints = -1;
+    memset(&normalHintsReturn, 0xff, sizeof(normalHintsReturn));
+    if ((XChangeProperty(&browserDisplay.display, window, XA_WM_NORMAL_HINTS,
+	    XA_WM_SIZE_HINTS, 32, PropModeReplace,
+	    (const unsigned char *)oldSizeHints, 15) != Success)
+	    || !XGetWMSizeHints(&browserDisplay.display, window,
+		    &normalHintsReturn, &suppliedHints, XA_WM_NORMAL_HINTS)
+	    || (suppliedHints != oldSizeHintsSupplied)
+	    || (normalHintsReturn.flags != (oldSizeHintsFlags
+		    & oldSizeHintsSupplied))
+	    || (normalHintsReturn.min_width != 21)
+	    || (normalHintsReturn.min_height != 22)
+	    || (normalHintsReturn.max_width != 421)
+	    || (normalHintsReturn.max_height != 422)
+	    || (normalHintsReturn.width_inc != 4)
+	    || (normalHintsReturn.height_inc != 5)
+	    || (normalHintsReturn.min_aspect.x != 3)
+	    || (normalHintsReturn.min_aspect.y != 2)
+	    || (normalHintsReturn.max_aspect.x != 16)
+	    || (normalHintsReturn.max_aspect.y != 9)
+	    || (normalHintsReturn.base_width != 0)
+	    || (normalHintsReturn.base_height != 0)
+	    || (normalHintsReturn.win_gravity != 0)) {
 	goto cleanup;
     }
     XSetWMSizeHints(&browserDisplay.display, window, NULL,
@@ -4447,7 +4492,8 @@ X11WasmTestXlibApis(void)
     suppliedHints = 0;
     if (!XGetWMNormalHints(&browserDisplay.display, window,
 	    &normalHintsReturn, &suppliedHints)
-	    || (suppliedHints != normalHints.flags)
+	    || (suppliedHints != allSizeHintsSupplied)
+	    || (normalHintsReturn.flags != normalHints.flags)
 	    || (normalHintsReturn.min_width != 12)
 	    || (normalHintsReturn.min_height != 13)
 	    || (normalHintsReturn.max_width != 240)

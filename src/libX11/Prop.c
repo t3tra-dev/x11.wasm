@@ -1732,25 +1732,27 @@ BrowserApplyWindowMetadataProperty(
     } else if (property == XA_WM_NORMAL_HINTS) {
 	XSizeHints hints;
 
-	    if ((format == 32) && (propertyPtr != NULL)
-		    && (propertyPtr->dataLength >= (int)sizeof(hints))) {
-		memcpy(&hints, data, sizeof(hints));
-		BrowserSetWindowSizeHints(window, &hints);
-	    } else {
-		BrowserSetWindowSizeHints(window, NULL);
-	    }
-	} else if (property == XA_WM_ZOOM_HINTS) {
-	    XSizeHints hints;
+	if ((type == XA_WM_SIZE_HINTS) && (format == 32)
+		&& (propertyPtr != NULL)
+		&& BrowserDecodeSizeHintsProperty(data, propertyPtr->nitems,
+			&hints, NULL)) {
+	    BrowserSetWindowSizeHints(window, &hints);
+	} else {
+	    BrowserSetWindowSizeHints(window, NULL);
+	}
+    } else if (property == XA_WM_ZOOM_HINTS) {
+	XSizeHints hints;
 
-	    if ((format == 32) && (propertyPtr != NULL)
-		    && (propertyPtr->dataLength >= (int)sizeof(hints))) {
-		memcpy(&hints, data, sizeof(hints));
-		BrowserSetWindowZoomHints(window, &hints);
-	    } else {
-		BrowserSetWindowZoomHints(window, NULL);
-	    }
-	} else if (property == XA_WM_HINTS) {
-	    XWMHints hints;
+	if ((type == XA_WM_SIZE_HINTS) && (format == 32)
+		&& (propertyPtr != NULL)
+		&& BrowserDecodeSizeHintsProperty(data, propertyPtr->nitems,
+			&hints, NULL)) {
+	    BrowserSetWindowZoomHints(window, &hints);
+	} else {
+	    BrowserSetWindowZoomHints(window, NULL);
+	}
+    } else if (property == XA_WM_HINTS) {
+	XWMHints hints;
 
 	if ((format == 32) && (propertyPtr != NULL)
 		&& (propertyPtr->dataLength >= (int)sizeof(hints))) {

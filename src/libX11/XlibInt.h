@@ -737,6 +737,11 @@ int BrowserEventMatchesWindowMask(
     long mask);
 Window BrowserEventWindow(
     const XEvent *eventPtr);
+int BrowserDecodeSizeHintsProperty(
+    const unsigned char *data,
+    unsigned long nitems,
+    XSizeHints *hintsReturn,
+    long *suppliedReturn);
 int BrowserExternalClipboardTextProperty(
     Atom target,
     XTextProperty *textPropPtr);
