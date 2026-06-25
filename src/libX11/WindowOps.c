@@ -701,6 +701,20 @@ XCreatePixmap(
     if (drawablePtr == NULL) {
 	return None;
     }
+    if (!BrowserValueOrError(&display, width, width > 0,
+	    X11_WASM_XREQ_CREATE_PIXMAP)) {
+	return None;
+    }
+    if (!BrowserValueOrError(&display, height, height > 0,
+	    X11_WASM_XREQ_CREATE_PIXMAP)) {
+	return None;
+    }
+    if (!BrowserValueOrError(&display, depth,
+	    (depth == 1U)
+	    || (depth == (unsigned int)DefaultDepth(display,
+		    DefaultScreen(display))), X11_WASM_XREQ_CREATE_PIXMAP)) {
+	return None;
+    }
     resourcePtr = X11WasmCreateResource(display, X11_WASM_RESOURCE_PIXMAP);
     resourcePtr->width = width;
     resourcePtr->height = height;

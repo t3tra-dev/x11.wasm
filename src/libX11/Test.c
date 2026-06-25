@@ -2037,6 +2037,11 @@ X11WasmTestXlibApis(void)
     pixmapPtr = X11WasmFindResource((XID)pixmap);
     if ((copyExposurePixmap == None) || (pixmapPtr == NULL)
 	    || (pixmapPtr->type != X11_WASM_RESOURCE_PIXMAP)
+	    || (pixmapPtr->width != 1)
+	    || (pixmapPtr->height != 1)
+	    || (pixmapPtr->depth
+		    != (unsigned int)DefaultDepth(&browserDisplay.display,
+			    screen))
 	    || (pixmapPtr->atts.colormap != firstColormap)) {
 	goto cleanup;
     }
@@ -4431,6 +4436,9 @@ X11WasmTestXErrorHandler(void)
     int revertAfterValidation = 0;
     Window invalidCreateWindowResult;
     Pixmap createPixmapResult;
+    Pixmap invalidCreatePixmapWidthResult;
+    Pixmap invalidCreatePixmapHeightResult;
+    Pixmap invalidCreatePixmapDepthResult;
     Pixmap colorPixmap;
     Pixmap depthOnePixmap;
     Pixmap propertyPixmap;
@@ -4546,6 +4554,18 @@ X11WasmTestXErrorHandler(void)
     oldHandler = XSetErrorHandler(BrowserTestXErrorHandler);
     createPixmapResult = XCreatePixmap(&browserDisplay.display,
 	    (Drawable)invalidWindow, 1, 1, 1);
+    invalidCreatePixmapWidthResult = XCreatePixmap(&browserDisplay.display,
+	    (Drawable)browserDisplay.rootWindow, 0, 1,
+	    (unsigned int)DefaultDepth(&browserDisplay.display,
+		    DefaultScreen(&browserDisplay.display)));
+    invalidCreatePixmapHeightResult = XCreatePixmap(&browserDisplay.display,
+	    (Drawable)browserDisplay.rootWindow, 1, 0,
+	    (unsigned int)DefaultDepth(&browserDisplay.display,
+		    DefaultScreen(&browserDisplay.display)));
+    invalidCreatePixmapDepthResult = XCreatePixmap(&browserDisplay.display,
+	    (Drawable)browserDisplay.rootWindow, 1, 1,
+	    (unsigned int)DefaultDepth(&browserDisplay.display,
+		    DefaultScreen(&browserDisplay.display)) + 1U);
     freePixmapResult = XFreePixmap(&browserDisplay.display,
 	    (Pixmap)invalidWindow);
     createGCResult = XCreateGC(&browserDisplay.display,
@@ -5074,6 +5094,9 @@ X11WasmTestXErrorHandler(void)
 	    || (invalidSelectionOwnerResult != None)
 	    || (selectionValidationResultSum != Success)
 	    || (createPixmapResult != None)
+	    || (invalidCreatePixmapWidthResult != None)
+	    || (invalidCreatePixmapHeightResult != None)
+	    || (invalidCreatePixmapDepthResult != None)
 	    || (freePixmapResult != Success)
 	    || (createGCResult != NULL)
 	    || (getImageResult != NULL)
@@ -5163,6 +5186,9 @@ X11WasmTestXErrorHandler(void)
 	return 0;
     }
     expectedRequestCodeSum = X11_WASM_XREQ_CREATE_PIXMAP
+	    + X11_WASM_XREQ_CREATE_PIXMAP
+	    + X11_WASM_XREQ_CREATE_PIXMAP
+	    + X11_WASM_XREQ_CREATE_PIXMAP
 	    + X11_WASM_XREQ_FREE_PIXMAP
 	    + X11_WASM_XREQ_CREATE_GC
 	    + X11_WASM_XREQ_GET_IMAGE
@@ -5364,15 +5390,15 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 165)
+    if ((browserTestXErrorCount != 168)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
 	    || (browserTestRequestCodeSum != expectedRequestCodeSum)
 	    || (browserTestRequestCodeMask != expectedRequestCodeMask)
-	    || (browserTestLastSerial != initialSerial + 165)
+	    || (browserTestLastSerial != initialSerial + 168)
 	    || (LastKnownRequestProcessed(&browserDisplay.display)
-		    != initialSerial + 165)) {
+		    != initialSerial + 168)) {
 	return 0;
     }
     return 1;
