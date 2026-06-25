@@ -139,6 +139,14 @@
     throw new Error("X11WasmDOMBackend core must be loaded first");
   }
 
+  /**
+   * @param {X11WasmDOMDrawStyle} style
+   * @returns {boolean}
+   */
+  function drawStyleUsesFullPlaneMask(style) {
+    return (unsignedInt(style.planeMask, 0xffffffff) & 0xffffff) === 0xffffff;
+  }
+
   Object.assign(X11WasmDOMBackend.prototype, /** @type {any} */ ({
     /**
      * @param {boolean} enabled
@@ -222,6 +230,7 @@
      * @param {number} backgroundPixel
      * @param {number} fontPixelSize
      * @param {string} fontFamily
+     * @param {number=} planeMask
      * @returns {number}
      */
     setDrawStyle(
@@ -241,6 +250,7 @@
       backgroundPixel,
       fontPixelSize,
       fontFamily,
+      planeMask = 0xffffffff,
     ) {
       this.currentDrawStyle = {
         functionId,
@@ -264,6 +274,7 @@
           typeof fontFamily === "string" && fontFamily.length > 0
             ? fontFamily
             : "sans-serif",
+        planeMask: unsignedInt(planeMask, 0xffffffff),
       };
       return 0;
     },
@@ -279,7 +290,10 @@
      */
     rasterFillSolidRectangle(context, pixel, x, y, width, height) {
       const style = this.currentDrawStyle;
-      if (style.fillStyle !== FILL_SOLID || style.functionId === GX_COPY) {
+      if (
+        style.fillStyle !== FILL_SOLID ||
+        (style.functionId === GX_COPY && drawStyleUsesFullPlaneMask(style))
+      ) {
         return null;
       }
       if (style.functionId === GX_NOOP) {
@@ -349,6 +363,7 @@
               green,
               blue,
               255,
+              style.planeMask,
             );
           }
           offset += 4;
@@ -395,7 +410,7 @@
      */
     rasterDrawShape(context, bounds, draw, drawBackground) {
       const style = this.currentDrawStyle;
-      if (style.functionId === GX_COPY) {
+      if (style.functionId === GX_COPY && drawStyleUsesFullPlaneMask(style)) {
         return null;
       }
       if (style.functionId === GX_NOOP) {
@@ -493,6 +508,7 @@
               sourceData.data[offset + 1],
               sourceData.data[offset + 2],
               alpha,
+              style.planeMask,
             );
           }
           offset += 4;
@@ -763,6 +779,7 @@
               sourceGreen,
               sourceBlue,
               sourceAlpha,
+              style.planeMask,
             );
           }
           offset += 4;
@@ -931,6 +948,7 @@
               rgb[1],
               rgb[2],
               255,
+              style.planeMask,
             );
           }
           offset += 4;
@@ -1508,6 +1526,7 @@
             green,
             blue,
             255,
+            style.planeMask,
           );
           out += 4;
         }

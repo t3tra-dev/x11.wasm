@@ -464,6 +464,12 @@ unsigned long BrowserApplyRasterFunction(
     unsigned long source,
     unsigned long dest,
     unsigned int depth);
+unsigned long BrowserApplyPlaneMaskedRasterFunction(
+    int function,
+    unsigned long source,
+    unsigned long dest,
+    unsigned int depth,
+    unsigned long planeMask);
 void BrowserApplyWindowAttributes(
     X11WasmResource *resourcePtr,
     unsigned long mask,

@@ -237,7 +237,7 @@ extern int X11WasmJsSetDrawStyle(int function, unsigned int lineWidth,
 	int dashCount, int fillStyle, unsigned int stipple,
 	unsigned int tile, int tsOriginX, int tsOriginY,
 	unsigned long backgroundPixel, int fontPixelSize,
-	const char *fontFamily);
+	const char *fontFamily, unsigned long planeMask);
 extern int X11WasmJsSetWindowStyle(unsigned int window, int hasBackground,
 	unsigned long backgroundPixel, unsigned int backgroundPixmap,
 	int hasBorder, unsigned long borderPixel, unsigned int borderPixmap,
@@ -444,8 +444,8 @@ X11WasmJsSetDrawStyle(int function, unsigned int lineWidth, int lineStyle,
 	const unsigned char *dashPattern, int dashCount, int fillStyle,
 	unsigned int stipple, unsigned int tile, int tsOriginX, int tsOriginY,
 	unsigned long backgroundPixel, int fontPixelSize,
-	const char *fontFamily)
-{ (void)function; (void)lineWidth; (void)lineStyle; (void)capStyle; (void)joinStyle; (void)dashOffset; (void)dashLength; (void)dashPattern; (void)dashCount; (void)fillStyle; (void)stipple; (void)tile; (void)tsOriginX; (void)tsOriginY; (void)backgroundPixel; (void)fontPixelSize; (void)fontFamily; return 0; }
+	const char *fontFamily, unsigned long planeMask)
+{ (void)function; (void)lineWidth; (void)lineStyle; (void)capStyle; (void)joinStyle; (void)dashOffset; (void)dashLength; (void)dashPattern; (void)dashCount; (void)fillStyle; (void)stipple; (void)tile; (void)tsOriginX; (void)tsOriginY; (void)backgroundPixel; (void)fontPixelSize; (void)fontFamily; (void)planeMask; return 0; }
 static inline int
 X11WasmJsSetWindowStyle(unsigned int window, int hasBackground,
 	unsigned long backgroundPixel, unsigned int backgroundPixmap,

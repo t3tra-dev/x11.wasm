@@ -753,6 +753,84 @@ test("browser backend applies GC raster operations to putImage", async ({
   expect(samples.clearTarget[3]).toBe(0);
 });
 
+test("browser backend applies GC plane masks to rasterized drawing", async ({
+  page,
+}) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const samples = await page.evaluate(async () => {
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
+    const backend =
+      /** @type {Window & { Module?: { x11WasmBackend?: X11WasmBackendSnapshot & { rootWindow?: number, createWindow?: Function, mapWindow?: Function, drawRectangle?: Function, setDrawStyle?: Function, flush?: Function } } }} */ (
+        window
+      ).Module?.x11WasmBackend;
+    if (
+      !backend?.createWindow ||
+      !backend.mapWindow ||
+      !backend.drawRectangle ||
+      !backend.setDrawStyle ||
+      !backend.flush
+    ) {
+      throw new Error("missing X11 wasm backend plane mask methods");
+    }
+    const rootWindow = backend.rootWindow || 1;
+    const windowId = 0x72030a;
+    /** @param {number} planeMask */
+    const setPlaneMask = (planeMask) =>
+      backend.setDrawStyle(
+        3,
+        1,
+        0,
+        1,
+        0,
+        0,
+        4,
+        [],
+        0,
+        0,
+        0,
+        0,
+        0,
+        0xffffff,
+        14,
+        "sans-serif",
+        planeMask,
+      );
+
+    backend.createWindow(windowId, rootWindow, 0, 0, 2, 1, 24, 0);
+    backend.mapWindow(windowId);
+    backend.drawRectangle(windowId, 0x112233, 0, 0, 2, 1, true);
+    setPlaneMask(0x00ff00);
+    backend.drawRectangle(windowId, 0xaabbcc, 0, 0, 1, 1, true);
+    setPlaneMask(0);
+    backend.drawRectangle(windowId, 0xffffff, 1, 0, 1, 1, true);
+    backend.flush();
+
+    const resource = backend.resources.get(windowId);
+    const canvas = resource?.canvas;
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      throw new Error("missing plane mask test canvas");
+    }
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("missing plane mask test context");
+    }
+    const pixel = (x, y) => Array.from(context.getImageData(x, y, 1, 1).data);
+    return {
+      greenPlaneOnly: pixel(0, 0),
+      zeroMask: pixel(1, 0),
+    };
+  });
+
+  expect(samples.greenPlaneOnly).toEqual([0x11, 0xbb, 0x33, 255]);
+  expect(samples.zeroMask).toEqual([0x11, 0x22, 0x33, 255]);
+});
+
 test("browser backend clips putImage to drawable bounds", async ({ page }) => {
   await page.goto("/x11.html");
   await expect(page.locator("#x11-wasm-status")).toHaveText("running", {

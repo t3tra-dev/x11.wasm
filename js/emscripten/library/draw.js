@@ -251,6 +251,7 @@
     backgroundPixel,
     fontPixelSize,
     fontFamily,
+    planeMask,
   ) {
     var dashes = [];
     var count = Math.max(0, dashCount | 0);
@@ -276,6 +277,7 @@
         backgroundPixel,
         fontPixelSize,
         family,
+        planeMask,
       ]) | 0
     );
   },

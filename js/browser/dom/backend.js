@@ -283,6 +283,7 @@
         backgroundPixel: 0xffffff,
         fontPixelSize: 14,
         fontFamily: "sans-serif",
+        planeMask: 0xffffffff,
       };
     }
   }

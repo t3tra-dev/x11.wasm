@@ -243,7 +243,7 @@ BrowserApplyGCStyle(
     if (gc == NULL) {
 	(void)X11WasmJsSetDrawStyle(GXcopy, 1, LineSolid, CapButt,
 		JoinMiter, 0, 4, NULL, 0, FillSolid, None, None, 0, 0,
-		0xffffff, fontPixelSize, fontFamily);
+		0xffffff, fontPixelSize, fontFamily, AllPlanes);
 	return;
     }
     fontPtr = X11WasmFindResource(gc->font);
@@ -261,7 +261,7 @@ BrowserApplyGCStyle(
 	    gc->dash_offset, (unsigned int)((unsigned char)gc->dashes),
 	    dashPattern, dashCount, gc->fill_style, BrowserJsXId(gc->stipple),
 	    BrowserJsXId(gc->tile), gc->ts_x_origin, gc->ts_y_origin,
-	    gc->background, fontPixelSize, fontFamily);
+	    gc->background, fontPixelSize, fontFamily, gc->plane_mask);
 }
 
 int
@@ -464,6 +464,7 @@ BrowserStorePixmapCopyImage(
     XImage backingImage;
     unsigned int ix, iy;
     int function = (gc != NULL) ? gc->function : GXcopy;
+    unsigned long planeMask = (gc != NULL) ? gc->plane_mask : AllPlanes;
 
     if ((targetPtr == NULL) || (targetPtr->type != X11_WASM_RESOURCE_PIXMAP)
 	    || (sourceImage == NULL)
@@ -501,8 +502,8 @@ BrowserStorePixmapCopyImage(
 		source = sourcePixel;
 	    }
 	    dest = BrowserImageGetPixel(&backingImage, targetX, targetY);
-	    result = BrowserApplyRasterFunction(function, source, dest,
-		    targetPtr->depth);
+	    result = BrowserApplyPlaneMaskedRasterFunction(function, source,
+		    dest, targetPtr->depth, planeMask);
 	    (void)BrowserImagePutPixel(&backingImage, targetX, targetY,
 		    result);
 	    if ((targetPtr->depth == 1) && (targetPtr->bitmapData != NULL)) {

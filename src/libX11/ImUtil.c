@@ -134,6 +134,23 @@ BrowserApplyRasterFunction(
     }
 }
 
+unsigned long
+BrowserApplyPlaneMaskedRasterFunction(
+    int function,
+    unsigned long source,
+    unsigned long dest,
+    unsigned int depth,
+    unsigned long planeMask)
+{
+    unsigned long mask = BrowserDepthPlaneMask(depth);
+    unsigned long effectivePlaneMask = planeMask & mask;
+    unsigned long result = BrowserApplyRasterFunction(function, source, dest,
+	    depth) & mask;
+
+    dest &= mask;
+    return (result & effectivePlaneMask) | (dest & ~effectivePlaneMask);
+}
+
 void
 BrowserSetImageMasks(
     XImage *imagePtr)
@@ -747,10 +764,15 @@ BrowserStorePixmapImage(
     XImage backingImage;
     unsigned int ix, iy;
     int function = (gc != NULL) ? gc->function : GXcopy;
+    unsigned long planeMask = (gc != NULL) ? gc->plane_mask : AllPlanes;
+    int updateBitmap = 0;
 
     if ((image == NULL) || !BrowserEnsurePixmapBacking(resourcePtr)
 	    || !BrowserInitPixmapBackingImage(resourcePtr, &backingImage)) {
 	return;
+    }
+    if (resourcePtr->depth == 1) {
+	updateBitmap = BrowserEnsureBitmapStorage(resourcePtr);
     }
     for (iy = 0; iy < height; iy++) {
 	for (ix = 0; ix < width; ix++) {
@@ -758,6 +780,7 @@ BrowserStorePixmapImage(
 	    int targetY = destY + (int)iy;
 	    unsigned long source;
 	    unsigned long dest;
+	    unsigned long result;
 
 	    if ((targetX < 0) || (targetY < 0)
 		    || ((unsigned int)targetX >= resourcePtr->width)
@@ -767,9 +790,13 @@ BrowserStorePixmapImage(
 	    source = BrowserImageGetPixel(image, srcX + (int)ix,
 		    srcY + (int)iy);
 	    dest = BrowserImageGetPixel(&backingImage, targetX, targetY);
-	    (void)BrowserImagePutPixel(&backingImage, targetX, targetY,
-		    BrowserApplyRasterFunction(function, source, dest,
-			    resourcePtr->depth));
+	    result = BrowserApplyPlaneMaskedRasterFunction(function, source,
+		    dest, resourcePtr->depth, planeMask);
+	    (void)BrowserImagePutPixel(&backingImage, targetX, targetY, result);
+	    if (updateBitmap) {
+		BrowserBitmapPutPixel(resourcePtr, (unsigned int)targetX,
+			(unsigned int)targetY, (result & 1UL) != 0);
+	    }
 	}
     }
 }

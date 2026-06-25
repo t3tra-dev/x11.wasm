@@ -185,6 +185,7 @@
  * @property {number} backgroundPixel
  * @property {number} fontPixelSize
  * @property {string} fontFamily
+ * @property {number} planeMask
  */
 
 /**

@@ -2448,6 +2448,44 @@ X11WasmTestXlibApis(void)
 	    || (XGetPixel(xyBitmapReadback, 1, 0) != 0x0000ffUL)) {
 	goto cleanup;
     }
+    if ((XSetForeground(&browserDisplay.display, xyBitmapGC, 0xaabbccUL)
+	    != Success)
+	    || (XSetBackground(&browserDisplay.display, xyBitmapGC, 0x445566UL)
+		    != Success)
+	    || (XSetPlaneMask(&browserDisplay.display, xyBitmapGC, 0x00ff00UL)
+		    != Success)
+	    || (XPutImage(&browserDisplay.display, xyBitmapPixmap, xyBitmapGC,
+		    xyBitmapImage, 0, 0, 0, 0, 2, 1) != Success)) {
+	goto cleanup;
+    }
+    (void)XDestroyImage(xyBitmapReadback);
+    xyBitmapReadback = NULL;
+    xyBitmapReadback = XGetImage(&browserDisplay.display, xyBitmapPixmap,
+	    0, 0, 2, 1, AllPlanes, ZPixmap);
+    if ((xyBitmapReadback == NULL)
+	    || (XGetPixel(xyBitmapReadback, 0, 0) != 0xffbb00UL)
+	    || (XGetPixel(xyBitmapReadback, 1, 0) != 0x0055ffUL)) {
+	goto cleanup;
+    }
+    if ((XSetForeground(&browserDisplay.display, xyBitmapGC, 0xff0000UL)
+	    != Success)
+	    || (XSetBackground(&browserDisplay.display, xyBitmapGC, 0x0000ffUL)
+		    != Success)
+	    || (XSetPlaneMask(&browserDisplay.display, xyBitmapGC, AllPlanes)
+		    != Success)
+	    || (XPutImage(&browserDisplay.display, xyBitmapPixmap, xyBitmapGC,
+		    xyBitmapImage, 0, 0, 0, 0, 2, 1) != Success)) {
+	goto cleanup;
+    }
+    (void)XDestroyImage(xyBitmapReadback);
+    xyBitmapReadback = NULL;
+    xyBitmapReadback = XGetImage(&browserDisplay.display, xyBitmapPixmap,
+	    0, 0, 2, 1, AllPlanes, ZPixmap);
+    if ((xyBitmapReadback == NULL)
+	    || (XGetPixel(xyBitmapReadback, 0, 0) != 0xff0000UL)
+	    || (XGetPixel(xyBitmapReadback, 1, 0) != 0x0000ffUL)) {
+	goto cleanup;
+    }
     xyBitmapSubImage = XCreateImage(&browserDisplay.display,
 	    DefaultVisual(&browserDisplay.display,
 		    DefaultScreen(&browserDisplay.display)),
@@ -2489,6 +2527,47 @@ X11WasmTestXlibApis(void)
 	    != Success) {
 	goto cleanup;
     }
+    xyBitmapReadback = XGetImage(&browserDisplay.display, xyBitmapPixmap,
+	    0, 0, 2, 1, AllPlanes, ZPixmap);
+    if ((xyBitmapReadback == NULL)
+	    || (XGetPixel(xyBitmapReadback, 0, 0) != 0xff0000UL)
+	    || (XGetPixel(xyBitmapReadback, 1, 0) != 0xff0000UL)) {
+	goto cleanup;
+    }
+    if ((XSetForeground(&browserDisplay.display, xyBitmapGC, 0x112233UL)
+	    != Success)
+	    || (XSetBackground(&browserDisplay.display, xyBitmapGC, 0x445566UL)
+		    != Success)
+	    || (XPutImage(&browserDisplay.display, xyBitmapPixmap, xyBitmapGC,
+		    xyBitmapImage, 0, 0, 0, 0, 2, 1) != Success)
+	    || (XSetPlaneMask(&browserDisplay.display, xyBitmapGC, 0x00ff00UL)
+		    != Success)
+	    || (XCopyArea(&browserDisplay.display, (Drawable)xyBitmapPixmap,
+		    (Drawable)xyBitmapPixmap, xyBitmapGC, 0, 0, 1, 1, 1, 0)
+		    != Success)) {
+	goto cleanup;
+    }
+    (void)XDestroyImage(xyBitmapReadback);
+    xyBitmapReadback = NULL;
+    xyBitmapReadback = XGetImage(&browserDisplay.display, xyBitmapPixmap,
+	    0, 0, 2, 1, AllPlanes, ZPixmap);
+    if ((xyBitmapReadback == NULL)
+	    || (XGetPixel(xyBitmapReadback, 0, 0) != 0x112233UL)
+	    || (XGetPixel(xyBitmapReadback, 1, 0) != 0x442266UL)) {
+	goto cleanup;
+    }
+    if ((XSetForeground(&browserDisplay.display, xyBitmapGC, 0xff0000UL)
+	    != Success)
+	    || (XSetBackground(&browserDisplay.display, xyBitmapGC, 0xff0000UL)
+		    != Success)
+	    || (XSetPlaneMask(&browserDisplay.display, xyBitmapGC, AllPlanes)
+		    != Success)
+	    || (XPutImage(&browserDisplay.display, xyBitmapPixmap, xyBitmapGC,
+		    xyBitmapImage, 0, 0, 0, 0, 2, 1) != Success)) {
+	goto cleanup;
+    }
+    (void)XDestroyImage(xyBitmapReadback);
+    xyBitmapReadback = NULL;
     xyBitmapReadback = XGetImage(&browserDisplay.display, xyBitmapPixmap,
 	    0, 0, 2, 1, AllPlanes, ZPixmap);
     if ((xyBitmapReadback == NULL)

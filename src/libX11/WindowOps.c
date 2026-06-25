@@ -2895,9 +2895,6 @@ XPutImage(
     BrowserStorePixmapImage(resourcePtr, gc, putImage,
 	    (putImage == image) ? srcX : 0, (putImage == image) ? srcY : 0,
 	    destX, destY, width, height);
-    BrowserStoreBitmapImage(resourcePtr, putImage, (putImage == image) ? srcX : 0,
-	    (putImage == image) ? srcY : 0, destX, destY,
-	    width, height);
     if ((putImage != NULL) && (putImage != image)) {
 	(void)XDestroyImage(putImage);
     }

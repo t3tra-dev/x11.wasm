@@ -279,6 +279,7 @@
    * @param {number} green
    * @param {number} blue
    * @param {number} alpha
+   * @param {number=} planeMask
    */
   function applyRasterFunctionPixel(
     data,
@@ -288,23 +289,30 @@
     green,
     blue,
     alpha,
+    planeMask = 0xffffffff,
   ) {
-    data[offset] = rasterFunctionByte(functionId, red, data[offset]);
-    data[offset + 1] = rasterFunctionByte(
-      functionId,
-      green,
-      data[offset + 1],
-    );
-    data[offset + 2] = rasterFunctionByte(
-      functionId,
-      blue,
-      data[offset + 2],
-    );
-    data[offset + 3] = rasterFunctionAlpha(
-      functionId,
-      alpha,
-      data[offset + 3],
-    );
+    const effectivePlaneMask = unsignedInt(planeMask, 0xffffffff) & 0xffffff;
+    if (effectivePlaneMask === 0) {
+      return;
+    }
+    const resultPixel =
+      (rasterFunctionByte(functionId, red, data[offset]) << 16) |
+      (rasterFunctionByte(functionId, green, data[offset + 1]) << 8) |
+      rasterFunctionByte(functionId, blue, data[offset + 2]);
+    const destPixel =
+      (data[offset] << 16) | (data[offset + 1] << 8) | data[offset + 2];
+    const maskedPixel =
+      (resultPixel & effectivePlaneMask) |
+      (destPixel & ~effectivePlaneMask & 0xffffff);
+    const resultAlpha = rasterFunctionAlpha(functionId, alpha, data[offset + 3]);
+
+    data[offset] = (maskedPixel >> 16) & 0xff;
+    data[offset + 1] = (maskedPixel >> 8) & 0xff;
+    data[offset + 2] = maskedPixel & 0xff;
+    data[offset + 3] =
+      effectivePlaneMask === 0xffffff
+        ? resultAlpha
+        : Math.max(data[offset + 3], resultAlpha);
   }
 
   /**
