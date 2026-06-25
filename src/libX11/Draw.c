@@ -718,8 +718,14 @@ XInternAtom(
 {
     X11WasmAtomName *atomPtr;
     Atom predefined;
-    (void)display;
 
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    }
+    if (!BrowserValidateBool(&display, onlyIfExists,
+	    X11_WASM_XREQ_INTERN_ATOM)) {
+	return None;
+    }
     if (name == NULL) {
 	return None;
     }
