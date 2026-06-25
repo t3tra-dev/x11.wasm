@@ -4505,6 +4505,7 @@ X11WasmTestXErrorHandler(void)
     Atom atomPropertyValue = XA_WM_NAME;
     unsigned long colorPixel = 0;
     unsigned long invalidGCMask = 1UL << 30;
+    unsigned long invalidWindowAttributeMask = 1UL << 30;
     unsigned int expectedRequestCodeSum;
     unsigned long long expectedRequestCodeMask;
     Window invalidCreateSizeResult;
@@ -4512,6 +4513,7 @@ X11WasmTestXErrorHandler(void)
     Window invalidCreateDepthWindowResult;
     Window invalidCreateVisualWindowResult;
     Window invalidCreateParentClassWindowResult;
+    Window invalidCreateAttributeMaskWindowResult;
 
     BrowserInitDisplay();
     memset(&changes, 0, sizeof(changes));
@@ -4791,6 +4793,12 @@ X11WasmTestXErrorHandler(void)
 	    &browserDisplay.display, inputOnlyParentWindow, 0, 0, 1, 1, 0,
 	    CopyFromParent, InputOutput, DefaultVisual(&browserDisplay.display,
 		    DefaultScreen(&browserDisplay.display)), 0, NULL);
+    invalidCreateAttributeMaskWindowResult = XCreateWindow(
+	    &browserDisplay.display, browserDisplay.rootWindow, 0, 0, 1, 1,
+	    0, CopyFromParent, InputOutput,
+	    DefaultVisual(&browserDisplay.display,
+		    DefaultScreen(&browserDisplay.display)),
+	    invalidWindowAttributeMask, NULL);
     invalidCreateColormapResult = XCreateColormap(&browserDisplay.display,
 	    invalidWindow, DefaultVisual(&browserDisplay.display,
 		    DefaultScreen(&browserDisplay.display)), AllocNone);
@@ -4849,6 +4857,9 @@ X11WasmTestXErrorHandler(void)
     invalidWindowAttributeResultSum += XChangeWindowAttributes(
 	    &browserDisplay.display, browserDisplay.rootWindow,
 	    CWDontPropagate, &attributes);
+    invalidWindowAttributeResultSum += XChangeWindowAttributes(
+	    &browserDisplay.display, browserDisplay.rootWindow,
+	    invalidWindowAttributeMask, NULL);
     invalidWindowAttributeResultSum += XSelectInput(
 	    &browserDisplay.display, browserDisplay.rootWindow,
 	    OwnerGrabButtonMask << 1);
@@ -5163,6 +5174,7 @@ X11WasmTestXErrorHandler(void)
 	    || (invalidCreateVisualWindowResult != None)
 	    || (inputOnlyParentWindow == None)
 	    || (invalidCreateParentClassWindowResult != None)
+	    || (invalidCreateAttributeMaskWindowResult != None)
 	    || (invalidCreateColormapResult != None)
 	    || (invalidVisualColormapResult != None)
 	    || (invalidFreeColormapResult != Success)
@@ -5296,6 +5308,7 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_CREATE_WINDOW
 	    + X11_WASM_XREQ_CREATE_WINDOW
 	    + X11_WASM_XREQ_CREATE_WINDOW
+	    + X11_WASM_XREQ_CREATE_WINDOW
 	    + X11_WASM_XREQ_CREATE_COLORMAP
 	    + X11_WASM_XREQ_CREATE_COLORMAP
 	    + X11_WASM_XREQ_FREE_COLORMAP
@@ -5304,6 +5317,7 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_LOOKUP_COLOR
 	    + X11_WASM_XREQ_QUERY_COLORS
 	    + X11_WASM_XREQ_FREE_COLORS
+	    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
 	    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
 	    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
 	    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
@@ -5420,15 +5434,15 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 171)
+    if ((browserTestXErrorCount != 173)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
 	    || (browserTestRequestCodeSum != expectedRequestCodeSum)
 	    || (browserTestRequestCodeMask != expectedRequestCodeMask)
-	    || (browserTestLastSerial != initialSerial + 171)
+	    || (browserTestLastSerial != initialSerial + 173)
 	    || (LastKnownRequestProcessed(&browserDisplay.display)
-		    != initialSerial + 171)) {
+		    != initialSerial + 173)) {
 	return 0;
     }
     return 1;

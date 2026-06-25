@@ -721,6 +721,12 @@ BrowserValidateWindowAttributeValues(
     XSetWindowAttributes *atts,
     unsigned char requestCode)
 {
+    unsigned long invalidMask = mask & ~((unsigned long)X11_WASM_WINDOW_ATTR_MASK);
+
+    if (invalidMask != 0UL) {
+	return BrowserValueOrError(displayPtr, (long)invalidMask, 0,
+		requestCode);
+    }
     if (atts == NULL) {
 	return 1;
     }

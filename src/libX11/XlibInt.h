@@ -151,6 +151,11 @@
 #define X11_WASM_INPUT_ONLY_WINDOW_ATTR_MASK \
 	(CWWinGravity | CWEventMask | CWDontPropagate | CWOverrideRedirect \
 	| CWCursor)
+#define X11_WASM_WINDOW_ATTR_MASK \
+	(CWBackPixmap | CWBackPixel | CWBorderPixmap | CWBorderPixel \
+	| CWBitGravity | CWWinGravity | CWBackingStore | CWBackingPlanes \
+	| CWBackingPixel | CWOverrideRedirect | CWSaveUnder | CWEventMask \
+	| CWDontPropagate | CWColormap | CWCursor)
 #define X11_WASM_WINDOW_EVENT_MASK \
 	(KeyPressMask | KeyReleaseMask | ButtonPressMask | ButtonReleaseMask \
 	| EnterWindowMask | LeaveWindowMask | PointerMotionMask \
