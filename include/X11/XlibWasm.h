@@ -34,6 +34,9 @@ EXTERN XImage *XCreateImage(Display *d, Visual *v, unsigned int ui1,
 	int i3, int i4);
 EXTERN XImage *XGetImage(Display *d, Drawable dr, int i1, int i2,
 	unsigned int ui1, unsigned int ui2, unsigned long ul, int i3);
+EXTERN XImage *XGetSubImage(Display *d, Drawable dr, int i1, int i2,
+	unsigned int ui1, unsigned int ui2, unsigned long ul, int i3,
+	XImage *x, int i4, int i5);
 EXTERN char *XGetAtomName(Display *d, Atom a);
 EXTERN char *XKeysymToString(KeySym k);
 EXTERN Colormap XCreateColormap(Display *d, Window w, Visual *v, int i);
@@ -175,6 +178,9 @@ EXTERN int XCopyPlane(Display *d, Drawable dr1, Drawable dr2, GC g,
 EXTERN int XCopyGC(Display *d, GC src, unsigned long valuemask, GC dest);
 EXTERN Pixmap XCreateBitmapFromData(Display *display, Drawable d,
 	_Xconst char *data, unsigned int width, unsigned int height);
+EXTERN Pixmap XCreatePixmapFromBitmapData(Display *display, Drawable d,
+	char *data, unsigned int width, unsigned int height,
+	unsigned long fg, unsigned long bg, unsigned int depth);
 EXTERN int XDefineCursor(Display *d, Window w, Cursor c);
 EXTERN int XDeleteProperty(Display *d, Window w, Atom a);
 EXTERN int XDestroySubwindows(Display *d, Window w);
@@ -268,6 +274,15 @@ EXTERN int XQueryColor(Display *d, Colormap c, XColor *def_in_out);
 EXTERN Bool XQueryExtension(Display *d, const char *name,
 	int *major_opcode_return, int *first_event_return,
 	int *first_error_return);
+EXTERN Status XQueryBestCursor(Display *d, Drawable dr, unsigned int ui1,
+	unsigned int ui2, unsigned int *ui3, unsigned int *ui4);
+EXTERN Status XQueryBestSize(Display *d, int i, Drawable dr,
+	unsigned int ui1, unsigned int ui2, unsigned int *ui3,
+	unsigned int *ui4);
+EXTERN Status XQueryBestStipple(Display *d, Drawable dr, unsigned int ui1,
+	unsigned int ui2, unsigned int *ui3, unsigned int *ui4);
+EXTERN Status XQueryBestTile(Display *d, Drawable dr, unsigned int ui1,
+	unsigned int ui2, unsigned int *ui3, unsigned int *ui4);
 EXTERN Bool XQueryPointer(Display *d, Window w1, Window *w2, Window *w3,
 	int *i1, int *i2, int *i3, int *i4, unsigned int *ui);
 	EXTERN Status XQueryTree(Display *d, Window w1, Window *w2, Window *w3,

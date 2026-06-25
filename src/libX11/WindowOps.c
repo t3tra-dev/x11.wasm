@@ -2498,6 +2498,42 @@ XGetImage(
     return imagePtr;
 }
 
+XImage *
+XGetSubImage(
+    Display *display,
+    Drawable drawable,
+    int x,
+    int y,
+    unsigned int width,
+    unsigned int height,
+    unsigned long planeMask,
+    int format,
+    XImage *destImage,
+    int destX,
+    int destY)
+{
+    XImage *sourceImage;
+    unsigned int ix, iy;
+
+    if (destImage == NULL) {
+	return NULL;
+    }
+    sourceImage = XGetImage(display, drawable, x, y, width, height, planeMask,
+	    format);
+    if (sourceImage == NULL) {
+	return NULL;
+    }
+    for (iy = 0; iy < height; iy++) {
+	for (ix = 0; ix < width; ix++) {
+	    (void)BrowserImagePutPixel(destImage, destX + (int)ix,
+		    destY + (int)iy, BrowserImageGetPixel(sourceImage,
+			    (int)ix, (int)iy));
+	}
+    }
+    (void)XDestroyImage(sourceImage);
+    return destImage;
+}
+
 int
 XPutImage(
     Display *display,
@@ -2586,4 +2622,129 @@ XCreateBitmapFromData(
 	    height);
     (void)BrowserImageDestroy(imagePtr);
     return pixmap;
+}
+
+Pixmap
+XCreatePixmapFromBitmapData(
+    Display *display,
+    Drawable drawable,
+    char *data,
+    unsigned int width,
+    unsigned int height,
+    unsigned long foreground,
+    unsigned long background,
+    unsigned int depth)
+{
+    Pixmap pixmap = XCreatePixmap(display, drawable, width, height, depth);
+    XGCValues gcValues;
+    XImage *imagePtr;
+    GC gc;
+
+    if ((pixmap == None) || (data == NULL)) {
+	return pixmap;
+    }
+    memset(&gcValues, 0, sizeof(gcValues));
+    gcValues.foreground = foreground;
+    gcValues.background = background;
+    gc = XCreateGC(display, pixmap, GCForeground | GCBackground, &gcValues);
+    if (gc == NULL) {
+	return pixmap;
+    }
+    imagePtr = XCreateImage(display, DefaultVisual(display,
+	    DefaultScreen(display)), 1, XYBitmap, 0, data, width, height, 8,
+	    BrowserBitmapBytesPerLine(width));
+    if (imagePtr != NULL) {
+	(void)XPutImage(display, pixmap, gc, imagePtr, 0, 0, 0, 0, width,
+		height);
+	(void)BrowserImageDestroy(imagePtr);
+    }
+    (void)XFreeGC(display, gc);
+    return pixmap;
+}
+
+static Status
+BrowserQueryBestSize(
+    Display *display,
+    int shape,
+    Drawable drawable,
+    unsigned int width,
+    unsigned int height,
+    unsigned int *widthReturn,
+    unsigned int *heightReturn)
+{
+    if (BrowserDrawableResourceOrError(&display, drawable,
+	    X11_WASM_XREQ_QUERY_BEST_SIZE) == NULL) {
+	return False;
+    }
+    if (!BrowserValueOrError(&display, shape,
+	    (shape == CursorShape) || (shape == TileShape)
+	    || (shape == StippleShape), X11_WASM_XREQ_QUERY_BEST_SIZE)) {
+	return False;
+    }
+    if (!BrowserValidateCard16(&display, (long)width, 1,
+	    X11_WASM_XREQ_QUERY_BEST_SIZE)
+	    || !BrowserValidateCard16(&display, (long)height, 1,
+		    X11_WASM_XREQ_QUERY_BEST_SIZE)) {
+	return False;
+    }
+    if (widthReturn != NULL) {
+	*widthReturn = width;
+    }
+    if (heightReturn != NULL) {
+	*heightReturn = height;
+    }
+    return True;
+}
+
+Status
+XQueryBestCursor(
+    Display *display,
+    Drawable drawable,
+    unsigned int width,
+    unsigned int height,
+    unsigned int *widthReturn,
+    unsigned int *heightReturn)
+{
+    return BrowserQueryBestSize(display, CursorShape, drawable, width, height,
+	    widthReturn, heightReturn);
+}
+
+Status
+XQueryBestSize(
+    Display *display,
+    int shape,
+    Drawable drawable,
+    unsigned int width,
+    unsigned int height,
+    unsigned int *widthReturn,
+    unsigned int *heightReturn)
+{
+    return BrowserQueryBestSize(display, shape, drawable, width, height,
+	    widthReturn, heightReturn);
+}
+
+Status
+XQueryBestStipple(
+    Display *display,
+    Drawable drawable,
+    unsigned int width,
+    unsigned int height,
+    unsigned int *widthReturn,
+    unsigned int *heightReturn)
+{
+    return BrowserQueryBestSize(display, StippleShape, drawable, width, height,
+	    widthReturn, heightReturn);
+}
+
+Status
+XQueryBestTile(
+    Display *display,
+    Drawable drawable,
+    unsigned int width,
+    unsigned int height,
+    unsigned int *widthReturn,
+    unsigned int *heightReturn)
+{
+    return BrowserQueryBestSize(display, TileShape, drawable, width, height,
+	    widthReturn, heightReturn);
 }
