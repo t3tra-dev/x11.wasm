@@ -1543,6 +1543,11 @@ X11WasmTestXlibApis(void)
     KeySym *keyboardMapping = NULL;
     XImage *image16 = NULL;
     XImage *invalidFormatImage = NULL;
+    XImage *invalidDepthImage = NULL;
+    XImage *invalidXYBitmapDepthImage = NULL;
+    XImage *invalidOffsetImage = NULL;
+    XImage *invalidBitmapPadImage = NULL;
+    XImage *shortStrideImage = NULL;
     XImage *bitmapImage = NULL;
     XImage *subImage16 = NULL;
     XImage *subBitmapImage = NULL;
@@ -2364,11 +2369,36 @@ X11WasmTestXlibApis(void)
 	    DefaultVisual(&browserDisplay.display,
 		    DefaultScreen(&browserDisplay.display)), 24, 99, 0, NULL,
 	    1, 1, 32, 0);
+    invalidDepthImage = XCreateImage(&browserDisplay.display,
+	    DefaultVisual(&browserDisplay.display,
+		    DefaultScreen(&browserDisplay.display)), 0, ZPixmap, 0, NULL,
+	    1, 1, 32, 0);
+    invalidXYBitmapDepthImage = XCreateImage(&browserDisplay.display,
+	    DefaultVisual(&browserDisplay.display,
+		    DefaultScreen(&browserDisplay.display)), 8, XYBitmap, 0, NULL,
+	    1, 1, 32, 0);
+    invalidOffsetImage = XCreateImage(&browserDisplay.display,
+	    DefaultVisual(&browserDisplay.display,
+		    DefaultScreen(&browserDisplay.display)), 1, XYBitmap, -1, NULL,
+	    1, 1, 32, 0);
+    invalidBitmapPadImage = XCreateImage(&browserDisplay.display,
+	    DefaultVisual(&browserDisplay.display,
+		    DefaultScreen(&browserDisplay.display)), 24, ZPixmap, 0, NULL,
+	    1, 1, 24, 0);
+    shortStrideImage = XCreateImage(&browserDisplay.display,
+	    DefaultVisual(&browserDisplay.display,
+		    DefaultScreen(&browserDisplay.display)), 16, ZPixmap, 0, NULL,
+	    3, 1, 32, 2);
     bitmapImage = XCreateImage(&browserDisplay.display,
 	    DefaultVisual(&browserDisplay.display,
 		    DefaultScreen(&browserDisplay.display)), 1, XYBitmap, 0,
 	    (char *)bitmapImageData, 17, 1, 32, 0);
     if ((image16 == NULL) || (invalidFormatImage != NULL)
+	    || (invalidDepthImage != NULL)
+	    || (invalidXYBitmapDepthImage != NULL)
+	    || (invalidOffsetImage != NULL)
+	    || (invalidBitmapPadImage != NULL)
+	    || (shortStrideImage != NULL)
 	    || (bitmapImage == NULL)
 	    || (image16->bits_per_pixel != 16)
 	    || (image16->bytes_per_line != 8)
@@ -5825,6 +5855,21 @@ cleanup:
     }
     if (invalidFormatImage != NULL) {
 	(void)XDestroyImage(invalidFormatImage);
+    }
+    if (invalidDepthImage != NULL) {
+	(void)XDestroyImage(invalidDepthImage);
+    }
+    if (invalidXYBitmapDepthImage != NULL) {
+	(void)XDestroyImage(invalidXYBitmapDepthImage);
+    }
+    if (invalidOffsetImage != NULL) {
+	(void)XDestroyImage(invalidOffsetImage);
+    }
+    if (invalidBitmapPadImage != NULL) {
+	(void)XDestroyImage(invalidBitmapPadImage);
+    }
+    if (shortStrideImage != NULL) {
+	(void)XDestroyImage(shortStrideImage);
     }
     if (bitmapImage != NULL) {
 	(void)XDestroyImage(bitmapImage);

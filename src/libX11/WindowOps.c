@@ -2603,15 +2603,40 @@ XCreateImage(
 {
     XImage *imagePtr;
     int bitsPerPixel;
+    int imageBitmapPad;
+    int minBytesPerLine;
+    unsigned long long xyBitsPerLine;
 
     (void)display;
     (void)visual;
-    if (!BrowserImageFormatIsValid(format)) {
+    if ((depth == 0) || (depth > 32) || !BrowserImageFormatIsValid(format)
+	    || ((format == XYBitmap) && (depth != 1)) || (offset < 0)) {
+	return NULL;
+    }
+    imageBitmapPad = (bitmapPad != 0) ? bitmapPad : 32;
+    if ((imageBitmapPad != 8) && (imageBitmapPad != 16)
+	    && (imageBitmapPad != 32)) {
+	return NULL;
+    }
+    bitsPerPixel = BrowserImageBitsPerPixel(depth);
+    if (format == XYBitmap) {
+	xyBitsPerLine = (unsigned long long)width
+		+ (unsigned long long)offset;
+	if (xyBitsPerLine > (unsigned long long)INT_MAX) {
+	    return NULL;
+	}
+	minBytesPerLine = BrowserImageBytesPerLine((unsigned int)xyBitsPerLine,
+		1, imageBitmapPad);
+    } else {
+	minBytesPerLine = BrowserImageBytesPerLine(width, bitsPerPixel,
+		imageBitmapPad);
+    }
+    if ((minBytesPerLine <= 0)
+	    || ((bytesPerLine != 0) && (bytesPerLine < minBytesPerLine))) {
 	return NULL;
     }
     imagePtr = (XImage *)ckalloc(sizeof(XImage));
     memset(imagePtr, 0, sizeof(XImage));
-    bitsPerPixel = BrowserImageBitsPerPixel(depth);
     imagePtr->width = (int)width;
     imagePtr->height = (int)height;
     imagePtr->xoffset = offset;
@@ -2620,16 +2645,11 @@ XCreateImage(
     imagePtr->byte_order = LSBFirst;
     imagePtr->bitmap_unit = 32;
     imagePtr->bitmap_bit_order = LSBFirst;
-    imagePtr->bitmap_pad = (bitmapPad != 0) ? bitmapPad : 32;
+    imagePtr->bitmap_pad = imageBitmapPad;
     imagePtr->depth = (int)depth;
     imagePtr->bits_per_pixel = bitsPerPixel;
     imagePtr->bytes_per_line = (bytesPerLine != 0) ? bytesPerLine
-	    : BrowserImageBytesPerLine(width, bitsPerPixel,
-		    imagePtr->bitmap_pad);
-    if (imagePtr->bytes_per_line <= 0) {
-	ckfree(imagePtr);
-	return NULL;
-    }
+	    : minBytesPerLine;
     BrowserSetImageMasks(imagePtr);
     BrowserInitImageFuncs(imagePtr);
     return imagePtr;
