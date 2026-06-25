@@ -5171,6 +5171,28 @@ X11WasmTestXlibApis(void)
 	goto cleanup;
     }
 
+    XSetAuthorization(NULL, 0, NULL, 0);
+    if ((XChangeSaveSet(&browserDisplay.display, browserDisplay.rootWindow,
+		    SetModeInsert) != Success)
+	    || (XAddToSaveSet(&browserDisplay.display,
+		    browserDisplay.rootWindow) != Success)
+	    || (XRemoveFromSaveSet(&browserDisplay.display,
+		    browserDisplay.rootWindow) != Success)
+	    || (XSetCloseDownMode(&browserDisplay.display, DestroyAll)
+		    != Success)
+	    || (XSetCloseDownMode(&browserDisplay.display, RetainPermanent)
+		    != Success)
+	    || (XSetCloseDownMode(&browserDisplay.display, RetainTemporary)
+		    != Success)
+	    || (XKillClient(&browserDisplay.display, AllTemporary)
+		    != Success)
+	    || (XKillClient(&browserDisplay.display,
+		    browserDisplay.rootWindow) != Success)
+	    || (XActivateScreenSaver(&browserDisplay.display) != Success)
+	    || (XResetScreenSaver(&browserDisplay.display) != Success)) {
+	goto cleanup;
+    }
+
     if ((browserDisplay.serverGrabDepth != 0)
 	    || (browserDisplay.synchronize != 0)
 	    || (browserDisplay.afterFunction != NULL)) {

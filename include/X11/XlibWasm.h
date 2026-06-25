@@ -54,6 +54,7 @@ EXTERN Cursor XCreateGlyphCursor(Display *d, Font f1, Font f2,
 EXTERN GContext XGContextFromGC(GC g);
 EXTERN int XAddHost(Display *d, XHostAddress *host);
 EXTERN int XAddHosts(Display *d, XHostAddress *hosts, int nhosts);
+EXTERN int XAddToSaveSet(Display *d, Window w);
 EXTERN int XDisableAccessControl(Display *d);
 EXTERN int XEnableAccessControl(Display *d);
 EXTERN XHostAddress *XListHosts(Display *d, int *i, Bool *b);
@@ -181,6 +182,7 @@ EXTERN int XCopyPlane(Display *d, Drawable dr1, Drawable dr2, GC g,
 	int i1, int i2, unsigned int ui1, unsigned int ui2, int i3, int i4,
 	unsigned long ul);
 EXTERN int XCopyGC(Display *d, GC src, unsigned long valuemask, GC dest);
+EXTERN int XChangeSaveSet(Display *d, Window w, int i);
 EXTERN Pixmap XCreateBitmapFromData(Display *display, Drawable d,
 	_Xconst char *data, unsigned int width, unsigned int height);
 EXTERN Pixmap XCreatePixmapFromBitmapData(Display *display, Drawable d,
@@ -239,6 +241,7 @@ EXTERN int XGrabKeyboard(Display *d, Window w, Bool b, int i1, int i2,
 	Time t);
 EXTERN int XGrabPointer(Display *d, Window w1, Bool b, unsigned int ui,
 	int i1, int i2, Window w2, Cursor c, Time t);
+EXTERN int XKillClient(Display *d, XID x);
 EXTERN KeyCode XKeysymToKeycode(Display *d, KeySym k);
 EXTERN Status XLookupColor(Display *d, Colormap c1, _Xconst char *c2,
 	XColor *x1, XColor *x2);
@@ -304,6 +307,7 @@ EXTERN Bool XQueryPointer(Display *d, Window w1, Window *w2, Window *w3,
 EXTERN int XRefreshKeyboardMapping(XMappingEvent *x);
 EXTERN Status XReconfigureWMWindow(Display *d, Window w, int screen,
 	unsigned int value_mask, XWindowChanges *values);
+EXTERN int XRemoveFromSaveSet(Display *d, Window w);
 EXTERN int XResetScreenSaver(Display *d);
 EXTERN int XResizeWindow(Display *d, Window w, unsigned int ui1,
 	unsigned int ui2);
@@ -313,7 +317,9 @@ EXTERN Status XSendEvent(Display *d, Window w, Bool b, long l, XEvent *x);
 EXTERN int XGetScreenSaver(Display *d, int *timeout_return,
 	int *interval_return, int *prefer_blanking_return,
 	int *allow_exposures_return);
+EXTERN int XActivateScreenSaver(Display *d);
 EXTERN int XSetCommand(Display *d, Window w, char **c, int i);
+EXTERN int XSetCloseDownMode(Display *d, int i);
 EXTERN Status XGetCommand(Display *d, Window w, char ***argv_return,
 	int *argc_return);
 EXTERN int XSetClassHint(Display *d, Window w, XClassHint *class_hints);
@@ -551,6 +557,8 @@ EXTERN XAfterFunction XSetAfterFunction(Display *display,
 	XAfterFunction procedure);
 EXTERN XAfterFunction XSynchronize(Display *display, Bool onoff);
 EXTERN int XSync(Display *display, Bool discard);
+EXTERN void XSetAuthorization(char *name, int namelen, char *data,
+	int datalen);
 EXTERN VisualID XVisualIDFromVisual(Visual *visual);
 EXTERN Bool XPointInRegion(Region rgn, int x, int y);
 EXTERN Region XPolygonRegion(XPoint *points, int n, int fill_rule);

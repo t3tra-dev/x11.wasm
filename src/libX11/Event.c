@@ -1445,6 +1445,105 @@ int XUngrabServer(Display *display)
     return XFlush(display);
 }
 
+static int
+BrowserChangeSaveSet(
+    Display *display,
+    Window window,
+    int mode)
+{
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    if (!BrowserValueOrError(&display, mode,
+	    (mode == SetModeInsert) || (mode == SetModeDelete),
+	    X11_WASM_XREQ_CHANGE_SAVE_SET)) {
+	return Success;
+    }
+    if (BrowserWindowResourceOrError(&display, window,
+	    X11_WASM_XREQ_CHANGE_SAVE_SET) == NULL) {
+	return Success;
+    }
+    return XNoOp(display);
+}
+
+int
+XChangeSaveSet(
+    Display *display,
+    Window window,
+    int mode)
+{
+    return BrowserChangeSaveSet(display, window, mode);
+}
+
+int
+XAddToSaveSet(
+    Display *display,
+    Window window)
+{
+    return BrowserChangeSaveSet(display, window, SetModeInsert);
+}
+
+int
+XRemoveFromSaveSet(
+    Display *display,
+    Window window)
+{
+    return BrowserChangeSaveSet(display, window, SetModeDelete);
+}
+
+int
+XSetCloseDownMode(
+    Display *display,
+    int mode)
+{
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    if (!BrowserValueOrError(&display, mode,
+	    (mode == DestroyAll) || (mode == RetainPermanent)
+	    || (mode == RetainTemporary),
+	    X11_WASM_XREQ_SET_CLOSE_DOWN_MODE)) {
+	return Success;
+    }
+    return XNoOp(display);
+}
+
+int
+XKillClient(
+    Display *display,
+    XID resource)
+{
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    if ((resource != AllTemporary)
+	    && (X11WasmFindResource(resource) == NULL)) {
+	(void)BrowserValueOrError(&display, (long)resource, 0,
+		X11_WASM_XREQ_KILL_CLIENT);
+	return Success;
+    }
+    return XNoOp(display);
+}
+
+void
+XSetAuthorization(
+    char *name,
+    int nameLength,
+    char *data,
+    int dataLength)
+{
+    (void)name;
+    (void)nameLength;
+    (void)data;
+    (void)dataLength;
+}
+
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestCompleteRequests(
     int noOpCount,
@@ -1513,6 +1612,8 @@ int XForceScreenSaver(Display *display, int mode)
     }
     return XNoOp(display);
 }
+int XActivateScreenSaver(Display *display)
+{ return XForceScreenSaver(display, ScreenSaverActive); }
 int XResetScreenSaver(Display *display)
 { return XForceScreenSaver(display, ScreenSaverReset); }
 
