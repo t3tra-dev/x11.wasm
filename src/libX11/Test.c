@@ -6453,6 +6453,10 @@ X11WasmTestXErrorHandler(void)
     int invalidAtomNamesResult;
     int sawGeometryBadDrawable;
     int sawWarpPointerBadValue;
+    int warpPointerZeroWidthX;
+    int warpPointerZeroWidthY;
+    int warpPointerZeroHeightX;
+    int warpPointerZeroHeightY;
     int sawClearAreaBadValue;
     int sawConfigureBadMatch;
     int sawReconfigureBadValue;
@@ -6612,6 +6616,10 @@ X11WasmTestXErrorHandler(void)
     sawIconifyBadValue = 0;
     sawWithdrawBadValue = 0;
     sawStoreBufferBadValue = 0;
+    warpPointerZeroWidthX = -1;
+    warpPointerZeroWidthY = -1;
+    warpPointerZeroHeightX = -1;
+    warpPointerZeroHeightY = -1;
 
     oldHandler = XSetErrorHandler(BrowserTestXErrorHandler);
     createPixmapResult = XCreatePixmap(&browserDisplay.display,
@@ -7211,6 +7219,18 @@ X11WasmTestXErrorHandler(void)
 	    0, 0, (unsigned int)USHRT_MAX + 1U, 1, 1, 2);
     sawWarpPointerBadValue = (browserTestLastErrorCode == BadValue)
 	    && (browserTestLastRequestCode == X11_WASM_XREQ_WARP_POINTER);
+    BrowserUpdatePointerState(browserDisplay.rootWindow, 4, 4, 0);
+    (void)XWarpPointer(&browserDisplay.display, browserDisplay.rootWindow,
+	    None, 10, 0, 0, 0, 100, 0);
+    (void)XQueryPointer(&browserDisplay.display, browserDisplay.rootWindow,
+	    &root, &child, &warpPointerZeroWidthX, &warpPointerZeroWidthY,
+	    &x, &y, NULL);
+    BrowserUpdatePointerState(browserDisplay.rootWindow, 4, 4, 0);
+    (void)XWarpPointer(&browserDisplay.display, browserDisplay.rootWindow,
+	    None, 0, 10, 0, 0, 0, 100);
+    (void)XQueryPointer(&browserDisplay.display, browserDisplay.rootWindow,
+	    &root, &child, &warpPointerZeroHeightX,
+	    &warpPointerZeroHeightY, &x, &y, NULL);
     queryPointerResult = XQueryPointer(&browserDisplay.display,
 	    invalidWindow, &root, &child, &x, &y, &x, &y, NULL);
     clearAreaExposuresResult = XClearArea(&browserDisplay.display,
@@ -7557,6 +7577,10 @@ X11WasmTestXErrorHandler(void)
 	    || (invalidAtomNames[1] != NULL)
 	    || !sawGeometryBadDrawable
 	    || !sawWarpPointerBadValue
+	    || (warpPointerZeroWidthX != 4)
+	    || (warpPointerZeroWidthY != 4)
+	    || (warpPointerZeroHeightX != 4)
+	    || (warpPointerZeroHeightY != 4)
 	    || !sawClearAreaBadValue
 	    || !sawConfigureBadMatch
 	    || !sawReconfigureBadValue

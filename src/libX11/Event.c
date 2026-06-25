@@ -1172,6 +1172,8 @@ XWarpPointer(
     if (src != None) {
 	int pointerX = 0;
 	int pointerY = 0;
+	long long srcRight;
+	long long srcBottom;
 	X11WasmResource *sourcePtr = BrowserWindowResourceOrError(&display,
 		src, X11_WASM_XREQ_WARP_POINTER);
 
@@ -1185,12 +1187,16 @@ XWarpPointer(
 		|| (pointerY >= (int)sourcePtr->height)) {
 	    return Success;
 	}
-	if ((srcW != 0) && ((pointerX < srcX)
-		|| (pointerX >= (srcX + (int)srcW)))) {
+	srcRight = (srcW == 0) ? (long long)sourcePtr->width
+		: (long long)srcX + (long long)srcW;
+	srcBottom = (srcH == 0) ? (long long)sourcePtr->height
+		: (long long)srcY + (long long)srcH;
+	if (((long long)pointerX < (long long)srcX)
+		|| ((long long)pointerX >= srcRight)) {
 	    return Success;
 	}
-	if ((srcH != 0) && ((pointerY < srcY)
-		|| (pointerY >= (srcY + (int)srcH)))) {
+	if (((long long)pointerY < (long long)srcY)
+		|| ((long long)pointerY >= srcBottom)) {
 	    return Success;
 	}
     }
