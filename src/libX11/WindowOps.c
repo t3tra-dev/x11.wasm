@@ -1097,8 +1097,10 @@ XSetLineAttributes(
     if (BrowserGCOrError(&display, gc, X11_WASM_XREQ_CHANGE_GC) == NULL) {
 	return Success;
     }
-    if (BrowserValidateGCLineStyle(&display, lineStyle,
+    if (BrowserValidateCard16(&display, (long)lineWidth, 1,
 	    X11_WASM_XREQ_CHANGE_GC)
+	    && BrowserValidateGCLineStyle(&display, lineStyle,
+		    X11_WASM_XREQ_CHANGE_GC)
 	    && BrowserValidateGCCapStyle(&display, capStyle,
 		    X11_WASM_XREQ_CHANGE_GC)
 	    && BrowserValidateGCJoinStyle(&display, joinStyle,

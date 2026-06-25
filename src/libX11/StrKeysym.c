@@ -1013,8 +1013,8 @@ BrowserValidateGCValueEnums(
 	return 0;
     }
     if ((mask & GCLineWidth)
-	    && !BrowserValueOrError(displayPtr, values->line_width,
-		    values->line_width >= 0, requestCode)) {
+	    && !BrowserValidateCard16(displayPtr, values->line_width, 1,
+		    requestCode)) {
 	return 0;
     }
     if ((mask & GCLineStyle)

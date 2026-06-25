@@ -4791,6 +4791,9 @@ X11WasmTestXErrorHandler(void)
     gcValues.function = GXset + 1;
     gcReferenceResultSum += XChangeGC(&browserDisplay.display, referenceGC,
 	    GCFunction, &gcValues);
+    gcValues.line_width = (int)USHRT_MAX + 1;
+    gcReferenceResultSum += XChangeGC(&browserDisplay.display, referenceGC,
+	    GCLineWidth, &gcValues);
     gcValues.line_style = LineDoubleDash + 1;
     gcReferenceResultSum += XChangeGC(&browserDisplay.display, referenceGC,
 	    GCLineStyle, &gcValues);
@@ -4808,6 +4811,9 @@ X11WasmTestXErrorHandler(void)
 	    referenceGC, WindingRule + 1);
     gcReferenceResultSum += XSetArcMode(&browserDisplay.display,
 	    referenceGC, ArcPieSlice + 1);
+    gcReferenceResultSum += XSetLineAttributes(&browserDisplay.display,
+	    referenceGC, (unsigned int)USHRT_MAX + 1U, LineSolid, CapButt,
+	    JoinMiter);
     gcReferenceResultSum += XSetLineAttributes(&browserDisplay.display,
 	    referenceGC, 1, LineDoubleDash + 1, CapButt, JoinMiter);
     gcReferenceResultSum += XSetDashes(&browserDisplay.display, referenceGC,
@@ -5481,6 +5487,8 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_CHANGE_GC
 	    + X11_WASM_XREQ_CHANGE_GC
 	    + X11_WASM_XREQ_CHANGE_GC
+	    + X11_WASM_XREQ_CHANGE_GC
+	    + X11_WASM_XREQ_CHANGE_GC
 	    + X11_WASM_XREQ_SET_DASHES
 	    + X11_WASM_XREQ_SET_DASHES
 	    + X11_WASM_XREQ_SET_CLIP_RECTANGLES
@@ -5649,15 +5657,15 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 208)
+    if ((browserTestXErrorCount != 210)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
 	    || (browserTestRequestCodeSum != expectedRequestCodeSum)
 	    || (browserTestRequestCodeMask != expectedRequestCodeMask)
-	    || (browserTestLastSerial != initialSerial + 208)
+	    || (browserTestLastSerial != initialSerial + 210)
 	    || (LastKnownRequestProcessed(&browserDisplay.display)
-		    != initialSerial + 208)) {
+		    != initialSerial + 210)) {
 	return 0;
     }
     return 1;
