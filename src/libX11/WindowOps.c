@@ -1408,6 +1408,40 @@ XSetBackground(
 }
 
 int
+XSetPlaneMask(
+    Display *display,
+    GC gc,
+    unsigned long planeMask)
+{
+    if (BrowserGCOrError(&display, gc, X11_WASM_XREQ_CHANGE_GC) != NULL) {
+	gc->plane_mask = planeMask;
+    }
+    return Success;
+}
+
+int
+XSetState(
+    Display *display,
+    GC gc,
+    unsigned long foreground,
+    unsigned long background,
+    int function,
+    unsigned long planeMask)
+{
+    if (BrowserGCOrError(&display, gc, X11_WASM_XREQ_CHANGE_GC) == NULL) {
+	return Success;
+    }
+    if (BrowserValidateGCFunction(&display, function,
+	    X11_WASM_XREQ_CHANGE_GC)) {
+	gc->foreground = foreground;
+	gc->background = background;
+	gc->function = function;
+	gc->plane_mask = planeMask;
+    }
+    return Success;
+}
+
+int
 XSetFont(
     Display *display,
     GC gc,
@@ -1436,6 +1470,38 @@ XSetFunction(
     if (BrowserValidateGCFunction(&display, function,
 	    X11_WASM_XREQ_CHANGE_GC)) {
 	gc->function = function;
+    }
+    return Success;
+}
+
+int
+XSetGraphicsExposures(
+    Display *display,
+    GC gc,
+    Bool graphicsExposures)
+{
+    if (BrowserGCOrError(&display, gc, X11_WASM_XREQ_CHANGE_GC) == NULL) {
+	return Success;
+    }
+    if (BrowserValidateGCBool(&display, graphicsExposures,
+	    X11_WASM_XREQ_CHANGE_GC)) {
+	gc->graphics_exposures = graphicsExposures;
+    }
+    return Success;
+}
+
+int
+XSetSubwindowMode(
+    Display *display,
+    GC gc,
+    int subwindowMode)
+{
+    if (BrowserGCOrError(&display, gc, X11_WASM_XREQ_CHANGE_GC) == NULL) {
+	return Success;
+    }
+    if (BrowserValidateGCSubwindowMode(&display, subwindowMode,
+	    X11_WASM_XREQ_CHANGE_GC)) {
+	gc->subwindow_mode = subwindowMode;
     }
     return Success;
 }

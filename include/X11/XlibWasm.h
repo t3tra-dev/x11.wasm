@@ -473,6 +473,12 @@ EXTERN int XSetClipOrigin(Display *display, GC gc, int clip_x_origin,
 	int clip_y_origin);
 EXTERN int XSetTSOrigin(Display *display, GC gc, int ts_x_origin,
 	int ts_y_origin);
+EXTERN int XSetGraphicsExposures(Display *display, GC gc,
+	Bool graphics_exposures);
+EXTERN int XSetPlaneMask(Display *display, GC gc, unsigned long plane_mask);
+EXTERN int XSetState(Display *display, GC gc, unsigned long foreground,
+	unsigned long background, int function, unsigned long plane_mask);
+EXTERN int XSetSubwindowMode(Display *display, GC gc, int subwindow_mode);
 EXTERN int XChangeGC(Display *d, GC gc, unsigned long mask,
 	XGCValues *values);
 EXTERN int XSetFont(Display *display, GC gc, Font font);

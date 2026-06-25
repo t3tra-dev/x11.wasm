@@ -1459,6 +1459,7 @@ X11WasmTestXlibApis(void)
     XRectangle polygonExtents;
     XPoint polygonPoints[6];
     XGCValues copyGCValues;
+    XGCValues stateGCValues;
     Atom pixelSizeAtom = None;
     unsigned long fontPropertyValue = 0;
     unsigned long oldFlushSerial = 0;
@@ -1542,6 +1543,7 @@ X11WasmTestXlibApis(void)
     memset(&visualTemplate, 0, sizeof(visualTemplate));
     memset(&regionRect, 0, sizeof(regionRect));
     memset(&copyGCValues, 0, sizeof(copyGCValues));
+    memset(&stateGCValues, 0, sizeof(stateGCValues));
     wideValue[0] = (wchar_t)'w';
     wideValue[1] = (wchar_t)'i';
     wideValue[2] = (wchar_t)'d';
@@ -2281,6 +2283,26 @@ X11WasmTestXlibApis(void)
     if ((xyBitmapReadback == NULL)
 	    || (XGetPixel(xyBitmapReadback, 0, 0) != 0xff0000UL)
 	    || (XGetPixel(xyBitmapReadback, 1, 0) != 0x00ff00UL)) {
+	goto cleanup;
+    }
+    if ((XSetState(&browserDisplay.display, xyBitmapGC, 0x010203UL,
+		    0x040506UL, GXinvert, 0x00ffffUL) != Success)
+	    || (XSetPlaneMask(&browserDisplay.display, xyBitmapGC,
+		    0x0000ffUL) != Success)
+	    || (XSetGraphicsExposures(&browserDisplay.display, xyBitmapGC,
+		    False) != Success)
+	    || (XSetSubwindowMode(&browserDisplay.display, xyBitmapGC,
+		    IncludeInferiors) != Success)
+	    || (XGetGCValues(&browserDisplay.display, xyBitmapGC,
+		    GCForeground | GCBackground | GCFunction | GCPlaneMask
+		    | GCGraphicsExposures | GCSubwindowMode,
+		    &stateGCValues) != True)
+	    || (stateGCValues.foreground != 0x010203UL)
+	    || (stateGCValues.background != 0x040506UL)
+	    || (stateGCValues.function != GXinvert)
+	    || (stateGCValues.plane_mask != 0x0000ffUL)
+	    || (stateGCValues.graphics_exposures != False)
+	    || (stateGCValues.subwindow_mode != IncludeInferiors)) {
 	goto cleanup;
     }
     regionA = XCreateRegion();
@@ -5763,6 +5785,12 @@ X11WasmTestXErrorHandler(void)
 	    GCDashList, &gcValues);
     gcReferenceResultSum += XSetFunction(&browserDisplay.display,
 	    referenceGC, GXset + 1);
+    gcReferenceResultSum += XSetState(&browserDisplay.display, referenceGC,
+	    1, 0, GXset + 1, AllPlanes);
+    gcReferenceResultSum += XSetGraphicsExposures(&browserDisplay.display,
+	    referenceGC, 2);
+    gcReferenceResultSum += XSetSubwindowMode(&browserDisplay.display,
+	    referenceGC, IncludeInferiors + 1);
     gcReferenceResultSum += XSetFillStyle(&browserDisplay.display,
 	    referenceGC, FillOpaqueStippled + 1);
     gcReferenceResultSum += XSetFillRule(&browserDisplay.display,
@@ -6444,6 +6472,9 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_CHANGE_GC
 	    + X11_WASM_XREQ_CHANGE_GC
 	    + X11_WASM_XREQ_CHANGE_GC
+	    + X11_WASM_XREQ_CHANGE_GC
+	    + X11_WASM_XREQ_CHANGE_GC
+	    + X11_WASM_XREQ_CHANGE_GC
 	    + X11_WASM_XREQ_COPY_AREA
 	    + X11_WASM_XREQ_COPY_GC
 	    + X11_WASM_XREQ_COPY_GC
@@ -6629,15 +6660,15 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 213)
+    if ((browserTestXErrorCount != 216)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
 	    || (browserTestRequestCodeSum != expectedRequestCodeSum)
 	    || (browserTestRequestCodeMask != expectedRequestCodeMask)
-	    || (browserTestLastSerial != initialSerial + 213)
+	    || (browserTestLastSerial != initialSerial + 216)
 	    || (LastKnownRequestProcessed(&browserDisplay.display)
-		    != initialSerial + 213)) {
+		    != initialSerial + 216)) {
 	return 0;
     }
     return 1;
