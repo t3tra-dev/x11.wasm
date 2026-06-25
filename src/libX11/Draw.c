@@ -677,6 +677,80 @@ BrowserCollectVisualInfos(
     return count;
 }
 
+XPixmapFormatValues *
+XListPixmapFormats(
+    Display *display,
+    int *countReturn)
+{
+    XPixmapFormatValues *formatList;
+    int count;
+    int i;
+
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    if (countReturn != NULL) {
+	*countReturn = 0;
+    }
+    count = display->nformats;
+    if ((count <= 0) || (display->pixmap_format == NULL)) {
+	return NULL;
+    }
+
+    formatList = (XPixmapFormatValues *)ckalloc(
+	    sizeof(XPixmapFormatValues) * (size_t)count);
+    for (i = 0; i < count; i++) {
+	formatList[i].depth = display->pixmap_format[i].depth;
+	formatList[i].bits_per_pixel = display->pixmap_format[i].bits_per_pixel;
+	formatList[i].scanline_pad = display->pixmap_format[i].scanline_pad;
+    }
+    if (countReturn != NULL) {
+	*countReturn = count;
+    }
+    return formatList;
+}
+
+int *
+XListDepths(
+    Display *display,
+    int screenNumber,
+    int *countReturn)
+{
+    Screen *screenPtr;
+    int *depthList;
+    int count;
+    int i;
+
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    if (countReturn != NULL) {
+	*countReturn = 0;
+    }
+    if ((screenNumber < 0) || (screenNumber >= ScreenCount(display))) {
+	return NULL;
+    }
+    screenPtr = ScreenOfDisplay(display, screenNumber);
+    if ((screenPtr == NULL) || (screenPtr->ndepths <= 0)
+	    || (screenPtr->depths == NULL)) {
+	return NULL;
+    }
+
+    count = screenPtr->ndepths;
+    depthList = (int *)ckalloc(sizeof(int) * (size_t)count);
+    for (i = 0; i < count; i++) {
+	depthList[i] = screenPtr->depths[i].depth;
+    }
+    if (countReturn != NULL) {
+	*countReturn = count;
+    }
+    return depthList;
+}
+
 XVisualInfo *
 XGetVisualInfo(
     Display *display,

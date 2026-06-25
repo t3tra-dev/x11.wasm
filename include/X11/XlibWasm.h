@@ -430,6 +430,10 @@ EXTERN int _XInitImageFuncPtrs(XImage *image);
 EXTERN XIC XCreateIC(XIM xim, ...);
 EXTERN XVisualInfo *XGetVisualInfo(Display *display, long vinfo_mask,
 	XVisualInfo *vinfo_template, int *nitems_return);
+EXTERN XPixmapFormatValues *XListPixmapFormats(Display *display,
+	int *count_return);
+EXTERN int *XListDepths(Display *display, int screen_number,
+	int *count_return);
 EXTERN Status XMatchVisualInfo(Display *display, int screen, int depth,
 	int c_class, XVisualInfo *vinfo_return);
 EXTERN void XSetWMClientMachine(Display *display, Window w,

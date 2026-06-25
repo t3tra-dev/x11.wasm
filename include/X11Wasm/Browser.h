@@ -79,7 +79,7 @@ typedef struct X11WasmDisplayState {
     Screen screen;
     Visual visual;
     Depth depth;
-    ScreenFormat pixmapFormat;
+    ScreenFormat pixmapFormats[2];
     XGCValues defaultGC;
     Window rootWindow;
     Window focusWindow;

@@ -92,6 +92,13 @@ BrowserInitDisplay(void)
     state->depth.nvisuals = 1;
     state->depth.visuals = &state->visual;
 
+    state->pixmapFormats[0].depth = 1;
+    state->pixmapFormats[0].bits_per_pixel = 1;
+    state->pixmapFormats[0].scanline_pad = 32;
+    state->pixmapFormats[1].depth = 24;
+    state->pixmapFormats[1].bits_per_pixel = 32;
+    state->pixmapFormats[1].scanline_pad = 32;
+
     state->screen.display = &state->display;
     state->screen.root = state->rootWindow;
     state->screen.width = X11_WASM_DEFAULT_SCREEN_WIDTH;
@@ -119,6 +126,8 @@ BrowserInitDisplay(void)
     state->display.bitmap_unit = 32;
     state->display.bitmap_pad = 32;
     state->display.bitmap_bit_order = LSBFirst;
+    state->display.nformats = 2;
+    state->display.pixmap_format = state->pixmapFormats;
     state->display.release = 1;
     state->display.display_name = (char *)"browser";
     state->display.default_screen = 0;

@@ -1280,6 +1280,10 @@ X11WasmTestXlibApis(void)
     XStandardColormap *standardColormapsReturn = NULL;
     int iconSizeCount = -1;
     int standardColormapCount = -1;
+    XPixmapFormatValues *pixmapFormats = NULL;
+    int pixmapFormatCount = -1;
+    int *depthList = NULL;
+    int depthCount = -1;
     int focusInitialRevert = 0;
     int focusAfterStaleRevert = 0;
     int focusAfterFutureRevert = 0;
@@ -2474,6 +2478,32 @@ X11WasmTestXlibApis(void)
     allocatedIconSize = NULL;
     XFree(allocatedStandardColormap);
     allocatedStandardColormap = NULL;
+    pixmapFormats = XListPixmapFormats(&browserDisplay.display,
+	    &pixmapFormatCount);
+    if ((pixmapFormats == NULL) || (pixmapFormatCount != 2)
+	    || (pixmapFormats[0].depth != 1)
+	    || (pixmapFormats[0].bits_per_pixel != 1)
+	    || (pixmapFormats[0].scanline_pad != 32)
+	    || (pixmapFormats[1].depth
+		    != DefaultDepth(&browserDisplay.display, screen))
+	    || (pixmapFormats[1].bits_per_pixel != 32)
+	    || (pixmapFormats[1].scanline_pad != 32)) {
+	goto cleanup;
+    }
+    XFree(pixmapFormats);
+    pixmapFormats = NULL;
+    depthList = XListDepths(&browserDisplay.display, screen, &depthCount);
+    if ((depthList == NULL) || (depthCount != 1)
+	    || (depthList[0] != DefaultDepth(&browserDisplay.display, screen))) {
+	goto cleanup;
+    }
+    XFree(depthList);
+    depthList = NULL;
+    depthCount = -1;
+    depthList = XListDepths(&browserDisplay.display, screen + 1, &depthCount);
+    if ((depthList != NULL) || (depthCount != 0)) {
+	goto cleanup;
+    }
     visualInfoList = XGetVisualInfo(&browserDisplay.display, VisualNoMask,
 	    NULL, &visualInfoCount);
     if ((visualInfoList == NULL) || (visualInfoCount != 1)
@@ -4805,6 +4835,12 @@ cleanup:
     }
     if (standardColormapsReturn != NULL) {
 	XFree(standardColormapsReturn);
+    }
+    if (pixmapFormats != NULL) {
+	XFree(pixmapFormats);
+    }
+    if (depthList != NULL) {
+	XFree(depthList);
     }
     if (visualInfoList != NULL) {
 	XFree(visualInfoList);
