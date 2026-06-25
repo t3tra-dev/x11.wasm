@@ -206,6 +206,7 @@ EXTERN Status XReconfigureWMWindow(Display *d, Window w, int screen,
 EXTERN int XResetScreenSaver(Display *d);
 EXTERN int XResizeWindow(Display *d, Window w, unsigned int ui1,
 	unsigned int ui2);
+EXTERN int XRestackWindows(Display *d, Window *w, int i);
 EXTERN int XSelectInput(Display *d, Window w, long l);
 EXTERN Status XSendEvent(Display *d, Window w, Bool b, long l, XEvent *x);
 EXTERN int XGetScreenSaver(Display *d, int *timeout_return,

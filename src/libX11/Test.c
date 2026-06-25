@@ -397,6 +397,7 @@ X11WasmTestConfigureStackingApis(void)
     Window top = None;
     Window far = None;
     Window expected[4];
+    Window restack[3];
     int result = 0;
     int screen;
 
@@ -581,6 +582,26 @@ X11WasmTestConfigureStackingApis(void)
 	goto cleanup;
     }
     BrowserClearEventQueue();
+
+    restack[0] = middle;
+    restack[1] = top;
+    restack[2] = far;
+    if (XRestackWindows(display, restack, 3) != Success) {
+	goto cleanup;
+    }
+    if (!BrowserTestPopConfigureEvent(top, far)
+	    || !BrowserTestPopConfigureEvent(far, None)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    expected[0] = far;
+    expected[1] = top;
+    expected[2] = middle;
+    expected[3] = bottom;
+    if (!BrowserTestQueryTreeOrder(display, parent, expected, 4)) {
+	goto cleanup;
+    }
+
     memset(&changes, 0, sizeof(changes));
     changes.x = 5;
     changes.y = 7;

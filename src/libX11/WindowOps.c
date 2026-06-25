@@ -384,6 +384,32 @@ XConfigureWindow(
 }
 
 int
+XRestackWindows(
+    Display *display,
+    Window *windows,
+    int nwindows)
+{
+    XWindowChanges changes;
+    int i;
+
+    if ((nwindows <= 0) || (windows == NULL)) {
+	return Success;
+    }
+    if (BrowserWindowResourceOrError(&display, windows[0],
+	    X11_WASM_XREQ_CONFIGURE_WINDOW) == NULL) {
+	return Success;
+    }
+    memset(&changes, 0, sizeof(changes));
+    changes.stack_mode = Below;
+    for (i = 1; i < nwindows; i++) {
+	changes.sibling = windows[i - 1];
+	(void)XConfigureWindow(display, windows[i], CWSibling | CWStackMode,
+		&changes);
+    }
+    return Success;
+}
+
+int
 BrowserScreenOrError(
     Display *display,
     int screen,
