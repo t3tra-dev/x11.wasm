@@ -1619,7 +1619,8 @@ XGetWindowProperty(
     elementBytes = BrowserPropertyElementBytes(propertyPtr->format);
     startBytes = (int)(offset * 4L);
     if (startBytes < propertyPtr->dataLength) {
-	long requestedBytes = length * 4L;
+	long requestedBytes = (length > (LONG_MAX / 4L))
+		? LONG_MAX : (length * 4L);
 	long availableBytes = propertyPtr->dataLength - startBytes;
 
 	if (requestedBytes <= 0) {

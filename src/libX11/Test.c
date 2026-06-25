@@ -4485,11 +4485,16 @@ X11WasmTestXErrorHandler(void)
     int invalidFormatPutImageResult;
     int depthMismatchPutImageResult;
     unsigned char *propertyData = NULL;
+    unsigned char *largeLengthPropertyData = NULL;
     Window invalidSelectionOwnerResult;
     Atom actualType = None;
+    Atom largeLengthActualType = None;
     int actualFormat = -1;
+    int largeLengthActualFormat = -1;
     unsigned long itemCount = 1;
+    unsigned long largeLengthItemCount = 0;
     unsigned long bytesAfter = 1;
+    unsigned long largeLengthBytesAfter = 1;
     char *invalidAtomName = NULL;
     Window root = None;
     Window child = None;
@@ -4531,6 +4536,8 @@ X11WasmTestXErrorHandler(void)
     Window invalidCreateVisualWindowResult;
     Window invalidCreateParentClassWindowResult;
     Window invalidCreateAttributeMaskWindowResult;
+    int largeLengthGetResult;
+    int largeLengthGetOk = 0;
 
     BrowserInitDisplay();
     memset(&changes, 0, sizeof(changes));
@@ -5119,6 +5126,22 @@ X11WasmTestXErrorHandler(void)
     propertyValidationResultSum += XChangeProperty(&browserDisplay.display,
 	    browserDisplay.rootWindow, validProperty, XA_ATOM, 32,
 	    PropModeAppend, (const unsigned char *)&atomPropertyValue, 1);
+    largeLengthGetResult = XGetWindowProperty(&browserDisplay.display,
+	    browserDisplay.rootWindow, validProperty, 0, LONG_MAX, False,
+	    AnyPropertyType, &largeLengthActualType, &largeLengthActualFormat,
+	    &largeLengthItemCount, &largeLengthBytesAfter,
+	    &largeLengthPropertyData);
+    largeLengthGetOk = (largeLengthGetResult == Success)
+	    && (largeLengthActualType == XA_STRING)
+	    && (largeLengthActualFormat == 8)
+	    && (largeLengthItemCount == 1)
+	    && (largeLengthBytesAfter == 0)
+	    && (largeLengthPropertyData != NULL)
+	    && (largeLengthPropertyData[0] == 'x');
+    if (largeLengthPropertyData != NULL) {
+	XFree(largeLengthPropertyData);
+	largeLengthPropertyData = NULL;
+    }
     propertyValidationResultSum += XChangeProperty(&browserDisplay.display,
 	    browserDisplay.rootWindow, BrowserWmProtocolsAtom(), XA_ATOM, 32,
 	    PropModeReplace, (const unsigned char *)&invalidAtom, 1);
@@ -5281,6 +5304,7 @@ X11WasmTestXErrorHandler(void)
 	    || (deletePixmapPropertyResult != Success)
 	    || (queryPixmapResult != False)
 	    || (propertyValidationResultSum != Success)
+	    || !largeLengthGetOk
 	    || (invalidWMColormapCountResult != False)
 	    || (invalidWMColormapListResult != False)
 	    || (getInvalidAtomResult != BadAtom)
