@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import shlex
+import subprocess
 from pathlib import Path
 
 
@@ -38,12 +39,31 @@ def parse_args():
     return parser.parse_args()
 
 
-def emscripten_tooling_flags(root: Path) -> list[str]:
-    sysroot = root / "build/emscripten/em-cache/sysroot"
-    flags = ["--target=wasm32-unknown-emscripten"]
+def ensure_emscripten_sysroot(root: Path, compiler: str) -> Path:
+    emcache = root / "build/emscripten/em-cache"
+    sysroot = emcache / "sysroot"
     if sysroot.exists():
-        flags.append(f"--sysroot={sysroot}")
-    return flags
+        return sysroot
+
+    emcache.mkdir(parents=True, exist_ok=True)
+    env = {**os.environ, "EM_CACHE": str(emcache)}
+    subprocess.run(
+        [compiler, "-x", "c", "-fsyntax-only", os.devnull],
+        cwd=root,
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return sysroot
+
+
+def emscripten_tooling_flags(root: Path, compiler: str) -> list[str]:
+    sysroot = ensure_emscripten_sysroot(root, compiler)
+    return [
+        "--target=wasm32-unknown-emscripten",
+        f"--sysroot={sysroot}",
+    ]
 
 
 def compile_entry(
@@ -132,7 +152,7 @@ def main():
     root = Path.cwd().resolve()
     output = (root / args.output).resolve()
     compiler = shutil.which("emcc") or "emcc"
-    tooling_flags = emscripten_tooling_flags(root)
+    tooling_flags = emscripten_tooling_flags(root, compiler)
     entries = [
         *xlib_entries(root, compiler, tooling_flags),
         *browser_app_entries(root, compiler, tooling_flags),

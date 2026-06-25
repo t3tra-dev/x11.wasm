@@ -7,6 +7,10 @@
 #ifndef _X11WASM_XLIBWASM_H
 #define _X11WASM_XLIBWASM_H
 
+#define X11WASM_XLIBWASM_INCLUDES_XUTIL
+#include <X11/Xutil.h>
+#undef X11WASM_XLIBWASM_INCLUDES_XUTIL
+
 #ifndef EXTERN
 #define EXTERN extern
 #endif

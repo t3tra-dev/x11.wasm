@@ -1097,5 +1097,12 @@ void
 XFreeExtensionList(
     char **list)
 {
-    (void)XFreeFontNames(list);
+    int i;
+
+    if (list != NULL) {
+	for (i = 0; list[i] != NULL; i++) {
+	    ckfree(list[i]);
+	}
+	ckfree(list);
+    }
 }
