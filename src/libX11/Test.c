@@ -839,16 +839,59 @@ X11WasmTestConfigureStackingApis(void)
     Window middle = None;
     Window top = None;
     Window far = None;
+    Window rootReturn = None;
+    Window rootAfterReturn = None;
     Window expected[4];
     Window restack[3];
+    int rootX = -1;
+    int rootY = -1;
+    int rootAfterX = -1;
+    int rootAfterY = -1;
+    unsigned int rootWidth = 0;
+    unsigned int rootHeight = 0;
+    unsigned int rootBorderWidth = 0;
+    unsigned int rootDepth = 0;
+    unsigned int rootAfterWidth = 0;
+    unsigned int rootAfterHeight = 0;
+    unsigned int rootAfterBorderWidth = 0;
+    unsigned int rootAfterDepth = 0;
     int result = 0;
     int screen;
 
     BrowserInitDisplay();
     display = &browserDisplay.display;
     screen = DefaultScreen(display);
+    BrowserClearEventQueue();
     memset(&attributes, 0, sizeof(attributes));
     attributes.event_mask = StructureNotifyMask;
+    memset(&changes, 0, sizeof(changes));
+    if (!XGetGeometry(display, browserDisplay.rootWindow, &rootReturn,
+	    &rootX, &rootY, &rootWidth, &rootHeight, &rootBorderWidth,
+	    &rootDepth)) {
+	goto cleanup;
+    }
+    changes.x = rootX + 11;
+    changes.y = rootY + 13;
+    changes.width = (int)rootWidth + 17;
+    changes.height = (int)rootHeight + 19;
+    changes.border_width = (int)rootBorderWidth + 3;
+    if (XConfigureWindow(display, browserDisplay.rootWindow,
+	    CWX | CWY | CWWidth | CWHeight | CWBorderWidth, &changes)
+	    != Success) {
+	goto cleanup;
+    }
+    if (!XGetGeometry(display, browserDisplay.rootWindow, &rootAfterReturn,
+	    &rootAfterX, &rootAfterY, &rootAfterWidth, &rootAfterHeight,
+	    &rootAfterBorderWidth, &rootAfterDepth)
+	    || (rootAfterReturn != rootReturn)
+	    || (rootAfterX != rootX) || (rootAfterY != rootY)
+	    || (rootAfterWidth != rootWidth)
+	    || (rootAfterHeight != rootHeight)
+	    || (rootAfterBorderWidth != rootBorderWidth)
+	    || (rootAfterDepth != rootDepth)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
     parent = XCreateWindow(display, browserDisplay.rootWindow, 0, 0, 100, 40, 0,
 	    CopyFromParent, InputOutput, DefaultVisual(display, screen), 0, NULL);
     bottom = XCreateWindow(display, parent, 0, 0, 20, 20, 0, CopyFromParent,

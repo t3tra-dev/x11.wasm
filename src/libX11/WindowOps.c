@@ -648,6 +648,9 @@ XConfigureWindow(
 	    valueMask, changes, X11_WASM_XREQ_CONFIGURE_WINDOW)) {
 	return Success;
     }
+    if (resourcePtr == &browserDisplay.rootResource) {
+	return Success;
+    }
     if (changes == NULL) {
 	return Success;
     }
