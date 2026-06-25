@@ -244,6 +244,70 @@ X11WasmTestEventQueueAndKeycodeApis(void)
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestClearAreaApis(void)
+{
+    Display *display;
+    XSetWindowAttributes attributes;
+    XEvent event;
+    Window window = None;
+    int result = 0;
+    int screen;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+    memset(&attributes, 0, sizeof(attributes));
+    attributes.event_mask = ExposureMask;
+    window = XCreateWindow(display, browserDisplay.rootWindow, 0, 0, 8, 6, 0,
+	    CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    CWEventMask, &attributes);
+    if ((window == None) || (XMapWindow(display, window) != Success)) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+    if (XClearArea(display, window, 1, 2, 3, 2, True) != Success) {
+	goto cleanup;
+    }
+    if (!BrowserPopEvent(&event, NULL)
+	    || (event.type != Expose)
+	    || (event.xexpose.window != window)
+	    || (event.xexpose.x != 1)
+	    || (event.xexpose.y != 2)
+	    || (event.xexpose.width != 3)
+	    || (event.xexpose.height != 2)
+	    || (event.xexpose.count != 0)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    if (XClearArea(display, window, 2, 1, 4, 3, False) != Success) {
+	goto cleanup;
+    }
+    if (XEventsQueued(display, QueuedAlready) != 0) {
+	goto cleanup;
+    }
+    if (XClearWindow(display, window) != Success) {
+	goto cleanup;
+    }
+    if (XEventsQueued(display, QueuedAlready) != 0) {
+	goto cleanup;
+    }
+    if (XClearArea(display, window, 99, 0, 0, 0, True) != Success) {
+	goto cleanup;
+    }
+    if (XEventsQueued(display, QueuedAlready) != 0) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    BrowserClearEventQueue();
+    if (window != None) {
+	(void)XDestroyWindow(display, window);
+    }
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestXlibApis(void)
 {
     char buffer[64];

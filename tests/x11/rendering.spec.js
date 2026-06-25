@@ -11,6 +11,23 @@ const {
   X11_WASM_JS_LIBRARY_SOURCES,
 } = require("../support/x11");
 
+test("XClearArea queues Expose events only when requested", async ({ page }) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestClearAreaApis?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestClearAreaApis) {
+      throw new Error("missing XClearArea test export");
+    }
+    return module._X11WasmTestClearAreaApis();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("browser backend copyPlane honors the requested source plane", async ({
   page,
 }) => {
