@@ -517,6 +517,11 @@ X11WasmTestConfigureStackingApis(void)
 	    || (XRaiseWindow(display, middle) != Success)) {
 	goto cleanup;
     }
+    if (!BrowserTestPopConfigureEvent(bottom, None)
+	    || !BrowserTestPopConfigureEvent(middle, far)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
     expected[0] = bottom;
     expected[1] = top;
     expected[2] = far;

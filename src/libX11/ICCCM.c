@@ -2117,28 +2117,16 @@ int XSelectInput(Display *display, Window window, long mask)
 int XRaiseWindow(Display *display, Window window)
 {
     XWindowChanges changes;
-    X11WasmResource *resourcePtr = BrowserWindowResourceOrError(&display,
-	    window, X11_WASM_XREQ_CONFIGURE_WINDOW);
 
-    if (resourcePtr == NULL) {
-	return Success;
-    }
     changes.stack_mode = Above;
-    BrowserRestackWindow(resourcePtr, CWStackMode, &changes);
-    return Success;
+    return XConfigureWindow(display, window, CWStackMode, &changes);
 }
 int XLowerWindow(Display *display, Window window)
 {
     XWindowChanges changes;
-    X11WasmResource *resourcePtr = BrowserWindowResourceOrError(&display,
-	    window, X11_WASM_XREQ_CONFIGURE_WINDOW);
 
-    if (resourcePtr == NULL) {
-	return Success;
-    }
     changes.stack_mode = Below;
-    BrowserRestackWindow(resourcePtr, CWStackMode, &changes);
-    return Success;
+    return XConfigureWindow(display, window, CWStackMode, &changes);
 }
 
 int
