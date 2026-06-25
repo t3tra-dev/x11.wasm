@@ -78,6 +78,93 @@ BrowserStoreColorDefinition(
     BrowserRememberColor(colormap, &color);
 }
 
+static unsigned long
+BrowserColorCellPlaneBits(
+    const unsigned long *planeMasks,
+    unsigned int nplanes,
+    size_t combination)
+{
+    unsigned long planeBits = 0;
+    unsigned int i;
+
+    for (i = 0; i < nplanes; i++) {
+	if (combination & ((size_t)1 << i)) {
+	    planeBits |= planeMasks[i];
+	}
+    }
+    return planeBits;
+}
+
+static int
+BrowserColorCellBlockIsFree(
+    Colormap colormap,
+    unsigned long basePixel,
+    const unsigned long *planeMasks,
+    unsigned int nplanes,
+    size_t combinationCount)
+{
+    size_t combination;
+
+    for (combination = 0; combination < combinationCount; combination++) {
+	unsigned long pixel = basePixel | BrowserColorCellPlaneBits(
+		planeMasks, nplanes, combination);
+
+	if (BrowserLookupColorEntry(colormap, pixel, NULL)) {
+	    return 0;
+	}
+    }
+    return 1;
+}
+
+static void
+BrowserRememberColorCellBlock(
+    Colormap colormap,
+    unsigned long basePixel,
+    const unsigned long *planeMasks,
+    unsigned int nplanes,
+    size_t combinationCount)
+{
+    XColor color;
+    size_t combination;
+
+    memset(&color, 0, sizeof(color));
+    color.flags = DoRed | DoGreen | DoBlue;
+    for (combination = 0; combination < combinationCount; combination++) {
+	color.pixel = basePixel | BrowserColorCellPlaneBits(planeMasks,
+		nplanes, combination);
+	BrowserRememberColor(colormap, &color);
+    }
+}
+
+static int
+BrowserReserveColorCellBlock(
+    Colormap colormap,
+    const unsigned long *planeMasks,
+    unsigned int nplanes,
+    unsigned long planeMaskUnion,
+    unsigned long *pixelReturn)
+{
+    size_t combinationCount;
+    unsigned long basePixel;
+
+    if (nplanes >= (unsigned int)(sizeof(size_t) * CHAR_BIT)) {
+	return 0;
+    }
+    combinationCount = ((size_t)1) << nplanes;
+    for (basePixel = 0; ; basePixel++) {
+	if ((basePixel & planeMaskUnion) != 0) {
+	    continue;
+	}
+	if (BrowserColorCellBlockIsFree(colormap, basePixel, planeMasks,
+		nplanes, combinationCount)) {
+	    BrowserRememberColorCellBlock(colormap, basePixel, planeMasks,
+		    nplanes, combinationCount);
+	    *pixelReturn = basePixel;
+	    return 1;
+	}
+    }
+}
+
 int XCopyArea(Display *d, Drawable s, Drawable t, GC g, int sx, int sy,
 	unsigned int w, unsigned int h, int dx, int dy)
 {
@@ -572,6 +659,7 @@ XAllocColorCells(
     unsigned int npixels)
 {
     unsigned int i;
+    unsigned long planeMaskUnion = 0;
 
     (void)contig;
     if (!BrowserColormapOrError(&display, colormap,
@@ -593,15 +681,13 @@ XAllocColorCells(
     for (i = 0; i < nplanes; i++) {
 	planeMasksReturn[i] = (i < (unsigned int)(sizeof(unsigned long)
 		* CHAR_BIT)) ? (1UL << i) : 0UL;
+	planeMaskUnion |= planeMasksReturn[i];
     }
     for (i = 0; i < npixels; i++) {
-	XColor color;
-
-	pixelsReturn[i] = BrowserReserveColorPixel(colormap);
-	memset(&color, 0, sizeof(color));
-	color.pixel = pixelsReturn[i];
-	color.flags = DoRed | DoGreen | DoBlue;
-	BrowserRememberColor(colormap, &color);
+	if (!BrowserReserveColorCellBlock(colormap, planeMasksReturn, nplanes,
+		planeMaskUnion, &pixelsReturn[i])) {
+	    return False;
+	}
     }
     return True;
 }

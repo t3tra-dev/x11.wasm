@@ -5997,6 +5997,8 @@ X11WasmTestColormapApis(void)
     XColor storedColor;
     XColor storedColors[2];
     unsigned long allocatedPixels[2];
+    unsigned long extraAllocatedPixel;
+    unsigned long allocatedPlaneMask;
     unsigned long planeFreePixel;
     unsigned long planeMasks[2];
     unsigned long colorPlanePixels[2];
@@ -6011,6 +6013,8 @@ X11WasmTestColormapApis(void)
     memset(&storedColor, 0, sizeof(storedColor));
     memset(storedColors, 0, sizeof(storedColors));
     memset(allocatedPixels, 0, sizeof(allocatedPixels));
+    extraAllocatedPixel = 0;
+    allocatedPlaneMask = 0;
     memset(planeMasks, 0, sizeof(planeMasks));
     memset(colorPlanePixels, 0, sizeof(colorPlanePixels));
 
@@ -6082,6 +6086,15 @@ X11WasmTestColormapApis(void)
 	    || (allocatedPixels[0] == allocatedPixels[1])
 	    || (planeMasks[0] != 1UL)
 	    || (planeMasks[1] != 2UL)) {
+	goto cleanup;
+    }
+    allocatedPlaneMask = planeMasks[0] | planeMasks[1];
+    if (((allocatedPixels[0] & allocatedPlaneMask) != 0)
+	    || ((allocatedPixels[1] & allocatedPlaneMask) != 0)
+	    || !XAllocColorCells(display, colormap, False, NULL, 0,
+		    &extraAllocatedPixel, 1)
+	    || (extraAllocatedPixel <= (allocatedPixels[1]
+		    | allocatedPlaneMask))) {
 	goto cleanup;
     }
     storedColor.pixel = allocatedPixels[0];
