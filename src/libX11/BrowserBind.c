@@ -125,6 +125,21 @@ X11WasmSetExternalClipboardText(
     return 1;
 }
 
+int
+X11WasmSetClipboardText(
+    const char *utf8,
+    int utf8Length)
+{
+    if (utf8 == NULL) {
+	utf8 = "";
+	utf8Length = 0;
+    } else if (utf8Length < 0) {
+	utf8Length = (int)strlen(utf8);
+    }
+    (void)X11WasmJsSetClipboardText(utf8, utf8Length);
+    return 1;
+}
+
 EMSCRIPTEN_KEEPALIVE int
 X11WasmQueueWindowProtocol(
     unsigned int window,

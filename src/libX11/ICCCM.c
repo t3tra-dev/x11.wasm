@@ -1785,6 +1785,14 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestSetClipboardText(int clear)
+{
+    static const char clipboardText[] = "x11.wasm clipboard api";
+
+    return X11WasmSetClipboardText(clear ? "" : clipboardText, clear ? 0 : -1);
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestSetPrimarySelectionOwner(unsigned int window, int enabled)
 {
     BrowserInitDisplay();

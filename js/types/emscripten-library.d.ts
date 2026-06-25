@@ -426,6 +426,7 @@ declare const Module: {
     window: number,
     enabled: number,
   ) => number;
+  _X11WasmTestSetClipboardText?: (clear: number) => number;
   _X11WasmTestSetStandardColormaps?: (
     window: number,
     enabled: number,

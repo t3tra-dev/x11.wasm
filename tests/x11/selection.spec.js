@@ -11,6 +11,61 @@ const {
   X11_WASM_JS_LIBRARY_SOURCES,
 } = require("../support/x11");
 
+test("X11WasmSetClipboardText updates browser clipboard bridge", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const clipboard = {
+      writes: /** @type {string[]} */ ([]),
+      writeText(text) {
+        this.writes.push(String(text));
+        return Promise.resolve();
+      },
+    };
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: clipboard,
+    });
+  });
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(async () => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestSetClipboardText?: Function, x11WasmBackend?: { clipboardText?: string, clipboardWriteStatus?: string } } }} */ (
+        window
+      ).Module;
+    const nativeClipboard =
+      /** @type {Navigator & { clipboard?: { writes?: string[] } }} */ (
+        navigator
+      ).clipboard;
+    if (!module?._X11WasmTestSetClipboardText || !module.x11WasmBackend) {
+      throw new Error("missing clipboard API test hooks");
+    }
+
+    const setResult = module._X11WasmTestSetClipboardText(0);
+    await Promise.resolve();
+    const clearResult = module._X11WasmTestSetClipboardText(1);
+    await Promise.resolve();
+
+    return {
+      clearResult,
+      setResult,
+      status: module.x11WasmBackend.clipboardWriteStatus,
+      stored: module.x11WasmBackend.clipboardText,
+      writes: nativeClipboard?.writes || [],
+    };
+  });
+
+  expect(result).toEqual({
+    clearResult: 1,
+    setResult: 1,
+    status: "written",
+    stored: "",
+    writes: ["x11.wasm clipboard api", ""],
+  });
+});
+
 test("XSetSelectionOwner updates browser selection metadata", async ({
   page,
 }) => {
