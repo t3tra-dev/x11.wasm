@@ -185,13 +185,6 @@ typedef struct X11WasmNamedColor {
     unsigned short blue;
 } X11WasmNamedColor;
 
-typedef struct X11WasmNativeBitmap {
-    const char *name;
-    const unsigned char *bits;
-    int width;
-    int height;
-} X11WasmNativeBitmap;
-
 typedef struct X11WasmExtensionInfo {
     const char *name;
     int majorOpcode;
@@ -365,8 +358,6 @@ extern const X11WasmKeySymName browserKeySymNames[];
 extern const size_t browserKeySymNameCount;
 extern const X11WasmExtensionInfo browserExtensions[];
 extern const size_t browserExtensionCount;
-extern const X11WasmNativeBitmap browserNativeBitmaps[];
-extern const size_t browserNativeBitmapCount;
 extern const X11WasmNamedColor browserNamedColors[];
 extern const size_t browserNamedColorCount;
 extern const char *const browserFontFallbackFamilies[];
@@ -717,8 +708,6 @@ X11WasmGCDashes *BrowserFindGCDashes(
     int create);
 int BrowserFindHostAddress(
     const XHostAddress *hostPtr);
-const X11WasmNativeBitmap *BrowserFindNativeBitmap(
-    const char *name);
 X11WasmProperty *BrowserFindProperty(
     X11WasmResource *resourcePtr,
     Atom atom);

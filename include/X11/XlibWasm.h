@@ -377,6 +377,7 @@ EXTERN void Xutf8SetWMProperties(Display *display, Window w,
 EXTERN int X11WasmSetClipboardText(_Xconst char *utf8, int utf8Length);
 EXTERN int X11WasmSetWindowMetadataTarget(Display *display, Window window,
 	Window target, int isRootToplevel);
+EXTERN void X11WasmSetPixmapColormap(Pixmap pixmap, Colormap colormap);
 EXTERN int XSetClipRectangles(Display *display, GC gc, int clip_x_origin,
 	int clip_y_origin, XRectangle rectangles[], int n, int ordering);
 EXTERN Status XParseColor(Display *display, Colormap map, _Xconst char *spec,

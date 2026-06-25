@@ -60,9 +60,5 @@ char *X11WasmExternalToUtfDString(X11WasmEncoding encoding, const char *src,
 char *X11WasmUtfToExternalDString(X11WasmEncoding encoding, const char *src,
 	int srcLen, X11WasmDString *dsPtr);
 int X11WasmUtfToCodepoint(const char *src, X11WasmCodepoint *chPtr);
-void X11WasmSetPixmapColormap(Pixmap pixmap, Colormap colormap);
-Pixmap X11WasmCreateNativeBitmap(Display *display, const void *source);
-Pixmap X11WasmGetNativeAppBitmap(Display *display, const char *name,
-	int *width, int *height);
 
 #endif /* _X11WASM_RUNTIME_H */

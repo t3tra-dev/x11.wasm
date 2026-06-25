@@ -1,22 +1,5 @@
 #include "XlibInt.h"
 
-const X11WasmNativeBitmap *
-BrowserFindNativeBitmap(
-    const char *name)
-{
-    size_t i;
-
-    if (name == NULL) {
-	return NULL;
-    }
-    for (i = 0; i < browserNativeBitmapCount; i++) {
-	if (strcmp(browserNativeBitmaps[i].name, name) == 0) {
-	    return &browserNativeBitmaps[i];
-	}
-    }
-    return NULL;
-}
-
 X11WasmGCClip *
 BrowserFindGCClip(
     GC gc,

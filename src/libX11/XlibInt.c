@@ -7,12 +7,6 @@
 
 #include "XlibInt.h"
 
-#include "bitmaps/error.xbm"
-#include "bitmaps/info.xbm"
-#include "bitmaps/questhead.xbm"
-#include "bitmaps/question.xbm"
-#include "bitmaps/warning.xbm"
-
 X11WasmDisplayState browserDisplay;
 int browserDisplayInitialized;
 X11WasmAtomName *atomList;
@@ -212,26 +206,6 @@ const X11WasmExtensionInfo browserExtensions[] = {
     }
 };
 const size_t browserExtensionCount = sizeof(browserExtensions) / sizeof(browserExtensions[0]);
-
-const X11WasmNativeBitmap browserNativeBitmaps[] = {
-    {"accessory", info_bits, info_width, info_height},
-    {"application", info_bits, info_width, info_height},
-    {"caution", warning_bits, warning_width, warning_height},
-    {"cdrom", info_bits, info_width, info_height},
-    {"document", question_bits, question_width, question_height},
-    {"edition", question_bits, question_width, question_height},
-    {"floppy", info_bits, info_width, info_height},
-    {"folder", questhead_bits, questhead_width, questhead_height},
-    {"note", info_bits, info_width, info_height},
-    {"pfolder", questhead_bits, questhead_width, questhead_height},
-    {"preferences", info_bits, info_width, info_height},
-    {"querydoc", question_bits, question_width, question_height},
-    {"ramdisk", info_bits, info_width, info_height},
-    {"stationery", question_bits, question_width, question_height},
-    {"stop", error_bits, error_width, error_height},
-    {"trash", warning_bits, warning_width, warning_height},
-};
-const size_t browserNativeBitmapCount = sizeof(browserNativeBitmaps) / sizeof(browserNativeBitmaps[0]);
 
 const X11WasmNamedColor browserNamedColors[] = {
 #include "tables/XColors.inc"
