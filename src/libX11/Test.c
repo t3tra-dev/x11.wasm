@@ -1119,6 +1119,13 @@ X11WasmTestXlibApis(void)
     char *commandArgv[2];
     char **commandArgvReturn = NULL;
     int commandArgcReturn = -1;
+    const char *contextDataOne = "context-one";
+    const char *contextDataTwo = "context-two";
+    XPointer contextDataReturn = NULL;
+    XID contextRidOne = 0x01020304UL;
+    XID contextRidTwo = 0x01020305UL;
+    XContext contextOne = 101;
+    XContext contextTwo = 102;
     XIOErrorHandler savedIOErrorHandler = ioErrorHandler;
     XAfterFunction oldAfterFunction = NULL;
     char *savedLocaleModifiers = NULL;
@@ -1374,6 +1381,48 @@ X11WasmTestXlibApis(void)
 	    || (XListHosts(&browserDisplay.display, &hostCount,
 		    &hostAccessEnabled) != NULL)
 	    || (hostCount != 0) || (hostAccessEnabled != True)) {
+	goto cleanup;
+    }
+    if ((XFindContext(&browserDisplay.display, contextRidOne, contextOne,
+	    &contextDataReturn) != XCNOENT)
+	    || (XDeleteContext(&browserDisplay.display, contextRidOne,
+		    contextOne) != XCNOENT)
+	    || (XSaveContext(&browserDisplay.display, contextRidOne,
+		    contextOne, contextDataOne) != Success)) {
+	goto cleanup;
+    }
+    contextDataReturn = NULL;
+    if ((XFindContext(&browserDisplay.display, contextRidOne, contextOne,
+	    &contextDataReturn) != Success)
+	    || (contextDataReturn != (XPointer)contextDataOne)
+	    || (XFindContext(&browserDisplay.display, contextRidOne, contextTwo,
+		    NULL) != XCNOENT)
+	    || (XFindContext(&browserDisplay.display, contextRidTwo, contextOne,
+		    NULL) != XCNOENT)) {
+	goto cleanup;
+    }
+    if ((XSaveContext(&browserDisplay.display, contextRidOne, contextOne,
+	    contextDataTwo) != Success)
+	    || (XSaveContext(&browserDisplay.display, contextRidOne,
+		    contextTwo, contextDataOne) != Success)
+	    || (XSaveContext(&browserDisplay.display, contextRidTwo,
+		    contextOne, contextDataOne) != Success)) {
+	goto cleanup;
+    }
+    contextDataReturn = NULL;
+    if ((XFindContext(&browserDisplay.display, contextRidOne, contextOne,
+	    &contextDataReturn) != Success)
+	    || (contextDataReturn != (XPointer)contextDataTwo)
+	    || (XFindContext(&browserDisplay.display, contextRidOne, contextTwo,
+		    NULL) != Success)
+	    || (XFindContext(&browserDisplay.display, contextRidTwo, contextOne,
+		    NULL) != Success)
+	    || (XDeleteContext(&browserDisplay.display, contextRidOne,
+		    contextOne) != Success)
+	    || (XFindContext(&browserDisplay.display, contextRidOne, contextOne,
+		    NULL) != XCNOENT)
+	    || (XDeleteContext(&browserDisplay.display, contextRidOne,
+		    contextOne) != XCNOENT)) {
 	goto cleanup;
     }
     keyboardMappingKeycode = XKeysymToKeycode(&browserDisplay.display, XK_a);
@@ -4213,6 +4262,9 @@ X11WasmTestXlibApis(void)
     result = 1;
 
 cleanup:
+    (void)XDeleteContext(&browserDisplay.display, contextRidOne, contextOne);
+    (void)XDeleteContext(&browserDisplay.display, contextRidOne, contextTwo);
+    (void)XDeleteContext(&browserDisplay.display, contextRidTwo, contextOne);
     if (extensionList != NULL) {
 	XFreeExtensionList(extensionList);
     }
