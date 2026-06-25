@@ -1281,7 +1281,8 @@ BrowserQueueCreateNotify(
 	return 0;
     }
     parentPtr = BrowserWindowResource(resourcePtr->parent);
-    if (parentPtr == NULL) {
+    if ((parentPtr == NULL)
+	    || !BrowserResourceWantsEvent(parentPtr, SubstructureNotifyMask)) {
 	return 0;
     }
     BrowserSetCommonEventFields(&event, CreateNotify,
@@ -1299,21 +1300,98 @@ BrowserQueueCreateNotify(
 }
 
 int
+BrowserQueueMapNotify(
+    X11WasmResource *resourcePtr)
+{
+    X11WasmResource *parentPtr;
+    XEvent event;
+    int queued = 0;
+
+    if ((resourcePtr == NULL)
+	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)) {
+	return 0;
+    }
+    if (BrowserResourceWantsEvent(resourcePtr, StructureNotifyMask)) {
+	BrowserSetCommonEventFields(&event, MapNotify, (Window)resourcePtr->id,
+		CurrentTime);
+	event.xmap.event = (Window)resourcePtr->id;
+	event.xmap.window = (Window)resourcePtr->id;
+	event.xmap.override_redirect = resourcePtr->atts.override_redirect;
+	queued += BrowserQueueEvent(&event);
+    }
+    parentPtr = BrowserWindowResource(resourcePtr->parent);
+    if (BrowserResourceWantsEvent(parentPtr, SubstructureNotifyMask)) {
+	BrowserSetCommonEventFields(&event, MapNotify, (Window)parentPtr->id,
+		CurrentTime);
+	event.xmap.event = (Window)parentPtr->id;
+	event.xmap.window = (Window)resourcePtr->id;
+	event.xmap.override_redirect = resourcePtr->atts.override_redirect;
+	queued += BrowserQueueEvent(&event);
+    }
+    return queued;
+}
+
+int
+BrowserQueueUnmapNotify(
+    X11WasmResource *resourcePtr,
+    Bool fromConfigure)
+{
+    X11WasmResource *parentPtr;
+    XEvent event;
+    int queued = 0;
+
+    if ((resourcePtr == NULL)
+	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)) {
+	return 0;
+    }
+    if (BrowserResourceWantsEvent(resourcePtr, StructureNotifyMask)) {
+	BrowserSetCommonEventFields(&event, UnmapNotify,
+		(Window)resourcePtr->id, CurrentTime);
+	event.xunmap.event = (Window)resourcePtr->id;
+	event.xunmap.window = (Window)resourcePtr->id;
+	event.xunmap.from_configure = fromConfigure;
+	queued += BrowserQueueEvent(&event);
+    }
+    parentPtr = BrowserWindowResource(resourcePtr->parent);
+    if (BrowserResourceWantsEvent(parentPtr, SubstructureNotifyMask)) {
+	BrowserSetCommonEventFields(&event, UnmapNotify,
+		(Window)parentPtr->id, CurrentTime);
+	event.xunmap.event = (Window)parentPtr->id;
+	event.xunmap.window = (Window)resourcePtr->id;
+	event.xunmap.from_configure = fromConfigure;
+	queued += BrowserQueueEvent(&event);
+    }
+    return queued;
+}
+
+int
 BrowserQueueDestroyNotify(
     X11WasmResource *resourcePtr)
 {
+    X11WasmResource *parentPtr;
     XEvent event;
+    int queued = 0;
 
     if ((resourcePtr == NULL)
-	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)
-	    || !BrowserResourceWantsEvent(resourcePtr, StructureNotifyMask)) {
+	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)) {
 	return 0;
     }
-    BrowserSetCommonEventFields(&event, DestroyNotify,
-	    (Window)resourcePtr->id, CurrentTime);
-    event.xdestroywindow.event = (Window)resourcePtr->id;
-    event.xdestroywindow.window = (Window)resourcePtr->id;
-    return BrowserQueueEvent(&event);
+    if (BrowserResourceWantsEvent(resourcePtr, StructureNotifyMask)) {
+	BrowserSetCommonEventFields(&event, DestroyNotify,
+		(Window)resourcePtr->id, CurrentTime);
+	event.xdestroywindow.event = (Window)resourcePtr->id;
+	event.xdestroywindow.window = (Window)resourcePtr->id;
+	queued += BrowserQueueEvent(&event);
+    }
+    parentPtr = BrowserWindowResource(resourcePtr->parent);
+    if (BrowserResourceWantsEvent(parentPtr, SubstructureNotifyMask)) {
+	BrowserSetCommonEventFields(&event, DestroyNotify,
+		(Window)parentPtr->id, CurrentTime);
+	event.xdestroywindow.event = (Window)parentPtr->id;
+	event.xdestroywindow.window = (Window)resourcePtr->id;
+	queued += BrowserQueueEvent(&event);
+    }
+    return queued;
 }
 
 int
@@ -1321,25 +1399,44 @@ BrowserQueueConfigureNotify(
     X11WasmResource *resourcePtr,
     Window above)
 {
+    X11WasmResource *parentPtr;
     XEvent event;
+    int queued = 0;
 
     if ((resourcePtr == NULL)
-	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)
-	    || !BrowserResourceWantsEvent(resourcePtr, StructureNotifyMask)) {
+	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)) {
 	return 0;
     }
-    BrowserSetCommonEventFields(&event, ConfigureNotify,
-	    (Window)resourcePtr->id, CurrentTime);
-    event.xconfigure.event = (Window)resourcePtr->id;
-    event.xconfigure.window = (Window)resourcePtr->id;
-    event.xconfigure.x = resourcePtr->x;
-    event.xconfigure.y = resourcePtr->y;
-    event.xconfigure.width = (int)resourcePtr->width;
-    event.xconfigure.height = (int)resourcePtr->height;
-    event.xconfigure.border_width = (int)resourcePtr->borderWidth;
-    event.xconfigure.above = above;
-    event.xconfigure.override_redirect = resourcePtr->atts.override_redirect;
-    return BrowserQueueEvent(&event);
+    if (BrowserResourceWantsEvent(resourcePtr, StructureNotifyMask)) {
+	BrowserSetCommonEventFields(&event, ConfigureNotify,
+		(Window)resourcePtr->id, CurrentTime);
+	event.xconfigure.event = (Window)resourcePtr->id;
+	event.xconfigure.window = (Window)resourcePtr->id;
+	event.xconfigure.x = resourcePtr->x;
+	event.xconfigure.y = resourcePtr->y;
+	event.xconfigure.width = (int)resourcePtr->width;
+	event.xconfigure.height = (int)resourcePtr->height;
+	event.xconfigure.border_width = (int)resourcePtr->borderWidth;
+	event.xconfigure.above = above;
+	event.xconfigure.override_redirect = resourcePtr->atts.override_redirect;
+	queued += BrowserQueueEvent(&event);
+    }
+    parentPtr = BrowserWindowResource(resourcePtr->parent);
+    if (BrowserResourceWantsEvent(parentPtr, SubstructureNotifyMask)) {
+	BrowserSetCommonEventFields(&event, ConfigureNotify,
+		(Window)parentPtr->id, CurrentTime);
+	event.xconfigure.event = (Window)parentPtr->id;
+	event.xconfigure.window = (Window)resourcePtr->id;
+	event.xconfigure.x = resourcePtr->x;
+	event.xconfigure.y = resourcePtr->y;
+	event.xconfigure.width = (int)resourcePtr->width;
+	event.xconfigure.height = (int)resourcePtr->height;
+	event.xconfigure.border_width = (int)resourcePtr->borderWidth;
+	event.xconfigure.above = above;
+	event.xconfigure.override_redirect = resourcePtr->atts.override_redirect;
+	queued += BrowserQueueEvent(&event);
+    }
+    return queued;
 }
 
 int

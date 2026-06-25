@@ -494,11 +494,23 @@ BrowserEventMask(
     case VisibilityNotify:
 	return VisibilityChangeMask;
     case DestroyNotify:
+	return (eventPtr->xdestroywindow.event == eventPtr->xdestroywindow.window)
+		? StructureNotifyMask : SubstructureNotifyMask;
     case UnmapNotify:
+	return (eventPtr->xunmap.event == eventPtr->xunmap.window)
+		? StructureNotifyMask : SubstructureNotifyMask;
     case MapNotify:
+	return (eventPtr->xmap.event == eventPtr->xmap.window)
+		? StructureNotifyMask : SubstructureNotifyMask;
     case ReparentNotify:
+	return (eventPtr->xreparent.event == eventPtr->xreparent.window)
+		? StructureNotifyMask : SubstructureNotifyMask;
     case ConfigureNotify:
+	return (eventPtr->xconfigure.event == eventPtr->xconfigure.window)
+		? StructureNotifyMask : SubstructureNotifyMask;
     case GravityNotify:
+	return (eventPtr->xgravity.event == eventPtr->xgravity.window)
+		? StructureNotifyMask : SubstructureNotifyMask;
     case CirculateNotify:
 	return StructureNotifyMask;
     case CreateNotify:

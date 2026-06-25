@@ -504,6 +504,7 @@ declare const Module: {
   _X11WasmTestEventQueueAndKeycodeApis?: () => number;
   _X11WasmTestClearAreaApis?: () => number;
   _X11WasmTestConfigureStackingApis?: () => number;
+  _X11WasmTestSubstructureNotifyApis?: () => number;
   _X11WasmTestXlibApis?: () => number;
   _X11WasmTestXSendEventTargets?: (
     focusWindow: number,

@@ -173,7 +173,6 @@ XMapWindow(
 {
     X11WasmResource *resourcePtr = BrowserWindowResourceOrError(&display,
 	    window, X11_WASM_XREQ_MAP_WINDOW);
-    XEvent event;
 
     if (resourcePtr == NULL) {
 	return Success;
@@ -187,11 +186,7 @@ XMapWindow(
 	BrowserSetWindowWmState(window,
 		BrowserInitialWmStateForMap(display, window));
     }
-    BrowserSetCommonEventFields(&event, MapNotify, window, CurrentTime);
-    event.xmap.event = window;
-    event.xmap.window = window;
-    event.xmap.override_redirect = resourcePtr->atts.override_redirect;
-    (void)BrowserQueueEvent(&event);
+    (void)BrowserQueueMapNotify(resourcePtr);
     BrowserNotifyVisibilityTree(resourcePtr, VisibilityUnobscured);
     if (resourcePtr->c_class != InputOnly) {
 	(void)BrowserQueueExpose(resourcePtr, 0, 0, resourcePtr->width,
@@ -241,8 +236,6 @@ BrowserUnmapWindowResource(
     X11WasmResource *resourcePtr,
     Bool fromConfigure)
 {
-    XEvent event;
-
     if (resourcePtr == NULL) {
 	return Success;
     }
@@ -251,12 +244,7 @@ BrowserUnmapWindowResource(
     }
     resourcePtr->mapped = 0;
     (void)X11WasmJsUnmapWindow(BrowserJsXId(resourcePtr->id));
-    BrowserSetCommonEventFields(&event, UnmapNotify,
-	    (Window)resourcePtr->id, CurrentTime);
-    event.xunmap.event = (Window)resourcePtr->id;
-    event.xunmap.window = (Window)resourcePtr->id;
-    event.xunmap.from_configure = fromConfigure;
-    (void)BrowserQueueEvent(&event);
+    (void)BrowserQueueUnmapNotify(resourcePtr, fromConfigure);
     return Success;
 }
 

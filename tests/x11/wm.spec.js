@@ -28,6 +28,23 @@ test("XConfigureWindow honors conditional stacking modes", async ({ page }) => {
   expect(result).toBe(1);
 });
 
+test("structure notifications split child and parent masks", async ({ page }) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestSubstructureNotifyApis?: () => number } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestSubstructureNotifyApis) {
+      throw new Error("missing substructure notify test export");
+    }
+    return module._X11WasmTestSubstructureNotifyApis();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XSetIconSizes updates browser WM_ICON_SIZE metadata", async ({ page }) => {
   await waitForX11Runtime(page);
   const windowId = await createMappedWindow(page);
