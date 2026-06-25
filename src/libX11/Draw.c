@@ -1255,6 +1255,55 @@ BrowserDrawUtf8Text(
 }
 
 int
+BrowserDrawUtf8ImageString(
+    Display *display,
+    Drawable drawable,
+    GC gc,
+    int x,
+    int y,
+    const char *utf8,
+    int length,
+    unsigned char requestCode)
+{
+    X11WasmResource *resourcePtr;
+    X11WasmResource *fontPtr = NULL;
+    int charWidth = 8;
+    int ascent = 12;
+    int descent = 4;
+    int width;
+
+    if ((utf8 == NULL) || (length <= 0)) {
+	return Success;
+    }
+    resourcePtr = BrowserDrawableResourceOrError(&display, drawable,
+	    requestCode);
+    if (resourcePtr == NULL) {
+	return Success;
+    }
+    if (!BrowserOptionalGCOrError(&display, gc, requestCode)) {
+	return Success;
+    }
+    if (gc != NULL) {
+	fontPtr = X11WasmFindResource(gc->font);
+    }
+    if ((fontPtr != NULL) && (fontPtr->fontPixelSize > 0)) {
+	BrowserFontMetricsForPixelSize(fontPtr->fontPixelSize, &charWidth,
+		&ascent, &descent);
+    }
+    width = BrowserFontResourceTextWidth(fontPtr, charWidth, utf8, length);
+    BrowserApplyGCStyle(gc);
+    BrowserApplyGCClip(gc);
+    (void)X11WasmJsDrawRectangle(BrowserJsXId(drawable),
+	    (gc != NULL) ? gc->background : 0, x, y - ascent,
+	    (unsigned int)width, (unsigned int)(ascent + descent), 1);
+    (void)X11WasmJsDrawText(BrowserJsXId(drawable), BrowserGCPixel(gc), x, y,
+	    utf8, length);
+    BrowserMarkResourceDamage(resourcePtr, x, y - ascent,
+	    (unsigned int)(width + 2), (unsigned int)(ascent + descent));
+    return Success;
+}
+
+int
 XDrawString(
     Display *d,
     Drawable dr,
@@ -1279,6 +1328,30 @@ XDrawString(
 }
 
 int
+XDrawImageString(
+    Display *d,
+    Drawable dr,
+    GC gc,
+    int x,
+    int y,
+    _Xconst char *string,
+    int length)
+{
+    char *utf8;
+    int utf8Length;
+    int result;
+
+    utf8 = BrowserUtf8FromLatin1String(string, length, &utf8Length);
+    if (utf8 == NULL) {
+	return Success;
+    }
+    result = BrowserDrawUtf8ImageString(d, dr, gc, x, y, utf8, utf8Length,
+	    X11_WASM_XREQ_IMAGE_TEXT_8);
+    ckfree(utf8);
+    return result;
+}
+
+int
 XDrawString16(
     Display *d,
     Drawable dr,
@@ -1298,6 +1371,30 @@ XDrawString16(
     }
     result = BrowserDrawUtf8Text(d, dr, gc, x, y, utf8, utf8Length,
 	    X11_WASM_XREQ_POLY_TEXT_16);
+    ckfree(utf8);
+    return result;
+}
+
+int
+XDrawImageString16(
+    Display *d,
+    Drawable dr,
+    GC gc,
+    int x,
+    int y,
+    _Xconst XChar2b *string,
+    int length)
+{
+    char *utf8;
+    int utf8Length;
+    int result;
+
+    utf8 = BrowserUtf8FromXChar2bString(string, length, &utf8Length);
+    if (utf8 == NULL) {
+	return Success;
+    }
+    result = BrowserDrawUtf8ImageString(d, dr, gc, x, y, utf8, utf8Length,
+	    X11_WASM_XREQ_IMAGE_TEXT_16);
     ckfree(utf8);
     return result;
 }

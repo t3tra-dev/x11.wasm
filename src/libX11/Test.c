@@ -4414,6 +4414,12 @@ X11WasmTestXlibApis(void)
 	    latin1Text, 4) != Success) {
 	goto cleanup;
     }
+    if ((XDrawImageString(&browserDisplay.display, (Drawable)pixmap, queryGC,
+		    0, textAscent, latin1Text, 4) != Success)
+	    || (XDrawImageString16(&browserDisplay.display, (Drawable)pixmap,
+		    queryGC, 0, textAscent * 2, latin1Text16, 4) != Success)) {
+	goto cleanup;
+    }
     memset(&textExtents, 0, sizeof(textExtents));
     textDirection = 0;
     textAscent = 0;
@@ -5307,6 +5313,10 @@ X11WasmTestXErrorHandler(void)
 	    (Drawable)invalidWindow, NULL, 0, 0, "x", 1);
     drawResultSum += XDrawString16(&browserDisplay.display,
 	    (Drawable)invalidWindow, NULL, 0, 0, text16, 1);
+    drawResultSum += XDrawImageString(&browserDisplay.display,
+	    (Drawable)invalidWindow, NULL, 0, 0, "x", 1);
+    drawResultSum += XDrawImageString16(&browserDisplay.display,
+	    (Drawable)invalidWindow, NULL, 0, 0, text16, 1);
     drawValueValidationResultSum = XDrawLines(&browserDisplay.display,
 	    (Drawable)browserDisplay.rootWindow, NULL, points, 2,
 	    CoordModePrevious + 1);
@@ -5472,6 +5482,10 @@ X11WasmTestXErrorHandler(void)
 	    0, 0, 0, 0, 1, 1);
     invalidDrawGCResultSum += XDrawString(&browserDisplay.display,
 	    (Drawable)browserDisplay.rootWindow, invalidGC, 0, 0, "x", 1);
+    invalidDrawGCResultSum += XDrawImageString(&browserDisplay.display,
+	    (Drawable)browserDisplay.rootWindow, invalidGC, 0, 0, "x", 1);
+    invalidDrawGCResultSum += XDrawImageString16(&browserDisplay.display,
+	    (Drawable)browserDisplay.rootWindow, invalidGC, 0, 0, text16, 1);
     invalidCreateWindowResult = XCreateWindow(&browserDisplay.display,
 	    invalidWindow, 0, 0, 1, 1, 0, CopyFromParent, InputOutput,
 	    DefaultVisual(&browserDisplay.display,

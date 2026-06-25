@@ -508,6 +508,10 @@ EXTERN int XTextWidth(XFontStruct *font_struct, _Xconst char *string,
 		_Xconst char *string, int length);
 	EXTERN int XDrawString16(Display *display, Drawable d, GC gc, int x, int y,
 		_Xconst XChar2b *string, int length);
+EXTERN int XDrawImageString(Display *display, Drawable d, GC gc, int x, int y,
+	_Xconst char *string, int length);
+EXTERN int XDrawImageString16(Display *display, Drawable d, GC gc, int x,
+	int y, _Xconst XChar2b *string, int length);
 	EXTERN int XUndefineCursor(Display *display, Window w);
 
 #ifdef __cplusplus
