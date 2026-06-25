@@ -202,7 +202,7 @@
         context.fillStyle = resource.backgroundColor;
         context.fillRect(clearX, clearY, clearWidth, clearHeight);
       } else {
-        context.clearRect(clearX, clearY, clearWidth, clearHeight);
+        return;
       }
       this.markDirty(resource, clearX, clearY, clearWidth, clearHeight);
     },

@@ -1266,6 +1266,67 @@ test("browser backend clears a window subarea with background color", async ({
   }
 });
 
+test("browser backend preserves window contents without a background", async ({
+  page,
+}) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const samples = await page.evaluate(async () => {
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
+    const backend =
+      /** @type {Window & { Module?: { x11WasmBackend?: X11WasmBackendSnapshot & { rootWindow?: number, createWindow?: Function, mapWindow?: Function, setWindowStyle?: Function, clearWindowArea?: Function, drawRectangle?: Function, flush?: Function } } }} */ (
+        window
+      ).Module?.x11WasmBackend;
+    if (
+      !backend?.createWindow ||
+      !backend.mapWindow ||
+      !backend.setWindowStyle ||
+      !backend.clearWindowArea ||
+      !backend.drawRectangle ||
+      !backend.flush
+    ) {
+      throw new Error("missing X11 wasm backend clear background methods");
+    }
+    const rootWindow = backend.rootWindow || 1;
+    const windowId = 0x720601;
+    backend.createWindow(windowId, rootWindow, 0, 0, 5, 3, 24, 0);
+    backend.mapWindow(windowId);
+    backend.drawRectangle(windowId, 0x0000ff, 0, 0, 5, 3, true);
+    backend.flush();
+    backend.setWindowStyle(windowId, false, 0, 0, false, 0, 0, false, 0);
+    backend.clearWindowArea(windowId, 1, 1, 2, 1);
+    backend.flush();
+
+    const resource = backend.resources.get(windowId);
+    const canvas = resource?.canvas;
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      throw new Error("missing clear background test canvas");
+    }
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("missing clear background test context");
+    }
+    const pixel = (x, y) => Array.from(context.getImageData(x, y, 1, 1).data);
+    return {
+      cleared: pixel(1, 1),
+      clearedRight: pixel(2, 1),
+      outside: pixel(3, 1),
+    };
+  });
+
+  for (const sample of [samples.cleared, samples.clearedRight, samples.outside]) {
+    expect(sample[0]).toBeLessThan(80);
+    expect(sample[1]).toBeLessThan(80);
+    expect(sample[2]).toBeGreaterThan(180);
+    expect(sample[3]).toBe(255);
+  }
+});
+
 test("browser backend preserves window bits according to bit gravity", async ({
   page,
 }) => {
