@@ -2564,6 +2564,12 @@ XReparentWindow(
 		X11_WASM_XREQ_REPARENT_WINDOW);
 	return Success;
     }
+    if ((parentPtr->c_class == InputOnly)
+	    && (resourcePtr->c_class != InputOnly)) {
+	(void)BrowserBadMatchOrError(&display, (XID)parent,
+		X11_WASM_XREQ_REPARENT_WINDOW);
+	return Success;
+    }
     oldParent = resourcePtr->parent;
     wasMapped = resourcePtr->mapped;
     if (wasMapped) {

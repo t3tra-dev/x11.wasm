@@ -6629,6 +6629,8 @@ X11WasmTestXErrorHandler(void)
     int warpPointerZeroHeightY;
     int sawClearAreaBadValue;
     int sawConfigureBadMatch;
+    int reparentInputOnlyResult;
+    int sawReparentInputOnlyBadMatch;
     int sawReconfigureBadValue;
     int sawIconifyBadValue;
     int sawWithdrawBadValue;
@@ -6788,6 +6790,8 @@ X11WasmTestXErrorHandler(void)
     browserTestRequestCodeSum = 0;
     browserTestRequestCodeMask = 0;
     sawConfigureBadMatch = 0;
+    reparentInputOnlyResult = !Success;
+    sawReparentInputOnlyBadMatch = 0;
     sawReconfigureBadValue = 0;
     sawIconifyBadValue = 0;
     sawWithdrawBadValue = 0;
@@ -7285,6 +7289,11 @@ X11WasmTestXErrorHandler(void)
 	unviewableGetImageResult = XGetImage(&browserDisplay.display,
 		(Drawable)configureWindow, 0, 0, 1, 1, AllPlanes,
 		ZPixmap);
+	reparentInputOnlyResult = XReparentWindow(&browserDisplay.display,
+		configureWindow, inputOnlyParentWindow, 0, 0);
+	sawReparentInputOnlyBadMatch = (browserTestLastErrorCode == BadMatch)
+		&& (browserTestLastRequestCode == X11_WASM_XREQ_REPARENT_WINDOW)
+		&& (browserTestLastResourceId == (XID)inputOnlyParentWindow);
     } else {
 	reconfigureValidResult = False;
 	reconfigureInvalidScreenResult = True;
@@ -7759,6 +7768,8 @@ X11WasmTestXErrorHandler(void)
 	    || (rootPixmapErrorCount != 0)
 	    || (invalidWindowAttributeResultSum != Success)
 	    || (configureValidationResultSum != Success)
+	    || (reparentInputOnlyResult != Success)
+	    || !sawReparentInputOnlyBadMatch
 	    || (reconfigureValidResult != True)
 	    || (reconfigureInvalidScreenResult != False)
 	    || (iconifyValidResult != True)
@@ -7980,6 +7991,7 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_CONFIGURE_WINDOW
 	    + X11_WASM_XREQ_CONFIGURE_WINDOW
 	    + X11_WASM_XREQ_CONFIGURE_WINDOW
+	    + X11_WASM_XREQ_REPARENT_WINDOW
 	    + X11_WASM_XREQ_UNMAP_WINDOW
 	    + X11_WASM_XREQ_UNMAP_WINDOW
 	    + X11_WASM_XREQ_GET_IMAGE
@@ -8117,7 +8129,7 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 238)
+    if ((browserTestXErrorCount != 239)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
