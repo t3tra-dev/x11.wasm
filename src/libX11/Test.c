@@ -1106,6 +1106,8 @@ X11WasmTestXlibApis(void)
     int keysymsPerKeycode = -1;
     KeySym unicodeSnowman =
 	    (KeySym)(X11_WASM_UNICODE_KEYSYM_BASE | 0x2603U);
+    KeySym lowerKeySym = NoSymbol;
+    KeySym upperKeySym = NoSymbol;
     XModifierKeymap *modifierMap = NULL;
     int modifierIndex = 0;
     int modeSwitchFound = 0;
@@ -1459,6 +1461,40 @@ X11WasmTestXlibApis(void)
 	    || (XStringToKeysym("0x1008ffff") != (KeySym)0x1008ffffUL)
 	    || (XStringToKeysym("0x") != NoSymbol)
 	    || (XStringToKeysym("0x100000000") != NoSymbol)) {
+	goto cleanup;
+    }
+    XConvertCase(XK_A, &lowerKeySym, &upperKeySym);
+    if ((lowerKeySym != XK_a) || (upperKeySym != XK_A)) {
+	goto cleanup;
+    }
+    XConvertCase(XK_z, &lowerKeySym, &upperKeySym);
+    if ((lowerKeySym != XK_z) || (upperKeySym != XK_Z)) {
+	goto cleanup;
+    }
+    XConvertCase(XK_Eacute, &lowerKeySym, &upperKeySym);
+    if ((lowerKeySym != XK_eacute) || (upperKeySym != XK_Eacute)) {
+	goto cleanup;
+    }
+    XConvertCase(XK_oslash, &lowerKeySym, &upperKeySym);
+    if ((lowerKeySym != XK_oslash) || (upperKeySym != XK_Oslash)) {
+	goto cleanup;
+    }
+    XConvertCase(XK_THORN, &lowerKeySym, &upperKeySym);
+    if ((lowerKeySym != XK_thorn) || (upperKeySym != XK_THORN)) {
+	goto cleanup;
+    }
+    XConvertCase(XK_multiply, &lowerKeySym, &upperKeySym);
+    if ((lowerKeySym != XK_multiply) || (upperKeySym != XK_multiply)) {
+	goto cleanup;
+    }
+    upperKeySym = NoSymbol;
+    XConvertCase(XK_B, NULL, &upperKeySym);
+    if (upperKeySym != XK_B) {
+	goto cleanup;
+    }
+    lowerKeySym = NoSymbol;
+    XConvertCase(XK_b, &lowerKeySym, NULL);
+    if (lowerKeySym != XK_b) {
 	goto cleanup;
     }
     image16 = XCreateImage(&browserDisplay.display,

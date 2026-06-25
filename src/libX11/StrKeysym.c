@@ -1609,6 +1609,37 @@ BrowserShiftedAsciiKeySym(
     }
 }
 
+void
+XConvertCase(
+    KeySym sym,
+    KeySym *lowerReturn,
+    KeySym *upperReturn)
+{
+    KeySym lower = sym;
+    KeySym upper = sym;
+
+    if ((sym >= XK_A) && (sym <= XK_Z)) {
+	lower = sym + (XK_a - XK_A);
+    } else if ((sym >= XK_a) && (sym <= XK_z)) {
+	upper = sym - (XK_a - XK_A);
+    } else if ((sym >= XK_Agrave) && (sym <= XK_Odiaeresis)) {
+	lower = sym + (XK_agrave - XK_Agrave);
+    } else if ((sym >= XK_agrave) && (sym <= XK_odiaeresis)) {
+	upper = sym - (XK_agrave - XK_Agrave);
+    } else if ((sym >= XK_Ooblique) && (sym <= XK_Thorn)) {
+	lower = sym + (XK_oslash - XK_Ooblique);
+    } else if ((sym >= XK_oslash) && (sym <= XK_thorn)) {
+	upper = sym - (XK_oslash - XK_Ooblique);
+    }
+
+    if (lowerReturn != NULL) {
+	*lowerReturn = lower;
+    }
+    if (upperReturn != NULL) {
+	*upperReturn = upper;
+    }
+}
+
 unsigned int
 BrowserAsciiKeycodeFromKeySym(
     KeySym keySym)
