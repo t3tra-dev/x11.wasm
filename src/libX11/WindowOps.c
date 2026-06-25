@@ -1423,6 +1423,22 @@ XEqualRegion(
     return True;
 }
 
+static short
+BrowserRegionOffsetShort(
+    short value,
+    int delta)
+{
+    long result = (long)value + (long)delta;
+
+    if (result > SHRT_MAX) {
+	return SHRT_MAX;
+    }
+    if (result < SHRT_MIN) {
+	return SHRT_MIN;
+    }
+    return (short)result;
+}
+
 int
 XOffsetRegion(
     Region region,
@@ -1433,11 +1449,15 @@ XOffsetRegion(
     if ((regionPtr != NULL) && !regionPtr->empty) {
 	int i;
 
-	regionPtr->extents.x += (short)dx;
-	regionPtr->extents.y += (short)dy;
+	regionPtr->extents.x = BrowserRegionOffsetShort(
+		regionPtr->extents.x, dx);
+	regionPtr->extents.y = BrowserRegionOffsetShort(
+		regionPtr->extents.y, dy);
 	for (i = 0; i < regionPtr->rectCount; i++) {
-	    regionPtr->rects[i].x += (short)dx;
-	    regionPtr->rects[i].y += (short)dy;
+	    regionPtr->rects[i].x = BrowserRegionOffsetShort(
+		    regionPtr->rects[i].x, dx);
+	    regionPtr->rects[i].y = BrowserRegionOffsetShort(
+		    regionPtr->rects[i].y, dy);
 	}
     }
     return Success;

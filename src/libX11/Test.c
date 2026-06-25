@@ -1611,6 +1611,25 @@ X11WasmTestXlibApis(void)
 	    || !XEqualRegion(regionA, regionC)) {
 	goto cleanup;
     }
+    (void)XSubtractRegion(regionC, regionC, regionC);
+    BrowserSetRectangleBounds(&regionRect, 1, 2, 3, 4);
+    (void)XUnionRectWithRegion(&regionRect, regionC, regionC);
+    (void)XOffsetRegion(regionC, SHRT_MAX, SHRT_MAX);
+    (void)XClipBox(regionC, &regionRect);
+    if ((regionRect.x != SHRT_MAX) || (regionRect.y != SHRT_MAX)
+	    || (regionRect.width != 2) || (regionRect.height != 2)) {
+	goto cleanup;
+    }
+    (void)XSubtractRegion(regionC, regionC, regionC);
+    BrowserSetRectangleBounds(&regionRect, -1, -2, 1, 1);
+    (void)XUnionRectWithRegion(&regionRect, regionC, regionC);
+    (void)XOffsetRegion(regionC, SHRT_MIN, SHRT_MIN);
+    (void)XClipBox(regionC, &regionRect);
+    if ((regionRect.x != SHRT_MIN) || (regionRect.y != SHRT_MIN)
+	    || (regionRect.width != 2) || (regionRect.height != 3)) {
+	goto cleanup;
+    }
+    (void)XSubtractRegion(regionC, regionC, regionC);
     (void)XXorRegion(regionA, regionB, regionC);
     if (!XEmptyRegion(regionC)) {
 	goto cleanup;
