@@ -1,3 +1,4 @@
+#define XUTIL_DEFINE_FUNCTIONS
 #include "XlibInt.h"
 
 int
@@ -418,6 +419,66 @@ BrowserInitImageFuncs(
 }
 
 int
+XDestroyImage(
+    XImage *image)
+{
+    if ((image == NULL) || (image->f.destroy_image == NULL)) {
+	return Success;
+    }
+    return image->f.destroy_image(image);
+}
+
+unsigned long
+XGetPixel(
+    XImage *image,
+    int x,
+    int y)
+{
+    if ((image == NULL) || (image->f.get_pixel == NULL)) {
+	return 0;
+    }
+    return image->f.get_pixel(image, x, y);
+}
+
+int
+XPutPixel(
+    XImage *image,
+    int x,
+    int y,
+    unsigned long pixel)
+{
+    if ((image == NULL) || (image->f.put_pixel == NULL)) {
+	return 0;
+    }
+    return image->f.put_pixel(image, x, y, pixel);
+}
+
+XImage *
+XSubImage(
+    XImage *image,
+    int x,
+    int y,
+    unsigned int width,
+    unsigned int height)
+{
+    if ((image == NULL) || (image->f.sub_image == NULL)) {
+	return NULL;
+    }
+    return image->f.sub_image(image, x, y, width, height);
+}
+
+int
+XAddPixel(
+    XImage *image,
+    long value)
+{
+    if ((image == NULL) || (image->f.add_pixel == NULL)) {
+	return Success;
+    }
+    return image->f.add_pixel(image, value);
+}
+
+int
 BrowserImageDestroy(
     XImage *image)
 {
@@ -829,14 +890,25 @@ BrowserImageSubImage(
 {
     XImage *subImage;
     unsigned int ix, iy;
+    unsigned long dataLength;
 
+    if ((image == NULL) || (image->data == NULL)) {
+	return NULL;
+    }
     subImage = XCreateImage(NULL, NULL, (unsigned int)image->depth,
 	    image->format, 0, NULL, width, height, image->bitmap_pad, 0);
     if (subImage == NULL) {
 	return NULL;
     }
-    subImage->data = (char *)ckalloc(subImage->bytes_per_line * height);
-    memset(subImage->data, 0, subImage->bytes_per_line * height);
+    dataLength = (unsigned long)subImage->bytes_per_line
+	    * (unsigned long)subImage->height;
+    if ((subImage->bytes_per_line <= 0) || (subImage->height <= 0)
+	    || (dataLength > (unsigned long)INT_MAX)) {
+	(void)BrowserImageDestroy(subImage);
+	return NULL;
+    }
+    subImage->data = (char *)ckalloc((unsigned int)dataLength);
+    memset(subImage->data, 0, (unsigned int)dataLength);
     subImage->obdata = (XPointer)subImage;
     for (iy = 0; iy < height; iy++) {
 	for (ix = 0; ix < width; ix++) {

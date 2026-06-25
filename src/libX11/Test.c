@@ -1373,6 +1373,8 @@ X11WasmTestXlibApis(void)
     XImage *image16 = NULL;
     XImage *invalidFormatImage = NULL;
     XImage *bitmapImage = NULL;
+    XImage *subImage16 = NULL;
+    XImage *subBitmapImage = NULL;
     XImage *xyBitmapImage = NULL;
     XImage *xyBitmapReadback = NULL;
     XImage *textReadback = NULL;
@@ -2003,6 +2005,27 @@ X11WasmTestXlibApis(void)
 	    || (bitmapImageData[2] != 1U)) {
 	goto cleanup;
     }
+    subImage16 = XSubImage(image16, 1, 0, 2, 1);
+    subBitmapImage = XSubImage(bitmapImage, 16, 0, 1, 1);
+    if ((subImage16 == NULL) || (subBitmapImage == NULL)
+	    || (subImage16->width != 2) || (subImage16->height != 1)
+	    || (subImage16->bits_per_pixel != 16)
+	    || (subBitmapImage->width != 1) || (subBitmapImage->height != 1)
+	    || (subBitmapImage->bits_per_pixel != 1)
+	    || (XGetPixel(subImage16, 0, 0) != 0x07e0UL)
+	    || (XGetPixel(subImage16, 1, 0) != 0x001fUL)
+	    || (XGetPixel(subBitmapImage, 0, 0) != 1UL)
+	    || (XAddPixel(subImage16, 1) != Success)
+	    || (XAddPixel(subBitmapImage, 1) != Success)
+	    || (XGetPixel(subImage16, 0, 0) != 0x07e1UL)
+	    || (XGetPixel(subImage16, 1, 0) != 0x0020UL)
+	    || (XGetPixel(subBitmapImage, 0, 0) != 0UL)) {
+	goto cleanup;
+    }
+    (void)XDestroyImage(subImage16);
+    subImage16 = NULL;
+    (void)XDestroyImage(subBitmapImage);
+    subBitmapImage = NULL;
     memset(image16Data, 0, sizeof(image16Data));
     image16->byte_order = MSBFirst;
     image16->xoffset = 1;
@@ -4868,6 +4891,12 @@ cleanup:
     }
     if (bitmapImage != NULL) {
 	(void)XDestroyImage(bitmapImage);
+    }
+    if (subImage16 != NULL) {
+	(void)XDestroyImage(subImage16);
+    }
+    if (subBitmapImage != NULL) {
+	(void)XDestroyImage(subBitmapImage);
     }
     if (xyBitmapReadback != NULL) {
 	(void)XDestroyImage(xyBitmapReadback);
