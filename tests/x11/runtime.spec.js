@@ -460,7 +460,7 @@ test("XSynchronize updates browser synchronize metadata", async ({ page }) => {
   expect(state.afterOff.syncSerial).toBe(state.afterOn.syncSerial);
 });
 
-test.fixme("Xlib extension and error text compatibility APIs are stable", async ({
+test("Xlib extension and error text compatibility APIs are stable", async ({
   page,
 }) => {
   await page.goto("/x11.html");
