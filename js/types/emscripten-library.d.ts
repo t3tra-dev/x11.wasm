@@ -444,6 +444,11 @@ declare const Module: {
     window: number,
     enabled: number,
   ) => number;
+  _X11WasmTestSetWindowMetadataTargetProperty?: (
+    window: number,
+    target: number,
+    isRootToplevel: number,
+  ) => number;
   _X11WasmTestMapWindowWithInitialState?: (initialState: number) => number;
   _XGrabPointer?: (
     display: number,

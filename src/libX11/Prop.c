@@ -488,14 +488,14 @@ BrowserWindowIsRootToplevel(
     if (resourcePtr == NULL) {
 	return 0;
     }
-    if (resourcePtr->metadataIsRootToplevel) {
-	return 1;
+    if (resourcePtr->metadataRootToplevelSet) {
+	return resourcePtr->metadataIsRootToplevel ? 1 : 0;
     }
 
     target = BrowserWindowMetadataTarget(window);
     targetPtr = (target != window) ? BrowserWindowResource(target) : NULL;
-    if ((targetPtr != NULL) && targetPtr->metadataIsRootToplevel) {
-	return 1;
+    if ((targetPtr != NULL) && targetPtr->metadataRootToplevelSet) {
+	return targetPtr->metadataIsRootToplevel ? 1 : 0;
     }
     return resourcePtr->parent == browserDisplay.rootWindow;
 }
@@ -512,6 +512,91 @@ BrowserWindowMetadataTarget(
     }
     return ((topLevelPtr != NULL) && ((Window)topLevelPtr->id != None))
 	    ? (Window)topLevelPtr->id : window;
+}
+
+static Atom
+BrowserWindowMetadataTargetAtom(void)
+{
+    return XInternAtom(X11WasmGetDisplay(NULL), "_X11_WASM_METADATA_TARGET",
+	    False);
+}
+
+static Atom
+BrowserWindowMetadataRootToplevelAtom(void)
+{
+    return XInternAtom(X11WasmGetDisplay(NULL),
+	    "_X11_WASM_METADATA_ROOT_TOPLEVEL", False);
+}
+
+static void
+BrowserReapplyWindowMetadataProperties(
+    Window window,
+    X11WasmResource *resourcePtr)
+{
+    X11WasmProperty *propertyPtr;
+    Atom targetAtom = BrowserWindowMetadataTargetAtom();
+    Atom rootToplevelAtom = BrowserWindowMetadataRootToplevelAtom();
+
+    if (resourcePtr == NULL) {
+	return;
+    }
+    for (propertyPtr = resourcePtr->propertyList; propertyPtr != NULL;
+	    propertyPtr = propertyPtr->nextPtr) {
+	if ((propertyPtr->atom == targetAtom)
+		|| (propertyPtr->atom == rootToplevelAtom)) {
+	    continue;
+	}
+	BrowserApplyWindowMetadataProperty(window, propertyPtr->atom,
+		propertyPtr);
+    }
+}
+
+static int
+BrowserApplyWindowMetadataRoutingProperty(
+    Window window,
+    Atom property,
+    X11WasmProperty *propertyPtr)
+{
+    X11WasmResource *resourcePtr;
+    Atom targetAtom = BrowserWindowMetadataTargetAtom();
+    Atom rootToplevelAtom = BrowserWindowMetadataRootToplevelAtom();
+
+    if ((property != targetAtom) && (property != rootToplevelAtom)) {
+	return 0;
+    }
+    resourcePtr = BrowserWindowResource(window);
+    if (resourcePtr == NULL) {
+	return 1;
+    }
+    if (property == targetAtom) {
+	Window target = None;
+
+	if ((propertyPtr != NULL) && (propertyPtr->format == 32)
+		&& (propertyPtr->nitems > 0) && (propertyPtr->data != NULL)
+		&& ((propertyPtr->type == XA_WINDOW)
+			|| (propertyPtr->type == targetAtom))) {
+	    target = (Window)BrowserPropertyAtomAt(propertyPtr->data, 0);
+	    if ((target != None) && (BrowserWindowResource(target) == NULL)) {
+		target = None;
+	    }
+	}
+	resourcePtr->metadataTarget = target;
+    } else {
+	int isRootToplevel = 0;
+	int rootToplevelSet = 0;
+
+	if ((propertyPtr != NULL) && (propertyPtr->type == XA_CARDINAL)
+		&& (propertyPtr->format == 32) && (propertyPtr->nitems > 0)
+		&& (propertyPtr->data != NULL)) {
+	    isRootToplevel = BrowserPropertyAtomAt(propertyPtr->data, 0)
+		    ? 1 : 0;
+	    rootToplevelSet = 1;
+	}
+	resourcePtr->metadataRootToplevelSet = rootToplevelSet;
+	resourcePtr->metadataIsRootToplevel = isRootToplevel;
+    }
+    BrowserReapplyWindowMetadataProperties(window, resourcePtr);
+    return 1;
 }
 
 int
@@ -538,6 +623,7 @@ X11WasmSetWindowMetadataTarget(
 	return 0;
     }
     resourcePtr->metadataTarget = target;
+    resourcePtr->metadataRootToplevelSet = 1;
     resourcePtr->metadataIsRootToplevel = isRootToplevel ? 1 : 0;
     return 1;
 }
@@ -1540,6 +1626,10 @@ BrowserApplyWindowMetadataProperty(
     int nitems = (propertyPtr != NULL) ? (int)propertyPtr->nitems : 0;
     const unsigned char *data = (propertyPtr != NULL) ? propertyPtr->data : NULL;
 
+    if (BrowserApplyWindowMetadataRoutingProperty(window, property,
+	    propertyPtr)) {
+	return;
+    }
     if (property == XA_WM_NAME) {
 	BrowserSetWindowTitle(window,
 		(BrowserPropertyIsTextEncoding((Atom)type) && (format == 8)

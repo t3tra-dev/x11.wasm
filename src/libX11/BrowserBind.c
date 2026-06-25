@@ -541,6 +541,7 @@ X11WasmDeleteResource(
 	    aliasPtr = aliasPtr->nextPtr) {
 	if (aliasPtr->metadataTarget == (Window)id) {
 	    aliasPtr->metadataTarget = None;
+	    aliasPtr->metadataRootToplevelSet = 0;
 	    aliasPtr->metadataIsRootToplevel = 0;
 	}
     }

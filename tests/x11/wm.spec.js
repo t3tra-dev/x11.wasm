@@ -322,6 +322,98 @@ test("ICCCM setters update browser metadata through window properties", async ({
   });
 });
 
+test("metadata target properties forward ICCCM metadata to another window", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+  const [sourceId, targetId] = await createMappedWindows(page, 2);
+
+  const metadata = await page.evaluate(({ sourceId, targetId }) => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestSetWindowMetadataProperties?: Function, _X11WasmTestSetWindowMetadataTargetProperty?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    if (
+      !module?._X11WasmTestSetWindowMetadataProperties ||
+      !module._X11WasmTestSetWindowMetadataTargetProperty ||
+      !backend
+    ) {
+      throw new Error("missing metadata routing test hooks");
+    }
+
+    const targetResult = module._X11WasmTestSetWindowMetadataTargetProperty(
+      sourceId,
+      targetId,
+      1,
+    );
+    const metadataResult = module._X11WasmTestSetWindowMetadataProperties(
+      sourceId,
+      1,
+    );
+    backend.flush?.();
+    const rootDocumentTitle = document.title;
+    document.title = "non-root metadata title sentinel";
+    const nonRootTargetResult = module._X11WasmTestSetWindowMetadataTargetProperty(
+      sourceId,
+      targetId,
+      0,
+    );
+    backend.flush?.();
+    const nonRootDocumentTitle = document.title;
+
+    const source = backend.resources.get(sourceId);
+    const target = backend.resources.get(targetId);
+    const sourceElement = source?.element;
+    const targetElement = target?.element;
+    if (
+      !(sourceElement instanceof HTMLElement) ||
+      !(targetElement instanceof HTMLElement) ||
+      !source ||
+      !target
+    ) {
+      throw new Error("missing metadata routing test elements");
+    }
+    return {
+      documentTitle: rootDocumentTitle,
+      metadataResult,
+      nonRootDocumentTitle,
+      nonRootTargetResult,
+      source: {
+        command: source.command,
+        title: source.title,
+        titleAttr: sourceElement.getAttribute("data-x11-wasm-title"),
+      },
+      target: {
+        command: target.command,
+        commandAttr: targetElement.getAttribute("data-x11-wasm-command"),
+        title: target.title,
+        titleAttr: targetElement.getAttribute("data-x11-wasm-title"),
+      },
+      targetResult,
+    };
+  }, { sourceId, targetId });
+
+  expect(metadata).toEqual({
+    documentTitle: "X11Wasm Metadata Title",
+    metadataResult: 1,
+    nonRootDocumentTitle: "non-root metadata title sentinel",
+    nonRootTargetResult: 1,
+    source: {
+      command: "",
+      title: "",
+      titleAttr: null,
+    },
+    target: {
+      command: "x11wasm-test --metadata",
+      commandAttr: "x11wasm-test --metadata",
+      title: "X11Wasm Metadata Title",
+      titleAttr: "X11Wasm Metadata Title",
+    },
+    targetResult: 1,
+  });
+});
+
 test("browser backend reflects WM_HINTS relationships in DOM state", async ({
   page,
 }) => {

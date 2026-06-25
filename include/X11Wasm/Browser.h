@@ -57,6 +57,7 @@ typedef struct X11WasmResource {
     X11WasmProperty *propertyList;
     X11WasmColorEntry *colorList;
     Window metadataTarget;
+    int metadataRootToplevelSet;
     int metadataIsRootToplevel;
 } X11WasmResource;
 

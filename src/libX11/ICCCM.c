@@ -505,6 +505,40 @@ X11WasmTestSetWindowMetadataProperties(unsigned int window, int enabled)
     return 1;
 }
 
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestSetWindowMetadataTargetProperty(
+    unsigned int window,
+    unsigned int target,
+    int isRootToplevel)
+{
+    Atom targetAtom;
+    Atom rootToplevelAtom;
+    Window targetWindow = (Window)target;
+    unsigned int targetValue = target;
+    unsigned int rootToplevelValue = isRootToplevel ? 1U : 0U;
+
+    BrowserInitDisplay();
+    if (BrowserWindowResource((Window)window) == NULL) {
+	return 0;
+    }
+    if ((targetWindow != None) && (BrowserWindowResource(targetWindow) == NULL)) {
+	return 0;
+    }
+    targetAtom = XInternAtom(&browserDisplay.display,
+	    "_X11_WASM_METADATA_TARGET", False);
+    rootToplevelAtom = XInternAtom(&browserDisplay.display,
+	    "_X11_WASM_METADATA_ROOT_TOPLEVEL", False);
+    if ((XChangeProperty(&browserDisplay.display, (Window)window,
+	    rootToplevelAtom, XA_CARDINAL, 32, PropModeReplace,
+	    (const unsigned char *)&rootToplevelValue, 1) != Success)
+	    || (XChangeProperty(&browserDisplay.display, (Window)window, targetAtom,
+		    XA_WINDOW, 32, PropModeReplace,
+		    (const unsigned char *)&targetValue, 1) != Success)) {
+	return 0;
+    }
+    return 1;
+}
+
 void
 XSetWMSizeHints(
     Display *display,
