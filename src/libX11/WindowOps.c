@@ -1865,6 +1865,12 @@ XPutImage(
     if (!BrowserOptionalGCOrError(&display, gc, X11_WASM_XREQ_PUT_IMAGE)) {
 	return Success;
     }
+    if (!BrowserValidateCard16(&display, (long)width, 1,
+	    X11_WASM_XREQ_PUT_IMAGE)
+	    || !BrowserValidateCard16(&display, (long)height, 1,
+		    X11_WASM_XREQ_PUT_IMAGE)) {
+	return Success;
+    }
     if ((image != NULL) && !BrowserValueOrError(&display, image->format,
 	    BrowserImageFormatIsValid(image->format),
 	    X11_WASM_XREQ_PUT_IMAGE)) {

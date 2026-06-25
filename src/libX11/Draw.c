@@ -1,5 +1,17 @@
 #include "XlibInt.h"
 
+static int
+BrowserValidateDrawableDimensions(
+    Display **displayPtr,
+    unsigned int width,
+    unsigned int height,
+    unsigned char requestCode)
+{
+    return BrowserValidateCard16(displayPtr, (long)width, 1, requestCode)
+	    && BrowserValidateCard16(displayPtr, (long)height, 1,
+		    requestCode);
+}
+
 int XCopyArea(Display *d, Drawable s, Drawable t, GC g, int sx, int sy,
 	unsigned int w, unsigned int h, int dx, int dy)
 {
@@ -20,6 +32,10 @@ int XCopyArea(Display *d, Drawable s, Drawable t, GC g, int sx, int sy,
 	return Success;
     }
     if (!BrowserOptionalGCOrError(&d, g, X11_WASM_XREQ_COPY_AREA)) {
+	return Success;
+    }
+    if (!BrowserValidateDrawableDimensions(&d, w, h,
+	    X11_WASM_XREQ_COPY_AREA)) {
 	return Success;
     }
     BrowserApplyGCStyle(g);
@@ -51,6 +67,10 @@ int XCopyPlane(Display *d, Drawable s, Drawable t, GC g, int sx, int sy,
     if (!BrowserOptionalGCOrError(&d, g, X11_WASM_XREQ_COPY_PLANE)) {
 	return Success;
     }
+    if (!BrowserValidateDrawableDimensions(&d, w, h,
+	    X11_WASM_XREQ_COPY_PLANE)) {
+	return Success;
+    }
     BrowserApplyGCStyle(g);
     BrowserApplyGCClip(g);
     BrowserStorePixmapCopy(d, s, sourcePtr, targetPtr, g, sx, sy, w, h, dx,
@@ -76,6 +96,10 @@ int XDrawArc(Display *d, Drawable dr, GC g, int x, int y, unsigned int w,
 	return Success;
     }
     if (!BrowserOptionalGCOrError(&d, g, X11_WASM_XREQ_POLY_ARC)) {
+	return Success;
+    }
+    if (!BrowserValidateDrawableDimensions(&d, w, h,
+	    X11_WASM_XREQ_POLY_ARC)) {
 	return Success;
     }
     lineWidth = BrowserGCLineWidth(g);
@@ -226,6 +250,10 @@ int XDrawRectangle(Display *d, Drawable dr, GC g, int x, int y,
     if (!BrowserOptionalGCOrError(&d, g, X11_WASM_XREQ_POLY_RECTANGLE)) {
 	return Success;
     }
+    if (!BrowserValidateDrawableDimensions(&d, w, h,
+	    X11_WASM_XREQ_POLY_RECTANGLE)) {
+	return Success;
+    }
     BrowserApplyGCStyle(g);
     BrowserApplyGCClip(g);
     (void)X11WasmJsDrawRectangle(BrowserJsXId(dr), BrowserGCPixel(g), x, y,
@@ -283,6 +311,10 @@ int XFillArc(Display *d, Drawable dr, GC g, int x, int y, unsigned int w,
 	return Success;
     }
     if (!BrowserOptionalGCOrError(&d, g, X11_WASM_XREQ_POLY_FILL_ARC)) {
+	return Success;
+    }
+    if (!BrowserValidateDrawableDimensions(&d, w, h,
+	    X11_WASM_XREQ_POLY_FILL_ARC)) {
 	return Success;
     }
     pieSlice = (g == NULL) || (g->arc_mode == ArcPieSlice);
@@ -380,6 +412,10 @@ int XFillRectangle(Display *d, Drawable dr, GC g, int x, int y,
 	return Success;
     }
     if (!BrowserOptionalGCOrError(&d, g,
+	    X11_WASM_XREQ_POLY_FILL_RECTANGLE)) {
+	return Success;
+    }
+    if (!BrowserValidateDrawableDimensions(&d, w, h,
 	    X11_WASM_XREQ_POLY_FILL_RECTANGLE)) {
 	return Success;
     }

@@ -4393,8 +4393,10 @@ X11WasmTestXErrorHandler(void)
     int putImageResult;
     int copyAreaSourceResult;
     int copyAreaTargetResult;
+    int copyAreaSizeResult;
     int copyPlaneSourceResult;
     int copyPlaneTargetResult;
+    int copyPlaneSizeResult;
     int copyAreaDepthMismatchResult;
     int drawResultSum;
     int drawValueValidationResultSum;
@@ -4622,18 +4624,29 @@ X11WasmTestXErrorHandler(void)
     invalidFormatPutImageResult = XPutImage(&browserDisplay.display,
 	    (Drawable)browserDisplay.rootWindow, NULL, &invalidFormatPutImage,
 	    0, 0, 0, 0, 1, 1);
+    putImageResult += XPutImage(&browserDisplay.display,
+	    (Drawable)browserDisplay.rootWindow, NULL, &depthMismatchPutImage,
+	    0, 0, 0, 0, (unsigned int)USHRT_MAX + 1U, 1);
     copyAreaSourceResult = XCopyArea(&browserDisplay.display,
 	    (Drawable)invalidWindow, (Drawable)browserDisplay.rootWindow,
 	    NULL, 0, 0, 1, 1, 0, 0);
     copyAreaTargetResult = XCopyArea(&browserDisplay.display,
 	    (Drawable)browserDisplay.rootWindow, (Drawable)invalidWindow,
 	    NULL, 0, 0, 1, 1, 0, 0);
+    copyAreaSizeResult = XCopyArea(&browserDisplay.display,
+	    (Drawable)browserDisplay.rootWindow,
+	    (Drawable)browserDisplay.rootWindow, NULL, 0, 0,
+	    (unsigned int)USHRT_MAX + 1U, 1, 0, 0);
     copyPlaneSourceResult = XCopyPlane(&browserDisplay.display,
 	    (Drawable)invalidWindow, (Drawable)browserDisplay.rootWindow,
 	    NULL, 0, 0, 1, 1, 0, 0, 1);
     copyPlaneTargetResult = XCopyPlane(&browserDisplay.display,
 	    (Drawable)browserDisplay.rootWindow, (Drawable)invalidWindow,
 	    NULL, 0, 0, 1, 1, 0, 0, 1);
+    copyPlaneSizeResult = XCopyPlane(&browserDisplay.display,
+	    (Drawable)browserDisplay.rootWindow,
+	    (Drawable)browserDisplay.rootWindow, NULL, 0, 0, 1,
+	    (unsigned int)USHRT_MAX + 1U, 0, 0, 1);
     drawResultSum = XDrawPoint(&browserDisplay.display,
 	    (Drawable)invalidWindow, NULL, 0, 0);
     drawResultSum += XDrawLine(&browserDisplay.display,
@@ -4667,6 +4680,18 @@ X11WasmTestXErrorHandler(void)
     drawValueValidationResultSum += XFillPolygon(&browserDisplay.display,
 	    (Drawable)browserDisplay.rootWindow, NULL, points, 3, Convex,
 	    CoordModePrevious + 1);
+    drawValueValidationResultSum += XDrawRectangle(&browserDisplay.display,
+	    (Drawable)browserDisplay.rootWindow, NULL, 0, 0,
+	    (unsigned int)USHRT_MAX + 1U, 1);
+    drawValueValidationResultSum += XDrawArc(&browserDisplay.display,
+	    (Drawable)browserDisplay.rootWindow, NULL, 0, 0,
+	    (unsigned int)USHRT_MAX + 1U, 1, 0, 360 * 64);
+    drawValueValidationResultSum += XFillRectangle(&browserDisplay.display,
+	    (Drawable)browserDisplay.rootWindow, NULL, 0, 0, 1,
+	    (unsigned int)USHRT_MAX + 1U);
+    drawValueValidationResultSum += XFillArc(&browserDisplay.display,
+	    (Drawable)browserDisplay.rootWindow, NULL, 0, 0, 1,
+	    (unsigned int)USHRT_MAX + 1U, 0, 360 * 64);
     temporaryGC = XCreateGC(&browserDisplay.display,
 	    (Drawable)browserDisplay.rootWindow, 0, NULL);
     freeTemporaryGCResult = (temporaryGC != NULL)
@@ -5262,8 +5287,10 @@ X11WasmTestXErrorHandler(void)
 	    || (depthMismatchPutImageResult != Success)
 	    || (copyAreaSourceResult != Success)
 	    || (copyAreaTargetResult != Success)
+	    || (copyAreaSizeResult != Success)
 	    || (copyPlaneSourceResult != Success)
 	    || (copyPlaneTargetResult != Success)
+	    || (copyPlaneSizeResult != Success)
 	    || (drawResultSum != Success)
 	    || (drawValueValidationResultSum != Success)
 	    || (temporaryGC == NULL)
@@ -5367,8 +5394,11 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_PUT_IMAGE
 	    + X11_WASM_XREQ_PUT_IMAGE
 	    + X11_WASM_XREQ_PUT_IMAGE
+	    + X11_WASM_XREQ_PUT_IMAGE
 	    + X11_WASM_XREQ_COPY_AREA
 	    + X11_WASM_XREQ_COPY_AREA
+	    + X11_WASM_XREQ_COPY_AREA
+	    + X11_WASM_XREQ_COPY_PLANE
 	    + X11_WASM_XREQ_COPY_PLANE
 	    + X11_WASM_XREQ_COPY_PLANE
 	    + X11_WASM_XREQ_POLY_POINT
@@ -5385,6 +5415,10 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_POLY_POINT
 	    + X11_WASM_XREQ_FILL_POLY
 	    + X11_WASM_XREQ_FILL_POLY
+	    + X11_WASM_XREQ_POLY_RECTANGLE
+	    + X11_WASM_XREQ_POLY_ARC
+	    + X11_WASM_XREQ_POLY_FILL_RECTANGLE
+	    + X11_WASM_XREQ_POLY_FILL_ARC
 	    + X11_WASM_XREQ_CHANGE_GC
 	    + X11_WASM_XREQ_COPY_GC
 	    + X11_WASM_XREQ_COPY_GC
@@ -5590,15 +5624,15 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 198)
+    if ((browserTestXErrorCount != 205)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
 	    || (browserTestRequestCodeSum != expectedRequestCodeSum)
 	    || (browserTestRequestCodeMask != expectedRequestCodeMask)
-	    || (browserTestLastSerial != initialSerial + 198)
+	    || (browserTestLastSerial != initialSerial + 205)
 	    || (LastKnownRequestProcessed(&browserDisplay.display)
-		    != initialSerial + 198)) {
+		    != initialSerial + 205)) {
 	return 0;
     }
     return 1;
