@@ -57,6 +57,8 @@ typedef struct X11WasmResource {
     int hasBorderPixel;
     unsigned int cursorShape;
     int hasCursorImage;
+    unsigned int referenceCount;
+    int clientReleased;
     char *fontFamily;
     int fontPixelSize;
     int fontPointSize;

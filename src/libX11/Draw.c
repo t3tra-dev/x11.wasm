@@ -2620,7 +2620,7 @@ int XDefineCursor(Display *display, Window window, Cursor cursor)
 	    X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES) == NULL)) {
 	return Success;
     }
-    resourcePtr->atts.cursor = cursor;
+    BrowserSetWindowCursor(resourcePtr, cursor);
     BrowserSyncWindowStyle(resourcePtr);
     return Success;
 }
@@ -2635,14 +2635,16 @@ XUndefineCursor(
 
 int XFreeCursor(Display *display, Cursor cursor)
 {
-    if (BrowserCursorResourceOrError(&display, cursor,
-	    X11_WASM_XREQ_FREE_CURSOR) == NULL) {
+    X11WasmResource *resourcePtr;
+
+    resourcePtr = BrowserCursorResourceOrError(&display, cursor,
+	    X11_WASM_XREQ_FREE_CURSOR);
+    if (resourcePtr == NULL) {
 	return Success;
     }
-    if (browserDisplay.pointerGrabCursor == cursor) {
-	browserDisplay.pointerGrabCursor = None;
-	BrowserSyncPointerGrabCursor();
-	BrowserSyncPointerGrabState();
+    resourcePtr->clientReleased = 1;
+    if (resourcePtr->referenceCount > 0) {
+	return Success;
     }
     (void)X11WasmJsDestroyResource(BrowserJsXId(cursor));
     X11WasmDeleteResource(cursor);

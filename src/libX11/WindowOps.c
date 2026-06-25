@@ -283,7 +283,7 @@ XCloseDisplay(
 	BrowserResetHostAccessControl();
 	browserDisplay.pointerGrabWindow = None;
 	browserDisplay.pointerGrabConfineWindow = None;
-	browserDisplay.pointerGrabCursor = None;
+	BrowserSetPointerGrabCursor(None);
 	browserDisplay.pointerGrabEventMask = 0;
 	browserDisplay.pointerGrabOwnerEvents = 0;
 	browserDisplay.pointerGrabPointerMode = GrabModeAsync;

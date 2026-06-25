@@ -666,6 +666,15 @@ X11WasmResource *BrowserCursorResourceOrError(
     unsigned char requestCode);
 unsigned int BrowserCursorShape(
     Cursor cursor);
+void BrowserRetainCursor(
+    Cursor cursor);
+void BrowserReleaseCursor(
+    Cursor cursor);
+void BrowserSetPointerGrabCursor(
+    Cursor cursor);
+void BrowserSetWindowCursor(
+    X11WasmResource *resourcePtr,
+    Cursor cursor);
 void BrowserDStringAppendHexByte(
     X11WasmDString *dsPtr,
     unsigned char byte);

@@ -935,7 +935,7 @@ BrowserApplyWindowAttributes(
 	resourcePtr->atts.colormap = atts->colormap;
     }
     if (mask & CWCursor) {
-	resourcePtr->atts.cursor = atts->cursor;
+	BrowserSetWindowCursor(resourcePtr, atts->cursor);
     }
 }
 
@@ -1076,6 +1076,78 @@ BrowserCursorShape(
 	return BrowserJsXId(cursorPtr->id);
     }
     return cursorPtr->cursorShape;
+}
+
+void
+BrowserRetainCursor(
+    Cursor cursor)
+{
+    X11WasmResource *cursorPtr;
+
+    if (cursor == None) {
+	return;
+    }
+    cursorPtr = X11WasmFindResource((XID)cursor);
+    if ((cursorPtr == NULL) || (cursorPtr->type != X11_WASM_RESOURCE_CURSOR)) {
+	return;
+    }
+    cursorPtr->referenceCount++;
+}
+
+void
+BrowserReleaseCursor(
+    Cursor cursor)
+{
+    X11WasmResource *cursorPtr;
+
+    if (cursor == None) {
+	return;
+    }
+    cursorPtr = X11WasmFindResource((XID)cursor);
+    if ((cursorPtr == NULL) || (cursorPtr->type != X11_WASM_RESOURCE_CURSOR)) {
+	return;
+    }
+    if (cursorPtr->referenceCount > 0) {
+	cursorPtr->referenceCount--;
+    }
+    if (cursorPtr->clientReleased && (cursorPtr->referenceCount == 0)) {
+	(void)X11WasmJsDestroyResource(BrowserJsXId(cursor));
+	X11WasmDeleteResource((XID)cursor);
+    }
+}
+
+void
+BrowserSetPointerGrabCursor(
+    Cursor cursor)
+{
+    Cursor oldCursor = browserDisplay.pointerGrabCursor;
+
+    if (oldCursor == cursor) {
+	return;
+    }
+    BrowserRetainCursor(cursor);
+    browserDisplay.pointerGrabCursor = cursor;
+    BrowserReleaseCursor(oldCursor);
+}
+
+void
+BrowserSetWindowCursor(
+    X11WasmResource *resourcePtr,
+    Cursor cursor)
+{
+    Cursor oldCursor;
+
+    if ((resourcePtr == NULL)
+	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)) {
+	return;
+    }
+    oldCursor = resourcePtr->atts.cursor;
+    if (oldCursor == cursor) {
+	return;
+    }
+    BrowserRetainCursor(cursor);
+    resourcePtr->atts.cursor = cursor;
+    BrowserReleaseCursor(oldCursor);
 }
 
 void

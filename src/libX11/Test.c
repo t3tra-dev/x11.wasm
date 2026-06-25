@@ -1344,6 +1344,7 @@ X11WasmTestXlibApis(void)
     Window destroyedGrandchildWindow = None;
     Window simpleWindow = None;
     Window inputOnlyWindow = None;
+    Window cursorWindow = None;
     Window invalidInputOnlyWindow = None;
     Window gravityParentWindow = None;
     Window gravitySouthEastWindow = None;
@@ -1522,6 +1523,7 @@ X11WasmTestXlibApis(void)
     GC queryGC = NULL;
     GC textGC = NULL;
     Cursor testCursor = None;
+    Cursor releasedCursor = None;
     XCharStruct textExtents;
     XTextItem textItems[3];
     XTextItem16 textItems16[2];
@@ -5507,12 +5509,47 @@ X11WasmTestXlibApis(void)
 	    || (BrowserCursorShape(testCursor) != XC_watch)
 	    || (XDefineCursor(&browserDisplay.display, window, testCursor)
 		    != Success)
-	    || (XUndefineCursor(&browserDisplay.display, window) != Success)
-	    || (X11WasmFindResource(window)->atts.cursor != None)) {
+	    || (X11WasmFindResource(window)->atts.cursor != testCursor)) {
 	goto cleanup;
     }
-    (void)XFreeCursor(&browserDisplay.display, testCursor);
+    if ((XFreeCursor(&browserDisplay.display, testCursor) != Success)
+	    || (X11WasmFindResource(testCursor) == NULL)
+	    || (BrowserCursorShape(testCursor) != XC_watch)
+	    || (X11WasmFindResource(window)->atts.cursor != testCursor)) {
+	goto cleanup;
+    }
+    if ((XUndefineCursor(&browserDisplay.display, window) != Success)
+	    || (X11WasmFindResource(window)->atts.cursor != None)
+	    || (X11WasmFindResource(testCursor) != NULL)) {
+	goto cleanup;
+    }
     testCursor = None;
+    cursorWindow = XCreateSimpleWindow(&browserDisplay.display,
+	    browserDisplay.rootWindow, 0, 0, 1, 1, 0, 0, 0);
+    testCursor = XCreateFontCursor(&browserDisplay.display, XC_watch);
+    if ((cursorWindow == None) || (testCursor == None)
+	    || (XDefineCursor(&browserDisplay.display, cursorWindow,
+		    testCursor) != Success)
+	    || (X11WasmFindResource(cursorWindow)->atts.cursor != testCursor)) {
+	goto cleanup;
+    }
+    releasedCursor = testCursor;
+    if ((XFreeCursor(&browserDisplay.display, releasedCursor) != Success)
+	    || (X11WasmFindResource(releasedCursor) == NULL)) {
+	goto cleanup;
+    }
+    testCursor = None;
+    destroyedWindow = cursorWindow;
+    if (XDestroyWindow(&browserDisplay.display, cursorWindow) != Success) {
+	goto cleanup;
+    }
+    cursorWindow = None;
+    if ((X11WasmFindResource(destroyedWindow) != NULL)
+	    || (X11WasmFindResource(releasedCursor) != NULL)) {
+	goto cleanup;
+    }
+    destroyedWindow = None;
+    releasedCursor = None;
     cursorFont = XLoadFont(&browserDisplay.display, "cursor");
     cursorMaskFont = XLoadFont(&browserDisplay.display, "cursor");
     parsedColor.red = 0xffff;
@@ -6102,6 +6139,9 @@ cleanup:
     }
     if (inputOnlyWindow != None) {
 	(void)XDestroyWindow(&browserDisplay.display, inputOnlyWindow);
+    }
+    if (cursorWindow != None) {
+	(void)XDestroyWindow(&browserDisplay.display, cursorWindow);
     }
     if (invalidInputOnlyWindow != None) {
 	(void)XDestroyWindow(&browserDisplay.display, invalidInputOnlyWindow);

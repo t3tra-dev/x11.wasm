@@ -479,7 +479,8 @@ BrowserCursorResourceOrError(
     }
     resourcePtr = X11WasmFindResource((XID)cursor);
     if ((resourcePtr == NULL)
-	    || (resourcePtr->type != X11_WASM_RESOURCE_CURSOR)) {
+	    || (resourcePtr->type != X11_WASM_RESOURCE_CURSOR)
+	    || resourcePtr->clientReleased) {
 	(void)BrowserReportXError(display, BadCursor, (XID)cursor,
 		requestCode, 0);
 	return NULL;

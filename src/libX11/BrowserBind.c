@@ -536,6 +536,8 @@ X11WasmDeleteResource(
 {
     X11WasmResource **linkPtr;
     X11WasmResource *aliasPtr;
+    Cursor pointerGrabCursorToRelease = None;
+    Cursor windowCursorToRelease = None;
 
     BrowserInitDisplay();
     for (aliasPtr = browserDisplay.resourceList; aliasPtr != NULL;
@@ -581,6 +583,7 @@ X11WasmDeleteResource(
 		browserDisplay.pointerGrabConfineWindow = None;
 		browserDisplay.pointerGrabOwnerEvents = 0;
 		browserDisplay.pointerGrabEventMask = 0;
+		pointerGrabCursorToRelease = browserDisplay.pointerGrabCursor;
 		browserDisplay.pointerGrabCursor = None;
 		browserDisplay.pointerGrabPointerMode = GrabModeAsync;
 		browserDisplay.pointerGrabKeyboardMode = GrabModeAsync;
@@ -597,6 +600,10 @@ X11WasmDeleteResource(
 		browserDisplay.keyboardGrabKeyboardMode = GrabModeAsync;
 		BrowserSyncKeyboardGrabState();
 	    }
+	    if (resourcePtr->type == X11_WASM_RESOURCE_WINDOW) {
+		windowCursorToRelease = resourcePtr->atts.cursor;
+		resourcePtr->atts.cursor = None;
+	    }
 	    BrowserDeleteSelectionOwnersForWindow((Window)id);
 	    BrowserFreePixmapBacking(resourcePtr);
 	    if (resourcePtr->bitmapData != NULL) {
@@ -609,6 +616,8 @@ X11WasmDeleteResource(
 	    BrowserFreeColorList(resourcePtr);
 	    *linkPtr = resourcePtr->nextPtr;
 	    ckfree(resourcePtr);
+	    BrowserReleaseCursor(pointerGrabCursorToRelease);
+	    BrowserReleaseCursor(windowCursorToRelease);
 	    return;
 	}
 	linkPtr = &resourcePtr->nextPtr;

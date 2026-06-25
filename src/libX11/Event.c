@@ -843,7 +843,7 @@ XGrabPointer(
     browserDisplay.pointerGrabOwnerEvents = ownerEvents ? 1 : 0;
     browserDisplay.pointerGrabEventMask = eventMask;
     browserDisplay.pointerGrabConfineWindow = confineTo;
-    browserDisplay.pointerGrabCursor = cursor;
+    BrowserSetPointerGrabCursor(cursor);
     browserDisplay.pointerGrabPointerMode = pointerMode;
     browserDisplay.pointerGrabKeyboardMode = keyboardMode;
     browserDisplay.pointerGrabTime = BrowserRequestEffectiveTime(time);
@@ -939,7 +939,7 @@ XChangeActivePointerGrab(
     if ((display == &browserDisplay.display)
 	    && (browserDisplay.pointerGrabWindow != None)) {
 	browserDisplay.pointerGrabEventMask = eventMask;
-	browserDisplay.pointerGrabCursor = cursor;
+	BrowserSetPointerGrabCursor(cursor);
 	BrowserSyncPointerGrabCursor();
 	BrowserSyncPointerGrabState();
     }
@@ -1132,7 +1132,7 @@ XUngrabPointer(
     browserDisplay.pointerGrabOwnerEvents = 0;
     browserDisplay.pointerGrabEventMask = 0;
     browserDisplay.pointerGrabConfineWindow = None;
-    browserDisplay.pointerGrabCursor = None;
+    BrowserSetPointerGrabCursor(None);
     browserDisplay.pointerGrabPointerMode = GrabModeAsync;
     browserDisplay.pointerGrabKeyboardMode = GrabModeAsync;
     browserDisplay.pointerGrabTime = effectiveTime;
