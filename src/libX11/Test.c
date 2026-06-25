@@ -221,6 +221,9 @@ X11WasmTestEventQueueAndKeycodeApis(void)
     int accelNumerator = -1;
     int accelDenominator = -1;
     int motionEventCount = -1;
+    Time firstMotionTime = 1000;
+    Time secondMotionTime = 1010;
+    Time thirdMotionTime = 1020;
     int pointerThreshold = -1;
     int minKeycode = -1;
     int maxKeycode = -1;
@@ -228,6 +231,8 @@ X11WasmTestEventQueueAndKeycodeApis(void)
     BrowserInitDisplay();
     display = &browserDisplay.display;
     BrowserClearEventQueue();
+    browserDisplay.motionHistoryStart = 0;
+    browserDisplay.motionHistoryCount = 0;
 
     if (XDisplayKeycodes(display, &minKeycode, &maxKeycode) != Success) {
 	return 10;
@@ -424,6 +429,38 @@ X11WasmTestEventQueueAndKeycodeApis(void)
     if ((motionEvents != NULL) || (motionEventCount != 0)) {
 	return 101;
     }
+    if (!X11WasmQueuePointerEvent(MotionNotify, browserDisplay.rootWindow, 0,
+	    0, 11, 13, firstMotionTime)
+	    || !X11WasmQueuePointerEvent(MotionNotify, browserDisplay.rootWindow,
+		    0, 0, 21, 23, secondMotionTime)
+	    || !X11WasmQueuePointerEvent(MotionNotify, browserDisplay.rootWindow,
+		    0, 0, 31, 33, thirdMotionTime)) {
+	return 102;
+    }
+    motionEventCount = -1;
+    motionEvents = XGetMotionEvents(display, browserDisplay.rootWindow,
+	    secondMotionTime, thirdMotionTime, &motionEventCount);
+    if ((motionEvents == NULL) || (motionEventCount != 2)
+	    || (motionEvents[0].time != secondMotionTime)
+	    || (motionEvents[0].x != 21) || (motionEvents[0].y != 23)
+	    || (motionEvents[1].time != thirdMotionTime)
+	    || (motionEvents[1].x != 31) || (motionEvents[1].y != 33)) {
+	if (motionEvents != NULL) {
+	    XFree(motionEvents);
+	}
+	return 103;
+    }
+    XFree(motionEvents);
+    motionEventCount = -1;
+    motionEvents = XGetMotionEvents(display, browserDisplay.rootWindow,
+	    firstMotionTime + 1, secondMotionTime - 1, &motionEventCount);
+    if ((motionEvents != NULL) || (motionEventCount != 0)) {
+	if (motionEvents != NULL) {
+	    XFree(motionEvents);
+	}
+	return 104;
+    }
+    BrowserClearEventQueue();
 
     memset(&firstEvent, 0, sizeof(firstEvent));
     firstEvent.type = ClientMessage;
@@ -1743,7 +1780,8 @@ X11WasmTestXlibApis(void)
 	    || (XMaxRequestSize(&browserDisplay.display) != 65535L)
 	    || (XMaxRequestSize(NULL) != 65535L)
 	    || (XExtendedMaxRequestSize(&browserDisplay.display) != 0L)
-	    || (XDisplayMotionBufferSize(&browserDisplay.display) != 0UL)
+	    || (XDisplayMotionBufferSize(&browserDisplay.display)
+		    != X11_WASM_MOTION_BUFFER_SIZE)
 	    || (XAllPlanes() != AllPlanes)
 	    || (XNextRequest(&browserDisplay.display)
 		    != NextRequest(&browserDisplay.display))

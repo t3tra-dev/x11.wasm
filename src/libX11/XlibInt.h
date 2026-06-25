@@ -1376,6 +1376,10 @@ Time BrowserRequestEffectiveTime(
 int BrowserRequestTimeIsValid(
     Time time,
     Time lastChangeTime);
+void BrowserRecordPointerMotion(
+    int rootX,
+    int rootY,
+    Time time);
 void BrowserResetHostAccessControl(void);
 int BrowserResizeRoot(
     unsigned int width,

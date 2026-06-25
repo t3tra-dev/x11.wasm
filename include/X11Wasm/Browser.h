@@ -11,6 +11,7 @@
 
 #define X11_WASM_MODIFIER_COUNT 8
 #define X11_WASM_MODIFIER_MAP_MAX_KEYPERMOD 8
+#define X11_WASM_MOTION_BUFFER_SIZE 64
 
 typedef enum {
     X11_WASM_RESOURCE_WINDOW,
@@ -79,6 +80,12 @@ typedef struct X11WasmHostEntry {
     char *address;
 } X11WasmHostEntry;
 
+typedef struct X11WasmMotionRecord {
+    Time time;
+    int rootX;
+    int rootY;
+} X11WasmMotionRecord;
+
 typedef struct X11WasmDisplayState {
     Display display;
     Screen screen;
@@ -137,6 +144,9 @@ typedef struct X11WasmDisplayState {
     int pointerX;
     int pointerY;
     unsigned int pointerState;
+    int motionHistoryStart;
+    int motionHistoryCount;
+    X11WasmMotionRecord motionHistory[X11_WASM_MOTION_BUFFER_SIZE];
     int pointerAccelNumerator;
     int pointerAccelDenominator;
     int pointerThreshold;

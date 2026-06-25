@@ -1574,6 +1574,43 @@ XSetPointerMapping(
     return MappingSuccess;
 }
 
+void
+BrowserRecordPointerMotion(
+    int rootX,
+    int rootY,
+    Time time)
+{
+    int index;
+
+    BrowserInitDisplay();
+    if (time == CurrentTime) {
+	time = eventTime;
+    }
+    if (browserDisplay.motionHistoryCount < X11_WASM_MOTION_BUFFER_SIZE) {
+	index = (browserDisplay.motionHistoryStart
+		+ browserDisplay.motionHistoryCount)
+		% X11_WASM_MOTION_BUFFER_SIZE;
+	browserDisplay.motionHistoryCount++;
+    } else {
+	index = browserDisplay.motionHistoryStart;
+	browserDisplay.motionHistoryStart =
+		(browserDisplay.motionHistoryStart + 1)
+		% X11_WASM_MOTION_BUFFER_SIZE;
+    }
+    browserDisplay.motionHistory[index].time = time;
+    browserDisplay.motionHistory[index].rootX = rootX;
+    browserDisplay.motionHistory[index].rootY = rootY;
+}
+
+static int
+BrowserMotionEventInRange(
+    Time time,
+    Time start,
+    Time stop)
+{
+    return (time >= start) && (time <= stop);
+}
+
 XTimeCoord *
 XGetMotionEvents(
     Display *display,
@@ -1582,8 +1619,11 @@ XGetMotionEvents(
     Time stop,
     int *neventsReturn)
 {
-    (void)start;
-    (void)stop;
+    XTimeCoord *events;
+    int count = 0;
+    int i;
+    int out = 0;
+
     if (display == NULL) {
 	display = X11WasmGetDisplay(NULL);
     } else {
@@ -1596,8 +1636,50 @@ XGetMotionEvents(
 	    X11_WASM_XREQ_GET_MOTION_EVENTS) == NULL) {
 	return NULL;
     }
+    if ((display != &browserDisplay.display)
+	    || (browserDisplay.motionHistoryCount == 0)
+	    || (start > stop)) {
+	(void)XNoOp(display);
+	return NULL;
+    }
+    for (i = 0; i < browserDisplay.motionHistoryCount; i++) {
+	int index = (browserDisplay.motionHistoryStart + i)
+		% X11_WASM_MOTION_BUFFER_SIZE;
+	X11WasmMotionRecord *recordPtr =
+		&browserDisplay.motionHistory[index];
+
+	if (BrowserMotionEventInRange(recordPtr->time, start, stop)) {
+	    count++;
+	}
+    }
+    if (count == 0) {
+	(void)XNoOp(display);
+	return NULL;
+    }
+    events = (XTimeCoord *)ckalloc(sizeof(XTimeCoord) * (size_t)count);
+    for (i = 0; i < browserDisplay.motionHistoryCount; i++) {
+	int index = (browserDisplay.motionHistoryStart + i)
+		% X11_WASM_MOTION_BUFFER_SIZE;
+	X11WasmMotionRecord *recordPtr =
+		&browserDisplay.motionHistory[index];
+	int x;
+	int y;
+
+	if (!BrowserMotionEventInRange(recordPtr->time, start, stop)) {
+	    continue;
+	}
+	BrowserWindowCoordinatesFromRoot(window, recordPtr->rootX,
+		recordPtr->rootY, &x, &y);
+	events[out].time = recordPtr->time;
+	events[out].x = BrowserClampShort(x);
+	events[out].y = BrowserClampShort(y);
+	out++;
+    }
+    if (neventsReturn != NULL) {
+	*neventsReturn = count;
+    }
     (void)XNoOp(display);
-    return NULL;
+    return events;
 }
 
 int

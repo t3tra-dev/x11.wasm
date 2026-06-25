@@ -138,6 +138,7 @@ BrowserInitDisplay(void)
     state->display.nformats = 2;
     state->display.pixmap_format = state->pixmapFormats;
     state->display.max_request_size = 65535U;
+    state->display.motion_buffer = X11_WASM_MOTION_BUFFER_SIZE;
     state->display.release = 1;
     state->display.display_name = (char *)"browser";
     state->display.default_screen = 0;

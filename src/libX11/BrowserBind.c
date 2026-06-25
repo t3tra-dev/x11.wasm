@@ -221,6 +221,7 @@ X11WasmQueuePointerEvent(
 	event.xmotion.state = state;
 	event.xmotion.is_hint = NotifyNormal;
 	event.xmotion.same_screen = True;
+	BrowserRecordPointerMotion(rootX, rootY, event.xmotion.time);
     } else {
 	event.xbutton.root = browserDisplay.rootWindow;
 	event.xbutton.subwindow = None;
