@@ -583,7 +583,7 @@ int BrowserConvertUtf8ListToEncoding(
     int count,
     Atom encoding,
     char ***convertedListPtr);
-XImage *BrowserConvertXYBitmapForPut(
+XImage *BrowserConvertImageForPut(
     X11WasmResource *resourcePtr,
     GC gc,
     XImage *image,
@@ -1015,6 +1015,8 @@ int BrowserImageDestroy(
     XImage *image);
 int BrowserImageFormatIsValid(
     int format);
+int BrowserImageStorageLength(
+    XImage *image);
 unsigned long BrowserImageGetPixel(
     XImage *image,
     int x,

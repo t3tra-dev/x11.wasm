@@ -2621,8 +2621,8 @@ XCreateImage(
 	    && (imageBitmapPad != 32)) {
 	return NULL;
     }
-    bitsPerPixel = BrowserImageBitsPerPixel(depth);
-    if (format == XYBitmap) {
+    bitsPerPixel = (format == ZPixmap) ? BrowserImageBitsPerPixel(depth) : 1;
+    if ((format == XYBitmap) || (format == XYPixmap)) {
 	xyBitsPerLine = (unsigned long long)width
 		+ (unsigned long long)offset;
 	if (xyBitsPerLine > (unsigned long long)INT_MAX) {
@@ -2721,7 +2721,7 @@ BrowserPutImageDrawableMatches(
 }
 
 XImage *
-BrowserConvertXYBitmapForPut(
+BrowserConvertImageForPut(
     X11WasmResource *resourcePtr,
     GC gc,
     XImage *image,
@@ -2736,8 +2736,32 @@ BrowserConvertXYBitmapForPut(
     unsigned long background;
     unsigned int x, y;
 
-    if ((image == NULL) || (image->format != XYBitmap)) {
+    if ((image == NULL)
+	    || ((image->format != XYBitmap) && (image->format != XYPixmap))) {
 	return image;
+    }
+    convertedImage = XCreateImage(NULL, NULL, resourcePtr->depth, ZPixmap, 0,
+	    NULL, width, height, 32, 0);
+    if (convertedImage == NULL) {
+	return NULL;
+    }
+    dataLength = BrowserImageStorageLength(convertedImage);
+    if (dataLength <= 0) {
+	(void)XDestroyImage(convertedImage);
+	return NULL;
+    }
+    convertedImage->data = (char *)ckalloc((unsigned int)dataLength);
+    memset(convertedImage->data, 0, (unsigned int)dataLength);
+    convertedImage->obdata = (XPointer)convertedImage;
+    if (image->format == XYPixmap) {
+	for (y = 0; y < height; y++) {
+	    for (x = 0; x < width; x++) {
+		(void)BrowserImagePutPixel(convertedImage, (int)x, (int)y,
+			BrowserImageGetPixel(image, srcX + (int)x,
+				srcY + (int)y));
+	    }
+	}
+	return convertedImage;
     }
     if (gc != NULL) {
 	foreground = gc->foreground;
@@ -2749,19 +2773,6 @@ BrowserConvertXYBitmapForPut(
 	foreground = 0UL;
 	background = 0xffffffUL;
     }
-    convertedImage = XCreateImage(NULL, NULL, resourcePtr->depth, ZPixmap, 0,
-	    NULL, width, height, 32, 0);
-    if (convertedImage == NULL) {
-	return NULL;
-    }
-    dataLength = convertedImage->bytes_per_line * convertedImage->height;
-    if (dataLength <= 0) {
-	(void)XDestroyImage(convertedImage);
-	return NULL;
-    }
-    convertedImage->data = (char *)ckalloc((unsigned int)dataLength);
-    memset(convertedImage->data, 0, (unsigned int)dataLength);
-    convertedImage->obdata = (XPointer)convertedImage;
     for (y = 0; y < height; y++) {
 	for (x = 0; x < width; x++) {
 	    unsigned long pixel = BrowserImageGetPixel(image,
@@ -2814,15 +2825,51 @@ XGetImage(
     imagePtr = XCreateImage(display, DefaultVisual(display, DefaultScreen(display)),
 	    depth, format, 0, NULL, width, height, 32, 0);
     if (imagePtr != NULL) {
-	dataLength = imagePtr->bytes_per_line * (int)height;
+	dataLength = BrowserImageStorageLength(imagePtr);
+	if (dataLength <= 0) {
+	    (void)XDestroyImage(imagePtr);
+	    return NULL;
+	}
 	imagePtr->data = (char *)ckalloc((unsigned int)dataLength);
 	memset(imagePtr->data, 0, (unsigned int)dataLength);
 	imagePtr->obdata = (XPointer)imagePtr;
 	if (!BrowserReadPixmapBacking(resourcePtr, imagePtr, x, y, width,
 		height)) {
-	    (void)X11WasmJsGetImage(BrowserJsXId(drawable), x, y, width,
-		    height, imagePtr->data, dataLength,
-		    imagePtr->bytes_per_line, imagePtr->bits_per_pixel);
+	    if (format == XYPixmap) {
+		XImage *zImagePtr = XCreateImage(display,
+			DefaultVisual(display, DefaultScreen(display)), depth,
+			ZPixmap, 0, NULL, width, height, 32, 0);
+		unsigned int ix, iy;
+		int zDataLength;
+
+		if (zImagePtr == NULL) {
+		    (void)XDestroyImage(imagePtr);
+		    return NULL;
+		}
+		zDataLength = BrowserImageStorageLength(zImagePtr);
+		if (zDataLength <= 0) {
+		    (void)XDestroyImage(zImagePtr);
+		    (void)XDestroyImage(imagePtr);
+		    return NULL;
+		}
+		zImagePtr->data = (char *)ckalloc((unsigned int)zDataLength);
+		memset(zImagePtr->data, 0, (unsigned int)zDataLength);
+		zImagePtr->obdata = (XPointer)zImagePtr;
+		(void)X11WasmJsGetImage(BrowserJsXId(drawable), x, y, width,
+			height, zImagePtr->data, zDataLength,
+			zImagePtr->bytes_per_line, zImagePtr->bits_per_pixel);
+		for (iy = 0; iy < height; iy++) {
+		    for (ix = 0; ix < width; ix++) {
+			(void)BrowserImagePutPixel(imagePtr, (int)ix, (int)iy,
+				BrowserImageGetPixel(zImagePtr, (int)ix, (int)iy));
+		    }
+		}
+		(void)XDestroyImage(zImagePtr);
+	    } else {
+		(void)X11WasmJsGetImage(BrowserJsXId(drawable), x, y, width,
+			height, imagePtr->data, dataLength,
+			imagePtr->bytes_per_line, imagePtr->bits_per_pixel);
+	    }
 	}
 	BrowserImageApplyPlaneMask(imagePtr, planeMask);
     }
@@ -2916,7 +2963,7 @@ XPutImage(
     }
     BrowserApplyGCStyle(gc);
     BrowserApplyGCClip(gc);
-    putImage = BrowserConvertXYBitmapForPut(resourcePtr, gc, image,
+    putImage = BrowserConvertImageForPut(resourcePtr, gc, image,
 	    srcX, srcY, width, height);
     if (putImage == NULL) {
 	return Success;

@@ -48,11 +48,32 @@ int
 BrowserImageDataLength(
     XImage *image)
 {
-    if ((image == NULL) || (image->data == NULL)
-	    || (image->bytes_per_line <= 0) || (image->height <= 0)) {
+    if ((image == NULL) || (image->data == NULL)) {
 	return 0;
     }
-    return image->bytes_per_line * image->height;
+    return BrowserImageStorageLength(image);
+}
+
+int
+BrowserImageStorageLength(
+    XImage *image)
+{
+    unsigned long long byteCount;
+    unsigned long long planes = 1;
+
+    if ((image == NULL) || (image->bytes_per_line <= 0)
+	    || (image->height <= 0)) {
+	return 0;
+    }
+    if (image->format == XYPixmap) {
+	if (image->depth <= 0) {
+	    return 0;
+	}
+	planes = (unsigned long long)image->depth;
+    }
+    byteCount = (unsigned long long)image->bytes_per_line
+	    * (unsigned long long)image->height * planes;
+    return (byteCount <= (unsigned long long)INT_MAX) ? (int)byteCount : 0;
 }
 
 int
@@ -530,6 +551,36 @@ BrowserImageGetPixel(
     if (pixelX < 0) {
 	return 0;
     }
+    if (image->format == XYPixmap) {
+	unsigned long planeStride;
+	int depthLimit = image->depth;
+
+	if ((image->bytes_per_line <= 0) || (image->height <= 0)
+		|| (depthLimit <= 0)) {
+	    return 0;
+	}
+	if (depthLimit > (int)(sizeof(unsigned long) * CHAR_BIT)) {
+	    depthLimit = (int)(sizeof(unsigned long) * CHAR_BIT);
+	}
+	planeStride = (unsigned long)image->bytes_per_line
+		* (unsigned long)image->height;
+	for (i = 0; i < depthLimit; i++) {
+	    unsigned long bitOffset = (unsigned long)y
+		    * (unsigned long)image->bytes_per_line * 8UL
+		    + (unsigned long)pixelX;
+	    unsigned long byteOffset = (unsigned long)i * planeStride
+		    + (bitOffset >> 3);
+	    unsigned char byte = ((unsigned char *)image->data)[byteOffset];
+	    unsigned char mask = (image->bitmap_bit_order == MSBFirst)
+		    ? (unsigned char)(0x80U >> (bitOffset & 7U))
+		    : (unsigned char)(1U << (bitOffset & 7U));
+
+	    if (byte & mask) {
+		pixel |= 1UL << i;
+	    }
+	}
+	return pixel;
+    }
     if (image->bits_per_pixel == 1) {
 	unsigned int bitOffset = (unsigned int)y
 		* (unsigned int)image->bytes_per_line * 8U
@@ -556,7 +607,7 @@ BrowserImageGetPixel(
 	    pixel = (pixel << 8) | pixelPtr[i];
 	}
     }
-    return pixel;
+    return pixel & BrowserDepthPlaneMask((unsigned int)image->depth);
 }
 
 int
@@ -579,6 +630,38 @@ BrowserImagePutPixel(
     pixelX = image->xoffset + x;
     if (pixelX < 0) {
 	return 0;
+    }
+    if (image->format == XYPixmap) {
+	unsigned long planeStride;
+	int depthLimit = image->depth;
+
+	if ((image->bytes_per_line <= 0) || (image->height <= 0)
+		|| (depthLimit <= 0)) {
+	    return 0;
+	}
+	if (depthLimit > (int)(sizeof(unsigned long) * CHAR_BIT)) {
+	    depthLimit = (int)(sizeof(unsigned long) * CHAR_BIT);
+	}
+	planeStride = (unsigned long)image->bytes_per_line
+		* (unsigned long)image->height;
+	for (i = 0; i < depthLimit; i++) {
+	    unsigned long bitOffset = (unsigned long)y
+		    * (unsigned long)image->bytes_per_line * 8UL
+		    + (unsigned long)pixelX;
+	    unsigned long byteOffset = (unsigned long)i * planeStride
+		    + (bitOffset >> 3);
+	    unsigned char *bytePtr = (unsigned char *)image->data + byteOffset;
+	    unsigned char mask = (image->bitmap_bit_order == MSBFirst)
+		    ? (unsigned char)(0x80U >> (bitOffset & 7U))
+		    : (unsigned char)(1U << (bitOffset & 7U));
+
+	    if (pixel & (1UL << i)) {
+		*bytePtr |= mask;
+	    } else {
+		*bytePtr &= (unsigned char)~mask;
+	    }
+	}
+	return Success;
     }
     if (image->bits_per_pixel == 1) {
 	unsigned int bitOffset = (unsigned int)y
@@ -625,7 +708,7 @@ BrowserImageApplyPlaneMask(
     if ((image == NULL) || (image->data == NULL) || (planeMask == AllPlanes)) {
 	return;
     }
-    if (image->bits_per_pixel == 1) {
+    if ((image->format != XYPixmap) && (image->bits_per_pixel == 1)) {
 	if ((planeMask & 1UL) == 0) {
 	    memset(image->data, 0,
 		    (size_t)image->bytes_per_line * (size_t)image->height);
@@ -927,10 +1010,8 @@ BrowserImageSubImage(
     if (subImage == NULL) {
 	return NULL;
     }
-    dataLength = (unsigned long)subImage->bytes_per_line
-	    * (unsigned long)subImage->height;
-    if ((subImage->bytes_per_line <= 0) || (subImage->height <= 0)
-	    || (dataLength > (unsigned long)INT_MAX)) {
+    dataLength = (unsigned long)BrowserImageStorageLength(subImage);
+    if (dataLength == 0UL) {
 	(void)BrowserImageDestroy(subImage);
 	return NULL;
     }
