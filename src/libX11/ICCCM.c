@@ -1919,13 +1919,16 @@ XStoreBuffer(
     int nbytes,
     int buffer)
 {
-    Atom property = BrowserCutBufferAtom(buffer);
+    Atom property;
 
-    if (property == None) {
-	return Success;
-    }
     if (display == NULL) {
 	display = X11WasmGetDisplay(NULL);
+    }
+    property = BrowserCutBufferAtom(buffer);
+    if (property == None) {
+	(void)BrowserPropertyValueOrError(&display, (XID)buffer,
+		X11_WASM_XREQ_CHANGE_PROPERTY);
+	return Success;
     }
     return XChangeProperty(display,
 	    RootWindow(display, DefaultScreen(display)), property, XA_STRING, 8,

@@ -6399,6 +6399,8 @@ X11WasmTestXErrorHandler(void)
     int rotateWindowValidationResultSum;
     int sawRotateWindowBadMatch;
     int sawRotateWindowDuplicateBadMatch;
+    int storeBufferValidationResult;
+    int sawStoreBufferBadValue;
     int invalidFetchBufferLength = -1;
     char *invalidFetchBuffer = NULL;
     int sawFetchBufferBadValue;
@@ -6562,6 +6564,7 @@ X11WasmTestXErrorHandler(void)
     sawReconfigureBadValue = 0;
     sawIconifyBadValue = 0;
     sawWithdrawBadValue = 0;
+    sawStoreBufferBadValue = 0;
 
     oldHandler = XSetErrorHandler(BrowserTestXErrorHandler);
     createPixmapResult = XCreatePixmap(&browserDisplay.display,
@@ -7276,6 +7279,11 @@ X11WasmTestXErrorHandler(void)
 	    && (browserTestLastRequestCode
 		    == X11_WASM_XREQ_ROTATE_PROPERTIES)
 	    && (browserTestLastResourceId == (XID)validProperty);
+    storeBufferValidationResult = XStoreBuffer(&browserDisplay.display,
+	    "invalid", 7, 8);
+    sawStoreBufferBadValue = (browserTestLastErrorCode == BadValue)
+	    && (browserTestLastRequestCode == X11_WASM_XREQ_CHANGE_PROPERTY)
+	    && (browserTestLastResourceId == (XID)8);
     invalidFetchBuffer = XFetchBuffer(&browserDisplay.display,
 	    &invalidFetchBufferLength, 8);
     sawFetchBufferBadValue = (invalidFetchBuffer == NULL)
@@ -7485,6 +7493,8 @@ X11WasmTestXErrorHandler(void)
 	    || (rotateWindowValidationResultSum != Success)
 	    || !sawRotateWindowBadMatch
 	    || !sawRotateWindowDuplicateBadMatch
+	    || (storeBufferValidationResult != Success)
+	    || !sawStoreBufferBadValue
 	    || !sawFetchBufferBadValue
 	    || (invalidAtomName != NULL)
 	    || (invalidAtomNamesResult != False)
@@ -7716,6 +7726,7 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_ROTATE_PROPERTIES
 	    + X11_WASM_XREQ_ROTATE_PROPERTIES
+	    + X11_WASM_XREQ_CHANGE_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
@@ -7780,7 +7791,7 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 232)
+    if ((browserTestXErrorCount != 233)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
