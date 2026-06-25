@@ -939,6 +939,73 @@ XGetScreenSaver(
     return XNoOp(display);
 }
 
+Bool
+XScreenSaverQueryExtension(
+    Display *display,
+    int *eventBaseReturn,
+    int *errorBaseReturn)
+{
+    return XQueryExtension(display, ScreenSaverName, NULL, eventBaseReturn,
+	    errorBaseReturn);
+}
+
+Status
+XScreenSaverQueryVersion(
+    Display *display,
+    int *majorVersionReturn,
+    int *minorVersionReturn)
+{
+    (void)display;
+    if (majorVersionReturn != NULL) {
+	*majorVersionReturn = ScreenSaverMajorVersion;
+    }
+    if (minorVersionReturn != NULL) {
+	*minorVersionReturn = ScreenSaverMinorVersion;
+    }
+    return True;
+}
+
+XScreenSaverInfo *
+XScreenSaverAllocInfo(void)
+{
+    XScreenSaverInfo *infoPtr;
+
+    infoPtr = (XScreenSaverInfo *)ckalloc(sizeof(XScreenSaverInfo));
+    memset(infoPtr, 0, sizeof(XScreenSaverInfo));
+    return infoPtr;
+}
+
+Status
+XScreenSaverQueryInfo(
+    Display *display,
+    Drawable drawable,
+    XScreenSaverInfo *infoPtr)
+{
+    X11WasmResource *resourcePtr;
+    unsigned long idle;
+    unsigned long timeout;
+
+    if (infoPtr == NULL) {
+	return False;
+    }
+    resourcePtr = BrowserDrawableResourceOrError(&display, drawable,
+	    X11_WASM_XREQ_GET_SCREEN_SAVER);
+    if (resourcePtr == NULL) {
+	return False;
+    }
+    idle = (unsigned long)X11WasmJsGetUserIdleTime();
+    timeout = (unsigned long)browserDisplay.screenSaverTimeout * 1000UL;
+    memset(infoPtr, 0, sizeof(*infoPtr));
+    infoPtr->window = (Window)resourcePtr->id;
+    infoPtr->state = (browserDisplay.screenSaverTimeout == 0)
+	    ? ScreenSaverDisabled : ScreenSaverOff;
+    infoPtr->kind = ScreenSaverInternal;
+    infoPtr->til_or_since = (timeout > idle) ? (timeout - idle) : 0UL;
+    infoPtr->idle = idle;
+    infoPtr->eventMask = 0;
+    return True;
+}
+
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestSetScreenSaverSettings(int enabled)
 {

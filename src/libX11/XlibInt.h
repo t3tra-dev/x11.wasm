@@ -22,6 +22,7 @@
 
 #include <X11/Xatom.h>
 #include <X11/cursorfont.h>
+#include <X11/extensions/scrnsaver.h>
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #else
@@ -144,6 +145,7 @@
 #define X11_WASM_XREQ_FORCE_SCREEN_SAVER 115
 #define X11_WASM_EXTENSION_NAME "X11-WASM"
 #define X11_WASM_EXTENSION_MAJOR_OPCODE 128
+#define X11_WASM_SCREENSAVER_MAJOR_OPCODE 129
 #define X11_WASM_INPUT_ONLY_WINDOW_ATTR_MASK \
 	(CWWinGravity | CWEventMask | CWDontPropagate | CWOverrideRedirect \
 	| CWCursor)

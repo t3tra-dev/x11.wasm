@@ -49,6 +49,11 @@
     return X11WasmBridge.call("forceScreenSaver", [mode]) | 0;
   },
 
+  X11WasmJsGetUserIdleTime__deps: ["$X11WasmBridge"],
+  X11WasmJsGetUserIdleTime: function () {
+    return X11WasmBridge.call("getUserIdleTime", []) | 0;
+  },
+
   X11WasmJsSetScreenSaverSettings__deps: ["$X11WasmBridge"],
   X11WasmJsSetScreenSaverSettings: function (
     timeout,

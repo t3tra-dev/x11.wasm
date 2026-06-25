@@ -203,6 +203,12 @@ const X11WasmExtensionInfo browserExtensions[] = {
 	X11_WASM_EXTENSION_MAJOR_OPCODE,
 	0,
 	0
+    },
+    {
+	ScreenSaverName,
+	X11_WASM_SCREENSAVER_MAJOR_OPCODE,
+	0,
+	0
     }
 };
 const size_t browserExtensionCount = sizeof(browserExtensions) / sizeof(browserExtensions[0]);

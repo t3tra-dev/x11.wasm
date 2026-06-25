@@ -219,6 +219,7 @@ extern int X11WasmJsSetRequestState(unsigned int requestSerial,
 	unsigned int flushSerial, unsigned int syncSerial);
 extern int X11WasmJsBell(int percent);
 extern int X11WasmJsForceScreenSaver(int mode);
+extern int X11WasmJsGetUserIdleTime(void);
 extern int X11WasmJsSetScreenSaverSettings(int timeout, int interval,
 	int preferBlanking, int allowExposures);
 extern int X11WasmJsSetHostAccessControl(int enabled,
@@ -545,6 +546,9 @@ X11WasmJsSetRequestState(unsigned int requestSerial,
 static inline int
 X11WasmJsSetSynchronizeState(int enabled)
 { (void)enabled; return 0; }
+static inline int
+X11WasmJsGetUserIdleTime(void)
+{ return 0; }
 static inline int
 X11WasmJsMeasureText(int fontPixelSize, const char *fontFamily,
 	const char *utf8, int utf8Length)

@@ -135,6 +135,8 @@ interface X11WasmBackend {
   screenWakeLockStatus: string;
   screenWakeLockError: string;
   screenWakeLockType: string;
+  recordUserActivity(): void;
+  getUserIdleTime(): number;
   hostAccessEnabled: boolean;
   hostAccessList: string;
   hostAccessHosts: X11WasmHostAccessEntry[];

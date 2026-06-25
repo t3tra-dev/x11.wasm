@@ -732,6 +732,9 @@ X11WasmTestXlibApis(void)
     int screenSaverInterval = -1;
     int screenSaverPreferBlanking = -1;
     int screenSaverAllowExposures = -1;
+    int screenSaverMajor = -1;
+    int screenSaverMinor = -1;
+    XScreenSaverInfo *screenSaverInfo = NULL;
     int screen;
     int result = 0;
     Bool hostAccessEnabled = False;
@@ -1117,11 +1120,35 @@ X11WasmTestXlibApis(void)
 	    || (firstEvent != 0) || (firstError != 0)) {
 	return 0;
     }
+    majorOpcode = firstEvent = firstError = -1;
+    if (XScreenSaverQueryExtension(&browserDisplay.display, &firstEvent,
+	    &firstError) != True) {
+	return 0;
+    }
+    if ((firstEvent != 0) || (firstError != 0)) {
+	return 0;
+    }
+    if (XQueryExtension(&browserDisplay.display, ScreenSaverName,
+	    &majorOpcode, &firstEvent, &firstError) != True) {
+	return 0;
+    }
+    if ((majorOpcode != X11_WASM_SCREENSAVER_MAJOR_OPCODE)
+	    || (firstEvent != 0) || (firstError != 0)) {
+	return 0;
+    }
+    if ((XScreenSaverQueryVersion(&browserDisplay.display, &screenSaverMajor,
+	    &screenSaverMinor) != True)
+	    || (screenSaverMajor != ScreenSaverMajorVersion)
+	    || (screenSaverMinor != ScreenSaverMinorVersion)) {
+	return 0;
+    }
     extensionList = XListExtensions(&browserDisplay.display, &extensionCount);
-    if ((extensionList == NULL) || (extensionCount != 1)
+    if ((extensionList == NULL) || (extensionCount != 2)
 	    || (extensionList[0] == NULL)
 	    || (strcmp(extensionList[0], X11_WASM_EXTENSION_NAME) != 0)
-	    || (extensionList[1] != NULL)) {
+	    || (extensionList[1] == NULL)
+	    || (strcmp(extensionList[1], ScreenSaverName) != 0)
+	    || (extensionList[2] != NULL)) {
 	goto cleanup;
     }
     XFreeExtensionList(extensionList);
@@ -3716,6 +3743,16 @@ X11WasmTestXlibApis(void)
 	    || (screenSaverAllowExposures != AllowExposures)) {
 	goto cleanup;
     }
+    screenSaverInfo = XScreenSaverAllocInfo();
+    if ((screenSaverInfo == NULL)
+	    || (XScreenSaverQueryInfo(&browserDisplay.display,
+		    browserDisplay.rootWindow, screenSaverInfo) != True)
+	    || (screenSaverInfo->window != browserDisplay.rootWindow)
+	    || (screenSaverInfo->state != ScreenSaverOff)
+	    || (screenSaverInfo->kind != ScreenSaverInternal)
+	    || (screenSaverInfo->til_or_since != 120000UL)) {
+	goto cleanup;
+    }
     (void)XGrabServer(&browserDisplay.display);
     if (browserDisplay.serverGrabDepth != 1) {
 	goto cleanup;
@@ -3768,6 +3805,9 @@ X11WasmTestXlibApis(void)
 cleanup:
     if (extensionList != NULL) {
 	XFreeExtensionList(extensionList);
+    }
+    if (screenSaverInfo != NULL) {
+	XFree(screenSaverInfo);
     }
     if (stringList != NULL) {
 	XFreeStringList(stringList);

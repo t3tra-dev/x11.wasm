@@ -47,6 +47,7 @@
       "flush",
       "focusInput",
       "forceScreenSaver",
+      "getUserIdleTime",
       "getImage",
       "getRootHeight",
       "getRootWidth",

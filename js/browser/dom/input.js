@@ -372,6 +372,7 @@
       this.listenersInstalled = true;
 
       root.addEventListener("pointerdown", (event) => {
+        this.recordUserActivity();
         void this.syncExternalClipboardText();
         const inputWasFocused = document.activeElement === input;
         this.queuePointerEvent(BUTTON_PRESS, event);
@@ -385,11 +386,13 @@
         event.preventDefault();
       });
       root.addEventListener("pointerup", (event) => {
+        this.recordUserActivity();
         this.queuePointerEvent(BUTTON_RELEASE, event);
         this.releasePointer(root, event);
         event.preventDefault();
       });
       root.addEventListener("pointermove", (event) => {
+        this.recordUserActivity();
         this.queuePointerEvent(MOTION_NOTIFY, event);
       });
       root.addEventListener("pointerover", (event) => {
@@ -401,6 +404,7 @@
       root.addEventListener(
         "wheel",
         (event) => {
+          this.recordUserActivity();
           this.queueWheelEvent(event);
           event.preventDefault();
         },
@@ -431,22 +435,28 @@
         this.queueFocusEvent(FOCUS_OUT, eventTime(event.timeStamp));
       });
       input.addEventListener("keydown", (event) => {
+        this.recordUserActivity();
         void this.syncExternalClipboardText();
         this.handleKeyDown(event);
       });
       input.addEventListener("keyup", (event) => {
+        this.recordUserActivity();
         this.handleKeyUp(event);
       });
       input.addEventListener("compositionstart", (event) => {
+        this.recordUserActivity();
         this.startComposition(event.data || "");
       });
       input.addEventListener("compositionupdate", (event) => {
+        this.recordUserActivity();
         this.updateComposition(event.data || "");
       });
       input.addEventListener("compositionend", (event) => {
+        this.recordUserActivity();
         this.endComposition(event.data || "");
       });
       input.addEventListener("beforeinput", (event) => {
+        this.recordUserActivity();
         this.handleBeforeInput(event);
       });
       input.addEventListener("paste", (event) => {

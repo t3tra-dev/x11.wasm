@@ -272,7 +272,7 @@
       this.lastScreenSaverMode = normalizedMode;
       if (normalizedMode === 0) {
         this.screenSaverResetCount += 1;
-        this.lastUserActivityTime = Date.now();
+        this.recordUserActivity();
       }
       this.updateScreenWakeLock();
       this.applyRootScreenSaverState();
@@ -292,6 +292,21 @@
         );
       }
       return 0;
+    },
+
+    recordUserActivity() {
+      this.lastUserActivityTime = Date.now();
+      this.applyRootScreenSaverState();
+    },
+
+    /**
+     * @returns {number}
+     */
+    getUserIdleTime() {
+      if (!this.lastUserActivityTime) {
+        return 0;
+      }
+      return Math.max(0, Math.trunc(Date.now() - this.lastUserActivityTime));
     },
 
     /**

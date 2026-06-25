@@ -60,6 +60,7 @@ build $x11wasm_xlib_common_deps: phony $
   $x11wasm_root/include/X11/XlibWasm.h $
   $x11wasm_root/include/X11/Xutil.h $
   $x11wasm_root/include/X11/cursorfont.h $
+  $x11wasm_root/include/X11/extensions/scrnsaver.h $
   $x11wasm_root/include/X11/keysym.h $
   $x11wasm_root/include/X11/keysymdef.h $
   $x11wasm_root/include/X11Wasm/Browser.h $
