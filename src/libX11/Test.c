@@ -1400,6 +1400,16 @@ X11WasmTestXlibApis(void)
     XVisualInfo matchedVisualInfo;
     Atom *propertyAtoms = NULL;
     int propertyAtomCount = -1;
+    Atom rotatePropertyAtoms[3];
+    Atom rotateActualType = None;
+    int rotateActualFormat = 0;
+    unsigned long rotateNitems = 0;
+    unsigned long rotateBytesAfter = 0;
+    unsigned char *rotatePropertyData = NULL;
+    char *fetchedCutBuffer = NULL;
+    int cutBufferLength = -1;
+    int cutBufferIndex;
+    char cutBufferValues[8] = {'0', '1', '2', '3', '4', '5', '6', '7'};
     Atom standardColormapAtom = None;
     X11WasmProperty *netWmStateProperty = NULL;
     X11WasmResource *stateWindowPtr = NULL;
@@ -4689,6 +4699,86 @@ X11WasmTestXlibApis(void)
     XFree(propertyAtoms);
     propertyAtoms = NULL;
 
+    rotatePropertyAtoms[0] = XInternAtom(&browserDisplay.display,
+	    "_X11_WASM_TEST_ROTATE_A", False);
+    rotatePropertyAtoms[1] = XInternAtom(&browserDisplay.display,
+	    "_X11_WASM_TEST_ROTATE_B", False);
+    rotatePropertyAtoms[2] = XInternAtom(&browserDisplay.display,
+	    "_X11_WASM_TEST_ROTATE_C", False);
+    if ((rotatePropertyAtoms[0] == None) || (rotatePropertyAtoms[1] == None)
+	    || (rotatePropertyAtoms[2] == None)
+	    || (XChangeProperty(&browserDisplay.display, window,
+		    rotatePropertyAtoms[0], XA_STRING, 8, PropModeReplace,
+		    (const unsigned char *)"a", 1) != Success)
+	    || (XChangeProperty(&browserDisplay.display, window,
+		    rotatePropertyAtoms[1], XA_STRING, 8, PropModeReplace,
+		    (const unsigned char *)"b", 1) != Success)
+	    || (XChangeProperty(&browserDisplay.display, window,
+		    rotatePropertyAtoms[2], XA_STRING, 8, PropModeReplace,
+		    (const unsigned char *)"c", 1) != Success)
+	    || (XRotateWindowProperties(&browserDisplay.display, window,
+		    rotatePropertyAtoms, 3, 1) != Success)
+	    || (XGetWindowProperty(&browserDisplay.display, window,
+		    rotatePropertyAtoms[0], 0, 1, False, XA_STRING,
+		    &rotateActualType, &rotateActualFormat, &rotateNitems,
+		    &rotateBytesAfter, &rotatePropertyData) != Success)
+	    || (rotateActualType != XA_STRING) || (rotateActualFormat != 8)
+	    || (rotateNitems != 1) || (rotateBytesAfter != 0)
+	    || (rotatePropertyData == NULL) || (rotatePropertyData[0] != 'c')) {
+	goto cleanup;
+    }
+    XFree(rotatePropertyData);
+    rotatePropertyData = NULL;
+    if ((XGetWindowProperty(&browserDisplay.display, window,
+		    rotatePropertyAtoms[1], 0, 1, False, XA_STRING,
+		    &rotateActualType, &rotateActualFormat, &rotateNitems,
+		    &rotateBytesAfter, &rotatePropertyData) != Success)
+	    || (rotateActualType != XA_STRING) || (rotateActualFormat != 8)
+	    || (rotateNitems != 1) || (rotateBytesAfter != 0)
+	    || (rotatePropertyData == NULL) || (rotatePropertyData[0] != 'a')) {
+	goto cleanup;
+    }
+    XFree(rotatePropertyData);
+    rotatePropertyData = NULL;
+
+    if (XStoreBytes(&browserDisplay.display, "alpha", 5) != Success) {
+	goto cleanup;
+    }
+    fetchedCutBuffer = XFetchBytes(&browserDisplay.display,
+	    &cutBufferLength);
+    if ((fetchedCutBuffer == NULL) || (cutBufferLength != 5)
+	    || (memcmp(fetchedCutBuffer, "alpha", 5) != 0)) {
+	goto cleanup;
+    }
+    XFree(fetchedCutBuffer);
+    fetchedCutBuffer = NULL;
+    for (cutBufferIndex = 0; cutBufferIndex < 8; cutBufferIndex++) {
+	if (XStoreBuffer(&browserDisplay.display,
+		cutBufferValues + cutBufferIndex, 1, cutBufferIndex)
+		!= Success) {
+	    goto cleanup;
+	}
+    }
+    if (XRotateBuffers(&browserDisplay.display, 2) != Success) {
+	goto cleanup;
+    }
+    fetchedCutBuffer = XFetchBuffer(&browserDisplay.display,
+	    &cutBufferLength, 0);
+    if ((fetchedCutBuffer == NULL) || (cutBufferLength != 1)
+	    || (fetchedCutBuffer[0] != '6')) {
+	goto cleanup;
+    }
+    XFree(fetchedCutBuffer);
+    fetchedCutBuffer = NULL;
+    fetchedCutBuffer = XFetchBuffer(&browserDisplay.display,
+	    &cutBufferLength, 2);
+    if ((fetchedCutBuffer == NULL) || (cutBufferLength != 1)
+	    || (fetchedCutBuffer[0] != '0')) {
+	goto cleanup;
+    }
+    XFree(fetchedCutBuffer);
+    fetchedCutBuffer = NULL;
+
     stateWindowPtr = X11WasmFindResource(window);
     netWmStateAtom = BrowserNetWmStateAtom();
     maxVertAtom = XInternAtom(&browserDisplay.display,
@@ -5391,6 +5481,12 @@ cleanup:
     if (propertyAtoms != NULL) {
 	XFree(propertyAtoms);
     }
+    if (rotatePropertyData != NULL) {
+	XFree(rotatePropertyData);
+    }
+    if (fetchedCutBuffer != NULL) {
+	XFree(fetchedCutBuffer);
+    }
     if (fetchedName != NULL) {
 	XFree(fetchedName);
     }
@@ -5732,6 +5828,12 @@ X11WasmTestXErrorHandler(void)
     int getNegativeOffsetResult;
     int getNegativeLengthResult;
     int getDeletePropertyResult;
+    int rotateWindowValidationResultSum;
+    int sawRotateWindowBadMatch;
+    int sawRotateWindowDuplicateBadMatch;
+    int invalidFetchBufferLength = -1;
+    char *invalidFetchBuffer = NULL;
+    int sawFetchBufferBadValue;
     int invalidAtomNamesResult;
     int sawGeometryBadDrawable;
     int sawWarpPointerBadValue;
@@ -5825,6 +5927,7 @@ X11WasmTestXErrorHandler(void)
     Atom validSelection;
     Atom invalidAtom = (Atom)0x7fffffedUL;
     Atom invalidAtomList[2];
+    Atom rotateErrorAtoms[2];
     Atom atomPropertyValue = XA_WM_NAME;
     unsigned long colorPixel = 0;
     unsigned long invalidGCMask = 1UL << 30;
@@ -6580,6 +6683,36 @@ X11WasmTestXErrorHandler(void)
 	XFree(largeLengthPropertyData);
 	largeLengthPropertyData = NULL;
     }
+    rotateErrorAtoms[0] = validProperty;
+    rotateErrorAtoms[1] = XInternAtom(&browserDisplay.display,
+	    "_X11_WASM_MISSING_ROTATE_PROPERTY", False);
+    rotateWindowValidationResultSum = XRotateWindowProperties(
+	    &browserDisplay.display, browserDisplay.rootWindow,
+	    rotateErrorAtoms, 2, 1);
+    sawRotateWindowBadMatch = (browserTestLastErrorCode == BadMatch)
+	    && (browserTestLastRequestCode
+		    == X11_WASM_XREQ_ROTATE_PROPERTIES)
+	    && (browserTestLastResourceId == (XID)rotateErrorAtoms[1]);
+    rotateErrorAtoms[1] = validProperty;
+    rotateWindowValidationResultSum += XRotateWindowProperties(
+	    &browserDisplay.display, browserDisplay.rootWindow,
+	    rotateErrorAtoms, 2, 1);
+    sawRotateWindowDuplicateBadMatch =
+	    (browserTestLastErrorCode == BadMatch)
+	    && (browserTestLastRequestCode
+		    == X11_WASM_XREQ_ROTATE_PROPERTIES)
+	    && (browserTestLastResourceId == (XID)validProperty);
+    invalidFetchBuffer = XFetchBuffer(&browserDisplay.display,
+	    &invalidFetchBufferLength, 8);
+    sawFetchBufferBadValue = (invalidFetchBuffer == NULL)
+	    && (invalidFetchBufferLength == 0)
+	    && (browserTestLastErrorCode == BadValue)
+	    && (browserTestLastRequestCode == X11_WASM_XREQ_GET_PROPERTY)
+	    && (browserTestLastResourceId == (XID)8);
+    if (invalidFetchBuffer != NULL) {
+	XFree(invalidFetchBuffer);
+	invalidFetchBuffer = NULL;
+    }
     propertyValidationResultSum += XChangeProperty(&browserDisplay.display,
 	    browserDisplay.rootWindow, BrowserWmProtocolsAtom(), XA_ATOM, 32,
 	    PropModeReplace, (const unsigned char *)&invalidAtom, 1);
@@ -6770,6 +6903,10 @@ X11WasmTestXErrorHandler(void)
 	    || (getNegativeOffsetResult != BadValue)
 	    || (getNegativeLengthResult != BadValue)
 	    || (getDeletePropertyResult != BadValue)
+	    || (rotateWindowValidationResultSum != Success)
+	    || !sawRotateWindowBadMatch
+	    || !sawRotateWindowDuplicateBadMatch
+	    || !sawFetchBufferBadValue
 	    || (invalidAtomName != NULL)
 	    || (invalidAtomNamesResult != False)
 	    || (invalidAtomNames[0] != NULL)
@@ -6986,6 +7123,9 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_CHANGE_PROPERTY
 	    + X11_WASM_XREQ_DELETE_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
+	    + X11_WASM_XREQ_ROTATE_PROPERTIES
+	    + X11_WASM_XREQ_ROTATE_PROPERTIES
+	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
@@ -7044,15 +7184,15 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 218)
+    if ((browserTestXErrorCount != 221)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
 	    || (browserTestRequestCodeSum != expectedRequestCodeSum)
 	    || (browserTestRequestCodeMask != expectedRequestCodeMask)
-	    || (browserTestLastSerial != initialSerial + 218)
+	    || (browserTestLastSerial != initialSerial + 221)
 	    || (LastKnownRequestProcessed(&browserDisplay.display)
-		    != initialSerial + 218)) {
+		    != initialSerial + 221)) {
 	return 0;
     }
     return 1;

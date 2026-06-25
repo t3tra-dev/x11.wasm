@@ -193,6 +193,8 @@ EXTERN Pixmap XCreatePixmapFromBitmapData(Display *display, Drawable d,
 	unsigned long fg, unsigned long bg, unsigned int depth);
 EXTERN int XDefineCursor(Display *d, Window w, Cursor c);
 EXTERN int XDeleteProperty(Display *d, Window w, Atom a);
+EXTERN char *XFetchBuffer(Display *d, int *i, int i2);
+EXTERN char *XFetchBytes(Display *d, int *i);
 EXTERN int XDestroySubwindows(Display *d, Window w);
 EXTERN int XDestroyWindow(Display *d, Window w);
 	EXTERN int XDrawArc(Display *d, Drawable dr, GC g, int i1, int i2,
@@ -320,6 +322,9 @@ EXTERN int XResetScreenSaver(Display *d);
 EXTERN int XResizeWindow(Display *d, Window w, unsigned int ui1,
 	unsigned int ui2);
 EXTERN int XRestackWindows(Display *d, Window *w, int i);
+EXTERN int XRotateBuffers(Display *d, int i);
+EXTERN int XRotateWindowProperties(Display *d, Window w, Atom *a, int i1,
+	int i2);
 EXTERN int XSelectInput(Display *d, Window w, long l);
 EXTERN Status XSendEvent(Display *d, Window w, Bool b, long l, XEvent *x);
 EXTERN int XGetScreenSaver(Display *d, int *timeout_return,
@@ -378,6 +383,8 @@ EXTERN int XSetWindowBorderPixmap(Display *d, Window w, Pixmap p);
 EXTERN int XSetWindowBorderWidth(Display *d, Window w, unsigned int ui);
 EXTERN int XSetWindowColormap(Display *d, Window w, Colormap c);
 EXTERN int XStoreName(Display *d, Window w, _Xconst char *name);
+EXTERN int XStoreBuffer(Display *d, _Xconst char *c, int i1, int i2);
+EXTERN int XStoreBytes(Display *d, _Xconst char *c, int i);
 EXTERN Bool XTranslateCoordinates(Display *d, Window w1, Window w2,
 	int i1, int i2, int *i3, int *i4, Window *w3);
 EXTERN int XUnloadFont(Display *d, Font font);

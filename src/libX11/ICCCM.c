@@ -1,5 +1,15 @@
 #include "XlibInt.h"
 
+#define X11_WASM_CUT_BUFFER_COUNT 8
+
+typedef struct BrowserPropertySnapshot {
+    Atom type;
+    int format;
+    unsigned long nitems;
+    int dataLength;
+    unsigned char *data;
+} BrowserPropertySnapshot;
+
 XClassHint *
 XAllocClassHint(void)
 {
@@ -1476,6 +1486,74 @@ XStringListToTextProperty(
 	    textPropReturn) == Success) ? True : False;
 }
 
+static Atom
+BrowserCutBufferAtom(
+    int buffer)
+{
+    return (buffer >= 0 && buffer < X11_WASM_CUT_BUFFER_COUNT)
+	    ? (Atom)(XA_CUT_BUFFER0 + buffer) : None;
+}
+
+static int
+BrowserCutBufferIndexIsValid(
+    int buffer)
+{
+    return BrowserCutBufferAtom(buffer) != None;
+}
+
+static void
+BrowserFreePropertySnapshots(
+    BrowserPropertySnapshot *snapshots,
+    int count)
+{
+    int i;
+
+    if (snapshots == NULL) {
+	return;
+    }
+    for (i = 0; i < count; i++) {
+	if (snapshots[i].data != NULL) {
+	    ckfree(snapshots[i].data);
+	}
+    }
+    ckfree(snapshots);
+}
+
+static void
+BrowserSnapshotProperty(
+    X11WasmProperty *propertyPtr,
+    BrowserPropertySnapshot *snapshotPtr)
+{
+    int dataLength = propertyPtr->dataLength;
+
+    memset(snapshotPtr, 0, sizeof(BrowserPropertySnapshot));
+    snapshotPtr->type = propertyPtr->type;
+    snapshotPtr->format = propertyPtr->format;
+    snapshotPtr->nitems = propertyPtr->nitems;
+    snapshotPtr->dataLength = dataLength;
+    snapshotPtr->data = (unsigned char *)ckalloc((size_t)dataLength + 1U);
+    if (dataLength > 0) {
+	memcpy(snapshotPtr->data, propertyPtr->data, (size_t)dataLength);
+    }
+    snapshotPtr->data[dataLength] = '\0';
+}
+
+static void
+BrowserAssignPropertySnapshot(
+    X11WasmProperty *propertyPtr,
+    BrowserPropertySnapshot *snapshotPtr)
+{
+    if (propertyPtr->data != NULL) {
+	ckfree(propertyPtr->data);
+    }
+    propertyPtr->type = snapshotPtr->type;
+    propertyPtr->format = snapshotPtr->format;
+    propertyPtr->nitems = snapshotPtr->nitems;
+    propertyPtr->dataLength = snapshotPtr->dataLength;
+    propertyPtr->data = snapshotPtr->data;
+    snapshotPtr->data = NULL;
+}
+
 int
 XChangeProperty(
     Display *display,
@@ -1718,6 +1796,195 @@ XGetWindowProperty(
 	}
     }
     return Success;
+}
+
+int
+XRotateWindowProperties(
+    Display *display,
+    Window window,
+    Atom *properties,
+    int numProperties,
+    int npositions)
+{
+    X11WasmResource *resourcePtr;
+    BrowserPropertySnapshot *snapshots;
+    int i;
+    int j;
+    int shift;
+
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    }
+    resourcePtr = BrowserWindowResourceOrError(&display, window,
+	    X11_WASM_XREQ_ROTATE_PROPERTIES);
+    if (resourcePtr == NULL) {
+	return Success;
+    }
+    if (numProperties < 0) {
+	(void)BrowserPropertyValueOrError(&display, (XID)numProperties,
+		X11_WASM_XREQ_ROTATE_PROPERTIES);
+	return Success;
+    }
+    if (numProperties == 0) {
+	return Success;
+    }
+    if (properties == NULL) {
+	(void)BrowserPropertyValueOrError(&display, 0,
+		X11_WASM_XREQ_ROTATE_PROPERTIES);
+	return Success;
+    }
+    for (i = 0; i < numProperties; i++) {
+	if (!BrowserPropertyAtomOrError(&display, properties[i],
+		X11_WASM_XREQ_ROTATE_PROPERTIES)) {
+	    return Success;
+	}
+	for (j = 0; j < i; j++) {
+	    if (properties[j] == properties[i]) {
+		(void)BrowserBadMatchOrError(&display, (XID)properties[i],
+			X11_WASM_XREQ_ROTATE_PROPERTIES);
+		return Success;
+	    }
+	}
+	if (BrowserFindProperty(resourcePtr, properties[i]) == NULL) {
+	    (void)BrowserBadMatchOrError(&display, (XID)properties[i],
+		    X11_WASM_XREQ_ROTATE_PROPERTIES);
+	    return Success;
+	}
+    }
+
+    shift = npositions % numProperties;
+    if (shift < 0) {
+	shift += numProperties;
+    }
+    if (shift == 0) {
+	return Success;
+    }
+
+    snapshots = (BrowserPropertySnapshot *)ckalloc(
+	    (size_t)numProperties * sizeof(BrowserPropertySnapshot));
+    memset(snapshots, 0,
+	    (size_t)numProperties * sizeof(BrowserPropertySnapshot));
+    for (i = 0; i < numProperties; i++) {
+	BrowserSnapshotProperty(BrowserFindProperty(resourcePtr,
+		properties[i]), snapshots + i);
+    }
+    for (i = 0; i < numProperties; i++) {
+	int target = (i + shift) % numProperties;
+	X11WasmProperty *targetPtr = BrowserFindProperty(resourcePtr,
+		properties[target]);
+
+	BrowserAssignPropertySnapshot(targetPtr, snapshots + i);
+    }
+    BrowserFreePropertySnapshots(snapshots, numProperties);
+
+    for (i = 0; i < numProperties; i++) {
+	X11WasmProperty *propertyPtr = BrowserFindProperty(resourcePtr,
+		properties[i]);
+
+	BrowserNotifyProperty(resourcePtr, properties[i], PropertyNewValue);
+	BrowserApplyWindowMetadataProperty(window, properties[i], propertyPtr);
+	BrowserSyncClipboardProperty(properties[i], propertyPtr);
+    }
+    return Success;
+}
+
+int
+XStoreBuffer(
+    Display *display,
+    _Xconst char *bytes,
+    int nbytes,
+    int buffer)
+{
+    Atom property = BrowserCutBufferAtom(buffer);
+
+    if (property == None) {
+	return Success;
+    }
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    }
+    return XChangeProperty(display,
+	    RootWindow(display, DefaultScreen(display)), property, XA_STRING, 8,
+	    PropModeReplace, (_Xconst unsigned char *)bytes, nbytes);
+}
+
+int
+XStoreBytes(
+    Display *display,
+    _Xconst char *bytes,
+    int nbytes)
+{
+    return XStoreBuffer(display, bytes, nbytes, 0);
+}
+
+char *
+XFetchBuffer(
+    Display *display,
+    int *nbytesReturn,
+    int buffer)
+{
+    Atom property = BrowserCutBufferAtom(buffer);
+    Atom actualType = None;
+    int actualFormat = 0;
+    unsigned long nitems = 0;
+    unsigned long bytesAfter = 0;
+    unsigned char *data = NULL;
+    int result;
+
+    if (nbytesReturn != NULL) {
+	*nbytesReturn = 0;
+    }
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    }
+    if (!BrowserCutBufferIndexIsValid(buffer)) {
+	(void)BrowserPropertyValueOrError(&display, (XID)buffer,
+		X11_WASM_XREQ_GET_PROPERTY);
+	return NULL;
+    }
+    result = XGetWindowProperty(display,
+	    RootWindow(display, DefaultScreen(display)), property, 0, LONG_MAX,
+	    False, XA_STRING, &actualType, &actualFormat, &nitems,
+	    &bytesAfter, &data);
+    if ((result != Success) || (actualType != XA_STRING)
+	    || (actualFormat != 8) || (nitems == 0) || (data == NULL)) {
+	if (data != NULL) {
+	    XFree(data);
+	}
+	return NULL;
+    }
+    if (nbytesReturn != NULL) {
+	*nbytesReturn = (nitems > (unsigned long)INT_MAX)
+		? INT_MAX : (int)nitems;
+    }
+    return (char *)data;
+}
+
+char *
+XFetchBytes(
+    Display *display,
+    int *nbytesReturn)
+{
+    return XFetchBuffer(display, nbytesReturn, 0);
+}
+
+int
+XRotateBuffers(
+    Display *display,
+    int rotate)
+{
+    Atom properties[X11_WASM_CUT_BUFFER_COUNT];
+    int i;
+
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    }
+    for (i = 0; i < X11_WASM_CUT_BUFFER_COUNT; i++) {
+	properties[i] = BrowserCutBufferAtom(i);
+    }
+    return XRotateWindowProperties(display,
+	    RootWindow(display, DefaultScreen(display)), properties,
+	    X11_WASM_CUT_BUFFER_COUNT, rotate);
 }
 
 int
