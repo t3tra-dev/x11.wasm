@@ -718,15 +718,443 @@ XQueryTree(
     return True;
 }
 
+static Display *
+BrowserAccessorDisplay(
+    Display *display)
+{
+    return (display != NULL) ? display : X11WasmGetDisplay(NULL);
+}
+
+static Screen *
+BrowserAccessorScreen(
+    Display *display,
+    int screen)
+{
+    display = BrowserAccessorDisplay(display);
+    if ((display == NULL) || (screen < 0) || (screen >= ScreenCount(display))) {
+	return NULL;
+    }
+    return ScreenOfDisplay(display, screen);
+}
+
+static Screen *
+BrowserAccessorDefaultScreen(
+    Display *display)
+{
+    display = BrowserAccessorDisplay(display);
+    if (display == NULL) {
+	return NULL;
+    }
+    return BrowserAccessorScreen(display, DefaultScreen(display));
+}
+
 Window
 XRootWindow(
     Display *display,
     int screen)
 {
-    if (display == NULL) {
-	display = X11WasmGetDisplay(NULL);
-    }
-    return RootWindow(display, screen);
+    Screen *screenPtr = BrowserAccessorScreen(display, screen);
+
+    return (screenPtr != NULL) ? RootWindowOfScreen(screenPtr) : None;
+}
+
+int
+XConnectionNumber(
+    Display *display)
+{
+    display = BrowserAccessorDisplay(display);
+    return (display != NULL) ? ConnectionNumber(display) : -1;
+}
+
+int
+XDefaultScreen(
+    Display *display)
+{
+    display = BrowserAccessorDisplay(display);
+    return (display != NULL) ? DefaultScreen(display) : 0;
+}
+
+Window
+XDefaultRootWindow(
+    Display *display)
+{
+    Screen *screenPtr = BrowserAccessorDefaultScreen(display);
+
+    return (screenPtr != NULL) ? RootWindowOfScreen(screenPtr) : None;
+}
+
+Visual *
+XDefaultVisual(
+    Display *display,
+    int screen)
+{
+    Screen *screenPtr = BrowserAccessorScreen(display, screen);
+
+    return (screenPtr != NULL) ? DefaultVisualOfScreen(screenPtr) : NULL;
+}
+
+GC
+XDefaultGC(
+    Display *display,
+    int screen)
+{
+    Screen *screenPtr = BrowserAccessorScreen(display, screen);
+
+    return (screenPtr != NULL) ? DefaultGCOfScreen(screenPtr) : NULL;
+}
+
+unsigned long
+XBlackPixel(
+    Display *display,
+    int screen)
+{
+    Screen *screenPtr = BrowserAccessorScreen(display, screen);
+
+    return (screenPtr != NULL) ? BlackPixelOfScreen(screenPtr) : 0UL;
+}
+
+unsigned long
+XWhitePixel(
+    Display *display,
+    int screen)
+{
+    Screen *screenPtr = BrowserAccessorScreen(display, screen);
+
+    return (screenPtr != NULL) ? WhitePixelOfScreen(screenPtr) : 0UL;
+}
+
+int
+XQLength(
+    Display *display)
+{
+    display = BrowserAccessorDisplay(display);
+    return (display != NULL) ? QLength(display) : 0;
+}
+
+int
+XDisplayWidth(
+    Display *display,
+    int screen)
+{
+    Screen *screenPtr = BrowserAccessorScreen(display, screen);
+
+    return (screenPtr != NULL) ? WidthOfScreen(screenPtr) : 0;
+}
+
+int
+XDisplayHeight(
+    Display *display,
+    int screen)
+{
+    Screen *screenPtr = BrowserAccessorScreen(display, screen);
+
+    return (screenPtr != NULL) ? HeightOfScreen(screenPtr) : 0;
+}
+
+int
+XDisplayWidthMM(
+    Display *display,
+    int screen)
+{
+    Screen *screenPtr = BrowserAccessorScreen(display, screen);
+
+    return (screenPtr != NULL) ? WidthMMOfScreen(screenPtr) : 0;
+}
+
+int
+XDisplayHeightMM(
+    Display *display,
+    int screen)
+{
+    Screen *screenPtr = BrowserAccessorScreen(display, screen);
+
+    return (screenPtr != NULL) ? HeightMMOfScreen(screenPtr) : 0;
+}
+
+int
+XDisplayPlanes(
+    Display *display,
+    int screen)
+{
+    Screen *screenPtr = BrowserAccessorScreen(display, screen);
+
+    return (screenPtr != NULL) ? PlanesOfScreen(screenPtr) : 0;
+}
+
+int
+XDisplayCells(
+    Display *display,
+    int screen)
+{
+    Screen *screenPtr = BrowserAccessorScreen(display, screen);
+
+    return ((screenPtr != NULL) && (DefaultVisualOfScreen(screenPtr) != NULL))
+	    ? CellsOfScreen(screenPtr) : 0;
+}
+
+int
+XScreenCount(
+    Display *display)
+{
+    display = BrowserAccessorDisplay(display);
+    return (display != NULL) ? ScreenCount(display) : 0;
+}
+
+char *
+XServerVendor(
+    Display *display)
+{
+    display = BrowserAccessorDisplay(display);
+    return (display != NULL) ? ServerVendor(display) : NULL;
+}
+
+int
+XProtocolVersion(
+    Display *display)
+{
+    display = BrowserAccessorDisplay(display);
+    return (display != NULL) ? ProtocolVersion(display) : 0;
+}
+
+int
+XProtocolRevision(
+    Display *display)
+{
+    display = BrowserAccessorDisplay(display);
+    return (display != NULL) ? ProtocolRevision(display) : 0;
+}
+
+int
+XVendorRelease(
+    Display *display)
+{
+    display = BrowserAccessorDisplay(display);
+    return (display != NULL) ? VendorRelease(display) : 0;
+}
+
+char *
+XDisplayString(
+    Display *display)
+{
+    display = BrowserAccessorDisplay(display);
+    return (display != NULL) ? DisplayString(display) : NULL;
+}
+
+int
+XDefaultDepth(
+    Display *display,
+    int screen)
+{
+    Screen *screenPtr = BrowserAccessorScreen(display, screen);
+
+    return (screenPtr != NULL) ? DefaultDepthOfScreen(screenPtr) : 0;
+}
+
+Colormap
+XDefaultColormap(
+    Display *display,
+    int screen)
+{
+    Screen *screenPtr = BrowserAccessorScreen(display, screen);
+
+    return (screenPtr != NULL) ? DefaultColormapOfScreen(screenPtr) : None;
+}
+
+int
+XBitmapUnit(
+    Display *display)
+{
+    display = BrowserAccessorDisplay(display);
+    return (display != NULL) ? BitmapUnit(display) : 0;
+}
+
+int
+XBitmapBitOrder(
+    Display *display)
+{
+    display = BrowserAccessorDisplay(display);
+    return (display != NULL) ? BitmapBitOrder(display) : 0;
+}
+
+int
+XBitmapPad(
+    Display *display)
+{
+    display = BrowserAccessorDisplay(display);
+    return (display != NULL) ? BitmapPad(display) : 0;
+}
+
+int
+XImageByteOrder(
+    Display *display)
+{
+    display = BrowserAccessorDisplay(display);
+    return (display != NULL) ? ImageByteOrder(display) : 0;
+}
+
+unsigned long
+XNextRequest(
+    Display *display)
+{
+    display = BrowserAccessorDisplay(display);
+    return (display != NULL) ? NextRequest(display) : 0UL;
+}
+
+unsigned long
+XLastKnownRequestProcessed(
+    Display *display)
+{
+    display = BrowserAccessorDisplay(display);
+    return (display != NULL) ? LastKnownRequestProcessed(display) : 0UL;
+}
+
+Screen *
+XScreenOfDisplay(
+    Display *display,
+    int screen)
+{
+    return BrowserAccessorScreen(display, screen);
+}
+
+Screen *
+XDefaultScreenOfDisplay(
+    Display *display)
+{
+    return BrowserAccessorDefaultScreen(display);
+}
+
+Display *
+XDisplayOfScreen(
+    Screen *screen)
+{
+    return (screen != NULL) ? DisplayOfScreen(screen) : NULL;
+}
+
+Window
+XRootWindowOfScreen(
+    Screen *screen)
+{
+    return (screen != NULL) ? RootWindowOfScreen(screen) : None;
+}
+
+unsigned long
+XBlackPixelOfScreen(
+    Screen *screen)
+{
+    return (screen != NULL) ? BlackPixelOfScreen(screen) : 0UL;
+}
+
+unsigned long
+XWhitePixelOfScreen(
+    Screen *screen)
+{
+    return (screen != NULL) ? WhitePixelOfScreen(screen) : 0UL;
+}
+
+Colormap
+XDefaultColormapOfScreen(
+    Screen *screen)
+{
+    return (screen != NULL) ? DefaultColormapOfScreen(screen) : None;
+}
+
+int
+XDefaultDepthOfScreen(
+    Screen *screen)
+{
+    return (screen != NULL) ? DefaultDepthOfScreen(screen) : 0;
+}
+
+GC
+XDefaultGCOfScreen(
+    Screen *screen)
+{
+    return (screen != NULL) ? DefaultGCOfScreen(screen) : NULL;
+}
+
+Visual *
+XDefaultVisualOfScreen(
+    Screen *screen)
+{
+    return (screen != NULL) ? DefaultVisualOfScreen(screen) : NULL;
+}
+
+int
+XWidthOfScreen(
+    Screen *screen)
+{
+    return (screen != NULL) ? WidthOfScreen(screen) : 0;
+}
+
+int
+XHeightOfScreen(
+    Screen *screen)
+{
+    return (screen != NULL) ? HeightOfScreen(screen) : 0;
+}
+
+int
+XWidthMMOfScreen(
+    Screen *screen)
+{
+    return (screen != NULL) ? WidthMMOfScreen(screen) : 0;
+}
+
+int
+XHeightMMOfScreen(
+    Screen *screen)
+{
+    return (screen != NULL) ? HeightMMOfScreen(screen) : 0;
+}
+
+int
+XPlanesOfScreen(
+    Screen *screen)
+{
+    return (screen != NULL) ? PlanesOfScreen(screen) : 0;
+}
+
+int
+XCellsOfScreen(
+    Screen *screen)
+{
+    return ((screen != NULL) && (DefaultVisualOfScreen(screen) != NULL))
+	    ? CellsOfScreen(screen) : 0;
+}
+
+int
+XMinCmapsOfScreen(
+    Screen *screen)
+{
+    return (screen != NULL) ? MinCmapsOfScreen(screen) : 0;
+}
+
+int
+XMaxCmapsOfScreen(
+    Screen *screen)
+{
+    return (screen != NULL) ? MaxCmapsOfScreen(screen) : 0;
+}
+
+Bool
+XDoesSaveUnders(
+    Screen *screen)
+{
+    return (screen != NULL) ? DoesSaveUnders(screen) : False;
+}
+
+int
+XDoesBackingStore(
+    Screen *screen)
+{
+    return (screen != NULL) ? DoesBackingStore(screen) : NotUseful;
+}
+
+long
+XEventMaskOfScreen(
+    Screen *screen)
+{
+    return (screen != NULL) ? EventMaskOfScreen(screen) : 0L;
 }
 
 Pixmap

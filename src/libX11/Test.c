@@ -1156,6 +1156,9 @@ X11WasmTestXlibApis(void)
     int screenSaverMinor = -1;
     XScreenSaverInfo *screenSaverInfo = NULL;
     int screen;
+    Screen *displayScreen = NULL;
+    Screen *defaultDisplayScreen = NULL;
+    unsigned long accessorSerial = 0;
     int result = 0;
     Bool hostAccessEnabled = False;
     XHostAddress hostAddresses[2];
@@ -1552,6 +1555,147 @@ X11WasmTestXlibApis(void)
 	    || (XResourceManagerString(&browserDisplay.display) != NULL)
 	    || (XGetDefault(&browserDisplay.display, "wish", "geometry")
 		    != NULL)) {
+	return 0;
+    }
+    screen = DefaultScreen(&browserDisplay.display);
+    displayScreen = ScreenOfDisplay(&browserDisplay.display, screen);
+    defaultDisplayScreen = DefaultScreenOfDisplay(&browserDisplay.display);
+    accessorSerial = LastKnownRequestProcessed(&browserDisplay.display);
+    if ((displayScreen == NULL) || (defaultDisplayScreen != displayScreen)) {
+	return 0;
+    }
+    if ((XConnectionNumber(&browserDisplay.display)
+		    != ConnectionNumber(&browserDisplay.display))
+	    || (XConnectionNumber(NULL)
+		    != ConnectionNumber(&browserDisplay.display))
+	    || (XDefaultScreen(&browserDisplay.display) != screen)
+	    || (XDefaultScreen(NULL) != screen)
+	    || (XDefaultRootWindow(&browserDisplay.display)
+		    != DefaultRootWindow(&browserDisplay.display))
+	    || (XDefaultRootWindow(NULL)
+		    != DefaultRootWindow(&browserDisplay.display))
+	    || (XRootWindow(&browserDisplay.display, screen)
+		    != RootWindow(&browserDisplay.display, screen))
+	    || (XDefaultVisual(&browserDisplay.display, screen)
+		    != DefaultVisual(&browserDisplay.display, screen))
+	    || (XDefaultGC(&browserDisplay.display, screen)
+		    != DefaultGC(&browserDisplay.display, screen))
+	    || (XBlackPixel(&browserDisplay.display, screen)
+		    != BlackPixel(&browserDisplay.display, screen))
+	    || (XWhitePixel(&browserDisplay.display, screen)
+		    != WhitePixel(&browserDisplay.display, screen))
+	    || (XQLength(&browserDisplay.display)
+		    != QLength(&browserDisplay.display))
+	    || (XDisplayWidth(&browserDisplay.display, screen)
+		    != DisplayWidth(&browserDisplay.display, screen))
+	    || (XDisplayHeight(&browserDisplay.display, screen)
+		    != DisplayHeight(&browserDisplay.display, screen))
+	    || (XDisplayWidthMM(&browserDisplay.display, screen)
+		    != DisplayWidthMM(&browserDisplay.display, screen))
+	    || (XDisplayHeightMM(&browserDisplay.display, screen)
+		    != DisplayHeightMM(&browserDisplay.display, screen))
+	    || (XDisplayPlanes(&browserDisplay.display, screen)
+		    != DisplayPlanes(&browserDisplay.display, screen))
+	    || (XDisplayCells(&browserDisplay.display, screen)
+		    != DisplayCells(&browserDisplay.display, screen))
+	    || (XScreenCount(&browserDisplay.display)
+		    != ScreenCount(&browserDisplay.display))
+	    || (XServerVendor(&browserDisplay.display)
+		    != ServerVendor(&browserDisplay.display))
+	    || (XProtocolVersion(&browserDisplay.display)
+		    != ProtocolVersion(&browserDisplay.display))
+	    || (XProtocolRevision(&browserDisplay.display)
+		    != ProtocolRevision(&browserDisplay.display))
+	    || (XVendorRelease(&browserDisplay.display)
+		    != VendorRelease(&browserDisplay.display))
+	    || (XDisplayString(&browserDisplay.display)
+		    != DisplayString(&browserDisplay.display))
+	    || (XDefaultDepth(&browserDisplay.display, screen)
+		    != DefaultDepth(&browserDisplay.display, screen))
+	    || (XDefaultColormap(&browserDisplay.display, screen)
+		    != DefaultColormap(&browserDisplay.display, screen))
+	    || (XBitmapUnit(&browserDisplay.display)
+		    != BitmapUnit(&browserDisplay.display))
+	    || (XBitmapBitOrder(&browserDisplay.display)
+		    != BitmapBitOrder(&browserDisplay.display))
+	    || (XBitmapPad(&browserDisplay.display)
+		    != BitmapPad(&browserDisplay.display))
+	    || (XImageByteOrder(&browserDisplay.display)
+		    != ImageByteOrder(&browserDisplay.display))
+	    || (XNextRequest(&browserDisplay.display)
+		    != NextRequest(&browserDisplay.display))
+	    || (XLastKnownRequestProcessed(&browserDisplay.display)
+		    != accessorSerial)) {
+	return 0;
+    }
+    if ((XScreenOfDisplay(&browserDisplay.display, screen) != displayScreen)
+	    || (XScreenOfDisplay(NULL, screen) != displayScreen)
+	    || (XDefaultScreenOfDisplay(&browserDisplay.display)
+		    != defaultDisplayScreen)
+	    || (XDefaultScreenOfDisplay(NULL) != defaultDisplayScreen)
+	    || (XDisplayOfScreen(displayScreen)
+		    != DisplayOfScreen(displayScreen))
+	    || (XRootWindowOfScreen(displayScreen)
+		    != RootWindowOfScreen(displayScreen))
+	    || (XBlackPixelOfScreen(displayScreen)
+		    != BlackPixelOfScreen(displayScreen))
+	    || (XWhitePixelOfScreen(displayScreen)
+		    != WhitePixelOfScreen(displayScreen))
+	    || (XDefaultColormapOfScreen(displayScreen)
+		    != DefaultColormapOfScreen(displayScreen))
+	    || (XDefaultDepthOfScreen(displayScreen)
+		    != DefaultDepthOfScreen(displayScreen))
+	    || (XDefaultGCOfScreen(displayScreen)
+		    != DefaultGCOfScreen(displayScreen))
+	    || (XDefaultVisualOfScreen(displayScreen)
+		    != DefaultVisualOfScreen(displayScreen))
+	    || (XWidthOfScreen(displayScreen) != WidthOfScreen(displayScreen))
+	    || (XHeightOfScreen(displayScreen) != HeightOfScreen(displayScreen))
+	    || (XWidthMMOfScreen(displayScreen)
+		    != WidthMMOfScreen(displayScreen))
+	    || (XHeightMMOfScreen(displayScreen)
+		    != HeightMMOfScreen(displayScreen))
+	    || (XPlanesOfScreen(displayScreen)
+		    != PlanesOfScreen(displayScreen))
+	    || (XCellsOfScreen(displayScreen) != CellsOfScreen(displayScreen))
+	    || (XMinCmapsOfScreen(displayScreen)
+		    != MinCmapsOfScreen(displayScreen))
+	    || (XMaxCmapsOfScreen(displayScreen)
+		    != MaxCmapsOfScreen(displayScreen))
+	    || (XDoesSaveUnders(displayScreen)
+		    != DoesSaveUnders(displayScreen))
+	    || (XDoesBackingStore(displayScreen)
+		    != DoesBackingStore(displayScreen))
+	    || (XEventMaskOfScreen(displayScreen)
+		    != EventMaskOfScreen(displayScreen))) {
+	return 0;
+    }
+    if ((XRootWindow(&browserDisplay.display, -1) != None)
+	    || (XRootWindow(&browserDisplay.display,
+		    XScreenCount(&browserDisplay.display)) != None)
+	    || (XScreenOfDisplay(&browserDisplay.display, -1) != NULL)
+	    || (XScreenOfDisplay(&browserDisplay.display,
+		    XScreenCount(&browserDisplay.display)) != NULL)
+	    || (XDefaultVisual(&browserDisplay.display,
+		    XScreenCount(&browserDisplay.display)) != NULL)
+	    || (XDefaultGC(&browserDisplay.display,
+		    XScreenCount(&browserDisplay.display)) != NULL)
+	    || (XDisplayWidth(&browserDisplay.display,
+		    XScreenCount(&browserDisplay.display)) != 0)
+	    || (XDefaultColormap(&browserDisplay.display,
+		    XScreenCount(&browserDisplay.display)) != None)
+	    || (XDisplayOfScreen(NULL) != NULL)
+	    || (XRootWindowOfScreen(NULL) != None)
+	    || (XDefaultVisualOfScreen(NULL) != NULL)
+	    || (XDefaultGCOfScreen(NULL) != NULL)
+	    || (XWidthOfScreen(NULL) != 0)
+	    || (XCellsOfScreen(NULL) != 0)
+	    || (XDoesSaveUnders(NULL) != False)
+	    || (XDoesBackingStore(NULL) != NotUseful)
+	    || (XEventMaskOfScreen(NULL) != 0L)) {
+	return 0;
+    }
+    if (LastKnownRequestProcessed(&browserDisplay.display) != accessorSerial) {
 	return 0;
     }
     if ((XGetErrorText(&browserDisplay.display, BadWindow, buffer,
