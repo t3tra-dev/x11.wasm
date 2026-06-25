@@ -6214,6 +6214,9 @@ X11WasmTestXErrorHandler(void)
     GC referenceGC;
     GC depthOneGC;
     GC invalidGC;
+    GContext defaultGContext;
+    GContext nextTemporaryGContext;
+    GContext temporaryGContext;
     Font validFont;
     Cursor validCursor;
     Cursor invalidPixmapCursorResult;
@@ -6325,6 +6328,7 @@ X11WasmTestXErrorHandler(void)
     clipRect.height = 1;
     defaultGC = DefaultGC(&browserDisplay.display,
 	    DefaultScreen(&browserDisplay.display));
+    defaultGContext = XGContextFromGC(defaultGC);
     invalidGC = (GC)(uintptr_t)invalidWindow;
     initialSerial = LastKnownRequestProcessed(&browserDisplay.display);
     browserTestXErrorCount = 0;
@@ -6459,8 +6463,10 @@ X11WasmTestXErrorHandler(void)
     drawValueValidationResultSum += XFillArc(&browserDisplay.display,
 	    (Drawable)browserDisplay.rootWindow, NULL, 0, 0, 1,
 	    (unsigned int)USHRT_MAX + 1U, 0, 360 * 64);
+    nextTemporaryGContext = (GContext)browserDisplay.nextXId;
     temporaryGC = XCreateGC(&browserDisplay.display,
 	    (Drawable)browserDisplay.rootWindow, 0, NULL);
+    temporaryGContext = XGContextFromGC(temporaryGC);
     freeTemporaryGCResult = (temporaryGC != NULL)
 	    ? XFreeGC(&browserDisplay.display, temporaryGC) : !Success;
     gcResultSum = XChangeGC(&browserDisplay.display, NULL,
@@ -7168,7 +7174,12 @@ X11WasmTestXErrorHandler(void)
 	    || (copyPlaneSizeResult != Success)
 	    || (drawResultSum != Success)
 	    || (drawValueValidationResultSum != Success)
+	    || (defaultGContext == None)
+	    || (XGContextFromGC(NULL) != None)
+	    || (XGContextFromGC(invalidGC) != None)
 	    || (temporaryGC == NULL)
+	    || (temporaryGContext != nextTemporaryGContext)
+	    || (temporaryGContext == defaultGContext)
 	    || (freeTemporaryGCResult != Success)
 	    || (gcResultSum != Success)
 	    || (getGCValuesInvalidResult != False)

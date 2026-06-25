@@ -283,6 +283,7 @@ typedef struct X11WasmGCDashes {
 
 typedef struct X11WasmTrackedGC {
     GC gc;
+    GContext gcontext;
     unsigned int depth;
     struct X11WasmTrackedGC *nextPtr;
 } X11WasmTrackedGC;
@@ -897,6 +898,8 @@ int BrowserGCClipMaskContains(
     int y);
 unsigned int BrowserGCDepth(
     GC gc);
+GContext BrowserGCContext(
+    GC gc);
 int BrowserGCDepthsMatchOrError(
     Display **displayPtr,
     GC src,
@@ -1354,6 +1357,7 @@ void BrowserRegionSetRectangles(
     int count);
 void BrowserRegisterGC(
     GC gc,
+    GContext gcontext,
     unsigned int depth);
 void BrowserRememberColor(
     Colormap colormap,

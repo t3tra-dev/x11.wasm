@@ -12,6 +12,7 @@
 #define X11_WASM_MODIFIER_COUNT 8
 #define X11_WASM_MODIFIER_MAP_MAX_KEYPERMOD 8
 #define X11_WASM_MOTION_BUFFER_SIZE 64
+#define X11_WASM_DEFAULT_GCONTEXT 3
 
 typedef enum {
     X11_WASM_RESOURCE_WINDOW,
@@ -93,6 +94,7 @@ typedef struct X11WasmDisplayState {
     Depth depth;
     ScreenFormat pixmapFormats[2];
     XGCValues defaultGC;
+    GContext defaultGCContext;
     Window rootWindow;
     Window focusWindow;
     int focusRevertTo;

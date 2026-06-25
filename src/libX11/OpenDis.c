@@ -96,6 +96,7 @@ BrowserInitDisplay(void)
     state->visual.blue_mask = 0x0000ff;
     state->visual.bits_per_rgb = 8;
     state->visual.map_entries = 256;
+    state->defaultGCContext = X11_WASM_DEFAULT_GCONTEXT;
 
     state->depth.depth = 24;
     state->depth.nvisuals = 1;

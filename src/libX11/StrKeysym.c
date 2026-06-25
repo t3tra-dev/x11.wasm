@@ -549,9 +549,24 @@ BrowserGCDepth(
     return (gcPtr != NULL) ? gcPtr->depth : 0U;
 }
 
+GContext
+BrowserGCContext(
+    GC gc)
+{
+    X11WasmTrackedGC *gcPtr;
+
+    BrowserInitDisplay();
+    if (gc == &browserDisplay.defaultGC) {
+	return browserDisplay.defaultGCContext;
+    }
+    gcPtr = BrowserTrackedGC(gc);
+    return (gcPtr != NULL) ? gcPtr->gcontext : None;
+}
+
 void
 BrowserRegisterGC(
     GC gc,
+    GContext gcontext,
     unsigned int depth)
 {
     X11WasmTrackedGC *gcPtr;
@@ -561,6 +576,7 @@ BrowserRegisterGC(
     }
     gcPtr = (X11WasmTrackedGC *)ckalloc(sizeof(X11WasmTrackedGC));
     gcPtr->gc = gc;
+    gcPtr->gcontext = gcontext;
     gcPtr->depth = depth;
     gcPtr->nextPtr = gcList;
     gcList = gcPtr;

@@ -2854,8 +2854,13 @@ X11WasmTestSetHostAccessControl(int configured)
     return XAddHosts(&browserDisplay.display, hosts, 2);
 }
 
-GContext XGContextFromGC(GC gc)
-{ return (GContext)(uintptr_t)gc; }
+GContext
+XGContextFromGC(
+    GC gc)
+{
+    return BrowserGCContext(gc);
+}
+
 int
 XFreeColors(
     Display *display,

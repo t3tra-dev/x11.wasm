@@ -1661,6 +1661,7 @@ XCreateGC(
 {
     X11WasmResource *resourcePtr;
     GC gc;
+    GContext gcontext;
 
     resourcePtr = BrowserDrawableResourceOrError(&display, drawable,
 	    X11_WASM_XREQ_CREATE_GC);
@@ -1682,7 +1683,8 @@ XCreateGC(
     gc = (GC)ckalloc(sizeof(XGCValues));
     BrowserInitGC(display, gc);
     BrowserApplyGCValues(gc, valueMask, values);
-    BrowserRegisterGC(gc, resourcePtr->depth);
+    gcontext = (GContext)X11WasmAllocXId(display);
+    BrowserRegisterGC(gc, gcontext, resourcePtr->depth);
     return gc;
 }
 
