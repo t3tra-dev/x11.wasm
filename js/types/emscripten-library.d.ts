@@ -24,6 +24,13 @@ interface X11WasmResource {
   element: HTMLElement | null;
   canvas?: HTMLCanvasElement | null;
   windowClass?: number;
+  title?: string;
+  iconName?: string;
+  transientFor?: number;
+  command?: string;
+  clientMachine?: string;
+  wmClassName?: string;
+  wmClass?: string;
   fullscreen?: boolean;
   zoomed?: boolean;
   wmState?: "" | "normal" | "iconic" | "withdrawn";
@@ -433,6 +440,10 @@ declare const Module: {
     enabled: number,
   ) => number;
   _X11WasmTestSetZoomHints?: (window: number, enabled: number) => number;
+  _X11WasmTestSetWindowMetadataProperties?: (
+    window: number,
+    enabled: number,
+  ) => number;
   _X11WasmTestMapWindowWithInitialState?: (initialState: number) => number;
   _XGrabPointer?: (
     display: number,

@@ -64,7 +64,6 @@ XSetClassHint(
     result = XChangeProperty(display, window, XA_WM_CLASS, XA_STRING, 8,
 	    PropModeReplace, data, (int)byteLength);
     ckfree(data);
-    BrowserSetWindowClassHint(window, resName, resClass);
     return result;
 }
 
@@ -126,7 +125,6 @@ XSetCommand(
     if ((argv == NULL) || (argc <= 0)) {
 	result = XChangeProperty(display, window, XA_WM_COMMAND, XA_STRING, 8,
 		PropModeReplace, (const unsigned char *)"", 0);
-	BrowserSetWindowCommand(window, NULL, 0);
 	return result;
     }
     for (i = 0; i < argc; i++) {
@@ -147,7 +145,6 @@ XSetCommand(
     }
     result = XChangeProperty(display, window, XA_WM_COMMAND, XA_STRING, 8,
 	    PropModeReplace, data, (int)byteLength);
-    BrowserSetWindowCommand(window, argv, argc);
     ckfree(data);
     return result;
 }
@@ -233,7 +230,6 @@ XSetIconName(
     int result = XChangeProperty(display, window, XA_WM_ICON_NAME, XA_STRING, 8,
 	    PropModeReplace, (const unsigned char *)value, (int)strlen(value));
 
-    BrowserSetWindowIconName(window, value);
     return result;
 }
 
@@ -304,7 +300,6 @@ XStoreName(
     int result = XChangeProperty(display, window, XA_WM_NAME, XA_STRING, 8,
 	    PropModeReplace, (const unsigned char *)value, (int)strlen(value));
 
-    BrowserSetWindowTitle(window, value, BrowserWindowIsRootToplevel(window));
     return result;
 }
 
@@ -318,7 +313,6 @@ XSetTransientForHint(
 	    XA_WM_TRANSIENT_FOR, 32, PropModeReplace,
 	    (const unsigned char *)&propWindow, 1);
 
-    BrowserSetWindowTransientFor(window, propWindow);
     return result;
 }
 
@@ -368,13 +362,11 @@ XSetWMHints(
 
     if (hints == NULL) {
 	result = XDeleteProperty(display, window, XA_WM_HINTS);
-	BrowserSetWindowWMHints(window, NULL);
 	return result;
     }
     result = XChangeProperty(display, window, XA_WM_HINTS, XA_WM_HINTS, 32,
 	    PropModeReplace, (const unsigned char *)hints,
 	    (int)(sizeof(XWMHints) / 4U));
-    BrowserSetWindowWMHints(window, hints);
     return result;
 }
 
@@ -430,6 +422,89 @@ X11WasmTestMapWindowWithInitialState(int initialState)
     return (unsigned int)BrowserJsXId(window);
 }
 
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestSetWindowMetadataProperties(unsigned int window, int enabled)
+{
+    static char *commandArgv[] = {
+	(char *)"x11wasm-test", (char *)"--metadata", NULL
+    };
+    XClassHint classHint;
+    XSizeHints sizeHints;
+    XTextProperty clientMachine;
+    XWMHints wmHints;
+    Window xid = (Window)window;
+
+    BrowserInitDisplay();
+    if (!enabled) {
+	(void)XDeleteProperty(&browserDisplay.display, xid, XA_WM_NAME);
+	(void)XDeleteProperty(&browserDisplay.display, xid, XA_WM_ICON_NAME);
+	(void)XDeleteProperty(&browserDisplay.display, xid, XA_WM_COMMAND);
+	(void)XDeleteProperty(&browserDisplay.display, xid, XA_WM_CLASS);
+	(void)XDeleteProperty(&browserDisplay.display, xid,
+		XA_WM_CLIENT_MACHINE);
+	(void)XDeleteProperty(&browserDisplay.display, xid,
+		XA_WM_TRANSIENT_FOR);
+	(void)XDeleteProperty(&browserDisplay.display, xid, XA_WM_HINTS);
+	(void)XDeleteProperty(&browserDisplay.display, xid,
+		XA_WM_NORMAL_HINTS);
+	return 1;
+    }
+
+    classHint.res_name = (char *)"metadata";
+    classHint.res_class = (char *)"X11WasmMetadata";
+    memset(&sizeHints, 0, sizeof(sizeHints));
+    sizeHints.flags = PPosition | PSize | PMinSize | PMaxSize | PResizeInc
+	    | PAspect | PBaseSize | PWinGravity;
+    sizeHints.x = 11;
+    sizeHints.y = 13;
+    sizeHints.width = 120;
+    sizeHints.height = 80;
+    sizeHints.min_width = 40;
+    sizeHints.min_height = 30;
+    sizeHints.max_width = 240;
+    sizeHints.max_height = 160;
+    sizeHints.width_inc = 7;
+    sizeHints.height_inc = 5;
+    sizeHints.min_aspect.x = 2;
+    sizeHints.min_aspect.y = 3;
+    sizeHints.max_aspect.x = 4;
+    sizeHints.max_aspect.y = 5;
+    sizeHints.base_width = 20;
+    sizeHints.base_height = 10;
+    sizeHints.win_gravity = SouthEastGravity;
+
+    memset(&wmHints, 0, sizeof(wmHints));
+    wmHints.flags = InputHint | StateHint | IconPositionHint;
+    wmHints.input = False;
+    wmHints.initial_state = IconicState;
+    wmHints.icon_x = 17;
+    wmHints.icon_y = 29;
+
+    memset(&clientMachine, 0, sizeof(clientMachine));
+    clientMachine.value = (unsigned char *)"x11wasm-client";
+    clientMachine.encoding = XA_STRING;
+    clientMachine.format = 8;
+    clientMachine.nitems = strlen((const char *)clientMachine.value);
+
+    if ((XStoreName(&browserDisplay.display, xid, "X11Wasm Metadata Title")
+	    != Success)
+	    || (XSetIconName(&browserDisplay.display, xid,
+		    "X11Wasm Metadata Icon") != Success)
+	    || (XSetClassHint(&browserDisplay.display, xid, &classHint)
+		    != Success)
+	    || (XSetCommand(&browserDisplay.display, xid, commandArgv, 2)
+		    != Success)
+	    || (XSetTransientForHint(&browserDisplay.display, xid,
+		    browserDisplay.rootWindow) != Success)
+	    || (XSetWMHints(&browserDisplay.display, xid, &wmHints)
+		    != Success)) {
+	return 0;
+    }
+    XSetWMNormalHints(&browserDisplay.display, xid, &sizeHints);
+    XSetWMClientMachine(&browserDisplay.display, xid, &clientMachine);
+    return 1;
+}
+
 void
 XSetWMSizeHints(
     Display *display,
@@ -439,21 +514,11 @@ XSetWMSizeHints(
 {
     if (hints == NULL) {
 	(void)XDeleteProperty(display, window, property);
-	if (property == XA_WM_NORMAL_HINTS) {
-	    BrowserSetWindowSizeHints(window, NULL);
-	} else if (property == XA_WM_ZOOM_HINTS) {
-	    BrowserSetWindowZoomHints(window, NULL);
-	}
 	return;
     }
     (void)XChangeProperty(display, window, property, XA_WM_SIZE_HINTS, 32,
 	    PropModeReplace,
 	    (const unsigned char *)hints, (int)(sizeof(XSizeHints) / 4U));
-    if (property == XA_WM_NORMAL_HINTS) {
-	BrowserSetWindowSizeHints(window, hints);
-    } else if (property == XA_WM_ZOOM_HINTS) {
-	BrowserSetWindowZoomHints(window, hints);
-    }
 }
 
 int
@@ -1183,14 +1248,11 @@ XSetWMClientMachine(
 {
     if ((textProp == NULL) || (textProp->value == NULL)) {
 	(void)XDeleteProperty(display, window, XA_WM_CLIENT_MACHINE);
-	BrowserSetWindowClientMachine(window, NULL, 0);
 	return;
     }
     (void)XChangeProperty(display, window, XA_WM_CLIENT_MACHINE,
 	    textProp->encoding, textProp->format, PropModeReplace,
 	    textProp->value, (int)textProp->nitems);
-    BrowserSetWindowClientMachine(window, (const char *)textProp->value,
-	    (int)textProp->nitems);
 }
 
 Status

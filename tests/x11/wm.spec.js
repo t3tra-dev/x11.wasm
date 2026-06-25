@@ -138,6 +138,190 @@ test("_NET_WM_ICON honors root WM_ICON_SIZE when choosing favicon", async ({
   expect(icon.center).toEqual([255, 0, 0, 255]);
 });
 
+test("ICCCM setters update browser metadata through window properties", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+  const windowId = await createMappedWindow(page);
+
+  const metadata = await page.evaluate((windowId) => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestSetWindowMetadataProperties?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    if (!module?._X11WasmTestSetWindowMetadataProperties || !backend) {
+      throw new Error("missing ICCCM metadata test hooks");
+    }
+
+    const snapshot = () => {
+      const resource = backend.resources.get(windowId);
+      const element = resource?.element;
+      if (!(element instanceof HTMLElement) || !resource) {
+        throw new Error("missing ICCCM metadata test element");
+      }
+      return {
+        attrs: {
+          title: element.getAttribute("data-x11-wasm-title"),
+          iconName: element.getAttribute("data-x11-wasm-icon-name"),
+          command: element.getAttribute("data-x11-wasm-command"),
+          className: element.getAttribute("data-x11-wasm-class-name"),
+          classValue: element.getAttribute("data-x11-wasm-class"),
+          clientMachine: element.getAttribute("data-x11-wasm-client-machine"),
+          transientFor: element.getAttribute("data-x11-wasm-transient-for"),
+          wmHintsFlags: element.getAttribute("data-x11-wasm-wm-hints-flags"),
+          inputEligible: element.getAttribute("data-x11-wasm-input-eligible"),
+          initialState: element.getAttribute(
+            "data-x11-wasm-initial-state-name",
+          ),
+          iconX: element.getAttribute("data-x11-wasm-icon-x"),
+          iconY: element.getAttribute("data-x11-wasm-icon-y"),
+          sizeFlags: element.getAttribute("data-x11-wasm-size-hints-flags"),
+          sizeX: element.getAttribute("data-x11-wasm-hint-x"),
+          sizeY: element.getAttribute("data-x11-wasm-hint-y"),
+          sizeWidth: element.getAttribute("data-x11-wasm-hint-width"),
+          sizeHeight: element.getAttribute("data-x11-wasm-hint-height"),
+          minWidth: element.getAttribute("data-x11-wasm-min-width"),
+          minHeight: element.getAttribute("data-x11-wasm-min-height"),
+          maxWidth: element.getAttribute("data-x11-wasm-max-width"),
+          maxHeight: element.getAttribute("data-x11-wasm-max-height"),
+          widthInc: element.getAttribute("data-x11-wasm-width-inc"),
+          heightInc: element.getAttribute("data-x11-wasm-height-inc"),
+          baseWidth: element.getAttribute("data-x11-wasm-base-width"),
+          baseHeight: element.getAttribute("data-x11-wasm-base-height"),
+          winGravity: element.getAttribute("data-x11-wasm-win-gravity"),
+        },
+        resource: {
+          title: resource.title,
+          iconName: resource.iconName,
+          command: resource.command,
+          className: resource.wmClassName,
+          classValue: resource.wmClass,
+          clientMachine: resource.clientMachine,
+          transientFor: resource.transientFor,
+          wmHints: resource.wmHints
+            ? JSON.parse(JSON.stringify(resource.wmHints))
+            : null,
+          sizeHints: resource.sizeHints
+            ? JSON.parse(JSON.stringify(resource.sizeHints))
+            : null,
+        },
+      };
+    };
+
+    const setResult = module._X11WasmTestSetWindowMetadataProperties(
+      windowId,
+      1,
+    );
+    backend.flush?.();
+    const afterSet = snapshot();
+    const clearResult = module._X11WasmTestSetWindowMetadataProperties(
+      windowId,
+      0,
+    );
+    backend.flush?.();
+    const afterClear = snapshot();
+    return {
+      afterClear,
+      afterSet,
+      clearResult,
+      rootWindow: backend.rootWindow,
+      setResult,
+    };
+  }, windowId);
+
+  expect(metadata.setResult).toBe(1);
+  expect(metadata.clearResult).toBe(1);
+  expect(metadata.afterSet.attrs).toEqual({
+    title: "X11Wasm Metadata Title",
+    iconName: "X11Wasm Metadata Icon",
+    command: "x11wasm-test --metadata",
+    className: "metadata",
+    classValue: "X11WasmMetadata",
+    clientMachine: "x11wasm-client",
+    transientFor: String(metadata.rootWindow),
+    wmHintsFlags: "19",
+    inputEligible: "0",
+    initialState: "iconic",
+    iconX: "17",
+    iconY: "29",
+    sizeFlags: "1020",
+    sizeX: "11",
+    sizeY: "13",
+    sizeWidth: "120",
+    sizeHeight: "80",
+    minWidth: "40",
+    minHeight: "30",
+    maxWidth: "240",
+    maxHeight: "160",
+    widthInc: "7",
+    heightInc: "5",
+    baseWidth: "20",
+    baseHeight: "10",
+    winGravity: "9",
+  });
+  expect(metadata.afterSet.resource).toMatchObject({
+    title: "X11Wasm Metadata Title",
+    iconName: "X11Wasm Metadata Icon",
+    command: "x11wasm-test --metadata",
+    className: "metadata",
+    classValue: "X11WasmMetadata",
+    clientMachine: "x11wasm-client",
+    transientFor: metadata.rootWindow,
+    wmHints: {
+      flags: 19,
+      input: 0,
+      initialState: 3,
+      iconX: 17,
+      iconY: 29,
+    },
+    sizeHints: {
+      flags: 1020,
+      x: 11,
+      y: 13,
+      width: 120,
+      height: 80,
+      minWidth: 40,
+      minHeight: 30,
+      maxWidth: 240,
+      maxHeight: 160,
+      widthInc: 7,
+      heightInc: 5,
+      baseWidth: 20,
+      baseHeight: 10,
+      winGravity: 9,
+    },
+  });
+  expect(metadata.afterClear.attrs).toMatchObject({
+    title: "",
+    iconName: "",
+    command: null,
+    className: null,
+    classValue: null,
+    clientMachine: null,
+    transientFor: null,
+    wmHintsFlags: null,
+    inputEligible: null,
+    initialState: null,
+    iconX: null,
+    iconY: null,
+    sizeFlags: null,
+    minWidth: null,
+    maxWidth: null,
+  });
+  expect(metadata.afterClear.resource).toMatchObject({
+    title: "",
+    iconName: "",
+    command: "",
+    className: "",
+    classValue: "",
+    clientMachine: "",
+    transientFor: 0,
+    wmHints: null,
+    sizeHints: null,
+  });
+});
+
 test("browser backend reflects WM_HINTS relationships in DOM state", async ({
   page,
 }) => {
