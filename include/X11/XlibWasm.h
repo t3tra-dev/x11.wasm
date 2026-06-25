@@ -374,9 +374,6 @@ EXTERN void Xutf8SetWMProperties(Display *display, Window w,
 	_Xconst char *window_name, _Xconst char *icon_name, char **argv,
 	int argc, XSizeHints *normal_hints, XWMHints *wm_hints,
 	XClassHint *class_hints);
-EXTERN int X11WasmPutImagePalette(unsigned long *colors, int ncolors, Display *display,
-	Drawable d, GC gc, XImage *image, int src_x, int src_y, int dest_x,
-	int dest_y, unsigned int width, unsigned int height);
 EXTERN int X11WasmSetClipboardText(_Xconst char *utf8, int utf8Length);
 EXTERN int X11WasmSetWindowMetadataTarget(Display *display, Window window,
 	Window target, int isRootToplevel);

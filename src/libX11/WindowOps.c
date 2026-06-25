@@ -1710,53 +1710,6 @@ BrowserConvertXYBitmapForPut(
 }
 
 XImage *
-BrowserConvertPaletteImageForPut(
-    X11WasmResource *resourcePtr,
-    unsigned long *colors,
-    int ncolors,
-    XImage *image,
-    int srcX,
-    int srcY,
-    unsigned int width,
-    unsigned int height)
-{
-    XImage *convertedImage;
-    int dataLength;
-    unsigned int x, y;
-
-    if ((resourcePtr == NULL) || (colors == NULL) || (ncolors <= 0)
-	    || (image == NULL) || (image->format == XYBitmap)
-	    || (image->bits_per_pixel >= 16)) {
-	return image;
-    }
-    convertedImage = XCreateImage(NULL, NULL, resourcePtr->depth, ZPixmap, 0,
-	    NULL, width, height, 32, 0);
-    if (convertedImage == NULL) {
-	return NULL;
-    }
-    dataLength = convertedImage->bytes_per_line * convertedImage->height;
-    if (dataLength <= 0) {
-	(void)XDestroyImage(convertedImage);
-	return NULL;
-    }
-    convertedImage->data = (char *)ckalloc((unsigned int)dataLength);
-    memset(convertedImage->data, 0, (unsigned int)dataLength);
-    convertedImage->obdata = (XPointer)convertedImage;
-    for (y = 0; y < height; y++) {
-	for (x = 0; x < width; x++) {
-	    unsigned long pixel = BrowserImageGetPixel(image, srcX + (int)x,
-		    srcY + (int)y);
-
-	    if (pixel < (unsigned long)ncolors) {
-		pixel = colors[pixel];
-	    }
-	    (void)BrowserImagePutPixel(convertedImage, (int)x, (int)y, pixel);
-	}
-    }
-    return convertedImage;
-}
-
-XImage *
 XGetImage(
     Display *display,
     Drawable drawable,
@@ -1861,47 +1814,6 @@ XPutImage(
     }
     BrowserMarkResourceDamage(resourcePtr, destX, destY, width, height);
     return Success;
-}
-
-int
-X11WasmPutImagePalette(
-    unsigned long *colors,
-    int ncolors,
-    Display *display,
-    Drawable drawable,
-    GC gc,
-    XImage *image,
-    int srcX,
-    int srcY,
-    int destX,
-    int destY,
-    unsigned int width,
-    unsigned int height)
-{
-    X11WasmResource *resourcePtr = X11WasmFindResource(drawable);
-    XImage *putImage = image;
-    int result;
-
-    if ((resourcePtr != NULL)
-	    && ((resourcePtr->type == X11_WASM_RESOURCE_WINDOW)
-		    || (resourcePtr->type == X11_WASM_RESOURCE_PIXMAP))
-	    && !((resourcePtr->type == X11_WASM_RESOURCE_WINDOW)
-		    && (resourcePtr->c_class == InputOnly))
-	    && (image != NULL)
-	    && BrowserImageFormatIsValid(image->format)) {
-	putImage = BrowserConvertPaletteImageForPut(resourcePtr, colors,
-		ncolors, image, srcX, srcY, width, height);
-	if (putImage == NULL) {
-	    return Success;
-	}
-    }
-    result = XPutImage(display, drawable, gc, putImage,
-	    (putImage == image) ? srcX : 0, (putImage == image) ? srcY : 0,
-	    destX, destY, width, height);
-    if ((putImage != NULL) && (putImage != image)) {
-	(void)XDestroyImage(putImage);
-    }
-    return result;
 }
 
 Pixmap

@@ -391,20 +391,12 @@ X11WasmTestXlibApis(void)
     XImage *bitmapImage = NULL;
     XImage *xyBitmapImage = NULL;
     XImage *xyBitmapReadback = NULL;
-    XImage *paletteImage = NULL;
-    XImage *paletteReadback = NULL;
     XImage *textReadback = NULL;
     Pixmap xyBitmapPixmap = None;
-    Pixmap palettePixmap = None;
     GC xyBitmapGC = NULL;
-    GC paletteGC = NULL;
     unsigned char image16Data[8];
     unsigned char bitmapImageData[4];
     unsigned char xyBitmapData[1];
-    unsigned char paletteImageData[4];
-    unsigned long paletteColors[3] = {
-	0xff0000UL, 0x00ff00UL, 0x0000ffUL
-    };
     int keysymsPerKeycode = -1;
     KeySym unicodeSnowman =
 	    (KeySym)(X11_WASM_UNICODE_KEYSYM_BASE | 0x2603U);
@@ -507,7 +499,6 @@ X11WasmTestXlibApis(void)
     memset(image16Data, 0, sizeof(image16Data));
     memset(bitmapImageData, 0, sizeof(bitmapImageData));
     memset(xyBitmapData, 0, sizeof(xyBitmapData));
-    memset(paletteImageData, 0, sizeof(paletteImageData));
     memset(iconSizes, 0, sizeof(iconSizes));
     memset(standardColormaps, 0, sizeof(standardColormaps));
     memset(&standardColormapReturn, 0, sizeof(standardColormapReturn));
@@ -851,35 +842,6 @@ X11WasmTestXlibApis(void)
     if ((xyBitmapReadback == NULL)
 	    || (XGetPixel(xyBitmapReadback, 0, 0) != 0xff0000UL)
 	    || (XGetPixel(xyBitmapReadback, 1, 0) != 0x00ff00UL)) {
-	goto cleanup;
-    }
-    paletteImageData[0] = 0;
-    paletteImageData[1] = 1;
-    paletteImageData[2] = 2;
-    palettePixmap = XCreatePixmap(&browserDisplay.display,
-	    (Drawable)browserDisplay.rootWindow, 3, 1,
-	    (unsigned int)DefaultDepth(&browserDisplay.display,
-		    DefaultScreen(&browserDisplay.display)));
-    paletteGC = (palettePixmap != None)
-	    ? XCreateGC(&browserDisplay.display, palettePixmap, 0, NULL)
-	    : NULL;
-    paletteImage = XCreateImage(&browserDisplay.display,
-	    DefaultVisual(&browserDisplay.display,
-		    DefaultScreen(&browserDisplay.display)), 8, ZPixmap, 0,
-	    (char *)paletteImageData, 3, 1, 32, 0);
-    if ((palettePixmap == None) || (paletteGC == NULL)
-	    || (paletteImage == NULL)
-	    || (X11WasmPutImagePalette(paletteColors, 3, &browserDisplay.display,
-		    palettePixmap, paletteGC, paletteImage, 0, 0, 0, 0, 3, 1)
-		    != Success)) {
-	goto cleanup;
-    }
-    paletteReadback = XGetImage(&browserDisplay.display, palettePixmap,
-	    0, 0, 3, 1, AllPlanes, ZPixmap);
-    if ((paletteReadback == NULL)
-	    || (XGetPixel(paletteReadback, 0, 0) != 0xff0000UL)
-	    || (XGetPixel(paletteReadback, 1, 0) != 0x00ff00UL)
-	    || (XGetPixel(paletteReadback, 2, 0) != 0x0000ffUL)) {
 	goto cleanup;
     }
     regionA = XCreateRegion();
@@ -3389,29 +3351,17 @@ cleanup:
     if (xyBitmapImage != NULL) {
 	(void)XDestroyImage(xyBitmapImage);
     }
-    if (paletteReadback != NULL) {
-	(void)XDestroyImage(paletteReadback);
-    }
-    if (paletteImage != NULL) {
-	(void)XDestroyImage(paletteImage);
-    }
     if (textReadback != NULL) {
 	(void)XDestroyImage(textReadback);
     }
     if (xyBitmapGC != NULL) {
 	(void)XFreeGC(&browserDisplay.display, xyBitmapGC);
     }
-    if (paletteGC != NULL) {
-	(void)XFreeGC(&browserDisplay.display, paletteGC);
-    }
     if (textGC != NULL) {
 	(void)XFreeGC(&browserDisplay.display, textGC);
     }
     if (xyBitmapPixmap != None) {
 	(void)XFreePixmap(&browserDisplay.display, xyBitmapPixmap);
-    }
-    if (palettePixmap != None) {
-	(void)XFreePixmap(&browserDisplay.display, palettePixmap);
     }
     if (textPixmap != None) {
 	(void)XFreePixmap(&browserDisplay.display, textPixmap);

@@ -41,8 +41,12 @@ typedef struct X11WasmDString {
 #define X11WasmDStringLength(dsPtr) ((dsPtr)->length)
 #define X11WasmDStringValue(dsPtr) ((dsPtr)->string)
 
+#ifndef ckalloc
 void *ckalloc(size_t size);
+#endif
+#ifndef ckfree
 void ckfree(void *ptr);
+#endif
 void X11WasmDStringInit(X11WasmDString *dsPtr);
 char *X11WasmDStringAppend(X11WasmDString *dsPtr, const char *bytes,
 	int length);
@@ -57,5 +61,8 @@ char *X11WasmUtfToExternalDString(X11WasmEncoding encoding, const char *src,
 	int srcLen, X11WasmDString *dsPtr);
 int X11WasmUtfToCodepoint(const char *src, X11WasmCodepoint *chPtr);
 void X11WasmSetPixmapColormap(Pixmap pixmap, Colormap colormap);
+Pixmap X11WasmCreateNativeBitmap(Display *display, const void *source);
+Pixmap X11WasmGetNativeAppBitmap(Display *display, const char *name,
+	int *width, int *height);
 
 #endif /* _X11WASM_RUNTIME_H */

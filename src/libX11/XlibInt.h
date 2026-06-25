@@ -527,15 +527,6 @@ int BrowserConvertExternalClipboardSelection(
     Atom target,
     Atom property,
     Time time);
-XImage *BrowserConvertPaletteImageForPut(
-    X11WasmResource *resourcePtr,
-    unsigned long *colors,
-    int ncolors,
-    XImage *image,
-    int srcX,
-    int srcY,
-    unsigned int width,
-    unsigned int height);
 int BrowserConvertUtf8ListToEncoding(
     char **list,
     int count,
