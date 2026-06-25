@@ -55,6 +55,7 @@ EXTERN GContext XGContextFromGC(GC g);
 EXTERN int XAddHost(Display *d, XHostAddress *host);
 EXTERN int XAddHosts(Display *d, XHostAddress *hosts, int nhosts);
 EXTERN int XAddToSaveSet(Display *d, Window w);
+EXTERN int XAllowEvents(Display *d, int i, Time t);
 EXTERN int XDisableAccessControl(Display *d);
 EXTERN int XEnableAccessControl(Display *d);
 EXTERN XHostAddress *XListHosts(Display *d, int *i, Bool *b);
@@ -165,6 +166,8 @@ EXTERN Status XAllocColor(Display *d, Colormap c, XColor *xp);
 EXTERN Status XAllocNamedColor(Display *d, Colormap c, _Xconst char *name,
 	XColor *screen_def_return, XColor *exact_def_return);
 	EXTERN int XBell(Display *d, int i);
+EXTERN int XChangeActivePointerGrab(Display *d, unsigned int ui,
+	Cursor c, Time t);
 	EXTERN int XChangeProperty(Display *d, Window w, Atom a1, Atom a2,
 		int i1, int i2, _Xconst unsigned char *c, int i3);
 EXTERN int XChangeWindowAttributes(Display *d, Window w, unsigned long ul,
@@ -237,6 +240,11 @@ EXTERN Bool XGetFontProperty(XFontStruct *font_struct, Atom atom,
 	unsigned long *value_return);
 EXTERN int XGetGCValues(Display *d, GC gc, unsigned long valuemask,
 	XGCValues *values_return);
+EXTERN int XGrabButton(Display *d, unsigned int ui1, unsigned int ui2,
+	Window w1, Bool b, unsigned int ui3, int i1, int i2, Window w2,
+	Cursor c);
+EXTERN int XGrabKey(Display *d, int i1, unsigned int ui, Window w, Bool b,
+	int i2, int i3);
 EXTERN int XGrabKeyboard(Display *d, Window w, Bool b, int i1, int i2,
 	Time t);
 EXTERN int XGrabPointer(Display *d, Window w1, Bool b, unsigned int ui,
@@ -373,6 +381,9 @@ EXTERN int XStoreName(Display *d, Window w, _Xconst char *name);
 EXTERN Bool XTranslateCoordinates(Display *d, Window w1, Window w2,
 	int i1, int i2, int *i3, int *i4, Window *w3);
 EXTERN int XUnloadFont(Display *d, Font font);
+EXTERN int XUngrabButton(Display *d, unsigned int ui1, unsigned int ui2,
+	Window w);
+EXTERN int XUngrabKey(Display *d, int i, unsigned int ui, Window w);
 EXTERN int XUngrabKeyboard(Display *d, Time t);
 EXTERN int XUngrabPointer(Display *d, Time t);
 EXTERN int XUnmapSubwindows(Display *d, Window w);

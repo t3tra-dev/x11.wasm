@@ -5192,6 +5192,43 @@ X11WasmTestXlibApis(void)
 	    || (XResetScreenSaver(&browserDisplay.display) != Success)) {
 	goto cleanup;
     }
+    if ((XGrabButton(&browserDisplay.display, Button1, AnyModifier,
+		    browserDisplay.rootWindow, False, ButtonPressMask,
+		    GrabModeAsync, GrabModeAsync, None, None) != Success)
+	    || (XUngrabButton(&browserDisplay.display, AnyButton,
+		    AnyModifier, browserDisplay.rootWindow) != Success)
+	    || (XGrabKey(&browserDisplay.display, AnyKey, AnyModifier,
+		    browserDisplay.rootWindow, False, GrabModeAsync,
+		    GrabModeAsync) != Success)
+	    || (XUngrabKey(&browserDisplay.display, AnyKey, AnyModifier,
+		    browserDisplay.rootWindow) != Success)) {
+	goto cleanup;
+    }
+    if ((XGrabPointer(&browserDisplay.display, browserDisplay.rootWindow,
+		    False, ButtonPressMask, GrabModeSync, GrabModeSync,
+		    None, None, CurrentTime) != GrabSuccess)
+	    || (XChangeActivePointerGrab(&browserDisplay.display,
+		    PointerMotionMask, None, CurrentTime) != Success)
+	    || (browserDisplay.pointerGrabEventMask != PointerMotionMask)
+	    || (XAllowEvents(&browserDisplay.display, AsyncBoth, CurrentTime)
+		    != Success)
+	    || (browserDisplay.pointerGrabPointerMode != GrabModeAsync)
+	    || (browserDisplay.pointerGrabKeyboardMode != GrabModeAsync)
+	    || (XUngrabPointer(&browserDisplay.display, CurrentTime)
+		    != Success)) {
+	goto cleanup;
+    }
+    if ((XGrabKeyboard(&browserDisplay.display, browserDisplay.rootWindow,
+		    False, GrabModeSync, GrabModeSync, CurrentTime)
+		    != GrabSuccess)
+	    || (XAllowEvents(&browserDisplay.display, AsyncBoth, CurrentTime)
+		    != Success)
+	    || (browserDisplay.keyboardGrabPointerMode != GrabModeAsync)
+	    || (browserDisplay.keyboardGrabKeyboardMode != GrabModeAsync)
+	    || (XUngrabKeyboard(&browserDisplay.display, CurrentTime)
+		    != Success)) {
+	goto cleanup;
+    }
 
     if ((browserDisplay.serverGrabDepth != 0)
 	    || (browserDisplay.synchronize != 0)
@@ -5675,6 +5712,14 @@ X11WasmTestXErrorHandler(void)
     int grabPointerWindowResult;
     int grabPointerConfineResult;
     int grabPointerCursorResult;
+    int passiveGrabValidationResultSum;
+    int sawGrabButtonBadValue;
+    int sawGrabButtonBadWindow;
+    int sawGrabKeyBadValue;
+    int sawUngrabKeyBadWindow;
+    int sawAllowEventsBadValue;
+    int sawChangeActivePointerGrabBadValue;
+    int sawChangeActivePointerGrabBadCursor;
     int bellValidationResult;
     int propertyValidationResultSum;
     int invalidWMColormapCountResult;
@@ -6342,6 +6387,49 @@ X11WasmTestXErrorHandler(void)
     grabPointerCursorResult = XGrabPointer(&browserDisplay.display,
 	    browserDisplay.rootWindow, False, 0, GrabModeAsync, GrabModeAsync,
 	    None, (Cursor)invalidWindow, CurrentTime);
+    passiveGrabValidationResultSum = XGrabButton(&browserDisplay.display,
+	    256U, 0, browserDisplay.rootWindow, False, 0, GrabModeAsync,
+	    GrabModeAsync, None, None);
+    sawGrabButtonBadValue = (browserTestLastErrorCode == BadValue)
+	    && (browserTestLastRequestCode == X11_WASM_XREQ_GRAB_BUTTON)
+	    && (browserTestLastResourceId == (XID)256U);
+    passiveGrabValidationResultSum += XGrabButton(&browserDisplay.display,
+	    Button1, 0, invalidWindow, False, 0, GrabModeAsync,
+	    GrabModeAsync, None, None);
+    sawGrabButtonBadWindow = (browserTestLastErrorCode == BadWindow)
+	    && (browserTestLastRequestCode == X11_WASM_XREQ_GRAB_BUTTON)
+	    && (browserTestLastResourceId == (XID)invalidWindow);
+    passiveGrabValidationResultSum += XGrabKey(&browserDisplay.display,
+	    browserDisplay.display.min_keycode - 1, 0,
+	    browserDisplay.rootWindow, False, GrabModeAsync, GrabModeAsync);
+    sawGrabKeyBadValue = (browserTestLastErrorCode == BadValue)
+	    && (browserTestLastRequestCode == X11_WASM_XREQ_GRAB_KEY)
+	    && (browserTestLastResourceId
+		    == (XID)(browserDisplay.display.min_keycode - 1));
+    passiveGrabValidationResultSum += XUngrabKey(&browserDisplay.display,
+	    AnyKey, 0, invalidWindow);
+    sawUngrabKeyBadWindow = (browserTestLastErrorCode == BadWindow)
+	    && (browserTestLastRequestCode == X11_WASM_XREQ_UNGRAB_KEY)
+	    && (browserTestLastResourceId == (XID)invalidWindow);
+    passiveGrabValidationResultSum += XAllowEvents(&browserDisplay.display,
+	    SyncBoth + 1, CurrentTime);
+    sawAllowEventsBadValue = (browserTestLastErrorCode == BadValue)
+	    && (browserTestLastRequestCode == X11_WASM_XREQ_ALLOW_EVENTS)
+	    && (browserTestLastResourceId == (XID)(SyncBoth + 1));
+    passiveGrabValidationResultSum += XChangeActivePointerGrab(
+	    &browserDisplay.display, ExposureMask, None, CurrentTime);
+    sawChangeActivePointerGrabBadValue =
+	    (browserTestLastErrorCode == BadValue)
+	    && (browserTestLastRequestCode
+		    == X11_WASM_XREQ_CHANGE_ACTIVE_POINTER_GRAB)
+	    && (browserTestLastResourceId == (XID)ExposureMask);
+    passiveGrabValidationResultSum += XChangeActivePointerGrab(
+	    &browserDisplay.display, 0, (Cursor)invalidWindow, CurrentTime);
+    sawChangeActivePointerGrabBadCursor =
+	    (browserTestLastErrorCode == BadCursor)
+	    && (browserTestLastRequestCode
+		    == X11_WASM_XREQ_CHANGE_ACTIVE_POINTER_GRAB)
+	    && (browserTestLastResourceId == (XID)invalidWindow);
     bellValidationResult = XBell(&browserDisplay.display, 101);
     (void)XSetScreenSaver(&browserDisplay.display, -1, 30,
 	    PreferBlanking, AllowExposures);
@@ -6659,6 +6747,14 @@ X11WasmTestXErrorHandler(void)
 	    || (grabPointerWindowResult != GrabNotViewable)
 	    || (grabPointerConfineResult != GrabNotViewable)
 	    || (grabPointerCursorResult != BadCursor)
+	    || (passiveGrabValidationResultSum != Success)
+	    || !sawGrabButtonBadValue
+	    || !sawGrabButtonBadWindow
+	    || !sawGrabKeyBadValue
+	    || !sawUngrabKeyBadWindow
+	    || !sawAllowEventsBadValue
+	    || !sawChangeActivePointerGrabBadValue
+	    || !sawChangeActivePointerGrabBadCursor
 	    || (bellValidationResult != Success)
 	    || (validProperty == None)
 	    || (propertyPixmap == None)

@@ -498,6 +498,73 @@ BrowserPointerGrabEventMaskIsValid(
     return (eventMask & ~allowedMask) == 0;
 }
 
+static int
+BrowserPassiveGrabButtonIsValid(
+    unsigned int button)
+{
+    return button <= 255U;
+}
+
+static int
+BrowserPassiveGrabKeycodeIsValid(
+    Display *display,
+    int keycode)
+{
+    return (keycode == AnyKey)
+	    || ((display != NULL) && (keycode >= display->min_keycode)
+	    && (keycode <= display->max_keycode));
+}
+
+static int
+BrowserPassiveGrabModifierMaskIsValid(
+    unsigned int modifiers)
+{
+    const unsigned int modifierMask = ShiftMask | LockMask | ControlMask
+	    | Mod1Mask | Mod2Mask | Mod3Mask | Mod4Mask | Mod5Mask;
+
+    return (modifiers == AnyModifier)
+	    || ((modifiers & ~(modifierMask)) == 0);
+}
+
+static int
+BrowserAllowEventsModeIsValid(
+    int mode)
+{
+    return (mode == AsyncPointer) || (mode == SyncPointer)
+	    || (mode == ReplayPointer) || (mode == AsyncKeyboard)
+	    || (mode == SyncKeyboard) || (mode == ReplayKeyboard)
+	    || (mode == AsyncBoth) || (mode == SyncBoth);
+}
+
+static int
+BrowserAllowEventsAffectsPointer(
+    int mode)
+{
+    return (mode == AsyncPointer) || (mode == SyncPointer)
+	    || (mode == ReplayPointer) || (mode == AsyncBoth)
+	    || (mode == SyncBoth);
+}
+
+static int
+BrowserAllowEventsAffectsKeyboard(
+    int mode)
+{
+    return (mode == AsyncKeyboard) || (mode == SyncKeyboard)
+	    || (mode == ReplayKeyboard) || (mode == AsyncBoth)
+	    || (mode == SyncBoth);
+}
+
+static int
+BrowserAllowEventsTimeIsValid(
+    int mode,
+    Time time)
+{
+    return (!BrowserAllowEventsAffectsPointer(mode)
+	    || BrowserRequestTimeIsValid(time, browserDisplay.pointerGrabTime))
+	    && (!BrowserAllowEventsAffectsKeyboard(mode)
+	    || BrowserRequestTimeIsValid(time, browserDisplay.keyboardGrabTime));
+}
+
 int
 BrowserRequestTimeIsValid(
     Time time,
@@ -789,6 +856,240 @@ XGrabPointer(
     BrowserSyncPointerGrabState();
     return GrabSuccess;
 }
+
+EMSCRIPTEN_KEEPALIVE int
+XAllowEvents(
+    Display *display,
+    int eventMode,
+    Time time)
+{
+    int pointerChanged = 0;
+    int keyboardChanged = 0;
+
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    if (!BrowserValueOrError(&display, eventMode,
+	    BrowserAllowEventsModeIsValid(eventMode),
+	    X11_WASM_XREQ_ALLOW_EVENTS)) {
+	return Success;
+    }
+    if (!BrowserAllowEventsTimeIsValid(eventMode, time)) {
+	return Success;
+    }
+    if (display == &browserDisplay.display) {
+	if ((eventMode == AsyncPointer) || (eventMode == ReplayPointer)
+		|| (eventMode == AsyncBoth)) {
+	    if (browserDisplay.pointerGrabWindow != None) {
+		browserDisplay.pointerGrabPointerMode = GrabModeAsync;
+		pointerChanged = 1;
+	    }
+	    if (browserDisplay.keyboardGrabWindow != None) {
+		browserDisplay.keyboardGrabPointerMode = GrabModeAsync;
+		keyboardChanged = 1;
+	    }
+	}
+	if ((eventMode == AsyncKeyboard) || (eventMode == ReplayKeyboard)
+		|| (eventMode == AsyncBoth)) {
+	    if (browserDisplay.pointerGrabWindow != None) {
+		browserDisplay.pointerGrabKeyboardMode = GrabModeAsync;
+		pointerChanged = 1;
+	    }
+	    if (browserDisplay.keyboardGrabWindow != None) {
+		browserDisplay.keyboardGrabKeyboardMode = GrabModeAsync;
+		keyboardChanged = 1;
+	    }
+	}
+	if (pointerChanged) {
+	    BrowserSyncPointerGrabState();
+	}
+	if (keyboardChanged) {
+	    BrowserSyncKeyboardGrabState();
+	}
+    }
+    return XNoOp(display);
+}
+
+EMSCRIPTEN_KEEPALIVE int
+XChangeActivePointerGrab(
+    Display *display,
+    unsigned int eventMask,
+    Cursor cursor,
+    Time time)
+{
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    if (!BrowserValueOrError(&display, (long)eventMask,
+	    BrowserPointerGrabEventMaskIsValid(eventMask),
+	    X11_WASM_XREQ_CHANGE_ACTIVE_POINTER_GRAB)) {
+	return Success;
+    }
+    if ((cursor != None) && (BrowserCursorResourceOrError(&display, cursor,
+	    X11_WASM_XREQ_CHANGE_ACTIVE_POINTER_GRAB) == NULL)) {
+	return Success;
+    }
+    if (!BrowserRequestTimeIsValid(time, browserDisplay.pointerGrabTime)) {
+	return Success;
+    }
+    if ((display == &browserDisplay.display)
+	    && (browserDisplay.pointerGrabWindow != None)) {
+	browserDisplay.pointerGrabEventMask = eventMask;
+	browserDisplay.pointerGrabCursor = cursor;
+	BrowserSyncPointerGrabCursor();
+	BrowserSyncPointerGrabState();
+    }
+    return XNoOp(display);
+}
+
+EMSCRIPTEN_KEEPALIVE int
+XGrabButton(
+    Display *display,
+    unsigned int button,
+    unsigned int modifiers,
+    Window grabWindow,
+    Bool ownerEvents,
+    unsigned int eventMask,
+    int pointerMode,
+    int keyboardMode,
+    Window confineTo,
+    Cursor cursor)
+{
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    if (!BrowserValueOrError(&display, (long)button,
+	    BrowserPassiveGrabButtonIsValid(button),
+	    X11_WASM_XREQ_GRAB_BUTTON)
+	    || !BrowserValueOrError(&display, (long)modifiers,
+		    BrowserPassiveGrabModifierMaskIsValid(modifiers),
+		    X11_WASM_XREQ_GRAB_BUTTON)
+	    || !BrowserValidateBool(&display, ownerEvents,
+		    X11_WASM_XREQ_GRAB_BUTTON)
+	    || !BrowserValueOrError(&display, (long)eventMask,
+		    BrowserPointerGrabEventMaskIsValid(eventMask),
+		    X11_WASM_XREQ_GRAB_BUTTON)
+	    || !BrowserValueOrError(&display, pointerMode,
+		    BrowserGrabModeIsValid(pointerMode),
+		    X11_WASM_XREQ_GRAB_BUTTON)
+	    || !BrowserValueOrError(&display, keyboardMode,
+		    BrowserGrabModeIsValid(keyboardMode),
+		    X11_WASM_XREQ_GRAB_BUTTON)) {
+	return Success;
+    }
+    if (BrowserWindowResourceOrError(&display, grabWindow,
+	    X11_WASM_XREQ_GRAB_BUTTON) == NULL) {
+	return Success;
+    }
+    if ((confineTo != None) && (BrowserWindowResourceOrError(&display,
+	    confineTo, X11_WASM_XREQ_GRAB_BUTTON) == NULL)) {
+	return Success;
+    }
+    if ((cursor != None) && (BrowserCursorResourceOrError(&display, cursor,
+	    X11_WASM_XREQ_GRAB_BUTTON) == NULL)) {
+	return Success;
+    }
+    return XNoOp(display);
+}
+
+EMSCRIPTEN_KEEPALIVE int
+XGrabKey(
+    Display *display,
+    int keycode,
+    unsigned int modifiers,
+    Window grabWindow,
+    Bool ownerEvents,
+    int pointerMode,
+    int keyboardMode)
+{
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    if (!BrowserValueOrError(&display, keycode,
+	    BrowserPassiveGrabKeycodeIsValid(display, keycode),
+	    X11_WASM_XREQ_GRAB_KEY)
+	    || !BrowserValueOrError(&display, (long)modifiers,
+		    BrowserPassiveGrabModifierMaskIsValid(modifiers),
+		    X11_WASM_XREQ_GRAB_KEY)
+	    || !BrowserValidateBool(&display, ownerEvents,
+		    X11_WASM_XREQ_GRAB_KEY)
+	    || !BrowserValueOrError(&display, pointerMode,
+		    BrowserGrabModeIsValid(pointerMode),
+		    X11_WASM_XREQ_GRAB_KEY)
+	    || !BrowserValueOrError(&display, keyboardMode,
+		    BrowserGrabModeIsValid(keyboardMode),
+		    X11_WASM_XREQ_GRAB_KEY)) {
+	return Success;
+    }
+    if (BrowserWindowResourceOrError(&display, grabWindow,
+	    X11_WASM_XREQ_GRAB_KEY) == NULL) {
+	return Success;
+    }
+    return XNoOp(display);
+}
+
+EMSCRIPTEN_KEEPALIVE int
+XUngrabButton(
+    Display *display,
+    unsigned int button,
+    unsigned int modifiers,
+    Window grabWindow)
+{
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    if (!BrowserValueOrError(&display, (long)button,
+	    BrowserPassiveGrabButtonIsValid(button),
+	    X11_WASM_XREQ_UNGRAB_BUTTON)
+	    || !BrowserValueOrError(&display, (long)modifiers,
+		    BrowserPassiveGrabModifierMaskIsValid(modifiers),
+		    X11_WASM_XREQ_UNGRAB_BUTTON)) {
+	return Success;
+    }
+    if (BrowserWindowResourceOrError(&display, grabWindow,
+	    X11_WASM_XREQ_UNGRAB_BUTTON) == NULL) {
+	return Success;
+    }
+    return XNoOp(display);
+}
+
+EMSCRIPTEN_KEEPALIVE int
+XUngrabKey(
+    Display *display,
+    int keycode,
+    unsigned int modifiers,
+    Window grabWindow)
+{
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    if (!BrowserValueOrError(&display, keycode,
+	    BrowserPassiveGrabKeycodeIsValid(display, keycode),
+	    X11_WASM_XREQ_UNGRAB_KEY)
+	    || !BrowserValueOrError(&display, (long)modifiers,
+		    BrowserPassiveGrabModifierMaskIsValid(modifiers),
+		    X11_WASM_XREQ_UNGRAB_KEY)) {
+	return Success;
+    }
+    if (BrowserWindowResourceOrError(&display, grabWindow,
+	    X11_WASM_XREQ_UNGRAB_KEY) == NULL) {
+	return Success;
+    }
+    return XNoOp(display);
+}
+
 EMSCRIPTEN_KEEPALIVE int
 XUngrabKeyboard(
     Display *display,
