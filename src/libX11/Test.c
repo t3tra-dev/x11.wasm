@@ -4420,6 +4420,8 @@ X11WasmTestXErrorHandler(void)
     int grabPointerCursorResult;
     int bellValidationResult;
     int propertyValidationResultSum;
+    int invalidWMColormapCountResult;
+    int invalidWMColormapListResult;
     int changePixmapPropertyResult;
     int getPixmapPropertyResult;
     int deletePixmapPropertyResult;
@@ -5088,6 +5090,18 @@ X11WasmTestXErrorHandler(void)
 	    browserDisplay.rootWindow, validProperty);
     propertyValidationResultSum += XDeleteProperty(&browserDisplay.display,
 	    browserDisplay.rootWindow, invalidAtom);
+    propertyValidationResultSum += XSetIconSizes(&browserDisplay.display,
+	    browserDisplay.rootWindow, NULL, -1);
+    propertyValidationResultSum += XSetIconSizes(&browserDisplay.display,
+	    browserDisplay.rootWindow, NULL, 1);
+    XSetRGBColormaps(&browserDisplay.display, browserDisplay.rootWindow,
+	    NULL, -1, validProperty);
+    XSetRGBColormaps(&browserDisplay.display, browserDisplay.rootWindow,
+	    NULL, 1, validProperty);
+    invalidWMColormapCountResult = XSetWMColormapWindows(
+	    &browserDisplay.display, browserDisplay.rootWindow, NULL, -1);
+    invalidWMColormapListResult = XSetWMColormapWindows(
+	    &browserDisplay.display, browserDisplay.rootWindow, NULL, 1);
     getInvalidAtomResult = XGetWindowProperty(&browserDisplay.display,
 	    browserDisplay.rootWindow, invalidAtom, 0, 1, False,
 	    AnyPropertyType, NULL, NULL, NULL, NULL, NULL);
@@ -5219,6 +5233,8 @@ X11WasmTestXErrorHandler(void)
 	    || (deletePixmapPropertyResult != Success)
 	    || (queryPixmapResult != False)
 	    || (propertyValidationResultSum != Success)
+	    || (invalidWMColormapCountResult != False)
+	    || (invalidWMColormapListResult != False)
 	    || (getInvalidAtomResult != BadAtom)
 	    || (getNegativeOffsetResult != BadValue)
 	    || (getNegativeLengthResult != BadValue)
@@ -5390,6 +5406,12 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_CHANGE_PROPERTY
 	    + X11_WASM_XREQ_CHANGE_PROPERTY
 	    + X11_WASM_XREQ_CHANGE_PROPERTY
+	    + X11_WASM_XREQ_CHANGE_PROPERTY
+	    + X11_WASM_XREQ_CHANGE_PROPERTY
+	    + X11_WASM_XREQ_CHANGE_PROPERTY
+	    + X11_WASM_XREQ_CHANGE_PROPERTY
+	    + X11_WASM_XREQ_CHANGE_PROPERTY
+	    + X11_WASM_XREQ_CHANGE_PROPERTY
 	    + X11_WASM_XREQ_DELETE_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
@@ -5447,15 +5469,15 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 175)
+    if ((browserTestXErrorCount != 181)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
 	    || (browserTestRequestCodeSum != expectedRequestCodeSum)
 	    || (browserTestRequestCodeMask != expectedRequestCodeMask)
-	    || (browserTestLastSerial != initialSerial + 175)
+	    || (browserTestLastSerial != initialSerial + 181)
 	    || (LastKnownRequestProcessed(&browserDisplay.display)
-		    != initialSerial + 175)) {
+		    != initialSerial + 181)) {
 	return 0;
     }
     return 1;

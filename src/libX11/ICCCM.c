@@ -701,6 +701,23 @@ X11WasmTestSetZoomHints(unsigned int window, int enabled)
     return XSetZoomHints(&browserDisplay.display, (Window)window, &hints);
 }
 
+static int
+BrowserValidatePropertyList(
+    Display **displayPtr,
+    const void *items,
+    int count,
+    unsigned char requestCode)
+{
+    if (count < 0) {
+	return BrowserValueOrError(displayPtr, count, 0, requestCode);
+    }
+    if ((count > 0) && (items == NULL)) {
+	return BrowserPropertyValueOrError(displayPtr, (XID)count,
+		requestCode);
+    }
+    return 1;
+}
+
 EMSCRIPTEN_KEEPALIVE int
 XSetIconSizes(
     Display *display,
@@ -708,7 +725,11 @@ XSetIconSizes(
     XIconSize *sizeList,
     int count)
 {
-    if ((sizeList == NULL) || (count <= 0)) {
+    if (!BrowserValidatePropertyList(&display, sizeList, count,
+	    X11_WASM_XREQ_CHANGE_PROPERTY)) {
+	return Success;
+    }
+    if (count == 0) {
 	(void)XDeleteProperty(display, window, XA_WM_ICON_SIZE);
 	return Success;
     }
@@ -850,7 +871,11 @@ XSetRGBColormaps(
     int count,
     Atom property)
 {
-    if ((stdcmaps == NULL) || (count <= 0)) {
+    if (!BrowserValidatePropertyList(&display, stdcmaps, count,
+	    X11_WASM_XREQ_CHANGE_PROPERTY)) {
+	return;
+    }
+    if (count == 0) {
 	(void)XDeleteProperty(display, window, property);
 	return;
     }
@@ -1183,7 +1208,11 @@ XSetWMColormapWindows(
 {
     Atom property = BrowserWmColormapWindowsAtom();
 
-    if ((count <= 0) || (windows == NULL)) {
+    if (!BrowserValidatePropertyList(&display, windows, count,
+	    X11_WASM_XREQ_CHANGE_PROPERTY)) {
+	return False;
+    }
+    if (count == 0) {
 	(void)XDeleteProperty(display, window, property);
 	return True;
     }
