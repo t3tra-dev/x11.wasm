@@ -4514,6 +4514,8 @@ X11WasmTestXErrorHandler(void)
     XColor color;
     XColor exactColor;
     XColor screenColor;
+    XIconSize oversizedIconSize;
+    XStandardColormap oversizedStandardColormap;
     XRectangle clipRect;
     Visual mismatchedVisual;
     XEvent event;
@@ -4546,6 +4548,8 @@ X11WasmTestXErrorHandler(void)
     memset(&color, 0, sizeof(color));
     memset(&exactColor, 0, sizeof(exactColor));
     memset(&screenColor, 0, sizeof(screenColor));
+    memset(&oversizedIconSize, 0, sizeof(oversizedIconSize));
+    memset(&oversizedStandardColormap, 0, sizeof(oversizedStandardColormap));
     memset(&clipRect, 0, sizeof(clipRect));
     memset(&event, 0, sizeof(event));
     memset(&invalidFormatPutImage, 0, sizeof(invalidFormatPutImage));
@@ -5158,10 +5162,14 @@ X11WasmTestXErrorHandler(void)
 	    browserDisplay.rootWindow, NULL, -1);
     propertyValidationResultSum += XSetIconSizes(&browserDisplay.display,
 	    browserDisplay.rootWindow, NULL, 1);
+    propertyValidationResultSum += XSetIconSizes(&browserDisplay.display,
+	    browserDisplay.rootWindow, &oversizedIconSize, INT_MAX);
     XSetRGBColormaps(&browserDisplay.display, browserDisplay.rootWindow,
 	    NULL, -1, validProperty);
     XSetRGBColormaps(&browserDisplay.display, browserDisplay.rootWindow,
 	    NULL, 1, validProperty);
+    XSetRGBColormaps(&browserDisplay.display, browserDisplay.rootWindow,
+	    &oversizedStandardColormap, INT_MAX, validProperty);
     invalidWMColormapCountResult = XSetWMColormapWindows(
 	    &browserDisplay.display, browserDisplay.rootWindow, NULL, -1);
     invalidWMColormapListResult = XSetWMColormapWindows(
@@ -5498,6 +5506,8 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_CHANGE_PROPERTY
 	    + X11_WASM_XREQ_CHANGE_PROPERTY
 	    + X11_WASM_XREQ_CHANGE_PROPERTY
+	    + X11_WASM_XREQ_CHANGE_PROPERTY
+	    + X11_WASM_XREQ_CHANGE_PROPERTY
 	    + X11_WASM_XREQ_DELETE_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
@@ -5557,15 +5567,15 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 192)
+    if ((browserTestXErrorCount != 194)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
 	    || (browserTestRequestCodeSum != expectedRequestCodeSum)
 	    || (browserTestRequestCodeMask != expectedRequestCodeMask)
-	    || (browserTestLastSerial != initialSerial + 192)
+	    || (browserTestLastSerial != initialSerial + 194)
 	    || (LastKnownRequestProcessed(&browserDisplay.display)
-		    != initialSerial + 192)) {
+		    != initialSerial + 194)) {
 	return 0;
     }
     return 1;

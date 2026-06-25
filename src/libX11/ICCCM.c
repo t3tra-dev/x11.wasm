@@ -718,6 +718,43 @@ BrowserValidatePropertyList(
     return 1;
 }
 
+static int
+BrowserPropertyListElementCountOrError(
+    Display **displayPtr,
+    int count,
+    size_t itemBytes,
+    unsigned char requestCode,
+    int *nelementsPtr)
+{
+    int wordsPerItem = (int)(itemBytes / 4U);
+
+    if (nelementsPtr != NULL) {
+	*nelementsPtr = 0;
+    }
+    if ((itemBytes == 0U) || ((itemBytes % 4U) != 0U)
+	    || (wordsPerItem <= 0)) {
+	return BrowserPropertyValueOrError(displayPtr, (XID)itemBytes,
+		requestCode);
+    }
+    if (count > (INT_MAX / wordsPerItem)) {
+	Display *display = (displayPtr != NULL) ? *displayPtr : NULL;
+
+	if (display == NULL) {
+	    display = X11WasmGetDisplay(NULL);
+	    if (displayPtr != NULL) {
+		*displayPtr = display;
+	    }
+	}
+	(void)BrowserReportXError(display, BadLength, (XID)count,
+		requestCode, 0);
+	return 0;
+    }
+    if (nelementsPtr != NULL) {
+	*nelementsPtr = count * wordsPerItem;
+    }
+    return 1;
+}
+
 EMSCRIPTEN_KEEPALIVE int
 XSetIconSizes(
     Display *display,
@@ -725,6 +762,8 @@ XSetIconSizes(
     XIconSize *sizeList,
     int count)
 {
+    int nelements;
+
     if (!BrowserValidatePropertyList(&display, sizeList, count,
 	    X11_WASM_XREQ_CHANGE_PROPERTY)) {
 	return Success;
@@ -733,9 +772,13 @@ XSetIconSizes(
 	(void)XDeleteProperty(display, window, XA_WM_ICON_SIZE);
 	return Success;
     }
+    if (!BrowserPropertyListElementCountOrError(&display, count,
+	    sizeof(XIconSize), X11_WASM_XREQ_CHANGE_PROPERTY, &nelements)) {
+	return Success;
+    }
     return XChangeProperty(display, window, XA_WM_ICON_SIZE, XA_WM_ICON_SIZE,
 	    32, PropModeReplace, (const unsigned char *)sizeList,
-	    count * (int)(sizeof(XIconSize) / 4U));
+	    nelements);
 }
 
 Status
@@ -871,6 +914,8 @@ XSetRGBColormaps(
     int count,
     Atom property)
 {
+    int nelements;
+
     if (!BrowserValidatePropertyList(&display, stdcmaps, count,
 	    X11_WASM_XREQ_CHANGE_PROPERTY)) {
 	return;
@@ -879,9 +924,14 @@ XSetRGBColormaps(
 	(void)XDeleteProperty(display, window, property);
 	return;
     }
+    if (!BrowserPropertyListElementCountOrError(&display, count,
+	    sizeof(XStandardColormap), X11_WASM_XREQ_CHANGE_PROPERTY,
+	    &nelements)) {
+	return;
+    }
     (void)XChangeProperty(display, window, property, XA_RGB_COLOR_MAP, 32,
 	    PropModeReplace, (const unsigned char *)stdcmaps,
-	    count * (int)(sizeof(XStandardColormap) / 4U));
+	    nelements);
 }
 
 Status
