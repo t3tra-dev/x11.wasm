@@ -132,6 +132,11 @@ typedef struct X11WasmDisplayState {
     int pointerX;
     int pointerY;
     unsigned int pointerState;
+    int pointerAccelNumerator;
+    int pointerAccelDenominator;
+    int pointerThreshold;
+    int pointerMapCount;
+    unsigned char pointerMap[5];
     Colormap defaultColormap;
     XID nextXId;
     X11WasmResource rootResource;

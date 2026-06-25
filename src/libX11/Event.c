@@ -1125,6 +1125,181 @@ XQueryKeymap(
 }
 
 int
+XChangePointerControl(
+    Display *display,
+    Bool doAccel,
+    Bool doThreshold,
+    int accelNumerator,
+    int accelDenominator,
+    int threshold)
+{
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    if (!BrowserValidateBool(&display, doAccel,
+	    X11_WASM_XREQ_CHANGE_POINTER_CONTROL)
+	    || !BrowserValidateBool(&display, doThreshold,
+		    X11_WASM_XREQ_CHANGE_POINTER_CONTROL)) {
+	return Success;
+    }
+    if (doAccel
+	    && (!BrowserValueOrError(&display, accelNumerator,
+		    accelNumerator >= -1,
+		    X11_WASM_XREQ_CHANGE_POINTER_CONTROL)
+	    || !BrowserValueOrError(&display, accelDenominator,
+		    (accelDenominator >= -1) && (accelDenominator != 0),
+		    X11_WASM_XREQ_CHANGE_POINTER_CONTROL))) {
+	return Success;
+    }
+    if (doThreshold
+	    && !BrowserValueOrError(&display, threshold, threshold >= -1,
+		    X11_WASM_XREQ_CHANGE_POINTER_CONTROL)) {
+	return Success;
+    }
+    if (display == &browserDisplay.display) {
+	if (doAccel) {
+	    if ((accelNumerator == -1) || (accelDenominator == -1)) {
+		browserDisplay.pointerAccelNumerator = 1;
+		browserDisplay.pointerAccelDenominator = 1;
+	    } else {
+		browserDisplay.pointerAccelNumerator = accelNumerator;
+		browserDisplay.pointerAccelDenominator = accelDenominator;
+	    }
+	}
+	if (doThreshold) {
+	    browserDisplay.pointerThreshold =
+		    (threshold == -1) ? 0 : threshold;
+	}
+    }
+    return XNoOp(display);
+}
+
+int
+XGetPointerControl(
+    Display *display,
+    int *accelNumeratorReturn,
+    int *accelDenominatorReturn,
+    int *thresholdReturn)
+{
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    if (display == &browserDisplay.display) {
+	if (accelNumeratorReturn != NULL) {
+	    *accelNumeratorReturn = browserDisplay.pointerAccelNumerator;
+	}
+	if (accelDenominatorReturn != NULL) {
+	    *accelDenominatorReturn = browserDisplay.pointerAccelDenominator;
+	}
+	if (thresholdReturn != NULL) {
+	    *thresholdReturn = browserDisplay.pointerThreshold;
+	}
+    } else {
+	if (accelNumeratorReturn != NULL) {
+	    *accelNumeratorReturn = 0;
+	}
+	if (accelDenominatorReturn != NULL) {
+	    *accelDenominatorReturn = 0;
+	}
+	if (thresholdReturn != NULL) {
+	    *thresholdReturn = 0;
+	}
+    }
+    return XNoOp(display);
+}
+
+int
+XGetPointerMapping(
+    Display *display,
+    unsigned char *mapReturn,
+    int nmap)
+{
+    int count;
+
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    count = (display == &browserDisplay.display)
+	    ? browserDisplay.pointerMapCount : 0;
+    if ((display == &browserDisplay.display) && (mapReturn != NULL)
+	    && (nmap > 0)) {
+	int copyCount = (nmap < count) ? nmap : count;
+
+	memcpy(mapReturn, browserDisplay.pointerMap, (size_t)copyCount);
+    }
+    (void)XNoOp(display);
+    return count;
+}
+
+int
+XSetPointerMapping(
+    Display *display,
+    _Xconst unsigned char *map,
+    int nmap)
+{
+    int i;
+    int j;
+
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    if ((display != &browserDisplay.display)
+	    || (nmap != browserDisplay.pointerMapCount)
+	    || ((nmap > 0) && (map == NULL))) {
+	(void)XNoOp(display);
+	return MappingFailed;
+    }
+    for (i = 0; i < nmap; i++) {
+	if (map[i] == 0) {
+	    continue;
+	}
+	for (j = i + 1; j < nmap; j++) {
+	    if (map[i] == map[j]) {
+		(void)XNoOp(display);
+		return MappingFailed;
+	    }
+	}
+    }
+    memcpy(browserDisplay.pointerMap, map, (size_t)nmap);
+    (void)XNoOp(display);
+    return MappingSuccess;
+}
+
+XTimeCoord *
+XGetMotionEvents(
+    Display *display,
+    Window window,
+    Time start,
+    Time stop,
+    int *neventsReturn)
+{
+    (void)start;
+    (void)stop;
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    if (neventsReturn != NULL) {
+	*neventsReturn = 0;
+    }
+    if (BrowserWindowResourceOrError(&display, window,
+	    X11_WASM_XREQ_GET_MOTION_EVENTS) == NULL) {
+	return NULL;
+    }
+    (void)XNoOp(display);
+    return NULL;
+}
+
+int
 BrowserFlushToJs(
     Display *display)
 {

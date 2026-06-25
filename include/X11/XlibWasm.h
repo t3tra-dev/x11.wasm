@@ -579,6 +579,18 @@ EXTERN int XChangeKeyboardControl(Display *display, unsigned long value_mask,
 EXTERN int XGetKeyboardControl(Display *display,
 	XKeyboardState *values_return);
 EXTERN int XQueryKeymap(Display *display, char keys_return[32]);
+EXTERN int XChangePointerControl(Display *display, Bool do_accel,
+	Bool do_threshold, int accel_numerator, int accel_denominator,
+	int threshold);
+EXTERN int XGetPointerControl(Display *display,
+	int *accel_numerator_return, int *accel_denominator_return,
+	int *threshold_return);
+EXTERN int XGetPointerMapping(Display *display, unsigned char *map_return,
+	int nmap);
+EXTERN int XSetPointerMapping(Display *display,
+	_Xconst unsigned char *map, int nmap);
+EXTERN XTimeCoord *XGetMotionEvents(Display *display, Window w,
+	Time start, Time stop, int *nevents_return);
 EXTERN Font XLoadFont(Display *display, _Xconst char *name);
 EXTERN XFontStruct *XLoadQueryFont(Display *display, _Xconst char *name);
 EXTERN char **XListFonts(Display *display, _Xconst char *pattern,

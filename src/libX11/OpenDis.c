@@ -78,6 +78,15 @@ BrowserInitDisplay(void)
     state->ledMask = 0;
     state->globalAutoRepeat = AutoRepeatModeOn;
     memset(state->autoRepeats, 0xff, sizeof(state->autoRepeats));
+    state->pointerAccelNumerator = 1;
+    state->pointerAccelDenominator = 1;
+    state->pointerThreshold = 0;
+    state->pointerMapCount = 5;
+    state->pointerMap[0] = Button1;
+    state->pointerMap[1] = Button2;
+    state->pointerMap[2] = Button3;
+    state->pointerMap[3] = Button4;
+    state->pointerMap[4] = Button5;
     state->hostAccessEnabled = True;
 
     state->visual.visualid = 1;

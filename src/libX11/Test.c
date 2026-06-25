@@ -201,11 +201,23 @@ X11WasmTestEventQueueAndKeycodeApis(void)
     XEvent readEvent;
     XKeyboardControl keyboardControl;
     XKeyboardState keyboardState;
+    XTimeCoord *motionEvents;
     char keymap[32];
+    unsigned char pointerMap[5];
+    unsigned char remappedPointerMap[5] = {
+	Button2, Button1, Button3, Button4, Button5
+    };
+    unsigned char duplicatePointerMap[5] = {
+	Button1, Button1, Button3, Button4, Button5
+    };
     long predicateValue = 0;
     KeyCode testKeycode;
     unsigned int keyMask;
     unsigned int i;
+    int accelNumerator = -1;
+    int accelDenominator = -1;
+    int motionEventCount = -1;
+    int pointerThreshold = -1;
     int minKeycode = -1;
     int maxKeycode = -1;
 
@@ -336,6 +348,77 @@ X11WasmTestEventQueueAndKeycodeApis(void)
 	    | KBBellPitch | KBBellDuration | KBLed | KBLedMode
 	    | KBAutoRepeatMode, &keyboardControl) != Success) {
 	return 28;
+    }
+    if ((XGetPointerControl(display, &accelNumerator, &accelDenominator,
+		    &pointerThreshold) != Success)
+	    || (accelNumerator != 1) || (accelDenominator != 1)
+	    || (pointerThreshold != 0)) {
+	return 90;
+    }
+    if (XChangePointerControl(display, True, True, 3, 2, 7) != Success) {
+	return 91;
+    }
+    accelNumerator = accelDenominator = pointerThreshold = -1;
+    if ((XGetPointerControl(display, &accelNumerator, &accelDenominator,
+		    &pointerThreshold) != Success)
+	    || (accelNumerator != 3) || (accelDenominator != 2)
+	    || (pointerThreshold != 7)) {
+	return 92;
+    }
+    if (XChangePointerControl(display, True, True, -1, -1, -1) != Success) {
+	return 93;
+    }
+    accelNumerator = accelDenominator = pointerThreshold = -1;
+    if ((XGetPointerControl(display, &accelNumerator, &accelDenominator,
+		    &pointerThreshold) != Success)
+	    || (accelNumerator != 1) || (accelDenominator != 1)
+	    || (pointerThreshold != 0)) {
+	return 94;
+    }
+    memset(pointerMap, 0, sizeof(pointerMap));
+    if ((XGetPointerMapping(display, pointerMap, (int)sizeof(pointerMap))
+		    != 5)
+	    || (pointerMap[0] != Button1) || (pointerMap[1] != Button2)
+	    || (pointerMap[2] != Button3) || (pointerMap[3] != Button4)
+	    || (pointerMap[4] != Button5)) {
+	return 95;
+    }
+    if (XSetPointerMapping(display, remappedPointerMap, 5)
+	    != MappingSuccess) {
+	return 96;
+    }
+    memset(pointerMap, 0, sizeof(pointerMap));
+    if ((XGetPointerMapping(display, pointerMap, (int)sizeof(pointerMap))
+		    != 5)
+	    || (memcmp(pointerMap, remappedPointerMap,
+		    sizeof(pointerMap)) != 0)) {
+	return 97;
+    }
+    if ((XSetPointerMapping(display, duplicatePointerMap, 5)
+		    != MappingFailed)
+	    || (XGetPointerMapping(display, pointerMap, (int)sizeof(pointerMap))
+		    != 5)
+	    || (memcmp(pointerMap, remappedPointerMap,
+		    sizeof(pointerMap)) != 0)) {
+	return 98;
+    }
+    if ((XSetPointerMapping(display, pointerMap, 4) != MappingFailed)
+	    || (XSetPointerMapping(display, duplicatePointerMap, 0)
+		    != MappingFailed)) {
+	return 99;
+    }
+    pointerMap[0] = Button1;
+    pointerMap[1] = Button2;
+    pointerMap[2] = Button3;
+    pointerMap[3] = Button4;
+    pointerMap[4] = Button5;
+    if (XSetPointerMapping(display, pointerMap, 5) != MappingSuccess) {
+	return 100;
+    }
+    motionEvents = XGetMotionEvents(display, browserDisplay.rootWindow,
+	    CurrentTime, CurrentTime, &motionEventCount);
+    if ((motionEvents != NULL) || (motionEventCount != 0)) {
+	return 101;
     }
 
     memset(&firstEvent, 0, sizeof(firstEvent));
