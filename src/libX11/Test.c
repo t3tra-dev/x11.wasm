@@ -5600,6 +5600,45 @@ X11WasmTestXlibApis(void)
     XFree(visualInfoList);
     visualInfoList = NULL;
     visualInfoCount = -1;
+    visualTemplate.visualid = XVisualIDFromVisual(
+	    DefaultVisual(&browserDisplay.display, screen));
+    visualTemplate.screen = screen;
+    visualTemplate.depth = DefaultDepth(&browserDisplay.display, screen);
+    visualTemplate.c_class = DefaultVisual(&browserDisplay.display,
+	    screen)->c_class;
+    visualTemplate.red_mask = DefaultVisual(&browserDisplay.display,
+	    screen)->red_mask;
+    visualTemplate.green_mask = DefaultVisual(&browserDisplay.display,
+	    screen)->green_mask;
+    visualTemplate.blue_mask = DefaultVisual(&browserDisplay.display,
+	    screen)->blue_mask;
+    visualTemplate.colormap_size = DefaultVisual(&browserDisplay.display,
+	    screen)->map_entries;
+    visualTemplate.bits_per_rgb = DefaultVisual(&browserDisplay.display,
+	    screen)->bits_per_rgb;
+    visualInfoList = XGetVisualInfo(&browserDisplay.display, VisualAllMask,
+	    &visualTemplate, &visualInfoCount);
+    if ((visualInfoList == NULL) || (visualInfoCount != 1)
+	    || (visualInfoList[0].red_mask != visualTemplate.red_mask)
+	    || (visualInfoList[0].green_mask != visualTemplate.green_mask)
+	    || (visualInfoList[0].blue_mask != visualTemplate.blue_mask)
+	    || (visualInfoList[0].colormap_size
+		    != visualTemplate.colormap_size)
+	    || (visualInfoList[0].bits_per_rgb
+		    != visualTemplate.bits_per_rgb)) {
+	goto cleanup;
+    }
+    XFree(visualInfoList);
+    visualInfoList = NULL;
+    visualInfoCount = -1;
+    visualTemplate.red_mask ^= 1UL;
+    visualInfoList = XGetVisualInfo(&browserDisplay.display,
+	    VisualRedMaskMask | VisualGreenMaskMask | VisualBlueMaskMask,
+	    &visualTemplate, &visualInfoCount);
+    if ((visualInfoList != NULL) || (visualInfoCount != 0)) {
+	goto cleanup;
+    }
+    visualInfoCount = -1;
     visualTemplate.visualid++;
     visualInfoList = XGetVisualInfo(&browserDisplay.display, VisualIDMask,
 	    &visualTemplate, &visualInfoCount);
