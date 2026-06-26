@@ -288,6 +288,7 @@ X11WasmTestEventQueueAndKeycodeApis(void)
     int motionEventCount = -1;
     Time firstMotionTime = 1000;
     Time secondMotionTime = 1010;
+    Time outsideChildMotionTime = 1015;
     Time thirdMotionTime = 1020;
     int pointerThreshold = -1;
     int minKeycode = -1;
@@ -559,6 +560,8 @@ X11WasmTestEventQueueAndKeycodeApis(void)
 	    || !X11WasmQueuePointerEvent(MotionNotify, browserDisplay.rootWindow,
 		    0, 0, 21, 23, secondMotionTime)
 	    || !X11WasmQueuePointerEvent(MotionNotify, browserDisplay.rootWindow,
+		    0, 0, 9, 25, outsideChildMotionTime)
+	    || !X11WasmQueuePointerEvent(MotionNotify, browserDisplay.rootWindow,
 		    0, 0, 31, 33, thirdMotionTime)) {
 	(void)XDestroyWindow(display, motionWindow);
 	return 102;
@@ -566,11 +569,13 @@ X11WasmTestEventQueueAndKeycodeApis(void)
     motionEventCount = -1;
     motionEvents = XGetMotionEvents(display, browserDisplay.rootWindow,
 	    secondMotionTime, thirdMotionTime, &motionEventCount);
-    if ((motionEvents == NULL) || (motionEventCount != 2)
+    if ((motionEvents == NULL) || (motionEventCount != 3)
 	    || (motionEvents[0].time != secondMotionTime)
 	    || (motionEvents[0].x != 21) || (motionEvents[0].y != 23)
-	    || (motionEvents[1].time != thirdMotionTime)
-	    || (motionEvents[1].x != 31) || (motionEvents[1].y != 33)) {
+	    || (motionEvents[1].time != outsideChildMotionTime)
+	    || (motionEvents[1].x != 9) || (motionEvents[1].y != 25)
+	    || (motionEvents[2].time != thirdMotionTime)
+	    || (motionEvents[2].x != 31) || (motionEvents[2].y != 33)) {
 	if (motionEvents != NULL) {
 	    XFree(motionEvents);
 	}

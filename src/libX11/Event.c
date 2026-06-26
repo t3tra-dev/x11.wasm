@@ -2668,6 +2668,36 @@ BrowserMotionEventInRange(
     return (time >= start) && (time <= stop);
 }
 
+static int
+BrowserMotionRecordMatchesWindow(
+    X11WasmResource *resourcePtr,
+    X11WasmMotionRecord *recordPtr,
+    Time start,
+    Time stop,
+    int *xPtr,
+    int *yPtr)
+{
+    int x;
+    int y;
+
+    if (!BrowserMotionEventInRange(recordPtr->time, start, stop)) {
+	return 0;
+    }
+    BrowserWindowCoordinatesFromRoot((Window)resourcePtr->id, recordPtr->rootX,
+	    recordPtr->rootY, &x, &y);
+    if ((x < 0) || (y < 0) || ((unsigned int)x >= resourcePtr->width)
+	    || ((unsigned int)y >= resourcePtr->height)) {
+	return 0;
+    }
+    if (xPtr != NULL) {
+	*xPtr = x;
+    }
+    if (yPtr != NULL) {
+	*yPtr = y;
+    }
+    return 1;
+}
+
 XTimeCoord *
 XGetMotionEvents(
     Display *display,
@@ -2676,6 +2706,7 @@ XGetMotionEvents(
     Time stop,
     int *neventsReturn)
 {
+    X11WasmResource *resourcePtr;
     XTimeCoord *events;
     int count = 0;
     int i;
@@ -2689,8 +2720,9 @@ XGetMotionEvents(
     if (neventsReturn != NULL) {
 	*neventsReturn = 0;
     }
-    if (BrowserWindowResourceOrError(&display, window,
-	    X11_WASM_XREQ_GET_MOTION_EVENTS) == NULL) {
+    resourcePtr = BrowserWindowResourceOrError(&display, window,
+	    X11_WASM_XREQ_GET_MOTION_EVENTS);
+    if (resourcePtr == NULL) {
 	return NULL;
     }
     if ((display != &browserDisplay.display)
@@ -2705,7 +2737,8 @@ XGetMotionEvents(
 	X11WasmMotionRecord *recordPtr =
 		&browserDisplay.motionHistory[index];
 
-	if (BrowserMotionEventInRange(recordPtr->time, start, stop)) {
+	if (BrowserMotionRecordMatchesWindow(resourcePtr, recordPtr, start, stop,
+		NULL, NULL)) {
 	    count++;
 	}
     }
@@ -2722,11 +2755,10 @@ XGetMotionEvents(
 	int x;
 	int y;
 
-	if (!BrowserMotionEventInRange(recordPtr->time, start, stop)) {
+	if (!BrowserMotionRecordMatchesWindow(resourcePtr, recordPtr, start, stop,
+		&x, &y)) {
 	    continue;
 	}
-	BrowserWindowCoordinatesFromRoot(window, recordPtr->rootX,
-		recordPtr->rootY, &x, &y);
 	events[out].time = recordPtr->time;
 	events[out].x = BrowserClampShort(x);
 	events[out].y = BrowserClampShort(y);
