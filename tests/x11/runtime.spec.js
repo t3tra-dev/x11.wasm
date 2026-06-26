@@ -416,7 +416,7 @@ test("XTranslateCoordinates preserves nested window coordinates", async ({
   expect(result).toBe(1);
 });
 
-test("XQueryPointer reports nested child coordinates and mask", async ({
+test("XQueryPointer and XWarpPointer preserve nested coordinates and mask", async ({
   page,
 }) => {
   await waitForX11Runtime(page);

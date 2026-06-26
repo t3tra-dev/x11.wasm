@@ -2515,6 +2515,40 @@ X11WasmTestQueryPointerApis(void)
 	    || (mask != (Button1Mask | ShiftMask))) {
 	goto cleanup;
     }
+
+    if (XWarpPointer(display, child, parent, 0, 0, 1, 1, 11, 12)
+	    != Success) {
+	goto cleanup;
+    }
+    rootReturn = childReturn = None;
+    rootX = rootY = winX = winY = -1;
+    mask = 0;
+    if (!XQueryPointer(display, browserDisplay.rootWindow, &rootReturn,
+	    &childReturn, &rootX, &rootY, &winX, &winY, &mask)
+	    || (rootReturn != browserDisplay.rootWindow)
+	    || (childReturn != parent)
+	    || (rootX != 17) || (rootY != 30)
+	    || (winX != 17) || (winY != 30)
+	    || (mask != (Button1Mask | ShiftMask))) {
+	goto cleanup;
+    }
+
+    if (XWarpPointer(display, child, grandchild, 2, 3, 1, 1, 2, 1)
+	    != Success) {
+	goto cleanup;
+    }
+    rootReturn = childReturn = None;
+    rootX = rootY = winX = winY = -1;
+    mask = 0;
+    if (!XQueryPointer(display, grandchild, &rootReturn, &childReturn,
+	    &rootX, &rootY, &winX, &winY, &mask)
+	    || (rootReturn != browserDisplay.rootWindow)
+	    || (childReturn != None)
+	    || (rootX != 18) || (rootY != 29)
+	    || (winX != 2) || (winY != 1)
+	    || (mask != (Button1Mask | ShiftMask))) {
+	goto cleanup;
+    }
     result = 1;
 
 cleanup:
