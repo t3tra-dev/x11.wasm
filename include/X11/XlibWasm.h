@@ -526,6 +526,8 @@ EXTERN void Xutf8SetWMProperties(Display *display, Window w,
 	int argc, XSizeHints *normal_hints, XWMHints *wm_hints,
 	XClassHint *class_hints);
 EXTERN int X11WasmSetClipboardText(_Xconst char *utf8, int utf8Length);
+EXTERN char *X11WasmTakeCompositionText(XEvent *eventPtr,
+	int *utf8LengthReturn);
 EXTERN int X11WasmSetWindowMetadataTarget(Display *display, Window window,
 	Window target, int isRootToplevel);
 EXTERN void X11WasmSetPixmapColormap(Pixmap pixmap, Colormap colormap);

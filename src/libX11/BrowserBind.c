@@ -93,6 +93,7 @@ X11WasmQueueCompositionEvent(
     const char *eventName = BrowserCompositionEventName(phase);
     Window target;
     XEvent event;
+    unsigned long payloadId = 0;
 
     if (eventName == NULL) {
 	return 0;
@@ -113,7 +114,110 @@ X11WasmQueueCompositionEvent(
     event.xclient.format = 32;
     event.xclient.data.l[0] = (long)phase;
     event.xclient.data.l[1] = (long)utf8Length;
-    return BrowserQueueEvent(&event);
+    payloadId = BrowserStoreCompositionPayload(utf8, utf8Length);
+    event.xclient.data.l[2] = (long)payloadId;
+    if (!BrowserQueueEvent(&event)) {
+	BrowserForgetCompositionPayload(payloadId);
+	return 0;
+    }
+    return 1;
+}
+
+unsigned long
+BrowserStoreCompositionPayload(
+    const char *utf8,
+    int utf8Length)
+{
+    X11WasmCompositionPayload *payloadPtr;
+
+    if ((utf8 == NULL) || (utf8Length <= 0)) {
+	return 0;
+    }
+    payloadPtr = (X11WasmCompositionPayload *)ckalloc(
+	    sizeof(X11WasmCompositionPayload));
+    payloadPtr->utf8 = (char *)ckalloc((size_t)utf8Length + 1);
+    memcpy(payloadPtr->utf8, utf8, (size_t)utf8Length);
+    payloadPtr->utf8[utf8Length] = '\0';
+    payloadPtr->utf8Length = utf8Length;
+    payloadPtr->id = nextCompositionPayloadId++;
+    if (nextCompositionPayloadId == 0) {
+	nextCompositionPayloadId = 1;
+    }
+    payloadPtr->nextPtr = compositionPayloadList;
+    compositionPayloadList = payloadPtr;
+    return payloadPtr->id;
+}
+
+void
+BrowserForgetCompositionPayload(
+    unsigned long payloadId)
+{
+    X11WasmCompositionPayload **linkPtr = &compositionPayloadList;
+
+    if (payloadId == 0) {
+	return;
+    }
+    while (*linkPtr != NULL) {
+	X11WasmCompositionPayload *payloadPtr = *linkPtr;
+
+	if (payloadPtr->id == payloadId) {
+	    *linkPtr = payloadPtr->nextPtr;
+	    ckfree(payloadPtr->utf8);
+	    ckfree(payloadPtr);
+	    return;
+	}
+	linkPtr = &payloadPtr->nextPtr;
+    }
+}
+
+void
+BrowserClearCompositionPayloads(void)
+{
+    while (compositionPayloadList != NULL) {
+	X11WasmCompositionPayload *payloadPtr = compositionPayloadList;
+
+	compositionPayloadList = payloadPtr->nextPtr;
+	ckfree(payloadPtr->utf8);
+	ckfree(payloadPtr);
+    }
+}
+
+char *
+X11WasmTakeCompositionText(
+    XEvent *eventPtr,
+    int *utf8LengthReturn)
+{
+    X11WasmCompositionPayload **linkPtr = &compositionPayloadList;
+    unsigned long payloadId;
+
+    if (utf8LengthReturn != NULL) {
+	*utf8LengthReturn = 0;
+    }
+    if ((eventPtr == NULL) || (eventPtr->type != ClientMessage)) {
+	return NULL;
+    }
+    payloadId = (unsigned long)eventPtr->xclient.data.l[2];
+    if (payloadId == 0) {
+	return NULL;
+    }
+    while (*linkPtr != NULL) {
+	X11WasmCompositionPayload *payloadPtr = *linkPtr;
+
+	if (payloadPtr->id == payloadId) {
+	    char *utf8 = payloadPtr->utf8;
+
+	    *linkPtr = payloadPtr->nextPtr;
+	    if (utf8LengthReturn != NULL) {
+		*utf8LengthReturn = payloadPtr->utf8Length;
+	    }
+	    ckfree(payloadPtr);
+	    eventPtr->xclient.data.l[2] = 0;
+	    return utf8;
+	}
+	linkPtr = &payloadPtr->nextPtr;
+    }
+    eventPtr->xclient.data.l[2] = 0;
+    return NULL;
 }
 
 EMSCRIPTEN_KEEPALIVE int

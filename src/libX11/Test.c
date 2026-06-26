@@ -987,6 +987,81 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestCompositionEventPayload(void)
+{
+    const char *payload = "compose \xe3\x81\x82";
+    const int payloadLength = (int)strlen(payload);
+    Display *display;
+    XEvent event;
+    char *text = NULL;
+    int textLength = -1;
+    int result = 0;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    BrowserClearEventQueue();
+    if (!X11WasmQueueCompositionEvent(X11_WASM_COMPOSITION_UPDATE,
+	    (unsigned int)browserDisplay.rootWindow, payload, payloadLength)) {
+	result = 10;
+	goto cleanup;
+    }
+    if (!BrowserPopEvent(&event, NULL)) {
+	result = 11;
+	goto cleanup;
+    }
+    if ((event.type != ClientMessage)
+	    || (event.xclient.message_type != XInternAtom(display,
+		    "X11WasmCompositionUpdate", False))
+	    || (event.xclient.format != 32)
+	    || (event.xclient.data.l[0] != X11_WASM_COMPOSITION_UPDATE)
+	    || (event.xclient.data.l[1] != payloadLength)
+	    || (event.xclient.data.l[2] == 0)) {
+	result = 12;
+	goto cleanup;
+    }
+    text = X11WasmTakeCompositionText(&event, &textLength);
+    if ((text == NULL) || (textLength != payloadLength)
+	    || (memcmp(text, payload, (size_t)payloadLength) != 0)
+	    || (text[payloadLength] != '\0')
+	    || (event.xclient.data.l[2] != 0)) {
+	result = 13;
+	goto cleanup;
+    }
+    XFree(text);
+    text = X11WasmTakeCompositionText(&event, &textLength);
+    if ((text != NULL) || (textLength != 0)) {
+	result = 14;
+	goto cleanup;
+    }
+    if (X11WasmQueueCompositionEvent(X11_WASM_COMPOSITION_START,
+	    (unsigned int)browserDisplay.rootWindow, "", 0) != 1) {
+	result = 15;
+	goto cleanup;
+    }
+    if (!BrowserPopEvent(&event, NULL)
+	    || (event.xclient.data.l[0] != X11_WASM_COMPOSITION_START)
+	    || (event.xclient.data.l[1] != 0)
+	    || (event.xclient.data.l[2] != 0)) {
+	result = 16;
+	goto cleanup;
+    }
+    textLength = -1;
+    text = X11WasmTakeCompositionText(&event, &textLength);
+    if ((text != NULL) || (textLength != 0)) {
+	result = 17;
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    if (text != NULL) {
+	XFree(text);
+    }
+    BrowserClearEventQueue();
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestCrossingEventHierarchy(void)
 {
     Display *display;

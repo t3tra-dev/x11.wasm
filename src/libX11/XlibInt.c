@@ -24,6 +24,8 @@ Atom nextAtom = XA_LAST_PREDEFINED;
 XErrorHandler errorHandler;
 XIOErrorHandler ioErrorHandler;
 X11WasmQueuedEvent eventQueue[X11_WASM_EVENT_QUEUE_LIMIT];
+X11WasmCompositionPayload *compositionPayloadList;
+unsigned long nextCompositionPayloadId = 1;
 int eventQueueHead;
 int eventQueueCount;
 unsigned long eventSerial = 1;

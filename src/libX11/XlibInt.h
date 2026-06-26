@@ -221,6 +221,13 @@ typedef struct X11WasmQueuedEvent {
     int internal;
 } X11WasmQueuedEvent;
 
+typedef struct X11WasmCompositionPayload {
+    unsigned long id;
+    char *utf8;
+    int utf8Length;
+    struct X11WasmCompositionPayload *nextPtr;
+} X11WasmCompositionPayload;
+
 typedef struct X11WasmAtomName {
     Atom atom;
     char *name;
@@ -392,6 +399,8 @@ extern Atom nextAtom;
 extern XErrorHandler errorHandler;
 extern XIOErrorHandler ioErrorHandler;
 extern X11WasmQueuedEvent eventQueue[X11_WASM_EVENT_QUEUE_LIMIT];
+extern X11WasmCompositionPayload *compositionPayloadList;
+extern unsigned long nextCompositionPayloadId;
 extern int eventQueueHead;
 extern int eventQueueCount;
 extern unsigned long eventSerial;
@@ -430,6 +439,14 @@ int X11WasmQueuePointerEvent(
     int x,
     int y,
     unsigned int time);
+int X11WasmQueueCompositionEvent(
+    int phase,
+    unsigned int window,
+    const char *utf8,
+    int utf8Length);
+char *X11WasmTakeCompositionText(
+    XEvent *eventPtr,
+    int *utf8LengthReturn);
 int BrowserQueuePointerEventFields(
     int type,
     unsigned int window,
@@ -566,6 +583,7 @@ void BrowserClearEventQueue(void);
 void BrowserClearExternalClipboardText(void);
 void BrowserClearFontPath(void);
 void BrowserClearHostAccessList(void);
+void BrowserClearCompositionPayloads(void);
 void BrowserClearInputContext(
     void);
 void BrowserClearKeycodeRange(
@@ -937,6 +955,8 @@ void BrowserForgetColors(
     unsigned long *pixels,
     int count,
     unsigned long planes);
+void BrowserForgetCompositionPayload(
+    unsigned long payloadId);
 void BrowserForgetHostAddress(
     const XHostAddress *hostPtr);
 void BrowserForgetIMInstantiateCallbacks(
@@ -1680,6 +1700,9 @@ X11WasmResource *BrowserStackingResource(
     X11WasmResource *resourcePtr);
 unsigned int BrowserStandardColormapXId(
     XID xid);
+unsigned long BrowserStoreCompositionPayload(
+    const char *utf8,
+    int utf8Length);
 void BrowserStoreBitmapImage(
     X11WasmResource *resourcePtr,
     XImage *image,

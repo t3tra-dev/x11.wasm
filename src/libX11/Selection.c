@@ -448,6 +448,7 @@ BrowserPopEvent(
 void
 BrowserClearEventQueue(void)
 {
+    BrowserClearCompositionPayloads();
     eventQueueHead = 0;
     eventQueueCount = 0;
     BrowserUpdateQueueLength();

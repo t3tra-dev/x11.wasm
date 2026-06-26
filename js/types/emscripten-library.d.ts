@@ -508,6 +508,7 @@ declare const Module: {
   _XListExtensions?: (display: number, nextensionsReturn: number) => number;
   _X11WasmTestUnixEventFileHandlers?: () => number;
   _X11WasmTestWheelEventConstants?: () => number;
+  _X11WasmTestCompositionEventPayload?: () => number;
   _X11WasmTestEventQueueAndKeycodeApis?: () => number;
   _X11WasmTestClearAreaApis?: () => number;
   _X11WasmTestConfigureStackingApis?: () => number;

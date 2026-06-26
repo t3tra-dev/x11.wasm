@@ -109,6 +109,23 @@ test("browser wheel events use the exported x11.wasm event constant", async ({
   expect(result).toBe(1);
 });
 
+test("composition ClientMessages preserve UTF-8 payloads", async ({ page }) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestCompositionEventPayload?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestCompositionEventPayload) {
+      throw new Error("missing composition payload test export");
+    }
+    return module._X11WasmTestCompositionEventPayload();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("X11 keyboard mapping APIs resolve ASCII key events", async ({ page }) => {
   await waitForX11Runtime(page);
 
