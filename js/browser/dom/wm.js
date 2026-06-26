@@ -922,8 +922,15 @@ syncDocumentIconFromResources() {
               "data-x11-wasm-colormap-windows",
               windowIds.join(" "),
             );
+            resource.element.setAttribute(
+              "data-x11-wasm-colormap-window-count",
+              String(windowIds.length),
+            );
           } else {
             resource.element.removeAttribute("data-x11-wasm-colormap-windows");
+            resource.element.removeAttribute(
+              "data-x11-wasm-colormap-window-count",
+            );
           }
         }
       }

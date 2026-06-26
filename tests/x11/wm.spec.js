@@ -102,6 +102,74 @@ test("XSetIconSizes updates browser WM_ICON_SIZE metadata", async ({ page }) => 
   });
 });
 
+test("XSetWMColormapWindows updates browser WM_COLORMAP_WINDOWS metadata", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+  const [ownerId, secondaryId] = await createMappedWindows(page, 2);
+
+  const metadata = await page.evaluate(
+    ({ ownerId, secondaryId }) => {
+      const module =
+        /** @type {Window & { Module?: { _X11WasmTestSetWMColormapWindows?: Function, x11WasmBackend?: X11WasmBackendSnapshot } }} */ (
+          window
+        ).Module;
+      const backend = module?.x11WasmBackend;
+      const resource = backend?.resources.get(ownerId);
+      const element = resource?.element;
+      if (
+        !module?._X11WasmTestSetWMColormapWindows ||
+        !resource ||
+        !(element instanceof HTMLElement)
+      ) {
+        throw new Error("missing WM_COLORMAP_WINDOWS test hooks");
+      }
+
+      const setResult = module._X11WasmTestSetWMColormapWindows(
+        ownerId,
+        secondaryId,
+        1,
+      );
+      const afterSet = {
+        attrCount: element.getAttribute(
+          "data-x11-wasm-colormap-window-count",
+        ),
+        attrWindows: element.getAttribute("data-x11-wasm-colormap-windows"),
+        resourceWindows: [...(resource.colormapWindows ?? [])],
+      };
+      const clearResult = module._X11WasmTestSetWMColormapWindows(
+        ownerId,
+        secondaryId,
+        0,
+      );
+      const afterClear = {
+        attrCount: element.getAttribute(
+          "data-x11-wasm-colormap-window-count",
+        ),
+        attrWindows: element.getAttribute("data-x11-wasm-colormap-windows"),
+        resourceWindows: [...(resource.colormapWindows ?? [])],
+      };
+      return { afterClear, afterSet, clearResult, setResult };
+    },
+    { ownerId, secondaryId },
+  );
+
+  expect(metadata).toEqual({
+    setResult: 1,
+    clearResult: 1,
+    afterSet: {
+      attrCount: "2",
+      attrWindows: `${ownerId} ${secondaryId}`,
+      resourceWindows: [String(ownerId), String(secondaryId)],
+    },
+    afterClear: {
+      attrCount: null,
+      attrWindows: null,
+      resourceWindows: [],
+    },
+  });
+});
+
 test("_NET_WM_ICON honors root WM_ICON_SIZE when choosing favicon", async ({
   page,
 }) => {

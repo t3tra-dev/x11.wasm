@@ -1321,6 +1321,25 @@ XSetWMColormapWindows(
     return True;
 }
 
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestSetWMColormapWindows(
+    unsigned int window,
+    unsigned int colormapWindow,
+    int enabled)
+{
+    Window windows[2];
+
+    BrowserInitDisplay();
+    if (!enabled) {
+	return XSetWMColormapWindows(&browserDisplay.display, (Window)window,
+		NULL, 0);
+    }
+    windows[0] = (Window)window;
+    windows[1] = (Window)colormapWindow;
+    return XSetWMColormapWindows(&browserDisplay.display, (Window)window,
+	    windows, 2);
+}
+
 Status
 XSetWMProtocols(
     Display *display,

@@ -41,6 +41,7 @@ interface X11WasmResource {
   closeRequestCount?: number;
   lastCloseRequestTime?: number;
   closeRequestStatus?: string;
+  colormapWindows?: string[];
   standardColormaps?: Record<string, unknown[]>;
   sizeHints?: X11WasmSizeHints | null;
   zoomHints?: X11WasmSizeHints | null;
