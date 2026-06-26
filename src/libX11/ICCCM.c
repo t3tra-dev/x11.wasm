@@ -2651,6 +2651,97 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestPropertyNotifyEvents(void)
+{
+    static const unsigned char value[] = {'p', 'r', 'o', 'p'};
+    Display *display;
+    Window window = None;
+    Atom property;
+    Atom actualType = None;
+    int actualFormat = 0;
+    unsigned long nitems = 0;
+    unsigned long bytesAfter = 0;
+    unsigned char *data = NULL;
+    XEvent event;
+    int result = 0;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    property = XInternAtom(display, "_X11_WASM_PROPERTY_NOTIFY_TEST", False);
+    window = XCreateSimpleWindow(display, browserDisplay.rootWindow, 0, 0,
+	    4, 4, 0, 0, 0);
+    if ((property == None) || (window == None)) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+    if (XSelectInput(display, window, PropertyChangeMask) != Success) {
+	goto cleanup;
+    }
+
+    if ((XChangeProperty(display, window, property, XA_STRING, 8,
+		    PropModeReplace, value, (int)sizeof(value)) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || (XNextEvent(display, &event) != Success)
+	    || (event.type != PropertyNotify)
+	    || (event.xproperty.window != window)
+	    || (event.xproperty.atom != property)
+	    || (event.xproperty.state != PropertyNewValue)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+
+    if ((XGetWindowProperty(display, window, property, 0, 1, True,
+		    AnyPropertyType, &actualType, &actualFormat, &nitems,
+		    &bytesAfter, &data) != Success)
+	    || (actualType != XA_STRING) || (actualFormat != 8)
+	    || (nitems != sizeof(value)) || (bytesAfter != 0)
+	    || (data == NULL) || (memcmp(data, value, sizeof(value)) != 0)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || (XNextEvent(display, &event) != Success)
+	    || (event.type != PropertyNotify)
+	    || (event.xproperty.window != window)
+	    || (event.xproperty.atom != property)
+	    || (event.xproperty.state != PropertyDelete)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    XFree(data);
+    data = NULL;
+
+    if ((XChangeProperty(display, window, property, XA_STRING, 8,
+		    PropModeReplace, value, (int)sizeof(value)) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || (XNextEvent(display, &event) != Success)
+	    || (event.type != PropertyNotify)
+	    || (event.xproperty.window != window)
+	    || (event.xproperty.atom != property)
+	    || (event.xproperty.state != PropertyNewValue)
+	    || (XDeleteProperty(display, window, property) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || (XNextEvent(display, &event) != Success)
+	    || (event.type != PropertyNotify)
+	    || (event.xproperty.window != window)
+	    || (event.xproperty.atom != property)
+	    || (event.xproperty.state != PropertyDelete)
+	    || (XDeleteProperty(display, window, property) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    if (data != NULL) {
+	XFree(data);
+    }
+    BrowserClearEventQueue();
+    if (window != None) {
+	(void)XDestroyWindow(display, window);
+    }
+    BrowserClearEventQueue();
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestSetClipboardText(int clear)
 {
     static const char clipboardText[] = "x11.wasm clipboard api";
