@@ -7939,6 +7939,18 @@ X11WasmTestXlibApis(void)
     }
     XFree(fetchedIconName);
     fetchedIconName = NULL;
+    XSetWMName(&browserDisplay.display, window, NULL);
+    XSetWMIconName(&browserDisplay.display, window, NULL);
+    if (XGetWMName(&browserDisplay.display, window, &readProp)
+	    || (readProp.value != NULL)
+	    || XGetWMIconName(&browserDisplay.display, window, &readProp)
+	    || (readProp.value != NULL)
+	    || XFetchName(&browserDisplay.display, window, &fetchedName)
+	    || (fetchedName != NULL)
+	    || XGetIconName(&browserDisplay.display, window, &fetchedIconName)
+	    || (fetchedIconName != NULL)) {
+	goto cleanup;
+    }
 
     fontAtomName = XGetAtomName(&browserDisplay.display, XA_FONT_NAME);
     if ((XInternAtom(&browserDisplay.display, "FONT_NAME", True)
