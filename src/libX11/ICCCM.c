@@ -2330,7 +2330,7 @@ BrowserTestExternalClipboardMultiple(
     Atom unsupportedProperty;
     Atom unsupportedTarget;
     XEvent event;
-    unsigned int pairs[8];
+    unsigned int pairs[10];
     unsigned char *data = NULL;
     int actualFormat = 0;
     unsigned long nitems = 0;
@@ -2358,6 +2358,8 @@ BrowserTestExternalClipboardMultiple(
     pairs[5] = (unsigned int)timestampProperty;
     pairs[6] = (unsigned int)unsupportedTarget;
     pairs[7] = (unsigned int)unsupportedProperty;
+    pairs[8] = (unsigned int)BrowserTextAtom();
+    pairs[9] = (unsigned int)None;
 
     BrowserClearEventQueue();
     (void)XDeleteProperty(&browserDisplay.display, browserDisplay.rootWindow,
@@ -2392,7 +2394,7 @@ BrowserTestExternalClipboardMultiple(
 	goto cleanup;
     }
     if ((actualType != BrowserAtomPairAtom()) || (actualFormat != 32)
-	    || (nitems != 8) || (bytesAfter != 0)
+	    || (nitems != 10) || (bytesAfter != 0)
 	    || (BrowserPropertyAtomAt(data, 0) != XA_STRING)
 	    || (BrowserPropertyAtomAt(data, 1) != stringProperty)
 	    || (BrowserPropertyAtomAt(data, 2) != BrowserUtf8StringAtom())
@@ -2400,7 +2402,9 @@ BrowserTestExternalClipboardMultiple(
 	    || (BrowserPropertyAtomAt(data, 4) != BrowserTimestampAtom())
 	    || (BrowserPropertyAtomAt(data, 5) != timestampProperty)
 	    || (BrowserPropertyAtomAt(data, 6) != unsupportedTarget)
-	    || (BrowserPropertyAtomAt(data, 7) != None)) {
+	    || (BrowserPropertyAtomAt(data, 7) != None)
+	    || (BrowserPropertyAtomAt(data, 8) != BrowserTextAtom())
+	    || (BrowserPropertyAtomAt(data, 9) != None)) {
 	goto cleanup;
     }
     XFree(data);
