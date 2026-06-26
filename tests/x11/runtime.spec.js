@@ -397,6 +397,25 @@ test("focus events preserve hierarchy details", async ({ page }) => {
   expect(result).toBe(1);
 });
 
+test("input focus reverts when focused windows become unviewable", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestFocusRevertOnUnviewable?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestFocusRevertOnUnviewable) {
+      throw new Error("missing focus revert test export");
+    }
+    return module._X11WasmTestFocusRevertOnUnviewable();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XTranslateCoordinates preserves nested window coordinates", async ({
   page,
 }) => {

@@ -1527,6 +1527,8 @@ int BrowserResourceIsVisible(
 int BrowserResourceSupportsProtocol(
     X11WasmResource *resourcePtr,
     Atom protocolAtom);
+void BrowserRevertInputFocusForUnviewableWindow(
+    X11WasmResource *resourcePtr);
 int BrowserResourceWantsEvent(
     X11WasmResource *resourcePtr,
     long mask);

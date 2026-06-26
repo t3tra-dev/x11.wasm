@@ -848,6 +848,76 @@ BrowserQueueFocusEventPath(
     return queued;
 }
 
+static Window
+BrowserClosestViewableFocusAncestor(
+    X11WasmResource *focusPtr,
+    X11WasmResource *unviewablePtr)
+{
+    X11WasmResource *resourcePtr;
+    Window unviewable = (Window)unviewablePtr->id;
+
+    for (resourcePtr = BrowserWindowParentResource(focusPtr);
+	    resourcePtr != NULL;
+	    resourcePtr = BrowserWindowParentResource(resourcePtr)) {
+	Window candidate = (Window)resourcePtr->id;
+
+	if (BrowserWindowInTree(candidate, unviewable)) {
+	    continue;
+	}
+	if (BrowserResourceIsVisible(resourcePtr)) {
+	    return candidate;
+	}
+    }
+    return None;
+}
+
+void
+BrowserRevertInputFocusForUnviewableWindow(
+    X11WasmResource *resourcePtr)
+{
+    X11WasmResource *focusPtr;
+    Window oldFocusWindow;
+    Window newFocus;
+    Window newFocusWindow;
+    int newRevertTo;
+
+    if ((resourcePtr == NULL)
+	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)
+	    || (resourcePtr == &browserDisplay.rootResource)
+	    || (browserDisplay.focusWindow == None)
+	    || (browserDisplay.focusWindow == PointerRoot)
+	    || !BrowserWindowInTree(browserDisplay.focusWindow,
+		    (Window)resourcePtr->id)) {
+	return;
+    }
+    focusPtr = BrowserWindowResource(browserDisplay.focusWindow);
+    if (focusPtr == NULL) {
+	return;
+    }
+
+    oldFocusWindow = BrowserGetFocusWindow();
+    newFocus = browserDisplay.focusWindow;
+    newRevertTo = browserDisplay.focusRevertTo;
+    if (browserDisplay.focusRevertTo == RevertToParent) {
+	newFocus = BrowserClosestViewableFocusAncestor(focusPtr, resourcePtr);
+	newRevertTo = RevertToNone;
+    } else if (browserDisplay.focusRevertTo == RevertToPointerRoot) {
+	newFocus = PointerRoot;
+    } else {
+	newFocus = None;
+    }
+
+    browserDisplay.focusWindow = newFocus;
+    browserDisplay.focusRevertTo = newRevertTo;
+    newFocusWindow = BrowserGetFocusWindow();
+    (void)X11WasmJsSetInputFocus(newFocusWindow != None,
+	    (unsigned int)newFocusWindow);
+    if (oldFocusWindow != newFocusWindow) {
+	(void)BrowserQueueFocusEventPath(oldFocusWindow, newFocusWindow,
+		CurrentTime);
+    }
+}
+
 int
 BrowserGrabModeIsValid(
     int mode)

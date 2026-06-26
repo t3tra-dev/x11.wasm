@@ -465,6 +465,7 @@ BrowserDestroyWindowResource(
 	    || (resourcePtr == &browserDisplay.rootResource)) {
 	return Success;
     }
+    BrowserRevertInputFocusForUnviewableWindow(resourcePtr);
     while (resourcePtr->firstChildPtr != NULL) {
 	(void)BrowserDestroyWindowResource(resourcePtr->firstChildPtr);
     }
@@ -553,6 +554,7 @@ BrowserUnmapWindowResource(
     if (!resourcePtr->mapped) {
 	return Success;
     }
+    BrowserRevertInputFocusForUnviewableWindow(resourcePtr);
     resourcePtr->mapped = 0;
     (void)X11WasmJsUnmapWindow(BrowserJsXId(resourcePtr->id));
     (void)BrowserQueueUnmapNotify(resourcePtr, fromConfigure);
