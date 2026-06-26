@@ -3452,6 +3452,7 @@ X11WasmTestXlibApis(void)
     wchar_t *wideValues[1];
     wchar_t fontWideText[3] = {'O', 'K', 0};
     wchar_t fontDrawWideText[2] = {'W', 0};
+    wchar_t fontDrawWideSpace[2] = {' ', 0};
     wchar_t **wideList = NULL;
     int wideCount = -1;
     char **stringList = NULL;
@@ -6903,6 +6904,15 @@ X11WasmTestXlibApis(void)
 	    || (fontPerCharLogical[1].x
 		    != (short)fontPerCharLogical[0].width)
 	    || (fontPerCharInk[2].height != fontPerCharLogical[2].height)
+	    || (XmbTextPerCharExtents(fontSet, "abc", 3, fontPerCharInk,
+		    fontPerCharLogical, 4, &fontCharCount,
+		    &fontOverallInkExtent, &fontOverallLogicalExtent) != True)
+	    || (fontCharCount != 3)
+	    || (fontOverallLogicalExtent.width
+		    != (unsigned short)fontUtf8Width)
+	    || (fontPerCharLogical[2].x
+		    != (short)(fontPerCharLogical[0].width
+			    + fontPerCharLogical[1].width))
 	    || (XwcTextPerCharExtents(fontSet, fontWideText, 2,
 		    fontPerCharInk, fontPerCharLogical, 4, &fontCharCount,
 		    NULL, &fontOverallLogicalExtent) != True)
@@ -6977,11 +6987,19 @@ X11WasmTestXlibApis(void)
     }
     Xutf8DrawImageString(&browserDisplay.display, (Drawable)textPixmap,
 	    fontSet, textGC, 4, 24, " ", 1);
+    XmbDrawImageString(&browserDisplay.display, (Drawable)textPixmap,
+	    fontSet, textGC, 20, 24, " ", 1);
+    XwcDrawImageString(&browserDisplay.display, (Drawable)textPixmap,
+	    fontSet, textGC, 36, 24, fontDrawWideSpace, 1);
     (void)XFlush(&browserDisplay.display);
     textReadback = XGetImage(&browserDisplay.display, textPixmap, 4,
-	    24 + fontLogicalExtent.y, 1, 1, AllPlanes, ZPixmap);
+	    24 + fontLogicalExtent.y, 40, 1, AllPlanes, ZPixmap);
     if ((textReadback == NULL)
 	    || ((XGetPixel(textReadback, 0, 0) & 0x00ffffffUL)
+		    != 0x00334455UL)
+	    || ((XGetPixel(textReadback, 16, 0) & 0x00ffffffUL)
+		    != 0x00334455UL)
+	    || ((XGetPixel(textReadback, 32, 0) & 0x00ffffffUL)
 		    != 0x00334455UL)) {
 	goto cleanup;
     }
