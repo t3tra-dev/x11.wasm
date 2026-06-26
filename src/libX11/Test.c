@@ -2698,6 +2698,7 @@ X11WasmTestXlibApis(void)
     XTextProperty wideProp;
     XTextProperty readProp;
     char *listValues[2];
+    char *emptyListValues[3];
     char *titleValues[1];
     char *iconValues[1];
     char *machineValues[1];
@@ -5775,6 +5776,40 @@ X11WasmTestXlibApis(void)
     }
     XFreeStringList(stringList);
     stringList = NULL;
+    stringCount = -1;
+
+    XFree(listProp.value);
+    memset(&listProp, 0, sizeof(listProp));
+    if (!XStringListToTextProperty(NULL, 0, &listProp)
+	    || (listProp.encoding != XA_STRING) || (listProp.format != 8)
+	    || (listProp.nitems != 0) || (listProp.value == NULL)
+	    || (listProp.value[0] != '\0')
+	    || !XTextPropertyToStringList(&listProp, &stringList,
+		    &stringCount)
+	    || (stringCount != 0) || (stringList != NULL)) {
+	goto cleanup;
+    }
+    XFree(listProp.value);
+    memset(&listProp, 0, sizeof(listProp));
+
+    emptyListValues[0] = (char *)"";
+    emptyListValues[1] = (char *)"middle";
+    emptyListValues[2] = (char *)"";
+    if (!XStringListToTextProperty(emptyListValues, 3, &listProp)
+	    || (listProp.encoding != XA_STRING) || (listProp.format != 8)
+	    || (listProp.nitems != 8)
+	    || (memcmp(listProp.value, "\0middle\0", 8) != 0)
+	    || !XTextPropertyToStringList(&listProp, &stringList,
+		    &stringCount)
+	    || (stringCount != 3)
+	    || (strcmp(stringList[0], "") != 0)
+	    || (strcmp(stringList[1], "middle") != 0)
+	    || (strcmp(stringList[2], "") != 0)) {
+	goto cleanup;
+    }
+    XFreeStringList(stringList);
+    stringList = NULL;
+    stringCount = -1;
 
     mbValues[0] = (char *)"compound";
     utf8Values[0] = (char *)"utf8";
