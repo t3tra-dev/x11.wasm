@@ -7366,7 +7366,7 @@ X11WasmTestXlibApis(void)
 	    || (XInternAtom(&browserDisplay.display, batchAtomNames[1], True)
 		    != batchAtoms[1])
 	    || (XInternAtoms(&browserDisplay.display, &batchAtomNames[2], 1,
-		    True, &missingBatchAtom) != True)
+		    True, &missingBatchAtom) != False)
 	    || (missingBatchAtom != None)
 	    || (XGetAtomNames(&browserDisplay.display, batchAtoms, 2,
 		    batchAtomNameReturns) != True)

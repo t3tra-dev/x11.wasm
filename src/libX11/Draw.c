@@ -1292,7 +1292,7 @@ XInternAtoms(
 	    continue;
 	}
 	atomsReturn[i] = XInternAtom(display, names[i], onlyIfExists);
-	if ((atomsReturn[i] == None) && !onlyIfExists) {
+	if (atomsReturn[i] == None) {
 	    status = False;
 	}
     }
