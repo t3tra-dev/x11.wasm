@@ -585,6 +585,71 @@ X11WasmTestSetWindowMetadataProperties(unsigned int window, int enabled)
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestSetWindowNetWmNameProperties(unsigned int window, int mode)
+{
+    static const char netTitle[] = "Net " "\xe2\x98\x83" " Title";
+    static const char netIconName[] = "Net " "\xc3\xa9" " Icon";
+    static const char invalidTitle[] = "Invalid Net Title";
+    static const char invalidIconName[] = "Invalid Net Icon";
+    Atom netWmNameAtom;
+    Atom netWmIconNameAtom;
+    Atom utf8StringAtom;
+    Window xid = (Window)window;
+
+    BrowserInitDisplay();
+    if (BrowserWindowResource(xid) == NULL) {
+	return 0;
+    }
+    netWmNameAtom = XInternAtom(&browserDisplay.display, "_NET_WM_NAME",
+	    False);
+    netWmIconNameAtom = XInternAtom(&browserDisplay.display,
+	    "_NET_WM_ICON_NAME", False);
+    utf8StringAtom = BrowserUtf8StringAtom();
+
+    switch (mode) {
+    case 0:
+	return (XDeleteProperty(&browserDisplay.display, xid, netWmNameAtom)
+		== Success)
+		&& (XDeleteProperty(&browserDisplay.display, xid,
+			netWmIconNameAtom) == Success)
+		&& (XDeleteProperty(&browserDisplay.display, xid,
+			XA_WM_NAME) == Success)
+		&& (XDeleteProperty(&browserDisplay.display, xid,
+			XA_WM_ICON_NAME) == Success);
+    case 1:
+	return (XStoreName(&browserDisplay.display, xid, "Fallback Title")
+		== Success)
+		&& (XSetIconName(&browserDisplay.display, xid,
+			"Fallback Icon") == Success);
+    case 2:
+	return (XChangeProperty(&browserDisplay.display, xid, netWmNameAtom,
+		    utf8StringAtom, 8, PropModeReplace,
+		    (const unsigned char *)netTitle, (int)strlen(netTitle))
+		== Success)
+		&& (XChangeProperty(&browserDisplay.display, xid,
+			netWmIconNameAtom, utf8StringAtom, 8, PropModeReplace,
+			(const unsigned char *)netIconName,
+			(int)strlen(netIconName)) == Success);
+    case 3:
+	return (XDeleteProperty(&browserDisplay.display, xid, netWmNameAtom)
+		== Success)
+		&& (XDeleteProperty(&browserDisplay.display, xid,
+			netWmIconNameAtom) == Success);
+    case 4:
+	return (XChangeProperty(&browserDisplay.display, xid, netWmNameAtom,
+		    XA_STRING, 8, PropModeReplace,
+		    (const unsigned char *)invalidTitle,
+		    (int)strlen(invalidTitle)) == Success)
+		&& (XChangeProperty(&browserDisplay.display, xid,
+			netWmIconNameAtom, XA_STRING, 8, PropModeReplace,
+			(const unsigned char *)invalidIconName,
+			(int)strlen(invalidIconName)) == Success);
+    default:
+	return 0;
+    }
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestSetWindowMetadataTargetProperty(
     unsigned int window,
     unsigned int target,

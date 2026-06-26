@@ -424,6 +424,101 @@ test("ICCCM setters update browser metadata through window properties", async ({
   });
 });
 
+test("EWMH UTF-8 name properties override ICCCM title metadata", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+  const windowId = await createMappedWindow(page);
+
+  const metadata = await page.evaluate((windowId) => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestSetWindowNetWmNameProperties?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    if (!module?._X11WasmTestSetWindowNetWmNameProperties || !backend) {
+      throw new Error("missing EWMH name metadata test hooks");
+    }
+
+    const resource = backend.resources.get(windowId);
+    const element = resource?.element;
+    if (!(element instanceof HTMLElement) || !resource) {
+      throw new Error("missing EWMH name metadata test element");
+    }
+
+    const snapshot = () => ({
+      attrIconName: element.getAttribute("data-x11-wasm-icon-name"),
+      attrTitle: element.getAttribute("data-x11-wasm-title"),
+      documentTitle: document.title,
+      resourceIconName: resource.iconName,
+      resourceTitle: resource.title,
+    });
+
+    const setFallbackResult =
+      module._X11WasmTestSetWindowNetWmNameProperties(windowId, 1);
+    backend.flush?.();
+    const afterFallback = snapshot();
+    const setNetResult =
+      module._X11WasmTestSetWindowNetWmNameProperties(windowId, 2);
+    backend.flush?.();
+    const afterNet = snapshot();
+    const setInvalidNetResult =
+      module._X11WasmTestSetWindowNetWmNameProperties(windowId, 4);
+    backend.flush?.();
+    const afterInvalidNet = snapshot();
+    const deleteNetResult =
+      module._X11WasmTestSetWindowNetWmNameProperties(windowId, 3);
+    backend.flush?.();
+    const afterDeleteNet = snapshot();
+    const clearResult =
+      module._X11WasmTestSetWindowNetWmNameProperties(windowId, 0);
+    backend.flush?.();
+    const afterClear = snapshot();
+
+    return {
+      afterClear,
+      afterDeleteNet,
+      afterFallback,
+      afterInvalidNet,
+      afterNet,
+      clearResult,
+      deleteNetResult,
+      setFallbackResult,
+      setInvalidNetResult,
+      setNetResult,
+    };
+  }, windowId);
+
+  expect(metadata.setFallbackResult).toBe(1);
+  expect(metadata.setNetResult).toBe(1);
+  expect(metadata.setInvalidNetResult).toBe(1);
+  expect(metadata.deleteNetResult).toBe(1);
+  expect(metadata.clearResult).toBe(1);
+  expect(metadata.afterFallback).toEqual({
+    attrIconName: "Fallback Icon",
+    attrTitle: "Fallback Title",
+    documentTitle: "Fallback Title",
+    resourceIconName: "Fallback Icon",
+    resourceTitle: "Fallback Title",
+  });
+  expect(metadata.afterNet).toEqual({
+    attrIconName: "Net \u00e9 Icon",
+    attrTitle: "Net \u2603 Title",
+    documentTitle: "Net \u2603 Title",
+    resourceIconName: "Net \u00e9 Icon",
+    resourceTitle: "Net \u2603 Title",
+  });
+  expect(metadata.afterInvalidNet).toEqual(metadata.afterFallback);
+  expect(metadata.afterDeleteNet).toEqual(metadata.afterFallback);
+  expect(metadata.afterClear).toEqual({
+    attrIconName: "",
+    attrTitle: "",
+    documentTitle: "",
+    resourceIconName: "",
+    resourceTitle: "",
+  });
+});
+
 test("metadata target properties forward ICCCM metadata to another window", async ({
   page,
 }) => {

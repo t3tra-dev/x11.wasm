@@ -838,6 +838,18 @@ BrowserNetWmIconAtom(void)
     return XInternAtom(X11WasmGetDisplay(NULL), "_NET_WM_ICON", True);
 }
 
+static Atom
+BrowserNetWmNameAtom(void)
+{
+    return XInternAtom(X11WasmGetDisplay(NULL), "_NET_WM_NAME", True);
+}
+
+static Atom
+BrowserNetWmIconNameAtom(void)
+{
+    return XInternAtom(X11WasmGetDisplay(NULL), "_NET_WM_ICON_NAME", True);
+}
+
 Atom
 BrowserNetWmStateAtom(void)
 {
@@ -1693,6 +1705,70 @@ BrowserSetWindowClassData(
     BrowserSetWindowClassHint(window, resName, resClass);
 }
 
+static const char *
+BrowserWindowTextPropertyString(
+    X11WasmProperty *propertyPtr,
+    int requireUtf8)
+{
+    if ((propertyPtr == NULL) || (propertyPtr->format != 8)
+	    || (propertyPtr->data == NULL)) {
+	return NULL;
+    }
+    if (requireUtf8) {
+	if (propertyPtr->type != BrowserUtf8StringAtom()) {
+	    return NULL;
+	}
+    } else if (!BrowserPropertyIsTextEncoding(propertyPtr->type)) {
+	return NULL;
+    }
+    return (const char *)propertyPtr->data;
+}
+
+static void
+BrowserApplyWindowTitleMetadata(
+    Window window)
+{
+    X11WasmResource *resourcePtr = BrowserWindowResource(window);
+    const char *title = NULL;
+    Atom netWmNameAtom = BrowserNetWmNameAtom();
+
+    if (resourcePtr == NULL) {
+	return;
+    }
+    if (netWmNameAtom != None) {
+	title = BrowserWindowTextPropertyString(
+		BrowserFindProperty(resourcePtr, netWmNameAtom), 1);
+    }
+    if (title == NULL) {
+	title = BrowserWindowTextPropertyString(
+		BrowserFindProperty(resourcePtr, XA_WM_NAME), 0);
+    }
+    BrowserSetWindowTitle(window, (title != NULL) ? title : "",
+	    BrowserWindowIsRootToplevel(window));
+}
+
+static void
+BrowserApplyWindowIconNameMetadata(
+    Window window)
+{
+    X11WasmResource *resourcePtr = BrowserWindowResource(window);
+    const char *iconName = NULL;
+    Atom netWmIconNameAtom = BrowserNetWmIconNameAtom();
+
+    if (resourcePtr == NULL) {
+	return;
+    }
+    if (netWmIconNameAtom != None) {
+	iconName = BrowserWindowTextPropertyString(
+		BrowserFindProperty(resourcePtr, netWmIconNameAtom), 1);
+    }
+    if (iconName == NULL) {
+	iconName = BrowserWindowTextPropertyString(
+		BrowserFindProperty(resourcePtr, XA_WM_ICON_NAME), 0);
+    }
+    BrowserSetWindowIconName(window, (iconName != NULL) ? iconName : "");
+}
+
 void
 BrowserApplyWindowMetadataProperty(
     Window window,
@@ -1708,17 +1784,11 @@ BrowserApplyWindowMetadataProperty(
 	    propertyPtr)) {
 	return;
     }
-    if (property == XA_WM_NAME) {
-	BrowserSetWindowTitle(window,
-		(BrowserPropertyIsTextEncoding((Atom)type) && (format == 8)
-		&& (data != NULL))
-		? (const char *)data : "",
-		BrowserWindowIsRootToplevel(window));
-    } else if (property == XA_WM_ICON_NAME) {
-	BrowserSetWindowIconName(window,
-		(BrowserPropertyIsTextEncoding((Atom)type) && (format == 8)
-		&& (data != NULL))
-		? (const char *)data : "");
+    if ((property == XA_WM_NAME) || (property == BrowserNetWmNameAtom())) {
+	BrowserApplyWindowTitleMetadata(window);
+    } else if ((property == XA_WM_ICON_NAME)
+	    || (property == BrowserNetWmIconNameAtom())) {
+	BrowserApplyWindowIconNameMetadata(window);
     } else if (property == XA_WM_TRANSIENT_FOR) {
 	Window transientFor = None;
 
