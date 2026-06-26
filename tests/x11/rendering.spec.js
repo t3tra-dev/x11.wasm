@@ -395,6 +395,54 @@ test("Xlib GC clip rectangles and empty regions constrain drawing", async ({
   expect(samples.windowId).toBeGreaterThan(0);
 });
 
+test("Xlib XCopyArea snapshots overlapping self copies", async ({ page }) => {
+  await waitForX11Runtime(page);
+
+  const samples = await page.evaluate(async () => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestCopyAreaSelfOverlapRendering?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    if (!module?._X11WasmTestCopyAreaSelfOverlapRendering || !backend) {
+      throw new Error("missing Xlib XCopyArea self-overlap test hooks");
+    }
+    const windowId = module._X11WasmTestCopyAreaSelfOverlapRendering() >>> 0;
+    backend.flush?.();
+    const resource = backend.resources.get(windowId);
+    const canvas = resource?.canvas;
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      throw new Error("missing XCopyArea self-overlap canvas");
+    }
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("missing XCopyArea self-overlap context");
+    }
+    const pixel = (x, y) => Array.from(context.getImageData(x, y, 1, 1).data);
+    return {
+      rightCopySource: pixel(0, 1),
+      rightCopyFirst: pixel(1, 1),
+      rightCopySecond: pixel(2, 1),
+      rightCopyFifth: pixel(5, 1),
+      leftCopyFirst: pixel(0, 4),
+      leftCopySecond: pixel(1, 4),
+      leftCopyFifth: pixel(4, 4),
+      leftCopyTail: pixel(5, 4),
+      windowId,
+    };
+  });
+
+  expect(samples.rightCopySource).toEqual([255, 0, 0, 255]);
+  expect(samples.rightCopyFirst).toEqual([255, 0, 0, 255]);
+  expect(samples.rightCopySecond).toEqual([0, 255, 0, 255]);
+  expect(samples.rightCopyFifth).toEqual([0, 255, 255, 255]);
+  expect(samples.leftCopyFirst).toEqual([0, 255, 0, 255]);
+  expect(samples.leftCopySecond).toEqual([0, 0, 255, 255]);
+  expect(samples.leftCopyFifth).toEqual([255, 0, 255, 255]);
+  expect(samples.leftCopyTail).toEqual([255, 0, 255, 255]);
+  expect(samples.windowId).toBeGreaterThan(0);
+});
+
 test("browser backend applies GC raster operations", async ({
   page,
 }) => {

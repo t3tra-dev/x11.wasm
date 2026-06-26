@@ -1930,6 +1930,63 @@ cleanup:
     return result;
 }
 
+EMSCRIPTEN_KEEPALIVE unsigned int
+X11WasmTestCopyAreaSelfOverlapRendering(void)
+{
+    static const unsigned long colors[] = {
+	0xff0000UL, 0x00ff00UL, 0x0000ffUL,
+	0xffff00UL, 0x00ffffUL, 0xff00ffUL
+    };
+    Display *display;
+    GC gc = NULL;
+    Window window = None;
+    unsigned int result = 0;
+    unsigned int i;
+    int screen;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+    window = XCreateWindow(display, browserDisplay.rootWindow, 0, 0, 8, 6, 0,
+	    CopyFromParent, InputOutput, DefaultVisual(display, screen), 0, NULL);
+    gc = (window != None) ? XCreateGC(display, window, 0, NULL) : NULL;
+    if ((window == None) || (gc == NULL)
+	    || (XMapWindow(display, window) != Success)) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+
+    if (XSetGraphicsExposures(display, gc, False) != Success) {
+	goto cleanup;
+    }
+    for (i = 0; i < sizeof(colors) / sizeof(colors[0]); i++) {
+	if ((XSetForeground(display, gc, colors[i]) != Success)
+		|| (XFillRectangle(display, window, gc, (int)i, 0, 1, 6)
+			!= Success)) {
+	    goto cleanup;
+	}
+    }
+    if ((XCopyArea(display, window, window, gc, 0, 0, 5, 3, 1, 0)
+		    != Success)
+	    || (XCopyArea(display, window, window, gc, 1, 3, 5, 3, 0, 3)
+		    != Success)) {
+	goto cleanup;
+    }
+    result = (unsigned int)BrowserJsXId(window);
+    window = None;
+
+cleanup:
+    BrowserClearEventQueue();
+    if (gc != NULL) {
+	(void)XFreeGC(display, gc);
+    }
+    if (window != None) {
+	(void)XDestroyWindow(display, window);
+    }
+    BrowserClearEventQueue();
+    return result;
+}
+
 static int
 BrowserTestPopCirculateEvent(
     Window eventWindow,
