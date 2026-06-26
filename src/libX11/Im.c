@@ -1,5 +1,27 @@
 #include "XlibInt.h"
 
+static unsigned char
+BrowserApplyControlModifier(
+    unsigned char byte)
+{
+    if (((byte >= '@') && (byte < 0x7f)) || (byte == ' ')) {
+	return (unsigned char)(byte & 0x1fU);
+    }
+    if (byte == '2') {
+	return '\0';
+    }
+    if ((byte >= '3') && (byte <= '7')) {
+	return (unsigned char)(byte - ('3' - 0x1b));
+    }
+    if (byte == '8') {
+	return 0x7f;
+    }
+    if (byte == '/') {
+	return (unsigned char)('_' & 0x1fU);
+    }
+    return byte;
+}
+
 int XLookupString(XKeyEvent *event, char *buffer, int bytes, KeySym *keySym,
 	XComposeStatus *status)
 {
@@ -11,6 +33,11 @@ int XLookupString(XKeyEvent *event, char *buffer, int bytes, KeySym *keySym,
 
     (void)status;
     if (keySym != NULL) *keySym = sym;
+    length = BrowserLookupReboundKeySym(sym,
+	    (event != NULL) ? event->state : 0U, buffer, bytes);
+    if (length >= 0) {
+	return length;
+    }
     if (((unsigned int)sym & 0xff000000U) == X11_WASM_UNICODE_KEYSYM_BASE) {
 	codepoint = ((unsigned int)sym & 0x00ffffffU);
 	length = BrowserUtf8FromCodepoint(codepoint, buffer, bytes);
@@ -20,10 +47,113 @@ int XLookupString(XKeyEvent *event, char *buffer, int bytes, KeySym *keySym,
 	if ((buffer == NULL) || (bytes <= 0)) {
 	    return 0;
 	}
+	if ((event != NULL) && (event->state & ControlMask)) {
+	    latin1 = BrowserApplyControlModifier(latin1);
+	}
 	buffer[0] = (char)latin1;
 	return 1;
     }
     return 0;
+}
+
+static unsigned int
+BrowserModifierMaskForKeySym(
+    KeySym keySym)
+{
+    unsigned int mask = 0;
+    int modifier;
+    int slot;
+    int maxKeyPerMod = browserDisplay.modifierMapMaxKeyPerMod;
+
+    if ((keySym == NoSymbol) || (maxKeyPerMod <= 0)) {
+	return 0;
+    }
+    for (modifier = 0; modifier < X11_WASM_MODIFIER_COUNT; modifier++) {
+	for (slot = 0; slot < maxKeyPerMod; slot++) {
+	    KeyCode keycode = browserDisplay.modifierMap[
+		    modifier * maxKeyPerMod + slot];
+
+	    if ((keycode != 0)
+		    && (BrowserKeySymForKeycodeLevel(keycode, 0) == keySym
+			|| BrowserKeySymForKeycodeLevel(keycode, 1) == keySym)) {
+		mask |= (1U << modifier);
+	    }
+	}
+    }
+    return mask;
+}
+
+int
+XRebindKeysym(
+    Display *display,
+    KeySym keySym,
+    KeySym *list,
+    int modCount,
+    _Xconst unsigned char *string,
+    int bytesString)
+{
+    X11WasmKeyBinding *bindingPtr;
+    unsigned char *copy = NULL;
+    unsigned int state = 0;
+    int i;
+
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
+    }
+    (void)display;
+    if ((modCount < 0) || (bytesString < 0)
+	    || ((bytesString > 0) && (string == NULL))) {
+	return Success;
+    }
+    for (i = 0; i < modCount; i++) {
+	state |= BrowserModifierMaskForKeySym((list != NULL) ? list[i]
+		: NoSymbol);
+    }
+    if (bytesString > 0) {
+	copy = (unsigned char *)ckalloc((size_t)bytesString);
+	memcpy(copy, string, (size_t)bytesString);
+    }
+    bindingPtr = (X11WasmKeyBinding *)ckalloc(sizeof(*bindingPtr));
+    memset(bindingPtr, 0, sizeof(*bindingPtr));
+    bindingPtr->keySym = keySym;
+    bindingPtr->state = state & (ShiftMask | LockMask | ControlMask
+	    | Mod1Mask | Mod2Mask | Mod3Mask | Mod4Mask | Mod5Mask);
+    bindingPtr->string = copy;
+    bindingPtr->length = bytesString;
+    bindingPtr->nextPtr = keyBindingList;
+    keyBindingList = bindingPtr;
+    return Success;
+}
+
+int
+BrowserLookupReboundKeySym(
+    KeySym keySym,
+    unsigned int state,
+    char *buffer,
+    int bytes)
+{
+    X11WasmKeyBinding *bindingPtr;
+    unsigned int modifierState = state & (ShiftMask | LockMask | ControlMask
+	    | Mod1Mask | Mod2Mask | Mod3Mask | Mod4Mask | Mod5Mask);
+
+    for (bindingPtr = keyBindingList; bindingPtr != NULL;
+	    bindingPtr = bindingPtr->nextPtr) {
+	if ((bindingPtr->keySym == keySym)
+		&& (bindingPtr->state == modifierState)) {
+	    int length = bindingPtr->length;
+
+	    if ((length > 0) && (buffer != NULL) && (bytes > 0)) {
+		int copyLength = (length < bytes) ? length : bytes;
+
+		memcpy(buffer, bindingPtr->string, (size_t)copyLength);
+		return copyLength;
+	    }
+	    return 0;
+	}
+    }
+    return -1;
 }
 
 int

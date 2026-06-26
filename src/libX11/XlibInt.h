@@ -307,6 +307,14 @@ typedef struct X11WasmTrackedGC {
     struct X11WasmTrackedGC *nextPtr;
 } X11WasmTrackedGC;
 
+typedef struct X11WasmKeyBinding {
+    KeySym keySym;
+    unsigned int state;
+    unsigned char *string;
+    int length;
+    struct X11WasmKeyBinding *nextPtr;
+} X11WasmKeyBinding;
+
 typedef int (*X11WasmQueuedEventPredicate)(
     Display *display,
     XEvent *eventPtr,
@@ -390,6 +398,7 @@ extern X11WasmSelectionOwner *selectionOwnerList;
 extern X11WasmGCClip *gcClipList;
 extern X11WasmGCDashes *gcDashList;
 extern X11WasmTrackedGC *gcList;
+extern X11WasmKeyBinding *keyBindingList;
 extern X11WasmIMInstantiateCallback *imInstantiateCallbackList;
 extern XIC focusedInputContext;
 extern char *localeModifiers;
@@ -1149,6 +1158,11 @@ unsigned int BrowserKnownKeycodeForKeySym(
 int BrowserLatin1FromKeySym(
     KeySym keySym,
     unsigned char *bytePtr);
+int BrowserLookupReboundKeySym(
+    KeySym keySym,
+    unsigned int state,
+    char *buffer,
+    int bytes);
 void BrowserLinkChildAfter(
     X11WasmResource *resourcePtr,
     X11WasmResource *parentPtr,

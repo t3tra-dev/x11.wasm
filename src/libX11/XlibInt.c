@@ -14,6 +14,7 @@ X11WasmSelectionOwner *selectionOwnerList;
 X11WasmGCClip *gcClipList;
 X11WasmGCDashes *gcDashList;
 X11WasmTrackedGC *gcList;
+X11WasmKeyBinding *keyBindingList;
 X11WasmIMInstantiateCallback *imInstantiateCallbackList;
 XIC focusedInputContext;
 char *localeModifiers;

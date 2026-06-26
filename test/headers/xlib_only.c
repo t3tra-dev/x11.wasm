@@ -33,6 +33,8 @@ X11WasmHeaderXlibOnlyPrototypeTest(void)
 	    XSetPointerMapping;
     XTimeCoord *(*getMotionEvents)(Display *, Window, Time, Time, int *) =
 	    XGetMotionEvents;
+    int (*rebindKeysym)(Display *, KeySym, KeySym *, int,
+	    _Xconst unsigned char *, int) = XRebindKeysym;
     int (*readBitmapFile)(Display *, Drawable, _Xconst char *,
 	    unsigned int *, unsigned int *, Pixmap *, int *, int *) =
 	    XReadBitmapFile;
@@ -67,7 +69,8 @@ X11WasmHeaderXlibOnlyPrototypeTest(void)
 	    && (autoRepeatOn != 0) && (queryKeymap != 0)
 	    && (changePointerControl != 0) && (getPointerControl != 0)
 	    && (getPointerMapping != 0) && (setPointerMapping != 0)
-	    && (getMotionEvents != 0) && (readBitmapFile != 0)
+	    && (getMotionEvents != 0) && (rebindKeysym != 0)
+	    && (readBitmapFile != 0)
 	    && (readBitmapFileData != 0) && (writeBitmapFile != 0)
 	    && (initImage != 0) && (loadQueryFont != 0)
 	    && (listFontsWithInfo != 0) && (freeFontInfo != 0)

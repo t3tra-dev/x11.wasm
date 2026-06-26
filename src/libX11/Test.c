@@ -45,6 +45,7 @@ X11WasmTestKeyboardAsciiMapping(void)
     int result = 0;
     int screen;
     Status lookupStatus;
+    KeySym rebindModifiers[1];
 
     /*
      * This broad compatibility hook returns section codes on failure so the
@@ -75,6 +76,45 @@ X11WasmTestKeyboardAsciiMapping(void)
 	    || (lookupSym != XK_a)) {
 	goto cleanup;
     }
+    event.state = ControlMask;
+    lookupSym = NoSymbol;
+    lookupLength = XLookupString(&event, buffer, (int)sizeof(buffer),
+	    &lookupSym, NULL);
+    if ((lookupLength != 1) || (buffer[0] != 1) || (lookupSym != XK_a)) {
+	goto cleanup;
+    }
+    event.state = 0;
+    if (XRebindKeysym(display, XK_a, NULL, 0,
+	    (const unsigned char *)"alpha", 5) != Success) {
+	goto cleanup;
+    }
+    lookupSym = NoSymbol;
+    lookupLength = XLookupString(&event, buffer, (int)sizeof(buffer),
+	    &lookupSym, NULL);
+    if ((lookupLength != 5) || (memcmp(buffer, "alpha", 5) != 0)
+	    || (lookupSym != XK_a)) {
+	goto cleanup;
+    }
+    lookupSym = NoSymbol;
+    lookupLength = XLookupString(&event, buffer, 2, &lookupSym, NULL);
+    if ((lookupLength != 2) || (memcmp(buffer, "al", 2) != 0)
+	    || (lookupSym != XK_a)) {
+	goto cleanup;
+    }
+    rebindModifiers[0] = XK_Shift_L;
+    if (XRebindKeysym(display, XK_A, rebindModifiers, 1,
+	    (const unsigned char *)"SHIFT", 5) != Success) {
+	goto cleanup;
+    }
+    event.state = ShiftMask;
+    lookupSym = NoSymbol;
+    lookupLength = XLookupString(&event, buffer, (int)sizeof(buffer),
+	    &lookupSym, NULL);
+    if ((lookupLength != 5) || (memcmp(buffer, "SHIFT", 5) != 0)
+	    || (lookupSym != XK_A)) {
+	goto cleanup;
+    }
+    event.state = 0;
     focusWindow = XCreateWindow(display, browserDisplay.rootWindow,
 	    0, 0, 10, 10, 0, CopyFromParent, InputOutput,
 	    DefaultVisual(display, screen), 0, NULL);

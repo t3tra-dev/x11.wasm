@@ -143,7 +143,9 @@ test("composition events can pin explicit target windows", async ({ page }) => {
   expect(result).toBe(1);
 });
 
-test("X11 keyboard mapping APIs resolve ASCII key events", async ({ page }) => {
+test("X11 keyboard mapping APIs resolve and rebind ASCII key events", async ({
+  page,
+}) => {
   await waitForX11Runtime(page);
 
   const result = await page.evaluate(() => {

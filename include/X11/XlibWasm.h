@@ -331,6 +331,8 @@ EXTERN Bool XQueryPointer(Display *d, Window w1, Window *w2, Window *w3,
 		int *font_ascent_return, int *font_descent_return,
 		XCharStruct *overall_return);
 	EXTERN int XRaiseWindow(Display *d, Window w);
+EXTERN int XRebindKeysym(Display *display, KeySym keysym, KeySym *list,
+	int mod_count, _Xconst unsigned char *string, int bytes_string);
 EXTERN int XRefreshKeyboardMapping(XMappingEvent *x);
 EXTERN Status XReconfigureWMWindow(Display *d, Window w, int screen,
 	unsigned int value_mask, XWindowChanges *values);
