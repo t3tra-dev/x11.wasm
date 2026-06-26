@@ -688,9 +688,37 @@ XGetInputFocus(
 }
 
 int
-BrowserQueueRawFocusEvent(
+BrowserFocusEndpointDetail(
+    int type,
+    Window oldTarget,
+    Window nextTarget)
+{
+    int nextIsInferior = BrowserWindowInTree(nextTarget, oldTarget);
+    int oldIsInferior = BrowserWindowInTree(oldTarget, nextTarget);
+
+    if (type == FocusOut) {
+	if (nextIsInferior) {
+	    return NotifyInferior;
+	}
+	if (oldIsInferior) {
+	    return NotifyAncestor;
+	}
+	return NotifyNonlinear;
+    }
+    if (nextIsInferior) {
+	return NotifyAncestor;
+    }
+    if (oldIsInferior) {
+	return NotifyInferior;
+    }
+    return NotifyNonlinear;
+}
+
+static int
+BrowserQueueFocusEventForWindow(
     Window window,
     int type,
+    int detail,
     Time time)
 {
     XEvent event;
@@ -702,8 +730,111 @@ BrowserQueueRawFocusEvent(
     event.xfocus.serial = ++LastKnownRequestProcessed(&browserDisplay.display);
     BrowserSyncRequestState(&browserDisplay.display);
     event.xfocus.mode = NotifyNormal;
-    event.xfocus.detail = NotifyNonlinear;
+    event.xfocus.detail = detail;
+    if (BrowserSelectedEventTarget(window, BrowserEventMask(&event), 0)
+	    == None) {
+	return 0;
+    }
     return BrowserQueueEvent(&event);
+}
+
+int
+BrowserQueueRawFocusEvent(
+    Window window,
+    int type,
+    Time time)
+{
+    return BrowserQueueFocusEventForWindow(window, type, NotifyNonlinear,
+	    time);
+}
+
+static int
+BrowserQueueFocusForResource(
+    X11WasmResource *resourcePtr,
+    int type,
+    int detail,
+    Time time)
+{
+    if (resourcePtr == NULL) {
+	return 0;
+    }
+    return BrowserQueueFocusEventForWindow((Window)resourcePtr->id, type,
+	    detail, time);
+}
+
+static int
+BrowserQueueFocusEventPath(
+    Window source,
+    Window dest,
+    Time time)
+{
+    X11WasmResource *sourcePtr = BrowserWindowResource(source);
+    X11WasmResource *destPtr = BrowserWindowResource(dest);
+    int upLevels = 0;
+    int downLevels = 0;
+    int queued = 0;
+    int i;
+
+    if (source == dest) {
+	return 0;
+    }
+    if ((sourcePtr == NULL) || (destPtr == NULL)) {
+	queued += BrowserQueueFocusEventForWindow(source, FocusOut,
+		NotifyNonlinear, time);
+	queued += BrowserQueueFocusEventForWindow(dest, FocusIn,
+		NotifyNonlinear, time);
+	return queued;
+    }
+
+    (void)BrowserWindowCommonAncestorResource(sourcePtr, destPtr, &upLevels,
+	    &downLevels);
+    if (downLevels == 0) {
+	X11WasmResource *resourcePtr;
+
+	queued += BrowserQueueFocusForResource(sourcePtr, FocusOut,
+		NotifyAncestor, time);
+	for (resourcePtr = BrowserWindowParentResource(sourcePtr),
+		i = upLevels - 1;
+		(resourcePtr != NULL) && (i > 0);
+		resourcePtr = BrowserWindowParentResource(resourcePtr), i--) {
+	    queued += BrowserQueueFocusForResource(resourcePtr, FocusOut,
+		    NotifyVirtual, time);
+	}
+	queued += BrowserQueueFocusForResource(destPtr, FocusIn,
+		NotifyInferior, time);
+    } else if (upLevels == 0) {
+	queued += BrowserQueueFocusForResource(sourcePtr, FocusOut,
+		NotifyInferior, time);
+	for (i = downLevels - 1; i > 0; i--) {
+	    X11WasmResource *resourcePtr =
+		    BrowserWindowAncestorResource(destPtr, i);
+
+	    queued += BrowserQueueFocusForResource(resourcePtr, FocusIn,
+		    NotifyVirtual, time);
+	}
+	queued += BrowserQueueFocusForResource(destPtr, FocusIn,
+		NotifyAncestor, time);
+    } else {
+	X11WasmResource *resourcePtr;
+
+	queued += BrowserQueueFocusForResource(sourcePtr, FocusOut,
+		NotifyNonlinear, time);
+	for (resourcePtr = BrowserWindowParentResource(sourcePtr),
+		i = upLevels - 1;
+		(resourcePtr != NULL) && (i > 0);
+		resourcePtr = BrowserWindowParentResource(resourcePtr), i--) {
+	    queued += BrowserQueueFocusForResource(resourcePtr, FocusOut,
+		    NotifyNonlinearVirtual, time);
+	}
+	for (i = downLevels - 1; i > 0; i--) {
+	    resourcePtr = BrowserWindowAncestorResource(destPtr, i);
+	    queued += BrowserQueueFocusForResource(resourcePtr, FocusIn,
+		    NotifyNonlinearVirtual, time);
+	}
+	queued += BrowserQueueFocusForResource(destPtr, FocusIn,
+		NotifyNonlinear, time);
+    }
+    return queued;
 }
 
 int
@@ -1256,8 +1387,8 @@ XSetInputFocus(
     (void)X11WasmJsSetInputFocus(newFocusWindow != None,
 	    (unsigned int)newFocusWindow);
     if (oldFocusWindow != newFocusWindow) {
-	(void)BrowserQueueRawFocusEvent(oldFocusWindow, FocusOut, effectiveTime);
-	(void)BrowserQueueRawFocusEvent(newFocusWindow, FocusIn, effectiveTime);
+	(void)BrowserQueueFocusEventPath(oldFocusWindow, newFocusWindow,
+		effectiveTime);
     }
     (void)display;
     return Success;

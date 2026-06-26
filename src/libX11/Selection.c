@@ -1487,6 +1487,88 @@ BrowserTranslateWindowCoordinates(
     }
 }
 
+X11WasmResource *
+BrowserWindowParentResource(
+    X11WasmResource *resourcePtr)
+{
+    if ((resourcePtr == NULL) || (resourcePtr->id == browserDisplay.rootWindow)) {
+	return NULL;
+    }
+    if (resourcePtr->parentPtr != NULL) {
+	return resourcePtr->parentPtr;
+    }
+    return BrowserWindowResource(resourcePtr->parent);
+}
+
+int
+BrowserWindowTreeDepth(
+    X11WasmResource *resourcePtr)
+{
+    int depth = 0;
+
+    while ((resourcePtr != NULL)
+	    && (resourcePtr->id != browserDisplay.rootWindow)) {
+	resourcePtr = BrowserWindowParentResource(resourcePtr);
+	depth++;
+    }
+    return depth;
+}
+
+X11WasmResource *
+BrowserWindowAncestorResource(
+    X11WasmResource *resourcePtr,
+    int levels)
+{
+    while ((resourcePtr != NULL) && (levels > 0)) {
+	resourcePtr = BrowserWindowParentResource(resourcePtr);
+	levels--;
+    }
+    return resourcePtr;
+}
+
+X11WasmResource *
+BrowserWindowCommonAncestorResource(
+    X11WasmResource *sourcePtr,
+    X11WasmResource *destPtr,
+    int *upLevelsPtr,
+    int *downLevelsPtr)
+{
+    X11WasmResource *sourceAncestorPtr = sourcePtr;
+    X11WasmResource *destAncestorPtr = destPtr;
+    int sourceDepth = BrowserWindowTreeDepth(sourcePtr);
+    int destDepth = BrowserWindowTreeDepth(destPtr);
+    int upLevels = 0;
+    int downLevels = 0;
+
+    while (sourceDepth > destDepth) {
+	sourceAncestorPtr = BrowserWindowParentResource(sourceAncestorPtr);
+	sourceDepth--;
+	upLevels++;
+    }
+    while (destDepth > sourceDepth) {
+	destAncestorPtr = BrowserWindowParentResource(destAncestorPtr);
+	destDepth--;
+	downLevels++;
+    }
+    while ((sourceAncestorPtr != NULL) && (destAncestorPtr != NULL)
+	    && (sourceAncestorPtr != destAncestorPtr)) {
+	sourceAncestorPtr = BrowserWindowParentResource(sourceAncestorPtr);
+	destAncestorPtr = BrowserWindowParentResource(destAncestorPtr);
+	upLevels++;
+	downLevels++;
+    }
+    if (sourceAncestorPtr != destAncestorPtr) {
+	sourceAncestorPtr = NULL;
+    }
+    if (upLevelsPtr != NULL) {
+	*upLevelsPtr = upLevels;
+    }
+    if (downLevelsPtr != NULL) {
+	*downLevelsPtr = downLevels;
+    }
+    return sourceAncestorPtr;
+}
+
 int
 BrowserWindowInTree(
     Window window,

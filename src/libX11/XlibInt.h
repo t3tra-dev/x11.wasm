@@ -1375,6 +1375,10 @@ int BrowserQueueRawFocusEvent(
     Window window,
     int type,
     Time time);
+int BrowserFocusEndpointDetail(
+    int type,
+    Window oldTarget,
+    Window nextTarget);
 int BrowserQueueSelectionClear(
     Window owner,
     Atom selection,
@@ -2055,6 +2059,14 @@ void BrowserWindowCoordinatesFromRoot(
 int BrowserWindowHasStateAtom(
     X11WasmProperty *propertyPtr,
     Atom stateAtom);
+X11WasmResource *BrowserWindowAncestorResource(
+    X11WasmResource *resourcePtr,
+    int levels);
+X11WasmResource *BrowserWindowCommonAncestorResource(
+    X11WasmResource *sourcePtr,
+    X11WasmResource *destPtr,
+    int *upLevelsPtr,
+    int *downLevelsPtr);
 int BrowserWindowInTree(
     Window window,
     Window ancestor);
@@ -2065,6 +2077,8 @@ int BrowserWindowIsRootToplevel(
 Window BrowserWindowMetadataTarget(
     Window window);
 Atom BrowserWindowOpacityAtom(void);
+X11WasmResource *BrowserWindowParentResource(
+    X11WasmResource *resourcePtr);
 X11WasmResource *BrowserWindowResource(
     Window window);
 X11WasmResource *BrowserWindowResourceOrError(
@@ -2078,6 +2092,8 @@ void BrowserWindowRootOffset(
 int BrowserWindowSupportsProtocol(
     X11WasmResource *resourcePtr,
     Atom protocolAtom);
+int BrowserWindowTreeDepth(
+    X11WasmResource *resourcePtr);
 Window BrowserWindowTransientFor(
     X11WasmResource *resourcePtr);
 Atom BrowserWmColormapWindowsAtom(void);

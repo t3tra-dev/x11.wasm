@@ -1047,6 +1047,136 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestFocusEventHierarchy(void)
+{
+    Display *display;
+    XEvent event;
+    Window parentA = None;
+    Window childA = None;
+    Window parentB = None;
+    Window childB = None;
+    int result = 0;
+    int screen;
+
+#define EXPECT_FOCUS_EVENT(expectedType, expectedWindow, expectedDetail, code) \
+    do { \
+	if (!BrowserPopEvent(&event, NULL) \
+		|| (event.type != (expectedType)) \
+		|| (event.xfocus.window != (expectedWindow)) \
+		|| (event.xfocus.detail != (expectedDetail)) \
+		|| (event.xfocus.mode != NotifyNormal)) { \
+	    result = (code); \
+	    goto cleanup; \
+	} \
+    } while (0)
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+    BrowserClearEventQueue();
+    parentA = XCreateWindow(display, browserDisplay.rootWindow, 30, 30, 100,
+	    80, 0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL);
+    childA = XCreateWindow(display, parentA, 5, 6, 30, 20, 0,
+	    CopyFromParent, InputOutput, DefaultVisual(display, screen), 0,
+	    NULL);
+    parentB = XCreateWindow(display, browserDisplay.rootWindow, 180, 30, 100,
+	    80, 0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL);
+    childB = XCreateWindow(display, parentB, 5, 6, 30, 20, 0,
+	    CopyFromParent, InputOutput, DefaultVisual(display, screen), 0,
+	    NULL);
+    if ((parentA == None) || (childA == None) || (parentB == None)
+	    || (childB == None)
+	    || (XSelectInput(display, parentA, FocusChangeMask) != Success)
+	    || (XSelectInput(display, childA, FocusChangeMask) != Success)
+	    || (XSelectInput(display, parentB, FocusChangeMask) != Success)
+	    || (XSelectInput(display, childB, FocusChangeMask) != Success)
+	    || (XMapWindow(display, parentA) != Success)
+	    || (XMapWindow(display, childA) != Success)
+	    || (XMapWindow(display, parentB) != Success)
+	    || (XMapWindow(display, childB) != Success)
+	    || (XSetInputFocus(display, browserDisplay.rootWindow,
+		    RevertToParent, CurrentTime) != Success)) {
+	result = 2;
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    if (XSetInputFocus(display, childA, RevertToParent, CurrentTime)
+	    != Success) {
+	result = 3;
+	goto cleanup;
+    }
+    EXPECT_FOCUS_EVENT(FocusIn, parentA, NotifyVirtual, 4);
+    EXPECT_FOCUS_EVENT(FocusIn, childA, NotifyAncestor, 5);
+    if (XEventsQueued(display, QueuedAlready) != 0) {
+	result = 6;
+	goto cleanup;
+    }
+
+    if (XSetInputFocus(display, parentA, RevertToParent, CurrentTime)
+	    != Success) {
+	result = 7;
+	goto cleanup;
+    }
+    EXPECT_FOCUS_EVENT(FocusOut, childA, NotifyAncestor, 8);
+    EXPECT_FOCUS_EVENT(FocusIn, parentA, NotifyInferior, 9);
+    if (XEventsQueued(display, QueuedAlready) != 0) {
+	result = 10;
+	goto cleanup;
+    }
+
+    if (XSetInputFocus(display, childA, RevertToParent, CurrentTime)
+	    != Success) {
+	result = 11;
+	goto cleanup;
+    }
+    EXPECT_FOCUS_EVENT(FocusOut, parentA, NotifyInferior, 12);
+    EXPECT_FOCUS_EVENT(FocusIn, childA, NotifyAncestor, 13);
+    if (XEventsQueued(display, QueuedAlready) != 0) {
+	result = 14;
+	goto cleanup;
+    }
+
+    if (XSetInputFocus(display, childB, RevertToParent, CurrentTime)
+	    != Success) {
+	result = 15;
+	goto cleanup;
+    }
+    EXPECT_FOCUS_EVENT(FocusOut, childA, NotifyNonlinear, 16);
+    EXPECT_FOCUS_EVENT(FocusOut, parentA, NotifyNonlinearVirtual, 17);
+    EXPECT_FOCUS_EVENT(FocusIn, parentB, NotifyNonlinearVirtual, 18);
+    EXPECT_FOCUS_EVENT(FocusIn, childB, NotifyNonlinear, 19);
+    if (XEventsQueued(display, QueuedAlready) != 0) {
+	result = 20;
+	goto cleanup;
+    }
+    result = 1;
+
+#undef EXPECT_FOCUS_EVENT
+
+cleanup:
+    (void)XSetInputFocus(display, browserDisplay.rootWindow, RevertToParent,
+	    CurrentTime);
+    BrowserClearEventQueue();
+    if (childB != None) {
+	(void)XDestroyWindow(display, childB);
+    }
+    if (parentB != None) {
+	(void)XDestroyWindow(display, parentB);
+    }
+    if (childA != None) {
+	(void)XDestroyWindow(display, childA);
+    }
+    if (parentA != None) {
+	(void)XDestroyWindow(display, parentA);
+    }
+    BrowserClearEventQueue();
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestClearAreaApis(void)
 {
     Display *display;

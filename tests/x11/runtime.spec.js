@@ -179,6 +179,23 @@ test("pointer crossing events preserve hierarchy details", async ({ page }) => {
   expect(result).toBe(1);
 });
 
+test("focus events preserve hierarchy details", async ({ page }) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestFocusEventHierarchy?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestFocusEventHierarchy) {
+      throw new Error("missing focus event hierarchy test export");
+    }
+    return module._X11WasmTestFocusEventHierarchy();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XIC spot location anchors the browser input context", async ({ page }) => {
   await waitForX11Runtime(page);
   const windowId = await createMappedWindow(page);
