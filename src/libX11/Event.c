@@ -49,6 +49,17 @@ BrowserKeyboardAutoRepeatModeIsValid(
 	    || (mode == AutoRepeatModeDefault);
 }
 
+static int
+BrowserEffectiveBellPercent(
+    int basePercent,
+    int percent)
+{
+    if (percent < 0) {
+	return basePercent + ((basePercent * percent) / 100);
+    }
+    return basePercent + (((100 - basePercent) * percent) / 100);
+}
+
 static unsigned long
 BrowserScreenSaverIdle(void)
 {
@@ -2065,7 +2076,9 @@ XBell(
 	return Success;
     }
     if (display == &browserDisplay.display) {
-	return X11WasmJsBell(percent);
+	return X11WasmJsBell(BrowserEffectiveBellPercent(
+		browserDisplay.bellPercent, percent),
+		(int)browserDisplay.bellPitch, (int)browserDisplay.bellDuration);
     }
     return Success;
 }

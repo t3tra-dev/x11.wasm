@@ -142,14 +142,20 @@
   Object.assign(X11WasmDOMBackend.prototype, /** @type {any} */ ({
     /**
      * @param {number} percent
+     * @param {number} pitch
+     * @param {number} duration
      * @returns {number}
      */
-    bell(percent) {
+    bell(percent, pitch, duration) {
       const rawPercent = Number.isFinite(percent) ? Math.trunc(percent) : 0;
-      const volumePercent = Math.max(-100, Math.min(100, rawPercent));
-      const volume = Math.max(0.03, Math.min(1, 0.35 + volumePercent / 200));
-      const duration = Math.max(30, Math.round(40 + volume * 90));
-      const frequency = volumePercent < 0 ? 660 : 880;
+      const volumePercent = Math.max(0, Math.min(100, rawPercent));
+      const rawPitch = Number.isFinite(pitch) ? Math.trunc(pitch) : 400;
+      const rawDuration = Number.isFinite(duration)
+        ? Math.trunc(duration)
+        : 100;
+      const volume = Math.max(0, Math.min(1, volumePercent / 100));
+      const durationMs = Math.max(0, rawDuration);
+      const frequency = Math.max(0, rawPitch);
       const target = this.rootElement || this.document;
       const view = this.document && this.document.defaultView;
       const navigatorObject =
@@ -157,8 +163,8 @@
         (typeof global.navigator !== "undefined" ? global.navigator : null);
 
       this.bellCount += 1;
-      this.lastBellPercent = rawPercent;
-      this.lastBellDuration = duration;
+      this.lastBellPercent = volumePercent;
+      this.lastBellDuration = durationMs;
       this.lastBellFrequency = frequency;
       this.lastBellVolume = volume;
       this.bellAudioStatus = "unavailable";
@@ -166,7 +172,9 @@
       this.bellVibrationStatus = "unavailable";
       this.bellVibrationError = "";
 
-      if (view) {
+      if (volume <= 0 || durationMs <= 0 || frequency <= 0) {
+        this.bellAudioStatus = "suppressed";
+      } else if (view) {
         const audioContextConstructor =
           view.AudioContext || /** @type {any} */ (view).webkitAudioContext;
 
@@ -217,7 +225,7 @@
                 ? context.currentTime
                 : 0;
             oscillator.start(now);
-            oscillator.stop(now + duration / 1000);
+            oscillator.stop(now + durationMs / 1000);
             this.bellAudioStatus = "played";
           } catch (error) {
             this.bellAudioStatus = "failed";
@@ -230,11 +238,12 @@
       if (
         navigatorObject &&
         typeof navigatorObject.vibrate === "function" &&
-        duration > 0
+        durationMs > 0 &&
+        volume > 0
       ) {
         try {
           this.bellVibrationStatus =
-            navigatorObject.vibrate(duration) === false
+            navigatorObject.vibrate(durationMs) === false
               ? "rejected"
               : "vibrated";
         } catch (error) {

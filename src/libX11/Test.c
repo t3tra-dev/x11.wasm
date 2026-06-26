@@ -751,6 +751,54 @@ X11WasmTestEventQueueAndKeycodeApis(void)
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestBellKeyboardControlApis(void)
+{
+    Display *display;
+    XKeyboardControl keyboardControl;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+
+    memset(&keyboardControl, 0, sizeof(keyboardControl));
+    keyboardControl.bell_percent = 25;
+    keyboardControl.bell_pitch = 880;
+    keyboardControl.bell_duration = 120;
+    if (XChangeKeyboardControl(display,
+	    KBBellPercent | KBBellPitch | KBBellDuration,
+	    &keyboardControl) != Success) {
+	return 10;
+    }
+    if (XBell(display, 50) != Success) {
+	return 11;
+    }
+
+    memset(&keyboardControl, 0, sizeof(keyboardControl));
+    keyboardControl.bell_percent = 80;
+    keyboardControl.bell_pitch = 660;
+    keyboardControl.bell_duration = 40;
+    if (XChangeKeyboardControl(display,
+	    KBBellPercent | KBBellPitch | KBBellDuration,
+	    &keyboardControl) != Success) {
+	return 12;
+    }
+    if (XBell(display, -50) != Success) {
+	return 13;
+    }
+
+    memset(&keyboardControl, 0, sizeof(keyboardControl));
+    keyboardControl.bell_percent = 50;
+    keyboardControl.bell_pitch = 400;
+    keyboardControl.bell_duration = 100;
+    if (XChangeKeyboardControl(display,
+	    KBBellPercent | KBBellPitch | KBBellDuration,
+	    &keyboardControl) != Success) {
+	return 14;
+    }
+
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestDomInputSelectionMasks(void)
 {
     Display *display;

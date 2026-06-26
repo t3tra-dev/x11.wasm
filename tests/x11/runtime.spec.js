@@ -162,6 +162,173 @@ test("X event queue and display keycode APIs preserve ordering", async ({
   expect(result).toBe(1);
 });
 
+test("XBell applies keyboard control before notifying the browser backend", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const target =
+      /** @type {Window & { __bellCalls?: unknown[], __bellEvents?: unknown[] }} */ (
+        window
+      );
+    target.__bellCalls = [];
+    target.__bellEvents = [];
+
+    class FakeAudioNode {
+      connect() {}
+      disconnect() {}
+    }
+
+    class FakeOscillator extends FakeAudioNode {
+      constructor() {
+        super();
+        this.frequency = { value: 0 };
+        this.type = "";
+      }
+
+      addEventListener() {}
+
+      start(time) {
+        target.__bellCalls?.push({
+          frequency: this.frequency.value,
+          kind: "start",
+          time,
+          type: this.type,
+        });
+      }
+
+      stop(time) {
+        target.__bellCalls?.push({ kind: "stop", time });
+      }
+    }
+
+    class FakeGain extends FakeAudioNode {
+      constructor() {
+        super();
+        this.gain = { value: 0 };
+      }
+    }
+
+    class FakeAudioContext {
+      constructor() {
+        this.currentTime = 3;
+        this.destination = {};
+        this.state = "running";
+      }
+
+      createGain() {
+        return new FakeGain();
+      }
+
+      createOscillator() {
+        return new FakeOscillator();
+      }
+    }
+
+    Object.defineProperty(window, "AudioContext", {
+      configurable: true,
+      value: FakeAudioContext,
+    });
+    Object.defineProperty(navigator, "vibrate", {
+      configurable: true,
+      value: (duration) => {
+        target.__bellCalls?.push({ duration, kind: "vibrate" });
+        return true;
+      },
+    });
+    window.addEventListener("x11wasmbell", (event) => {
+      target.__bellEvents?.push(
+        event instanceof CustomEvent && event.detail ? event.detail : {},
+      );
+    });
+  });
+  await waitForX11Runtime(page);
+
+  const bell = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestBellKeyboardControlApis?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { bellAudioStatus?: string, bellVibrationStatus?: string, bellCount?: number, lastBellDuration?: number, lastBellFrequency?: number, lastBellPercent?: number, lastBellVolume?: number } }, __bellCalls?: unknown[], __bellEvents?: unknown[] }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestBellKeyboardControlApis) {
+      throw new Error("missing XBell keyboard-control test export");
+    }
+    const initialCount = module.x11WasmBackend?.bellCount || 0;
+    const result = module._X11WasmTestBellKeyboardControlApis();
+    const backend = module.x11WasmBackend;
+    const calls =
+      /** @type {Window & { __bellCalls?: any[] }} */ (window).__bellCalls ||
+      [];
+    const events =
+      /** @type {Window & { __bellEvents?: any[] }} */ (window).__bellEvents ||
+      [];
+    /** @param {Record<string, unknown>} expected */
+    const callMatches = (expected) =>
+      calls.some((call) =>
+        Object.entries(expected).every(([key, value]) => call?.[key] === value),
+      );
+    return {
+      audioStatus: backend?.bellAudioStatus,
+      count: backend?.bellCount,
+      duration: backend?.lastBellDuration,
+      eventSummary: events.slice(-2).map((event) => ({
+        audioStatus: event.audioStatus,
+        duration: event.duration,
+        frequency: event.frequency,
+        percent: event.percent,
+        vibrationStatus: event.vibrationStatus,
+      })),
+      frequency: backend?.lastBellFrequency,
+      initialCount,
+      percent: backend?.lastBellPercent,
+      result,
+      sawStart660: callMatches({
+        frequency: 660,
+        kind: "start",
+        time: 3,
+        type: "sine",
+      }),
+      sawStart880: callMatches({
+        frequency: 880,
+        kind: "start",
+        time: 3,
+        type: "sine",
+      }),
+      sawVibrate40: callMatches({ duration: 40, kind: "vibrate" }),
+      sawVibrate120: callMatches({ duration: 120, kind: "vibrate" }),
+      vibrationStatus: backend?.bellVibrationStatus,
+      volume: backend?.lastBellVolume,
+    };
+  });
+
+  expect(bell.result).toBe(1);
+  expect(bell.count).toBe((bell.initialCount || 0) + 2);
+  expect(bell.audioStatus).toBe("played");
+  expect(bell.vibrationStatus).toBe("vibrated");
+  expect(bell.percent).toBe(40);
+  expect(bell.duration).toBe(40);
+  expect(bell.frequency).toBe(660);
+  expect(Math.abs((bell.volume || 0) - 0.4) < 0.000001).toBe(true);
+  expect(bell.sawStart880).toBe(true);
+  expect(bell.sawStart660).toBe(true);
+  expect(bell.sawVibrate120).toBe(true);
+  expect(bell.sawVibrate40).toBe(true);
+  expect(bell.eventSummary).toEqual([
+    {
+      audioStatus: "played",
+      duration: 120,
+      frequency: 880,
+      percent: 62,
+      vibrationStatus: "vibrated",
+    },
+    {
+      audioStatus: "played",
+      duration: 40,
+      frequency: 660,
+      percent: 40,
+      vibrationStatus: "vibrated",
+    },
+  ]);
+});
+
 test("DOM input events honor selected window masks", async ({ page }) => {
   await waitForX11Runtime(page);
 

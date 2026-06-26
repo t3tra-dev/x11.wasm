@@ -40,8 +40,8 @@
   },
 
   X11WasmJsBell__deps: ["$X11WasmBridge"],
-  X11WasmJsBell: function (percent) {
-    return X11WasmBridge.call("bell", [percent]) | 0;
+  X11WasmJsBell: function (percent, pitch, duration) {
+    return X11WasmBridge.call("bell", [percent, pitch, duration]) | 0;
   },
 
   X11WasmJsForceScreenSaver__deps: ["$X11WasmBridge"],

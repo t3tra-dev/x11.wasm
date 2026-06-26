@@ -288,7 +288,7 @@ extern int X11WasmJsCreateCursor(unsigned int cursor, const void *rgba,
 extern int X11WasmJsFlush(void);
 extern int X11WasmJsSetRequestState(unsigned int requestSerial,
 	unsigned int flushSerial, unsigned int syncSerial);
-extern int X11WasmJsBell(int percent);
+extern int X11WasmJsBell(int percent, int pitch, int duration);
 extern int X11WasmJsForceScreenSaver(int mode);
 extern int X11WasmJsGetUserIdleTime(void);
 extern int X11WasmJsSetScreenSaverSettings(int timeout, int interval,
@@ -508,8 +508,8 @@ X11WasmJsCreateCursor(unsigned int cursor, const void *rgba, int dataLength,
     return 0;
 }
 static inline int
-X11WasmJsBell(int percent)
-{ (void)percent; return 0; }
+X11WasmJsBell(int percent, int pitch, int duration)
+{ (void)percent; (void)pitch; (void)duration; return 0; }
 static inline int
 X11WasmJsForceScreenSaver(int mode)
 { (void)mode; return 0; }
