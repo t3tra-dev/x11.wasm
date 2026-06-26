@@ -9375,6 +9375,11 @@ BrowserTestXrmDatabaseApis(void)
     XrmDatabase mergeDatabase = NULL;
     XrmValue binaryValue;
     XrmValue readValue;
+    XrmBinding qBindings[8];
+    XrmQuark qQuarks[8];
+    XrmName qNames[8];
+    XrmClass qClasses[8];
+    XrmRepresentation qType = NULLQUARK;
     char *resourceType = NULL;
     int result = 0;
 
@@ -9419,6 +9424,23 @@ BrowserTestXrmDatabaseApis(void)
 	    || (XrmGetStringDatabase(NULL) != NULL)) {
 	goto cleanup;
     }
+    XrmStringToQuarkList("wish.main.foreground", qNames);
+    XrmStringToQuarkList("Wish.Main.Foreground", qClasses);
+    readValue.size = 0U;
+    readValue.addr = NULL;
+    qType = NULLQUARK;
+    if ((qNames[0] != XrmStringToName("wish"))
+	    || (qNames[1] != XrmStringToName("main"))
+	    || (qNames[2] != XrmStringToName("foreground"))
+	    || (qNames[3] != NULLQUARK)
+	    || !XrmQGetResource(database, qNames, qClasses, &qType,
+		    &readValue)
+	    || (qType != XrmStringToRepresentation("String"))
+	    || (readValue.addr == NULL)
+	    || (strcmp((const char *)readValue.addr,
+		    "wildcard-foreground") != 0)) {
+	goto cleanup;
+    }
     XrmPutStringResource(&putDatabase, "wish.geometry", "put-geometry");
     XrmPutStringResource(&putDatabase, "wish.geometry",
 	    "put-geometry-override");
@@ -9442,6 +9464,40 @@ BrowserTestXrmDatabaseApis(void)
     if (!XrmGetResource(putDatabase, "wish.binary", "Wish.Binary",
 	    &resourceType, &readValue)
 	    || (resourceType == NULL) || (strcmp(resourceType, "Binary") != 0)
+	    || (readValue.size != sizeof(binaryData))
+	    || (readValue.addr == NULL)
+	    || (memcmp(readValue.addr, binaryData, sizeof(binaryData)) != 0)) {
+	goto cleanup;
+    }
+    XrmStringToBindingQuarkList("wish*palette.background", qBindings,
+	    qQuarks);
+    if ((qBindings[0] != XrmBindTightly)
+	    || (qBindings[1] != XrmBindLoosely)
+	    || (qBindings[2] != XrmBindTightly)
+	    || (qQuarks[0] != XrmStringToQuark("wish"))
+	    || (qQuarks[1] != XrmStringToQuark("palette"))
+	    || (qQuarks[2] != XrmStringToQuark("background"))
+	    || (qQuarks[3] != NULLQUARK)) {
+	goto cleanup;
+    }
+    XrmQPutStringResource(&putDatabase, qBindings, qQuarks,
+	    "q-background");
+    if (!BrowserTestXrmResourceEquals(putDatabase,
+	    "wish.main.palette.background", "Wish.Main.Palette.Background",
+	    "q-background")) {
+	goto cleanup;
+    }
+    XrmStringToBindingQuarkList("wish*qbinary", qBindings, qQuarks);
+    XrmQPutResource(&putDatabase, qBindings, qQuarks,
+	    XrmStringToRepresentation("QBinary"), &binaryValue);
+    XrmStringToNameList("wish.main.qbinary", qNames);
+    XrmStringToClassList("Wish.Main.QBinary", qClasses);
+    readValue.size = 0U;
+    readValue.addr = NULL;
+    qType = NULLQUARK;
+    if (!XrmQGetResource(putDatabase, qNames, qClasses, &qType,
+	    &readValue)
+	    || (qType != XrmStringToRepresentation("QBinary"))
 	    || (readValue.size != sizeof(binaryData))
 	    || (readValue.addr == NULL)
 	    || (memcmp(readValue.addr, binaryData, sizeof(binaryData)) != 0)) {

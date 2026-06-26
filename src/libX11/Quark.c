@@ -1,4 +1,5 @@
 #include "XlibInt.h"
+#include <X11/Xresource.h>
 
 typedef struct X11WasmQuarkEntry {
     XrmQuark quark;
@@ -38,6 +39,24 @@ BrowserFindQuarkById(
 	}
     }
     return NULL;
+}
+
+static XrmQuark
+BrowserQuarkFromRange(
+    const char *start,
+    const char *end)
+{
+    size_t length = (size_t)(end - start);
+    char *copy = (char *)ckalloc(length + 1U);
+    XrmQuark quark;
+
+    if (length > 0U) {
+	memcpy(copy, start, length);
+    }
+    copy[length] = '\0';
+    quark = XrmStringToQuark(copy);
+    ckfree(copy);
+    return quark;
 }
 
 XrmQuark
@@ -86,4 +105,72 @@ XrmQuark
 XrmUniqueQuark(void)
 {
     return browserNextUniqueQuark--;
+}
+
+void
+XrmStringToQuarkList(
+    _Xconst char *string,
+    XrmQuarkList quarksReturn)
+{
+    const char *segmentStart;
+    const char *p;
+
+    if (quarksReturn == NULL) {
+	return;
+    }
+    if (string == NULL) {
+	*quarksReturn = NULLQUARK;
+	return;
+    }
+    segmentStart = string;
+    for (p = string; *p != '\0'; p++) {
+	if ((*p == '.') || (*p == '*')) {
+	    if (p > segmentStart) {
+		*quarksReturn++ = BrowserQuarkFromRange(segmentStart, p);
+	    }
+	    segmentStart = p + 1;
+	}
+    }
+    *quarksReturn++ = BrowserQuarkFromRange(segmentStart, p);
+    *quarksReturn = NULLQUARK;
+}
+
+void
+XrmStringToBindingQuarkList(
+    _Xconst char *string,
+    XrmBindingList bindingsReturn,
+    XrmQuarkList quarksReturn)
+{
+    const char *segmentStart;
+    const char *p;
+    XrmBinding binding = XrmBindTightly;
+
+    if (quarksReturn == NULL) {
+	return;
+    }
+    if (string == NULL) {
+	*quarksReturn = NULLQUARK;
+	return;
+    }
+    segmentStart = string;
+    for (p = string; *p != '\0'; p++) {
+	if ((*p == '.') || (*p == '*')) {
+	    if (p > segmentStart) {
+		if (bindingsReturn != NULL) {
+		    *bindingsReturn++ = binding;
+		}
+		*quarksReturn++ = BrowserQuarkFromRange(segmentStart, p);
+		binding = XrmBindTightly;
+	    }
+	    segmentStart = p + 1;
+	    if (*p == '*') {
+		binding = XrmBindLoosely;
+	    }
+	}
+    }
+    if (bindingsReturn != NULL) {
+	*bindingsReturn = binding;
+    }
+    *quarksReturn++ = BrowserQuarkFromRange(segmentStart, p);
+    *quarksReturn = NULLQUARK;
 }

@@ -1,4 +1,5 @@
 #include "XlibInt.h"
+#include <X11/Xresource.h>
 
 static char *browserDefaultValue = NULL;
 
@@ -167,6 +168,53 @@ BrowserDupRange(
     }
     copy[length] = '\0';
     return copy;
+}
+
+static char *
+BrowserXrmQuarkListToBindingString(
+    XrmBindingList bindings,
+    XrmQuarkList quarks)
+{
+    size_t length = 0U;
+    int count = 0;
+    int index;
+    char *string;
+    char *p;
+
+    if ((quarks == NULL) || (quarks[0] == NULLQUARK)) {
+	return NULL;
+    }
+    for (index = 0; quarks[index] != NULLQUARK; index++) {
+	const char *component = XrmQuarkToString(quarks[index]);
+
+	if (component == NULL) {
+	    return NULL;
+	}
+	if ((index > 0) || ((bindings != NULL)
+		&& (bindings[index] == XrmBindLoosely))) {
+	    length++;
+	}
+	length += strlen(component);
+	count++;
+    }
+    string = (char *)ckalloc(length + 1U);
+    p = string;
+    for (index = 0; index < count; index++) {
+	const char *component = XrmQuarkToString(quarks[index]);
+	size_t componentLength = strlen(component);
+
+	if ((index > 0) || ((bindings != NULL)
+		&& (bindings[index] == XrmBindLoosely))) {
+	    *p++ = ((bindings != NULL)
+		    && (bindings[index] == XrmBindLoosely)) ? '*' : '.';
+	}
+	if (componentLength > 0U) {
+	    memcpy(p, component, componentLength);
+	    p += componentLength;
+	}
+    }
+    *p = '\0';
+    return string;
 }
 
 static XrmDatabase
@@ -741,6 +789,24 @@ XrmPutResource(
 }
 
 void
+XrmQPutResource(
+    XrmDatabase *databasePtr,
+    XrmBindingList bindings,
+    XrmQuarkList quarks,
+    XrmRepresentation type,
+    XrmValue *value)
+{
+    char *specifier = BrowserXrmQuarkListToBindingString(bindings, quarks);
+    const char *typeString = XrmRepresentationToString(type);
+
+    if (specifier == NULL) {
+	return;
+    }
+    XrmPutResource(databasePtr, specifier, typeString, value);
+    ckfree(specifier);
+}
+
+void
 XrmPutStringResource(
     XrmDatabase *databasePtr,
     _Xconst char *specifier,
@@ -754,6 +820,22 @@ XrmPutStringResource(
     xrmValue.addr = (XPointer)value;
     xrmValue.size = (unsigned int)strlen(value) + 1U;
     XrmPutResource(databasePtr, specifier, "String", &xrmValue);
+}
+
+void
+XrmQPutStringResource(
+    XrmDatabase *databasePtr,
+    XrmBindingList bindings,
+    XrmQuarkList quarks,
+    _Xconst char *value)
+{
+    char *specifier = BrowserXrmQuarkListToBindingString(bindings, quarks);
+
+    if (specifier == NULL) {
+	return;
+    }
+    XrmPutStringResource(databasePtr, specifier, value);
+    ckfree(specifier);
 }
 
 void
@@ -851,6 +933,46 @@ cleanup:
 	ckfree(classParts);
     }
     return (bestEntryPtr != NULL) ? True : False;
+}
+
+Bool
+XrmQGetResource(
+    XrmDatabase database,
+    XrmNameList quarkName,
+    XrmClassList quarkClass,
+    XrmRepresentation *quarkTypeReturn,
+    XrmValue *valueReturn)
+{
+    char *resourceName = BrowserXrmQuarkListToBindingString(NULL, quarkName);
+    char *resourceClass = BrowserXrmQuarkListToBindingString(NULL, quarkClass);
+    char *resourceType = NULL;
+    Bool result = False;
+
+    if (resourceName == NULL) {
+	goto cleanup;
+    }
+    result = XrmGetResource(database, resourceName, resourceClass,
+	    &resourceType, valueReturn);
+    if (quarkTypeReturn != NULL) {
+	*quarkTypeReturn = (result && (resourceType != NULL))
+		? XrmStringToRepresentation(resourceType) : NULLQUARK;
+    }
+    if (!result && (valueReturn != NULL)) {
+	valueReturn->size = 0U;
+	valueReturn->addr = NULL;
+    }
+
+cleanup:
+    if (!result && (quarkTypeReturn != NULL)) {
+	*quarkTypeReturn = NULLQUARK;
+    }
+    if (resourceName != NULL) {
+	ckfree(resourceName);
+    }
+    if (resourceClass != NULL) {
+	ckfree(resourceClass);
+    }
+    return result;
 }
 
 void

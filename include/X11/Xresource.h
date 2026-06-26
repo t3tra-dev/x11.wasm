@@ -18,12 +18,41 @@ extern "C" {
 #define X11WASM_XRMDATABASE_DEFINED
 typedef struct _XrmHashBucketRec *XrmDatabase;
 typedef XrmQuark XrmRepresentation;
+#define XrmStringToRepresentation(string) XrmStringToQuark(string)
+#define XrmRepresentationToString(type) XrmQuarkToString(type)
 typedef struct {
     unsigned int size;
     XPointer addr;
 } XrmValue, *XrmValuePtr;
 #endif
 
+#define XrmStringsEqual(a1, a2) (strcmp((a1), (a2)) == 0)
+
+typedef enum {
+    XrmBindTightly,
+    XrmBindLoosely
+} XrmBinding, *XrmBindingList;
+
+typedef XrmQuark XrmName;
+typedef XrmQuarkList XrmNameList;
+#define XrmNameToString(name) XrmQuarkToString(name)
+#define XrmStringToName(string) XrmStringToQuark(string)
+#define XrmStringToNameList(str, name) XrmStringToQuarkList((str), (name))
+
+typedef XrmQuark XrmClass;
+typedef XrmQuarkList XrmClassList;
+#define XrmClassToString(c_class) XrmQuarkToString(c_class)
+#define XrmStringToClass(c_class) XrmStringToQuark(c_class)
+#define XrmStringToClassList(str, c_class) \
+    XrmStringToQuarkList((str), (c_class))
+
+extern void XrmStringToQuarkList(
+    _Xconst char *string,
+    XrmQuarkList quarks_return);
+extern void XrmStringToBindingQuarkList(
+    _Xconst char *string,
+    XrmBindingList bindings_return,
+    XrmQuarkList quarks_return);
 extern XrmDatabase XrmGetStringDatabase(
     _Xconst char *data);
 extern XrmDatabase XrmGetDatabase(
@@ -36,9 +65,20 @@ extern void XrmPutResource(
     _Xconst char *specifier,
     _Xconst char *type,
     XrmValue *value);
+extern void XrmQPutResource(
+    XrmDatabase *database,
+    XrmBindingList bindings,
+    XrmQuarkList quarks,
+    XrmRepresentation type,
+    XrmValue *value);
 extern void XrmPutStringResource(
     XrmDatabase *database,
     _Xconst char *specifier,
+    _Xconst char *value);
+extern void XrmQPutStringResource(
+    XrmDatabase *database,
+    XrmBindingList bindings,
+    XrmQuarkList quarks,
     _Xconst char *value);
 extern void XrmPutLineResource(
     XrmDatabase *database,
@@ -48,6 +88,12 @@ extern Bool XrmGetResource(
     _Xconst char *resource_name,
     _Xconst char *resource_class,
     char **resource_type_return,
+    XrmValue *value_return);
+extern Bool XrmQGetResource(
+    XrmDatabase database,
+    XrmNameList quark_name,
+    XrmClassList quark_class,
+    XrmRepresentation *quark_type_return,
     XrmValue *value_return);
 extern void XrmDestroyDatabase(
     XrmDatabase database);
