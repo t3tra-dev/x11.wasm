@@ -339,6 +339,8 @@ extern int X11WasmJsSetWindowIconPhoto(unsigned int window, int imageCount,
 	int rgbaLength, int width, int height);
 extern int X11WasmJsSetWindowProtocols(unsigned int window,
 	const char *utf8, int utf8Length);
+extern int X11WasmJsSetWindowTypes(unsigned int window,
+	const char *utf8, int utf8Length);
 extern int X11WasmJsSetWindowColormapWindows(unsigned int window,
 	const char *utf8, int utf8Length);
 extern int X11WasmJsSetWindowStandardColormaps(unsigned int window,
@@ -727,6 +729,10 @@ X11WasmJsSetWindowIconPhoto(unsigned int window, int imageCount,
 }
 static inline int
 X11WasmJsSetWindowProtocols(unsigned int window, const char *utf8,
+	int utf8Length)
+{ (void)window; (void)utf8; (void)utf8Length; return 0; }
+static inline int
+X11WasmJsSetWindowTypes(unsigned int window, const char *utf8,
 	int utf8Length)
 { (void)window; (void)utf8; (void)utf8Length; return 0; }
 static inline int

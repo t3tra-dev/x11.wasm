@@ -86,6 +86,7 @@
       "setWindowIconPhoto",
       "setWindowIconSizes",
       "setWindowProtocols",
+      "setWindowTypes",
       "setWindowSizeHints",
       "setWindowStandardColormaps",
       "setWindowState",

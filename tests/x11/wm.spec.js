@@ -519,6 +519,91 @@ test("EWMH UTF-8 name properties override ICCCM title metadata", async ({
   });
 });
 
+test("_NET_WM_WINDOW_TYPE updates browser window type metadata", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+  const windowId = await createMappedWindow(page);
+
+  const metadata = await page.evaluate((windowId) => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestSetWindowTypeProperties?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    const resource = backend?.resources.get(windowId);
+    const element = resource?.element;
+    if (
+      !module?._X11WasmTestSetWindowTypeProperties ||
+      !backend ||
+      !resource ||
+      !(element instanceof HTMLElement)
+    ) {
+      throw new Error("missing window type metadata test hooks");
+    }
+
+    const snapshot = () => ({
+      attr: element.getAttribute("data-x11-wasm-window-types"),
+      resourceTypes: [...(resource.windowTypes || [])],
+    });
+    const setResult = module._X11WasmTestSetWindowTypeProperties(windowId, 1);
+    backend.flush?.();
+    const afterSet = snapshot();
+    const invalidResult = module._X11WasmTestSetWindowTypeProperties(
+      windowId,
+      2,
+    );
+    backend.flush?.();
+    const afterInvalid = snapshot();
+    const resetResult = module._X11WasmTestSetWindowTypeProperties(windowId, 1);
+    backend.flush?.();
+    const afterReset = snapshot();
+    const clearResult = module._X11WasmTestSetWindowTypeProperties(windowId, 0);
+    backend.flush?.();
+    const afterClear = snapshot();
+
+    return {
+      afterClear,
+      afterInvalid,
+      afterReset,
+      afterSet,
+      clearResult,
+      invalidResult,
+      resetResult,
+      setResult,
+    };
+  }, windowId);
+
+  const expectedTypes = [
+    "_NET_WM_WINDOW_TYPE_DIALOG",
+    "_NET_WM_WINDOW_TYPE_UTILITY",
+    "_NET_WM_WINDOW_TYPE_NORMAL",
+  ];
+  const expectedAttr = expectedTypes.join(" ");
+  expect(metadata).toEqual({
+    setResult: 1,
+    invalidResult: 1,
+    resetResult: 1,
+    clearResult: 1,
+    afterSet: {
+      attr: expectedAttr,
+      resourceTypes: expectedTypes,
+    },
+    afterInvalid: {
+      attr: null,
+      resourceTypes: [],
+    },
+    afterReset: {
+      attr: expectedAttr,
+      resourceTypes: expectedTypes,
+    },
+    afterClear: {
+      attr: null,
+      resourceTypes: [],
+    },
+  });
+});
+
 test("metadata target properties forward ICCCM metadata to another window", async ({
   page,
 }) => {

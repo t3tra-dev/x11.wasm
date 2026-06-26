@@ -243,6 +243,7 @@
         iconSizeCount: 0,
         iconSizes: "",
         protocols: [],
+        windowTypes: [],
         closeRequestCount: 0,
         lastCloseRequestTime: 0,
         closeRequestStatus: "idle",

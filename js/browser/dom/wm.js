@@ -814,6 +814,30 @@ syncDocumentIconFromResources() {
     },
 
     /**
+     * @param {number} id
+     * @param {string} types
+     * @returns {number}
+     */
+    setWindowTypes(id, types) {
+      const resource = this.resources.get(id);
+      if (resource) {
+        const names = types ? types.split(/\s+/).filter(Boolean) : [];
+        resource.windowTypes = names;
+        if (resource.element) {
+          if (names.length > 0) {
+            resource.element.setAttribute(
+              "data-x11-wasm-window-types",
+              names.join(" "),
+            );
+          } else {
+            resource.element.removeAttribute("data-x11-wasm-window-types");
+          }
+        }
+      }
+      return 0;
+    },
+
+    /**
      * @param {X11WasmDOMResource | undefined} resource
      */
     installWindowCloseListener(resource) {

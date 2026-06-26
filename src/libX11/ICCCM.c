@@ -650,6 +650,45 @@ X11WasmTestSetWindowNetWmNameProperties(unsigned int window, int mode)
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestSetWindowTypeProperties(unsigned int window, int mode)
+{
+    static const char invalidTypes[] = "not-atoms";
+    Atom windowTypeAtom;
+    Atom atoms[3];
+    Window xid = (Window)window;
+
+    BrowserInitDisplay();
+    if (BrowserWindowResource(xid) == NULL) {
+	return 0;
+    }
+    windowTypeAtom = XInternAtom(&browserDisplay.display,
+	    "_NET_WM_WINDOW_TYPE", False);
+
+    switch (mode) {
+    case 0:
+	return XDeleteProperty(&browserDisplay.display, xid, windowTypeAtom)
+		== Success;
+    case 1:
+	atoms[0] = XInternAtom(&browserDisplay.display,
+		"_NET_WM_WINDOW_TYPE_DIALOG", False);
+	atoms[1] = XInternAtom(&browserDisplay.display,
+		"_NET_WM_WINDOW_TYPE_UTILITY", False);
+	atoms[2] = XInternAtom(&browserDisplay.display,
+		"_NET_WM_WINDOW_TYPE_NORMAL", False);
+	return XChangeProperty(&browserDisplay.display, xid, windowTypeAtom,
+		XA_ATOM, 32, PropModeReplace, (const unsigned char *)atoms, 3)
+		== Success;
+    case 2:
+	return XChangeProperty(&browserDisplay.display, xid, windowTypeAtom,
+		XA_STRING, 8, PropModeReplace,
+		(const unsigned char *)invalidTypes,
+		(int)strlen(invalidTypes)) == Success;
+    default:
+	return 0;
+    }
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestSetWindowMetadataTargetProperty(
     unsigned int window,
     unsigned int target,

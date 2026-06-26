@@ -157,6 +157,7 @@
  * @property {number} iconSizeCount
  * @property {string} iconSizes
  * @property {string[]} protocols
+ * @property {string[]} windowTypes
  * @property {number} closeRequestCount
  * @property {number} lastCloseRequestTime
  * @property {string} closeRequestStatus

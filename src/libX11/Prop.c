@@ -850,6 +850,12 @@ BrowserNetWmIconNameAtom(void)
     return XInternAtom(X11WasmGetDisplay(NULL), "_NET_WM_ICON_NAME", True);
 }
 
+static Atom
+BrowserNetWmWindowTypeAtom(void)
+{
+    return XInternAtom(X11WasmGetDisplay(NULL), "_NET_WM_WINDOW_TYPE", True);
+}
+
 Atom
 BrowserNetWmStateAtom(void)
 {
@@ -1059,6 +1065,51 @@ BrowserApplyWindowProtocolsProperty(
     }
     BrowserSetWindowProtocols(window, propertyPtr->data,
 	    propertyPtr->nitems);
+}
+
+static void
+BrowserSetWindowTypes(
+    Window window,
+    const unsigned char *data,
+    unsigned long atomCount)
+{
+    X11WasmDString types;
+    Display *display = X11WasmGetDisplay(NULL);
+    Window typesWindow = BrowserWindowMetadataTarget(window);
+    unsigned long i;
+
+    X11WasmDStringInit(&types);
+    for (i = 0; (data != NULL) && (i < atomCount); i++) {
+	Atom typeAtom = BrowserPropertyAtomAt(data, i);
+	char *name;
+
+	if (!BrowserAtomIsValid(typeAtom)) {
+	    continue;
+	}
+	name = XGetAtomName(display, typeAtom);
+	if ((name != NULL) && (name[0] != '\0')) {
+	    X11WasmDStringAppendElement(&types, name);
+	}
+	if (name != NULL) {
+	    XFree(name);
+	}
+    }
+    (void)X11WasmJsSetWindowTypes(BrowserJsXId(typesWindow),
+	    X11WasmDStringValue(&types), X11WasmDStringLength(&types));
+    X11WasmDStringFree(&types);
+}
+
+static void
+BrowserApplyWindowTypesProperty(
+    Window window,
+    X11WasmProperty *propertyPtr)
+{
+    if ((propertyPtr == NULL) || (propertyPtr->type != XA_ATOM)
+	    || (propertyPtr->format != 32)) {
+	BrowserSetWindowTypes(window, NULL, 0);
+	return;
+    }
+    BrowserSetWindowTypes(window, propertyPtr->data, propertyPtr->nitems);
 }
 
 int
@@ -1859,6 +1910,8 @@ BrowserApplyWindowMetadataProperty(
 	}
     } else if (property == BrowserWmProtocolsAtom()) {
 	BrowserApplyWindowProtocolsProperty(window, propertyPtr);
+    } else if (property == BrowserNetWmWindowTypeAtom()) {
+	BrowserApplyWindowTypesProperty(window, propertyPtr);
     } else if (property == BrowserWmColormapWindowsAtom()) {
 	BrowserApplyWindowColormapWindowsProperty(window, propertyPtr);
     } else if (property == BrowserNetWmStateAtom()) {

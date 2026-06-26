@@ -206,6 +206,16 @@
         return X11WasmBridge.call("setWindowProtocols", [id, protocols]) | 0;
       },
 
+  X11WasmJsSetWindowTypes__deps: ["$X11WasmBridge"],
+  X11WasmJsSetWindowTypes: function(id, utf8, utf8Length) {
+        var types = "";
+        if (utf8 && utf8Length > 0) {
+          // @ts-ignore UTF8ToString is provided by Emscripten generated code.
+          types = UTF8ToString(utf8, utf8Length);
+        }
+        return X11WasmBridge.call("setWindowTypes", [id, types]) | 0;
+      },
+
   X11WasmJsSetWindowColormapWindows__deps: ["$X11WasmBridge"],
   X11WasmJsSetWindowColormapWindows: function(id, utf8, utf8Length) {
         var colormapWindows = "";

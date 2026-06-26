@@ -38,6 +38,7 @@ interface X11WasmResource {
   iconSizeCount?: number;
   iconSizes?: string;
   protocols?: string[];
+  windowTypes?: string[];
   closeRequestCount?: number;
   lastCloseRequestTime?: number;
   closeRequestStatus?: string;
@@ -286,6 +287,7 @@ interface X11WasmBackend {
     count: number,
   ): number;
   setWindowProtocols(id: number, protocols: string): number;
+  setWindowTypes(id: number, types: string): number;
   dispatchWindowProtocol(id: number, protocol: string, time?: number): number;
   requestWindowClose(id: number, time?: number): number;
   setWindowIconSizes(id: number, sizes: string, count: number): number;
