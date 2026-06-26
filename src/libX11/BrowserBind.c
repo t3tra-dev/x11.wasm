@@ -316,11 +316,18 @@ BrowserQueueCrossingEventForTarget(
     unsigned int state,
     int rootX,
     int rootY,
-    Time time)
+    Time time,
+    int detail,
+    int subwindowRootX,
+    int subwindowRootY)
 {
     XEvent event;
     int x = rootX;
     int y = rootY;
+    X11WasmResource *targetPtr;
+    X11WasmResource *subwindowPtr = NULL;
+    int subwindowX = subwindowRootX;
+    int subwindowY = subwindowRootY;
 
     if ((type != EnterNotify) && (type != LeaveNotify)) {
 	return 0;
@@ -328,19 +335,28 @@ BrowserQueueCrossingEventForTarget(
     if (!BrowserWindowCanReceiveEvents(target)) {
 	return 0;
     }
+    targetPtr = BrowserWindowResource(target);
+    if (targetPtr == NULL) {
+	return 0;
+    }
     BrowserWindowCoordinatesFromRoot(target, rootX, rootY, &x, &y);
+    BrowserWindowCoordinatesFromRoot(target, subwindowRootX, subwindowRootY,
+	    &subwindowX, &subwindowY);
+    subwindowPtr = BrowserFindTopVisibleChildAt(targetPtr, subwindowX,
+	    subwindowY);
     BrowserSetCommonEventFields(&event, type, target, time);
     event.xcrossing.root = browserDisplay.rootWindow;
-    event.xcrossing.subwindow = None;
+    event.xcrossing.subwindow = (subwindowPtr != NULL)
+	    ? (Window)subwindowPtr->id : None;
     event.xcrossing.time = eventTime;
     event.xcrossing.x = x;
     event.xcrossing.y = y;
     event.xcrossing.x_root = rootX;
     event.xcrossing.y_root = rootY;
     event.xcrossing.mode = NotifyNormal;
-    event.xcrossing.detail = NotifyNonlinear;
+    event.xcrossing.detail = detail;
     event.xcrossing.same_screen = True;
-    event.xcrossing.focus = (browserDisplay.focusWindow != None);
+    event.xcrossing.focus = BrowserWindowInTree(target, BrowserGetFocusWindow());
     event.xcrossing.state = state;
     if (!BrowserPointerGrabAllowsEvent(&event)) {
 	return 0;
@@ -350,6 +366,210 @@ BrowserQueueCrossingEventForTarget(
 	return 0;
     }
     return BrowserQueueEvent(&event);
+}
+
+static X11WasmResource *
+BrowserCrossingParent(
+    X11WasmResource *resourcePtr)
+{
+    if ((resourcePtr == NULL) || (resourcePtr->id == browserDisplay.rootWindow)) {
+	return NULL;
+    }
+    if (resourcePtr->parentPtr != NULL) {
+	return resourcePtr->parentPtr;
+    }
+    return BrowserWindowResource(resourcePtr->parent);
+}
+
+static int
+BrowserCrossingDepth(
+    X11WasmResource *resourcePtr)
+{
+    int depth = 0;
+
+    while ((resourcePtr != NULL)
+	    && (resourcePtr->id != browserDisplay.rootWindow)) {
+	resourcePtr = BrowserCrossingParent(resourcePtr);
+	depth++;
+    }
+    return depth;
+}
+
+static X11WasmResource *
+BrowserCrossingAncestor(
+    X11WasmResource *resourcePtr,
+    int levels)
+{
+    while ((resourcePtr != NULL) && (levels > 0)) {
+	resourcePtr = BrowserCrossingParent(resourcePtr);
+	levels--;
+    }
+    return resourcePtr;
+}
+
+static X11WasmResource *
+BrowserCrossingCommonAncestor(
+    X11WasmResource *sourcePtr,
+    X11WasmResource *destPtr,
+    int *upLevelsPtr,
+    int *downLevelsPtr)
+{
+    X11WasmResource *sourceAncestorPtr = sourcePtr;
+    X11WasmResource *destAncestorPtr = destPtr;
+    int sourceDepth = BrowserCrossingDepth(sourcePtr);
+    int destDepth = BrowserCrossingDepth(destPtr);
+    int upLevels = 0;
+    int downLevels = 0;
+
+    while (sourceDepth > destDepth) {
+	sourceAncestorPtr = BrowserCrossingParent(sourceAncestorPtr);
+	sourceDepth--;
+	upLevels++;
+    }
+    while (destDepth > sourceDepth) {
+	destAncestorPtr = BrowserCrossingParent(destAncestorPtr);
+	destDepth--;
+	downLevels++;
+    }
+    while ((sourceAncestorPtr != NULL) && (destAncestorPtr != NULL)
+	    && (sourceAncestorPtr != destAncestorPtr)) {
+	sourceAncestorPtr = BrowserCrossingParent(sourceAncestorPtr);
+	destAncestorPtr = BrowserCrossingParent(destAncestorPtr);
+	upLevels++;
+	downLevels++;
+    }
+    if (sourceAncestorPtr != destAncestorPtr) {
+	sourceAncestorPtr = NULL;
+    }
+    if (upLevelsPtr != NULL) {
+	*upLevelsPtr = upLevels;
+    }
+    if (downLevelsPtr != NULL) {
+	*downLevelsPtr = downLevels;
+    }
+    return sourceAncestorPtr;
+}
+
+static int
+BrowserQueueCrossingForResource(
+    X11WasmResource *resourcePtr,
+    int type,
+    int detail,
+    unsigned int state,
+    int oldRootX,
+    int oldRootY,
+    int rootX,
+    int rootY,
+    Time time)
+{
+    int subwindowRootX = (type == LeaveNotify) ? oldRootX : rootX;
+    int subwindowRootY = (type == LeaveNotify) ? oldRootY : rootY;
+
+    if (resourcePtr == NULL) {
+	return 0;
+    }
+    return BrowserQueueCrossingEventForTarget(type, (Window)resourcePtr->id,
+	    state, rootX, rootY, time, detail, subwindowRootX,
+	    subwindowRootY);
+}
+
+static int
+BrowserQueuePointerCrossingEventPath(
+    X11WasmResource *sourcePtr,
+    X11WasmResource *destPtr,
+    unsigned int state,
+    int oldRootX,
+    int oldRootY,
+    int rootX,
+    int rootY,
+    Time time)
+{
+    int upLevels = 0;
+    int downLevels = 0;
+    int queued = 0;
+    int i;
+
+    if ((sourcePtr == NULL) || (destPtr == NULL) || (sourcePtr == destPtr)) {
+	return 0;
+    }
+    (void)BrowserCrossingCommonAncestor(sourcePtr, destPtr, &upLevels,
+	    &downLevels);
+    if (downLevels == 0) {
+	X11WasmResource *resourcePtr;
+
+	queued += BrowserQueueCrossingForResource(sourcePtr, LeaveNotify,
+		NotifyAncestor, state, oldRootX, oldRootY, rootX, rootY, time);
+	for (resourcePtr = BrowserCrossingParent(sourcePtr), i = upLevels - 1;
+		(resourcePtr != NULL) && (i > 0);
+		resourcePtr = BrowserCrossingParent(resourcePtr), i--) {
+	    queued += BrowserQueueCrossingForResource(resourcePtr, LeaveNotify,
+		    NotifyVirtual, state, oldRootX, oldRootY, rootX, rootY,
+		    time);
+	}
+	queued += BrowserQueueCrossingForResource(destPtr, EnterNotify,
+		NotifyInferior, state, oldRootX, oldRootY, rootX, rootY, time);
+    } else if (upLevels == 0) {
+	queued += BrowserQueueCrossingForResource(sourcePtr, LeaveNotify,
+		NotifyInferior, state, oldRootX, oldRootY, rootX, rootY, time);
+	for (i = downLevels - 1; i > 0; i--) {
+	    X11WasmResource *resourcePtr = BrowserCrossingAncestor(destPtr, i);
+
+	    queued += BrowserQueueCrossingForResource(resourcePtr, EnterNotify,
+		    NotifyVirtual, state, oldRootX, oldRootY, rootX, rootY,
+		    time);
+	}
+	queued += BrowserQueueCrossingForResource(destPtr, EnterNotify,
+		NotifyAncestor, state, oldRootX, oldRootY, rootX, rootY, time);
+    } else {
+	X11WasmResource *resourcePtr;
+
+	queued += BrowserQueueCrossingForResource(sourcePtr, LeaveNotify,
+		NotifyNonlinear, state, oldRootX, oldRootY, rootX, rootY, time);
+	for (resourcePtr = BrowserCrossingParent(sourcePtr), i = upLevels - 1;
+		(resourcePtr != NULL) && (i > 0);
+		resourcePtr = BrowserCrossingParent(resourcePtr), i--) {
+	    queued += BrowserQueueCrossingForResource(resourcePtr, LeaveNotify,
+		    NotifyNonlinearVirtual, state, oldRootX, oldRootY, rootX,
+		    rootY, time);
+	}
+	for (i = downLevels - 1; i > 0; i--) {
+	    resourcePtr = BrowserCrossingAncestor(destPtr, i);
+	    queued += BrowserQueueCrossingForResource(resourcePtr, EnterNotify,
+		    NotifyNonlinearVirtual, state, oldRootX, oldRootY, rootX,
+		    rootY, time);
+	}
+	queued += BrowserQueueCrossingForResource(destPtr, EnterNotify,
+		NotifyNonlinear, state, oldRootX, oldRootY, rootX, rootY,
+		time);
+    }
+    return queued;
+}
+
+static int
+BrowserCrossingEndpointDetail(
+    int type,
+    Window oldTarget,
+    Window nextTarget)
+{
+    int nextIsInferior = BrowserWindowInTree(nextTarget, oldTarget);
+    int oldIsInferior = BrowserWindowInTree(oldTarget, nextTarget);
+
+    if (type == LeaveNotify) {
+	if (nextIsInferior) {
+	    return NotifyInferior;
+	}
+	if (oldIsInferior) {
+	    return NotifyAncestor;
+	}
+	return NotifyNonlinear;
+    }
+    if (nextIsInferior) {
+	return NotifyAncestor;
+    }
+    if (oldIsInferior) {
+	return NotifyInferior;
+    }
+    return NotifyNonlinear;
 }
 
 int
@@ -362,19 +582,22 @@ BrowserQueuePointerCrossingEvents(
     Window oldTarget;
     Window nextTarget;
     int queued = 0;
+    int oldRootX;
+    int oldRootY;
 
     BrowserInitDisplay();
     BrowserClampPointerToGrabConfine(&rootX, &rootY);
     oldTarget = browserDisplay.pointerWindow;
+    oldRootX = browserDisplay.pointerX;
+    oldRootY = browserDisplay.pointerY;
     nextTarget = BrowserHitTestRoot(rootX, rootY, NULL, NULL);
     if (nextTarget == oldTarget) {
 	BrowserUpdatePointerState(nextTarget, rootX, rootY, state);
 	return 0;
     }
-    queued += BrowserQueueCrossingEventForTarget(LeaveNotify, oldTarget,
-	    state, rootX, rootY, (Time)time);
-    queued += BrowserQueueCrossingEventForTarget(EnterNotify, nextTarget,
-	    state, rootX, rootY, (Time)time);
+    queued += BrowserQueuePointerCrossingEventPath(
+	    BrowserWindowResource(oldTarget), BrowserWindowResource(nextTarget),
+	    state, oldRootX, oldRootY, rootX, rootY, (Time)time);
     BrowserUpdatePointerState(nextTarget, rootX, rootY, state);
     return queued;
 }
@@ -390,19 +613,25 @@ X11WasmQueueCrossingEvent(
 {
     Window target;
     Window nextTarget;
+    Window oldTarget;
     int rootX = x;
     int rootY = y;
+    int oldRootX;
+    int oldRootY;
 
     if ((type != EnterNotify) && (type != LeaveNotify)) {
 	return 0;
     }
     (void)window;
     BrowserClampPointerToGrabConfine(&rootX, &rootY);
+    oldTarget = browserDisplay.pointerWindow;
     nextTarget = BrowserHitTestRoot(rootX, rootY, NULL, NULL);
-    if (nextTarget == browserDisplay.pointerWindow) {
+    if (nextTarget == oldTarget) {
 	BrowserUpdatePointerState(nextTarget, rootX, rootY, state);
 	return 0;
     }
+    oldRootX = browserDisplay.pointerX;
+    oldRootY = browserDisplay.pointerY;
     if (type == LeaveNotify) {
 	if (!BrowserWindowCanReceiveEvents(browserDisplay.pointerWindow)) {
 	    BrowserUpdatePointerState(nextTarget, rootX, rootY, state);
@@ -418,7 +647,10 @@ X11WasmQueueCrossingEvent(
     }
     BrowserUpdatePointerState(nextTarget, rootX, rootY, state);
     return BrowserQueueCrossingEventForTarget(type, target, state, rootX,
-	    rootY, (Time)time);
+	    rootY, (Time)time,
+	    BrowserCrossingEndpointDetail(type, oldTarget, nextTarget),
+	    (type == LeaveNotify) ? oldRootX : rootX,
+	    (type == LeaveNotify) ? oldRootY : rootY);
 }
 
 EMSCRIPTEN_KEEPALIVE int

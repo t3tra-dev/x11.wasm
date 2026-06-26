@@ -162,6 +162,23 @@ test("DOM input events honor selected window masks", async ({ page }) => {
   expect(result).toBe(1);
 });
 
+test("pointer crossing events preserve hierarchy details", async ({ page }) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestCrossingEventHierarchy?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestCrossingEventHierarchy) {
+      throw new Error("missing crossing event hierarchy test export");
+    }
+    return module._X11WasmTestCrossingEventHierarchy();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XIC spot location anchors the browser input context", async ({ page }) => {
   await waitForX11Runtime(page);
   const windowId = await createMappedWindow(page);

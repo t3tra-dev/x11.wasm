@@ -905,6 +905,148 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestCrossingEventHierarchy(void)
+{
+    Display *display;
+    XEvent event;
+    Window parent = None;
+    Window child = None;
+    int parentRootX = 0;
+    int parentRootY = 0;
+    int childRootX = 0;
+    int childRootY = 0;
+    int result = 0;
+    int screen;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+    BrowserClearEventQueue();
+    parent = XCreateWindow(display, browserDisplay.rootWindow, 30, 30, 100,
+	    80, 0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL);
+    child = XCreateWindow(display, parent, 5, 6, 30, 20, 0,
+	    CopyFromParent, InputOutput, DefaultVisual(display, screen), 0,
+	    NULL);
+    if ((parent == None) || (child == None)
+	    || (XSelectInput(display, parent,
+		    EnterWindowMask | LeaveWindowMask) != Success)
+	    || (XSelectInput(display, child,
+		    EnterWindowMask | LeaveWindowMask) != Success)
+	    || (XMapWindow(display, parent) != Success)
+	    || (XMapWindow(display, child) != Success)) {
+	result = 2;
+	goto cleanup;
+    }
+    BrowserWindowRootOffset(parent, &parentRootX, &parentRootY);
+    BrowserWindowRootOffset(child, &childRootX, &childRootY);
+
+    BrowserUpdatePointerState(browserDisplay.rootWindow, 1, 1, 0);
+    BrowserClearEventQueue();
+    if (!BrowserQueuePointerCrossingEvents(0, childRootX + 1,
+	    childRootY + 1, 2000)) {
+	result = 3;
+	goto cleanup;
+    }
+    if (!BrowserPopEvent(&event, NULL)
+	    || (event.type != EnterNotify)
+	    || (event.xcrossing.window != parent)
+	    || (event.xcrossing.detail != NotifyVirtual)
+	    || (event.xcrossing.subwindow != child)
+	    || (event.xcrossing.x_root != childRootX + 1)
+	    || (event.xcrossing.y_root != childRootY + 1)) {
+	result = 4;
+	goto cleanup;
+    }
+    if (!BrowserPopEvent(&event, NULL)
+	    || (event.type != EnterNotify)
+	    || (event.xcrossing.window != child)
+	    || (event.xcrossing.detail != NotifyAncestor)
+	    || (event.xcrossing.subwindow != None)
+	    || (event.xcrossing.x != 1)
+	    || (event.xcrossing.y != 1)) {
+	result = 5;
+	goto cleanup;
+    }
+    if (XEventsQueued(display, QueuedAlready) != 0) {
+	result = 6;
+	goto cleanup;
+    }
+
+    if (!BrowserQueuePointerCrossingEvents(0, 1, 1, 2001)) {
+	result = 7;
+	goto cleanup;
+    }
+    if (!BrowserPopEvent(&event, NULL)
+	    || (event.type != LeaveNotify)
+	    || (event.xcrossing.window != child)
+	    || (event.xcrossing.detail != NotifyAncestor)
+	    || (event.xcrossing.subwindow != None)
+	    || (event.xcrossing.x_root != 1)
+	    || (event.xcrossing.y_root != 1)) {
+	result = 8;
+	goto cleanup;
+    }
+    if (!BrowserPopEvent(&event, NULL)
+	    || (event.type != LeaveNotify)
+	    || (event.xcrossing.window != parent)
+	    || (event.xcrossing.detail != NotifyVirtual)
+	    || (event.xcrossing.subwindow != child)
+	    || (event.xcrossing.x_root != 1)
+	    || (event.xcrossing.y_root != 1)) {
+	result = 9;
+	goto cleanup;
+    }
+    if (XEventsQueued(display, QueuedAlready) != 0) {
+	result = 10;
+	goto cleanup;
+    }
+
+    BrowserUpdatePointerState(parent, parentRootX + 50, parentRootY + 50, 0);
+    BrowserClearEventQueue();
+    if (!BrowserQueuePointerCrossingEvents(0, childRootX + 2,
+	    childRootY + 2, 2002)) {
+	result = 11;
+	goto cleanup;
+    }
+    if (!BrowserPopEvent(&event, NULL)
+	    || (event.type != LeaveNotify)
+	    || (event.xcrossing.window != parent)
+	    || (event.xcrossing.detail != NotifyInferior)
+	    || (event.xcrossing.subwindow != None)) {
+	result = 12;
+	goto cleanup;
+    }
+    if (!BrowserPopEvent(&event, NULL)
+	    || (event.type != EnterNotify)
+	    || (event.xcrossing.window != child)
+	    || (event.xcrossing.detail != NotifyAncestor)
+	    || (event.xcrossing.subwindow != None)
+	    || (event.xcrossing.x != 2)
+	    || (event.xcrossing.y != 2)) {
+	result = 13;
+	goto cleanup;
+    }
+    if (XEventsQueued(display, QueuedAlready) != 0) {
+	result = 14;
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    BrowserClearEventQueue();
+    BrowserUpdatePointerState(browserDisplay.rootWindow, 0, 0, 0);
+    if (child != None) {
+	(void)XDestroyWindow(display, child);
+    }
+    if (parent != None) {
+	(void)XDestroyWindow(display, parent);
+    }
+    BrowserClearEventQueue();
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestClearAreaApis(void)
 {
     Display *display;
