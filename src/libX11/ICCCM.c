@@ -438,6 +438,69 @@ X11WasmTestMapWindowWithInitialState(int initialState)
     return (unsigned int)BrowserJsXId(window);
 }
 
+EMSCRIPTEN_KEEPALIVE unsigned int
+X11WasmTestWindowManagerStateTransition(int state)
+{
+    Display *display;
+    Window window = None;
+    XWindowAttributes attributes;
+    XEvent event;
+    Status status;
+    unsigned int result = 0;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    window = XCreateWindow(display, browserDisplay.rootWindow, 14, 18, 64,
+	    42, 0, CopyFromParent, InputOutput, NULL, 0, NULL);
+    if (window == None) {
+	goto cleanup;
+    }
+    if ((XSelectInput(display, window, StructureNotifyMask) != Success)
+	    || (XMapWindow(display, window) != Success)) {
+	goto cleanup;
+    }
+    memset(&event, 0, sizeof(event));
+    if (!BrowserPopMatchingEvent(window, StructureNotifyMask, &event)
+	    || (event.type != MapNotify)
+	    || (event.xmap.window != window)
+	    || (event.xmap.event != window)
+	    || !XGetWindowAttributes(display, window, &attributes)
+	    || (attributes.map_state != IsViewable)
+	    || BrowserPopMatchingEvent(window, StructureNotifyMask, &event)) {
+	goto cleanup;
+    }
+
+    if (state == IconicState) {
+	status = XIconifyWindow(display, window, DefaultScreen(display));
+    } else if (state == WithdrawnState) {
+	status = XWithdrawWindow(display, window, DefaultScreen(display));
+    } else {
+	goto cleanup;
+    }
+    memset(&event, 0, sizeof(event));
+    if ((status != True)
+	    || !BrowserPopMatchingEvent(window, StructureNotifyMask, &event)
+	    || (event.type != UnmapNotify)
+	    || (event.xunmap.window != window)
+	    || (event.xunmap.event != window)
+	    || (event.xunmap.from_configure != False)
+	    || !XGetWindowAttributes(display, window, &attributes)
+	    || (attributes.map_state != IsUnmapped)
+	    || BrowserPopMatchingEvent(window, StructureNotifyMask, &event)) {
+	goto cleanup;
+    }
+    result = (unsigned int)BrowserJsXId(window);
+    window = None;
+
+cleanup:
+    BrowserClearEventQueue();
+    if (window != None) {
+	(void)XDestroyWindow(display, window);
+    }
+    BrowserClearEventQueue();
+    return result;
+}
+
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestSetWindowMetadataProperties(unsigned int window, int enabled)
 {

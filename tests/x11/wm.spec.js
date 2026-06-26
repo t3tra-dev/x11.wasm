@@ -725,6 +725,72 @@ test("browser backend honors WM_HINTS initialState on first map", async ({
   expect(states.cPath.windowId).toBeGreaterThan(0);
 });
 
+test("XIconifyWindow and XWithdrawWindow unmap windows and update WM_STATE", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+
+  const states = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestWindowManagerStateTransition?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    if (!module?._X11WasmTestWindowManagerStateTransition || !backend) {
+      throw new Error("missing WM state transition test hooks");
+    }
+    const snapshot = (windowId) => {
+      backend.flush?.();
+      const resource = backend.resources.get(windowId);
+      const element = resource?.element;
+      if (!(element instanceof HTMLElement) || !resource) {
+        throw new Error("missing WM state transition test element");
+      }
+      return {
+        ariaHidden: element.getAttribute("aria-hidden"),
+        display: element.style.display,
+        mapped: resource.mapped,
+        state: element.getAttribute("data-x11-wasm-wm-state"),
+        viewable: element.getAttribute("data-x11-wasm-viewable"),
+        windowId,
+      };
+    };
+
+    const iconicId =
+      module._X11WasmTestWindowManagerStateTransition(3) >>> 0;
+    const withdrawnId =
+      module._X11WasmTestWindowManagerStateTransition(0) >>> 0;
+    if (iconicId === 0 || withdrawnId === 0) {
+      throw new Error("WM state transition C hook failed");
+    }
+
+    return {
+      iconic: snapshot(iconicId),
+      withdrawn: snapshot(withdrawnId),
+    };
+  });
+
+  expect(states.iconic).toEqual({
+    ariaHidden: "true",
+    display: "none",
+    mapped: false,
+    state: "iconic",
+    viewable: "0",
+    windowId: expect.any(Number),
+  });
+  expect(states.withdrawn).toEqual({
+    ariaHidden: "true",
+    display: "none",
+    mapped: false,
+    state: "withdrawn",
+    viewable: "0",
+    windowId: expect.any(Number),
+  });
+  expect(states.iconic.windowId).toBeGreaterThan(0);
+  expect(states.withdrawn.windowId).toBeGreaterThan(0);
+  expect(states.iconic.windowId).not.toBe(states.withdrawn.windowId);
+});
+
 test("browser backend displays WM_HINTS icon window while owner is iconic", async ({
   page,
 }) => {
