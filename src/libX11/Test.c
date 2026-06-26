@@ -10426,6 +10426,9 @@ X11WasmTestXErrorHandler(void)
     int sawChangeActivePointerGrabBadValue;
     int sawChangeActivePointerGrabBadCursor;
     int sawRecolorCursorBadCursor;
+    int queryTextExtentsResultSum;
+    int sawQueryTextExtentsBadFont;
+    int sawQueryTextExtents16BadFont;
     int invalidSetFontPathResult;
     int sawSetFontPathBadValue;
     int invalidPointerMapLengthResult;
@@ -10653,6 +10656,8 @@ X11WasmTestXErrorHandler(void)
     sawDrawGCDepthBadMatch = 0;
     sawCopyPlaneGCDepthBadMatch = 0;
     sawPutImageGCDepthBadMatch = 0;
+    sawQueryTextExtentsBadFont = 0;
+    sawQueryTextExtents16BadFont = 0;
     sawStoreBufferBadValue = 0;
     validRootPixmapResultSum = Success;
     rootPixmapErrorCount = 0;
@@ -10787,6 +10792,22 @@ X11WasmTestXErrorHandler(void)
 	    (Drawable)invalidWindow, NULL, 0, 0, "x", 1);
     drawResultSum += XDrawImageString16(&browserDisplay.display,
 	    (Drawable)invalidWindow, NULL, 0, 0, text16, 1);
+    queryTextExtentsResultSum = XQueryTextExtents(&browserDisplay.display,
+	    (XID)browserDisplay.rootWindow, "x", 1, NULL, NULL, NULL, NULL);
+    sawQueryTextExtentsBadFont =
+	    (browserTestLastErrorCode == BadFont)
+	    && (browserTestLastRequestCode
+		    == X11_WASM_XREQ_QUERY_TEXT_EXTENTS)
+	    && (browserTestLastResourceId
+		    == (XID)browserDisplay.rootWindow);
+    queryTextExtentsResultSum += XQueryTextExtents16(
+	    &browserDisplay.display, (XID)invalidWindow, text16, 1, NULL,
+	    NULL, NULL, NULL);
+    sawQueryTextExtents16BadFont =
+	    (browserTestLastErrorCode == BadFont)
+	    && (browserTestLastRequestCode
+		    == X11_WASM_XREQ_QUERY_TEXT_EXTENTS)
+	    && (browserTestLastResourceId == (XID)invalidWindow);
     drawValueValidationResultSum = XDrawLines(&browserDisplay.display,
 	    (Drawable)browserDisplay.rootWindow, NULL, points, 2,
 	    CoordModePrevious + 1);
@@ -11644,6 +11665,9 @@ X11WasmTestXErrorHandler(void)
 	    || (freeTemporaryGCResult != Success)
 	    || (gcResultSum != Success)
 	    || (getGCValuesInvalidResult != False)
+	    || (queryTextExtentsResultSum != Success)
+	    || !sawQueryTextExtentsBadFont
+	    || !sawQueryTextExtents16BadFont
 	    || (validFont == None)
 	    || (validCursor == None)
 	    || (colorPixmap == None)
@@ -11812,6 +11836,8 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_POLY_TEXT_16
 	    + X11_WASM_XREQ_IMAGE_TEXT_8
 	    + X11_WASM_XREQ_IMAGE_TEXT_16
+	    + X11_WASM_XREQ_QUERY_TEXT_EXTENTS
+	    + X11_WASM_XREQ_QUERY_TEXT_EXTENTS
 	    + X11_WASM_XREQ_POLY_LINE
 	    + X11_WASM_XREQ_POLY_POINT
 	    + X11_WASM_XREQ_FILL_POLY
@@ -12033,6 +12059,7 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_SET_CLIP_RECTANGLES)
 	    | (1ULL << X11_WASM_XREQ_FREE_GC)
 	    | (1ULL << X11_WASM_XREQ_CLOSE_FONT)
+	    | (1ULL << X11_WASM_XREQ_QUERY_TEXT_EXTENTS)
 	    | (1ULL << X11_WASM_XREQ_SET_FONT_PATH)
 	    | (1ULL << X11_WASM_XREQ_GET_WINDOW_ATTRIBUTES)
 	    | (1ULL << X11_WASM_XREQ_GET_GEOMETRY)
@@ -12064,7 +12091,7 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 248)
+    if ((browserTestXErrorCount != 250)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
