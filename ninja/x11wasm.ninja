@@ -14,6 +14,7 @@ x11wasm_objs = $
   $x11wasm_builddir/Geometry.o $
   $x11wasm_builddir/Quark.o $
   $x11wasm_builddir/StrKeysym.o $
+  $x11wasm_builddir/Bitmap.o $
   $x11wasm_builddir/ImUtil.o $
   $x11wasm_builddir/OpenDis.o $
   $x11wasm_builddir/Region.o $
@@ -77,6 +78,7 @@ build $x11wasm_xlib_objects: phony $
   $x11wasm_builddir/Geometry.o $
   $x11wasm_builddir/Quark.o $
   $x11wasm_builddir/StrKeysym.o $
+  $x11wasm_builddir/Bitmap.o $
   $x11wasm_builddir/ImUtil.o $
   $x11wasm_builddir/OpenDis.o $
   $x11wasm_builddir/Region.o $
@@ -118,6 +120,7 @@ build $x11wasm_builddir/Geometry.o: x11wasm_compile_c $x11wasm_root/src/libX11/G
 build $x11wasm_builddir/Quark.o: x11wasm_compile_c $x11wasm_root/src/libX11/Quark.c | $x11wasm_xlib_common_deps
 build $x11wasm_builddir/Alloc.o: x11wasm_compile_c $x11wasm_root/src/libX11/Alloc.c | $x11wasm_xlib_common_deps
 build $x11wasm_builddir/StrKeysym.o: x11wasm_compile_c $x11wasm_root/src/libX11/StrKeysym.c | $x11wasm_xlib_common_deps
+build $x11wasm_builddir/Bitmap.o: x11wasm_compile_c $x11wasm_root/src/libX11/Bitmap.c | $x11wasm_xlib_common_deps
 build $x11wasm_builddir/ImUtil.o: x11wasm_compile_c $x11wasm_root/src/libX11/ImUtil.c | $x11wasm_xlib_common_deps
 build $x11wasm_builddir/OpenDis.o: x11wasm_compile_c $x11wasm_root/src/libX11/OpenDis.c | $x11wasm_xlib_common_deps
 build $x11wasm_builddir/Region.o: x11wasm_compile_c $x11wasm_root/src/libX11/Region.c | $x11wasm_xlib_common_deps

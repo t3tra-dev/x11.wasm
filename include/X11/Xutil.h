@@ -445,6 +445,26 @@ extern Status XGetIconSizes(
     int*		/* count_return */
 );
 
+extern int XReadBitmapFile(
+    Display*		/* display */,
+    Drawable		/* d */,
+    _Xconst char*	/* filename */,
+    unsigned int*	/* width_return */,
+    unsigned int*	/* height_return */,
+    Pixmap*		/* bitmap_return */,
+    int*		/* x_hot_return */,
+    int*		/* y_hot_return */
+);
+
+extern int XReadBitmapFileData(
+    _Xconst char*	/* filename */,
+    unsigned int*	/* width_return */,
+    unsigned int*	/* height_return */,
+    unsigned char**	/* data_return */,
+    int*		/* x_hot_return */,
+    int*		/* y_hot_return */
+);
+
 extern Status XGetNormalHints(
     Display*		/* display */,
     Window		/* w */,
@@ -838,6 +858,16 @@ extern int XWMGeometry(
     int*		/* width_return */,
     int*		/* height_return */,
     int*		/* gravity_return */
+);
+
+extern int XWriteBitmapFile(
+    Display*		/* display */,
+    _Xconst char*	/* filename */,
+    Pixmap		/* bitmap */,
+    unsigned int	/* width */,
+    unsigned int	/* height */,
+    int			/* x_hot */,
+    int			/* y_hot */
 );
 
 extern int XXorRegion(

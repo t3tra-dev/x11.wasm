@@ -6669,6 +6669,155 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestBitmapFileApis(void)
+{
+    Display *display;
+    const char *readPath = "x11wasm-bitmap-read.xbm";
+    const char *writePath = "x11wasm-bitmap-write.xbm";
+    const char *shortPath = "x11wasm-bitmap-short.xbm";
+    const char *invalidPath = "x11wasm-bitmap-invalid.xbm";
+    const char *missingPath = "x11wasm-bitmap-missing.xbm";
+    const char fixture[] =
+	    "#define sample_width 3\n"
+	    "#define sample_height 2\n"
+	    "#define sample_x_hot 1\n"
+	    "#define sample_y_hot 0\n"
+	    "static unsigned char sample_bits[] = { 0x05, 0x02 };\n";
+    const char shortFixture[] =
+	    "#define old_width 9\n"
+	    "#define old_height 1\n"
+	    "static short old_bits[] = { 0x0101 };\n";
+    const char invalidFixture[] = "not a bitmap\n";
+    FILE *file = NULL;
+    unsigned int width = 0U;
+    unsigned int height = 0U;
+    unsigned char *data = NULL;
+    Pixmap pixmap = None;
+    XImage *readback = NULL;
+    int xHot = -2;
+    int yHot = -2;
+    int result = 0;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    (void)remove(readPath);
+    (void)remove(writePath);
+    (void)remove(shortPath);
+    (void)remove(invalidPath);
+    (void)remove(missingPath);
+
+    file = fopen(readPath, "wb");
+    if ((file == NULL)
+	    || (fwrite(fixture, 1U, sizeof(fixture) - 1U, file)
+		    != sizeof(fixture) - 1U)
+	    || (fclose(file) != 0)) {
+	file = NULL;
+	goto cleanup;
+    }
+    file = NULL;
+    if (XReadBitmapFileData(missingPath, &width, &height, &data, &xHot,
+	    &yHot) != BitmapOpenFailed) {
+	goto cleanup;
+    }
+    if ((XReadBitmapFileData(readPath, &width, &height, &data, &xHot,
+	    &yHot) != BitmapSuccess)
+	    || (width != 3U) || (height != 2U) || (xHot != 1)
+	    || (yHot != 0) || (data == NULL) || (data[0] != 0x05U)
+	    || (data[1] != 0x02U)) {
+	goto cleanup;
+    }
+    XFree(data);
+    data = NULL;
+    xHot = -2;
+    yHot = -2;
+    if ((XReadBitmapFile(display, (Drawable)browserDisplay.rootWindow,
+	    readPath, &width, &height, &pixmap, &xHot, &yHot)
+	    != BitmapSuccess)
+	    || (width != 3U) || (height != 2U) || (xHot != 1)
+	    || (yHot != 0) || (pixmap == None)) {
+	goto cleanup;
+    }
+    readback = XGetImage(display, pixmap, 0, 0, width, height, AllPlanes,
+	    ZPixmap);
+    if ((readback == NULL)
+	    || (XGetPixel(readback, 0, 0) != 1UL)
+	    || (XGetPixel(readback, 1, 0) != 0UL)
+	    || (XGetPixel(readback, 2, 0) != 1UL)
+	    || (XGetPixel(readback, 0, 1) != 0UL)
+	    || (XGetPixel(readback, 1, 1) != 1UL)
+	    || (XGetPixel(readback, 2, 1) != 0UL)) {
+	goto cleanup;
+    }
+    if (XWriteBitmapFile(display, writePath, pixmap, width, height, 2, 1)
+	    != BitmapSuccess) {
+	goto cleanup;
+    }
+    if ((XReadBitmapFileData(writePath, &width, &height, &data, &xHot,
+	    &yHot) != BitmapSuccess)
+	    || (width != 3U) || (height != 2U) || (xHot != 2)
+	    || (yHot != 1) || (data == NULL) || (data[0] != 0x05U)
+	    || (data[1] != 0x02U)) {
+	goto cleanup;
+    }
+    XFree(data);
+    data = NULL;
+
+    file = fopen(shortPath, "wb");
+    if ((file == NULL)
+	    || (fwrite(shortFixture, 1U, sizeof(shortFixture) - 1U, file)
+		    != sizeof(shortFixture) - 1U)
+	    || (fclose(file) != 0)) {
+	file = NULL;
+	goto cleanup;
+    }
+    file = NULL;
+    if ((XReadBitmapFileData(shortPath, &width, &height, &data, NULL, NULL)
+	    != BitmapSuccess)
+	    || (width != 9U) || (height != 1U) || (data == NULL)
+	    || (data[0] != 0x01U) || (data[1] != 0x01U)) {
+	goto cleanup;
+    }
+    XFree(data);
+    data = NULL;
+
+    file = fopen(invalidPath, "wb");
+    if ((file == NULL)
+	    || (fwrite(invalidFixture, 1U, sizeof(invalidFixture) - 1U, file)
+		    != sizeof(invalidFixture) - 1U)
+	    || (fclose(file) != 0)) {
+	file = NULL;
+	goto cleanup;
+    }
+    file = NULL;
+    if (XReadBitmapFileData(invalidPath, &width, &height, &data, NULL, NULL)
+	    != BitmapFileInvalid) {
+	goto cleanup;
+    }
+
+    result = 1;
+
+cleanup:
+    if (file != NULL) {
+	(void)fclose(file);
+    }
+    if (data != NULL) {
+	XFree(data);
+    }
+    if (readback != NULL) {
+	(void)XDestroyImage(readback);
+    }
+    if (pixmap != None) {
+	(void)XFreePixmap(display, pixmap);
+    }
+    (void)remove(readPath);
+    (void)remove(writePath);
+    (void)remove(shortPath);
+    (void)remove(invalidPath);
+    BrowserClearEventQueue();
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestResourceManagerApis(void)
 {
     Display *display;

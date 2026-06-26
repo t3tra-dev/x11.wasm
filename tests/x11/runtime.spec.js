@@ -521,6 +521,26 @@ test("Xlib colormap compatibility APIs are stable", async ({ page }) => {
   expect(result).toBe(1);
 });
 
+test("XBM bitmap file APIs read and write pixmaps", async ({ page }) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestBitmapFileApis?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestBitmapFileApis) {
+      throw new Error("missing XBM bitmap file test hooks");
+    }
+    return module._X11WasmTestBitmapFileApis();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("X resource manager defaults are stable", async ({ page }) => {
   await page.goto("/x11.html");
   await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
