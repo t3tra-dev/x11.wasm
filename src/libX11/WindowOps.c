@@ -762,6 +762,22 @@ XReconfigureWMWindow(
 	    ? True : False;
 }
 
+static int
+BrowserWindowColormapInstalled(
+    X11WasmResource *resourcePtr)
+{
+    Colormap colormap;
+    X11WasmResource *colormapPtr;
+
+    if ((resourcePtr == NULL) || (resourcePtr->c_class == InputOnly)) {
+	return True;
+    }
+    colormap = (resourcePtr->atts.colormap != None)
+	    ? resourcePtr->atts.colormap : browserDisplay.defaultColormap;
+    colormapPtr = BrowserColormapResource(colormap);
+    return (colormapPtr == NULL) || colormapPtr->colormapInstalled;
+}
+
 int
 XGetWindowAttributes(
     Display *display,
@@ -799,7 +815,7 @@ XGetWindowAttributes(
 	    : ((resourcePtr->atts.colormap != None)
 	    ? resourcePtr->atts.colormap
 	    : DefaultColormap(display, DefaultScreen(display)));
-    attributes->map_installed = True;
+    attributes->map_installed = BrowserWindowColormapInstalled(resourcePtr);
     attributes->map_state = BrowserResourceIsVisible(resourcePtr) ? IsViewable
 	    : (resourcePtr->mapped ? IsUnviewable : IsUnmapped);
     attributes->all_event_masks = resourcePtr->atts.event_mask;
@@ -1659,7 +1675,6 @@ XListInstalledColormaps(
     int *countReturn)
 {
     X11WasmResource *windowPtr;
-    X11WasmResource *colormapPtr;
     Colormap colormap;
     Colormap *colormaps;
 
@@ -1673,8 +1688,7 @@ XListInstalledColormaps(
     }
     colormap = (windowPtr->atts.colormap != None)
 	    ? windowPtr->atts.colormap : browserDisplay.defaultColormap;
-    colormapPtr = BrowserColormapResource(colormap);
-    if ((colormapPtr != NULL) && !colormapPtr->colormapInstalled) {
+    if (!BrowserWindowColormapInstalled(windowPtr)) {
 	colormap = browserDisplay.defaultColormap;
     }
     colormaps = (Colormap *)ckalloc(sizeof(Colormap));

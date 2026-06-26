@@ -8513,6 +8513,7 @@ X11WasmTestColormapApis(void)
     int screen;
     int result = 0;
     XSetWindowAttributes attributes;
+    XWindowAttributes windowAttributes;
     Window window = None;
     Colormap colormap = None;
     Colormap copiedColormap = None;
@@ -8536,6 +8537,7 @@ X11WasmTestColormapApis(void)
     display = &browserDisplay.display;
     screen = DefaultScreen(display);
     memset(&attributes, 0, sizeof(attributes));
+    memset(&windowAttributes, 0, sizeof(windowAttributes));
     memset(&storedColor, 0, sizeof(storedColor));
     memset(storedColors, 0, sizeof(storedColors));
     memset(allocatedPixels, 0, sizeof(allocatedPixels));
@@ -8556,6 +8558,11 @@ X11WasmTestColormapApis(void)
 	    CopyFromParent, InputOutput, DefaultVisual(display, screen),
 	    CWColormap, &attributes);
     if (window == None) {
+	goto cleanup;
+    }
+    if (!XGetWindowAttributes(display, window, &windowAttributes)
+	    || (windowAttributes.colormap != colormap)
+	    || (windowAttributes.map_installed != False)) {
 	goto cleanup;
     }
 
@@ -8689,7 +8696,9 @@ X11WasmTestColormapApis(void)
 	    || ((installedColormaps = XListInstalledColormaps(display, window,
 		    &installedColormapCount)) == NULL)
 	    || (installedColormapCount != 1)
-	    || (installedColormaps[0] != colormap)) {
+	    || (installedColormaps[0] != colormap)
+	    || !XGetWindowAttributes(display, window, &windowAttributes)
+	    || (windowAttributes.map_installed != True)) {
 	goto cleanup;
     }
     XFree(installedColormaps);
@@ -8700,7 +8709,9 @@ X11WasmTestColormapApis(void)
 	    || ((installedColormaps = XListInstalledColormaps(display, window,
 		    &installedColormapCount)) == NULL)
 	    || (installedColormapCount != 1)
-	    || (installedColormaps[0] != browserDisplay.defaultColormap)) {
+	    || (installedColormaps[0] != browserDisplay.defaultColormap)
+	    || !XGetWindowAttributes(display, window, &windowAttributes)
+	    || (windowAttributes.map_installed != False)) {
 	goto cleanup;
     }
 
