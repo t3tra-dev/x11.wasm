@@ -2077,8 +2077,10 @@ X11WasmTestGCClipRendering(void)
     Display *display;
     GC gc = NULL;
     Region emptyRegion = NULL;
+    Region clipRegion = NULL;
     Window window = None;
     XRectangle clips[2];
+    XRectangle regionRect;
     unsigned int result = 0;
     int screen;
 
@@ -2090,7 +2092,9 @@ X11WasmTestGCClipRendering(void)
 	    0, NULL);
     gc = (window != None) ? XCreateGC(display, window, 0, NULL) : NULL;
     emptyRegion = XCreateRegion();
+    clipRegion = XCreateRegion();
     if ((window == None) || (gc == NULL) || (emptyRegion == NULL)
+	    || (clipRegion == NULL)
 	    || (XMapWindow(display, window) != Success)) {
 	goto cleanup;
     }
@@ -2116,8 +2120,19 @@ X11WasmTestGCClipRendering(void)
 		    != Success)) {
 	goto cleanup;
     }
-    if ((XSetRegion(display, gc, emptyRegion) != Success)
+    regionRect.x = 30;
+    regionRect.y = 30;
+    regionRect.width = 12;
+    regionRect.height = 6;
+    (void)XUnionRectWithRegion(&regionRect, clipRegion, clipRegion);
+    if ((XSetRegion(display, gc, clipRegion) != Success)
 	    || (XSetForeground(display, gc, 0x00ff00UL) != Success)
+	    || (XFillRectangle(display, window, gc, 0, 0, 80, 40)
+		    != Success)) {
+	goto cleanup;
+    }
+    if ((XSetRegion(display, gc, emptyRegion) != Success)
+	    || (XSetForeground(display, gc, 0xffff00UL) != Success)
 	    || (XFillRectangle(display, window, gc, 0, 0, 80, 40)
 		    != Success)) {
 	goto cleanup;
@@ -2129,6 +2144,9 @@ cleanup:
     BrowserClearEventQueue();
     if (emptyRegion != NULL) {
 	XDestroyRegion(emptyRegion);
+    }
+    if (clipRegion != NULL) {
+	XDestroyRegion(clipRegion);
     }
     if (gc != NULL) {
 	(void)XFreeGC(display, gc);
@@ -5058,6 +5076,10 @@ X11WasmTestXlibApis(void)
 	    || !XPointInRegion(regionA, 11, 10)
 	    || XPointInRegion(regionA, 12, 10)
 	    || XPointInRegion(regionA, 11, 11)
+	    || (XRectInRegion(regionA, 2, 3, 10, 8) != RectangleIn)
+	    || (XRectInRegion(regionA, 1, 3, 10, 8) != RectanglePart)
+	    || (XRectInRegion(regionA, 12, 3, 1, 1) != RectangleOut)
+	    || (XRectInRegion(regionA, 2, 3, 0, 8) != RectangleOut)
 	    || XEqualRegion(regionA, regionB)) {
 	goto cleanup;
     }
@@ -5066,6 +5088,10 @@ X11WasmTestXlibApis(void)
     BrowserSetRectangleBounds(&regionRect, 7, 3, 12, 11);
     (void)XUnionRectWithRegion(&regionRect, regionB, regionB);
     if (!XEqualRegion(regionA, regionB)) {
+	goto cleanup;
+    }
+    if ((XRectInRegion(regionB, 2, 3, 10, 8) != RectangleIn)
+	    || (XRectInRegion(regionB, 6, 3, 2, 8) != RectangleIn)) {
 	goto cleanup;
     }
     (void)XOffsetRegion(regionB, 1, 0);

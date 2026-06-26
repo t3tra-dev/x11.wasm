@@ -375,6 +375,8 @@ test("Xlib GC clip rectangles and empty regions constrain drawing", async ({
       firstClip: pixel(12, 12),
       gap: pixel(34, 12),
       secondClip: pixel(50, 12),
+      regionClip: pixel(34, 32),
+      regionMiss: pixel(44, 32),
       untouchedBase: pixel(70, 12),
       windowId,
     };
@@ -392,6 +394,14 @@ test("Xlib GC clip rectangles and empty regions constrain drawing", async ({
     expect(sample[2]).toBeGreaterThan(180);
     expect(sample[3]).toBe(255);
   }
+  expect(samples.regionClip[0]).toBeLessThan(80);
+  expect(samples.regionClip[1]).toBeGreaterThan(180);
+  expect(samples.regionClip[2]).toBeLessThan(80);
+  expect(samples.regionClip[3]).toBe(255);
+  expect(samples.regionMiss[0]).toBeLessThan(80);
+  expect(samples.regionMiss[1]).toBeLessThan(80);
+  expect(samples.regionMiss[2]).toBeGreaterThan(180);
+  expect(samples.regionMiss[3]).toBe(255);
   expect(samples.windowId).toBeGreaterThan(0);
 });
 
