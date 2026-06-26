@@ -1,0 +1,29 @@
+/*
+ * xlib_only.c --
+ *
+ *	Compile-only check that <X11/Xlib.h> exports the browser Xlib ABI.
+ */
+
+#include <X11/Xlib.h>
+
+int
+X11WasmHeaderXlibOnlyPrototypeTest(void)
+{
+    Display *(*openDisplay)(_Xconst char *) = XOpenDisplay;
+    int (*closeDisplay)(Display *) = XCloseDisplay;
+    Window (*createWindow)(Display *, Window, int, int, unsigned int,
+	    unsigned int, unsigned int, int, unsigned int, Visual *,
+	    unsigned long, XSetWindowAttributes *) = XCreateWindow;
+    int (*eventsQueued)(Display *, int) = XEventsQueued;
+    XTimeCoord *(*getMotionEvents)(Display *, Window, Time, Time, int *) =
+	    XGetMotionEvents;
+    XFontStruct *(*loadQueryFont)(Display *, _Xconst char *) =
+	    XLoadQueryFont;
+    Region (*createRegion)(void) = XCreateRegion;
+    int (*freeData)(void *) = XFree;
+
+    return (openDisplay != 0) && (closeDisplay != 0)
+	    && (createWindow != 0) && (eventsQueued != 0)
+	    && (getMotionEvents != 0) && (loadQueryFont != 0)
+	    && (createRegion != 0) && (freeData != 0);
+}

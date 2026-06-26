@@ -55,10 +55,10 @@ build build/typecheck-js.stamp: x11wasm_typecheck_js $
   playwright.config.js
 build build/compile_commands.json: x11wasm_compile_commands tools/gen_compile_commands.py build.ninja ninja/x11wasm.ninja
 build $x11wasm_browser_main: x11wasm_compile_c test/browser/main.c | $x11wasm_xlib_common_deps
-build $x11wasm_browser_app: x11wasm_link_browser $x11wasm_browser_main $x11wasm_lib build/typecheck-js.stamp $x11wasm_js_library $x11wasm_js_pre test/browser/shell.html
+build $x11wasm_browser_app: x11wasm_link_browser $x11wasm_browser_main $x11wasm_lib build/typecheck-js.stamp $x11wasm_js_library $x11wasm_js_pre test/browser/shell.html | x11wasm_header_tests
 
 build typecheck_js: phony build/typecheck-js.stamp
 build compile_commands: phony build/compile_commands.json
-build browser: phony $x11wasm_browser_app
+build browser: phony $x11wasm_browser_app x11wasm_header_tests
 
 default x11wasm

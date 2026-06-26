@@ -1393,6 +1393,10 @@ typedef void (*XConnectionWatchProc)(
     XPointer*			/* watch_data */ /* open sets, close uses */
 );
 
+#ifndef X11WASM_XLIBWASM_INCLUDES_XUTIL
+#include <X11/XlibWasm.h>  /* IWYU pragma: export */
+#endif
+
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif
