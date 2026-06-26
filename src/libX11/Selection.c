@@ -695,6 +695,37 @@ BrowserSendEventTarget(
     return None;
 }
 
+Window
+BrowserSelectedEventTarget(
+    Window window,
+    long eventMask,
+    int propagate)
+{
+    X11WasmResource *resourcePtr;
+
+    BrowserInitDisplay();
+    resourcePtr = BrowserWindowResource(window);
+    if (eventMask == NoEventMask) {
+	return (resourcePtr != NULL) ? window : None;
+    }
+    if (!propagate) {
+	return BrowserResourceWantsEvent(resourcePtr, eventMask) ? window : None;
+    }
+    for (; resourcePtr != NULL; resourcePtr = BrowserWindowResource(
+	    resourcePtr->parent)) {
+	if (BrowserResourceWantsEvent(resourcePtr, eventMask)) {
+	    return (Window)resourcePtr->id;
+	}
+	if (resourcePtr->atts.do_not_propagate_mask & eventMask) {
+	    return None;
+	}
+	if (resourcePtr->id == browserDisplay.rootWindow) {
+	    break;
+	}
+    }
+    return None;
+}
+
 int
 BrowserWindowMaskQueuedEvent(
     Display *display,
@@ -1570,11 +1601,13 @@ BrowserQueueKeyEventFields(
 {
     XEvent event;
     Window target;
+    Window deliveryTarget;
     int rootX = x;
     int rootY = y;
     unsigned int resolvedKeycode;
     KeySym resolvedKeySym = (KeySym)keySym;
     int queued;
+    int forceTarget;
 
     BrowserInitDisplay();
     if ((type != KeyPress) && (type != KeyRelease)) {
@@ -1605,6 +1638,23 @@ BrowserQueueKeyEventFields(
     event.xkey.keycode = resolvedKeycode;
     event.xkey.same_screen = True;
     BrowserUpdateKeymapState(resolvedKeycode, type == KeyPress);
+    forceTarget = BrowserWindowCanReceiveEvents(browserDisplay.keyboardGrabWindow)
+	    && !browserDisplay.keyboardGrabOwnerEvents;
+    deliveryTarget = forceTarget ? target
+	    : BrowserSelectedEventTarget(target, BrowserEventMask(&event), 1);
+    if (deliveryTarget == None) {
+	if (type == KeyRelease) {
+	    BrowserReleasePassiveKeyboardGrabIfIdle();
+	}
+	return 0;
+    }
+    if (deliveryTarget != target) {
+	target = deliveryTarget;
+	BrowserWindowCoordinatesFromRoot(target, rootX, rootY, &x, &y);
+	event.xany.window = target;
+	event.xkey.x = x;
+	event.xkey.y = y;
+    }
     queued = BrowserQueueEvent(&event);
     if (type == KeyRelease) {
 	BrowserReleasePassiveKeyboardGrabIfIdle();

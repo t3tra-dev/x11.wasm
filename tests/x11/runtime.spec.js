@@ -145,6 +145,23 @@ test("X event queue and display keycode APIs preserve ordering", async ({
   expect(result).toBe(1);
 });
 
+test("DOM input events honor selected window masks", async ({ page }) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestDomInputSelectionMasks?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestDomInputSelectionMasks) {
+      throw new Error("missing DOM input selection mask test export");
+    }
+    return module._X11WasmTestDomInputSelectionMasks();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XIC spot location anchors the browser input context", async ({ page }) => {
   await waitForX11Runtime(page);
   const windowId = await createMappedWindow(page);

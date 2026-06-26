@@ -1496,6 +1496,10 @@ int BrowserResourceSupportsProtocol(
 int BrowserResourceWantsEvent(
     X11WasmResource *resourcePtr,
     long mask);
+Window BrowserSelectedEventTarget(
+    Window window,
+    long eventMask,
+    int propagate);
 void BrowserRestackWindow(
     X11WasmResource *resourcePtr,
     unsigned int valueMask,

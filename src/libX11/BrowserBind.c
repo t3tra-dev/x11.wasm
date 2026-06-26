@@ -197,9 +197,12 @@ BrowserQueuePointerEventFields(
 {
     XEvent event;
     Window target;
+    Window deliveryTarget;
+    Window captureTarget;
     int rootX = x;
     int rootY = y;
     int queued;
+    int forceTarget;
 
     if ((type != ButtonPress) && (type != ButtonRelease)
 	    && (type != MotionNotify)) {
@@ -218,6 +221,7 @@ BrowserQueuePointerEventFields(
 		(Time)time);
     }
     target = BrowserResolvePointerEventWindow((Window)window, &x, &y);
+    captureTarget = target;
     BrowserUpdatePointerState(target, rootX, rootY, state);
 
     BrowserSetCommonEventFields(&event, type, target, (Time)time);
@@ -256,8 +260,31 @@ BrowserQueuePointerEventFields(
 	}
 	return 0;
     }
+    forceTarget = BrowserWindowCanReceiveEvents(browserDisplay.pointerGrabWindow)
+	    && !browserDisplay.pointerGrabOwnerEvents;
+    deliveryTarget = forceTarget ? target
+	    : BrowserSelectedEventTarget(target, BrowserEventMask(&event), 1);
+    if (deliveryTarget == None) {
+	if (type == ButtonRelease) {
+	    BrowserReleasePassivePointerGrabIfIdle(
+		    state & ~BrowserPointerButtonMask(button));
+	}
+	return 0;
+    }
+    if (deliveryTarget != target) {
+	target = deliveryTarget;
+	BrowserWindowCoordinatesFromRoot(target, rootX, rootY, &x, &y);
+	event.xany.window = target;
+	if (type == MotionNotify) {
+	    event.xmotion.x = x;
+	    event.xmotion.y = y;
+	} else {
+	    event.xbutton.x = x;
+	    event.xbutton.y = y;
+	}
+    }
     if (type == ButtonPress) {
-	browserDisplay.pointerCaptureWindow = target;
+	browserDisplay.pointerCaptureWindow = captureTarget;
 	BrowserSyncPointerState();
     }
     queued = BrowserQueueEvent(&event);
@@ -316,6 +343,10 @@ BrowserQueueCrossingEventForTarget(
     event.xcrossing.focus = (browserDisplay.focusWindow != None);
     event.xcrossing.state = state;
     if (!BrowserPointerGrabAllowsEvent(&event)) {
+	return 0;
+    }
+    if (BrowserSelectedEventTarget(target, BrowserEventMask(&event), 0)
+	    == None) {
 	return 0;
     }
     return BrowserQueueEvent(&event);
@@ -436,6 +467,10 @@ X11WasmQueueFocusEvent(
     BrowserSyncRequestState(&browserDisplay.display);
     event.xfocus.mode = NotifyNormal;
     event.xfocus.detail = NotifyNonlinear;
+    if (BrowserSelectedEventTarget(eventTarget, BrowserEventMask(&event), 0)
+	    == None) {
+	return 0;
+    }
     return BrowserQueueEvent(&event);
 }
 
@@ -450,6 +485,7 @@ X11WasmQueueWheelEvent(
 {
     XEvent event;
     Window target;
+    Window deliveryTarget;
     int rootX = x;
     int rootY = y;
 
@@ -474,6 +510,18 @@ X11WasmQueueWheelEvent(
     event.xbutton.state = state;
     event.xbutton.button = (unsigned int)delta;
     event.xbutton.same_screen = True;
+    deliveryTarget = BrowserSelectedEventTarget(target,
+	    BrowserEventMask(&event), 1);
+    if (deliveryTarget == None) {
+	return 0;
+    }
+    if (deliveryTarget != target) {
+	target = deliveryTarget;
+	BrowserWindowCoordinatesFromRoot(target, rootX, rootY, &x, &y);
+	event.xany.window = target;
+	event.xbutton.x = x;
+	event.xbutton.y = y;
+    }
     return BrowserQueueEventInternal(&event, 1);
 }
 

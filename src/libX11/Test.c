@@ -171,6 +171,7 @@ X11WasmTestWheelEventConstants(void)
     XWindowAttributes windowAttributes;
     XEvent event;
     Window window = None;
+    long rootEventMask;
     int internal = 0;
     int result = 0;
     int screen;
@@ -178,6 +179,7 @@ X11WasmTestWheelEventConstants(void)
     BrowserInitDisplay();
     display = &browserDisplay.display;
     screen = DefaultScreen(display);
+    rootEventMask = browserDisplay.rootResource.atts.event_mask;
     BrowserClearEventQueue();
     if ((X11_WASM_BROWSER_WHEEL_EVENT != (MappingNotify + 1))
 	    || (X11_WASM_BROWSER_WHEEL_MASK != (1L << 28))) {
@@ -192,6 +194,11 @@ X11WasmTestWheelEventConstants(void)
     result = 19;
     goto cleanup;
 #endif
+    if (XSelectInput(display, browserDisplay.rootWindow,
+	    rootEventMask | X11_WASM_BROWSER_WHEEL_MASK) != Success) {
+	result = 20;
+	goto cleanup;
+    }
     if (!X11WasmQueueWheelEvent((unsigned int)browserDisplay.rootWindow, 120,
 	    0, 12, 14, CurrentTime)) {
 	result = 11;
@@ -243,6 +250,7 @@ X11WasmTestWheelEventConstants(void)
     result = 1;
 
 cleanup:
+    (void)XSelectInput(display, browserDisplay.rootWindow, rootEventMask);
     BrowserClearEventQueue();
     if (window != None) {
 	(void)XDestroyWindow(display, window);
@@ -740,6 +748,160 @@ X11WasmTestEventQueueAndKeycodeApis(void)
     }
     BrowserClearEventQueue();
     return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestDomInputSelectionMasks(void)
+{
+    Display *display;
+    XSetWindowAttributes attributes;
+    XEvent event;
+    Window parent = None;
+    Window child = None;
+    unsigned int keycode;
+    int result = 0;
+    int screen;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+    keycode = (unsigned int)XKeysymToKeycode(display, XK_a);
+    if (keycode == 0) {
+	return 2;
+    }
+    BrowserClearEventQueue();
+    parent = XCreateWindow(display, browserDisplay.rootWindow, 20, 20, 100,
+	    80, 0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL);
+    child = XCreateWindow(display, parent, 5, 6, 30, 20, 0, CopyFromParent,
+	    InputOutput, DefaultVisual(display, screen), 0, NULL);
+    if ((parent == None) || (child == None)
+	    || (XMapWindow(display, parent) != Success)
+	    || (XMapWindow(display, child) != Success)) {
+	result = 3;
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    if ((XSelectInput(display, parent,
+		    KeyPressMask | ButtonPressMask | PointerMotionMask)
+		    != Success)
+	    || (XSelectInput(display, child, NoEventMask) != Success)
+	    || (XSetInputFocus(display, child, RevertToParent, CurrentTime)
+		    != Success)) {
+	result = 4;
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+    if (!BrowserQueueKeyEventFields(KeyPress, child, keycode, XK_a, 0,
+	    26, 27, 1000, 0)
+	    || !BrowserPopMatchingEvent(parent, KeyPressMask, &event)
+	    || (event.type != KeyPress) || (event.xkey.window != parent)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	result = 5;
+	goto cleanup;
+    }
+    if (!X11WasmQueuePointerEvent(ButtonPress, browserDisplay.rootWindow,
+	    Button1, 0, 26, 27, 1001)
+	    || !BrowserPopMatchingEvent(parent, ButtonPressMask, &event)
+	    || (event.type != ButtonPress) || (event.xbutton.window != parent)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	result = 6;
+	goto cleanup;
+    }
+    (void)X11WasmQueuePointerEvent(ButtonRelease, browserDisplay.rootWindow,
+	    Button1, Button1Mask, 26, 27, 1002);
+    BrowserClearEventQueue();
+    if (!X11WasmQueuePointerEvent(MotionNotify, browserDisplay.rootWindow,
+	    0, 0, 27, 28, 1003)
+	    || !BrowserPopMatchingEvent(parent, PointerMotionMask, &event)
+	    || (event.type != MotionNotify) || (event.xmotion.window != parent)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	result = 7;
+	goto cleanup;
+    }
+
+    if ((XSelectInput(display, child,
+		    KeyPressMask | ButtonPressMask | PointerMotionMask)
+		    != Success)
+	    || (XSetInputFocus(display, child, RevertToParent, CurrentTime)
+		    != Success)) {
+	result = 8;
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+    if (!BrowserQueueKeyEventFields(KeyPress, child, keycode, XK_a, 0,
+	    26, 27, 1010, 0)
+	    || !BrowserPopMatchingEvent(child, KeyPressMask, &event)
+	    || (event.type != KeyPress) || (event.xkey.window != child)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	result = 9;
+	goto cleanup;
+    }
+    if (!X11WasmQueuePointerEvent(ButtonPress, browserDisplay.rootWindow,
+	    Button1, 0, 26, 27, 1011)
+	    || !BrowserPopMatchingEvent(child, ButtonPressMask, &event)
+	    || (event.type != ButtonPress) || (event.xbutton.window != child)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	result = 10;
+	goto cleanup;
+    }
+    (void)X11WasmQueuePointerEvent(ButtonRelease, browserDisplay.rootWindow,
+	    Button1, Button1Mask, 26, 27, 1012);
+    BrowserClearEventQueue();
+    if (!X11WasmQueuePointerEvent(MotionNotify, browserDisplay.rootWindow,
+	    0, 0, 27, 28, 1013)
+	    || !BrowserPopMatchingEvent(child, PointerMotionMask, &event)
+	    || (event.type != MotionNotify) || (event.xmotion.window != child)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	result = 11;
+	goto cleanup;
+    }
+
+    memset(&attributes, 0, sizeof(attributes));
+    attributes.do_not_propagate_mask =
+	    KeyPressMask | ButtonPressMask | PointerMotionMask;
+    if ((XChangeWindowAttributes(display, child, CWDontPropagate,
+		    &attributes) != Success)
+	    || (XSelectInput(display, child, NoEventMask) != Success)
+	    || (XSetInputFocus(display, child, RevertToParent, CurrentTime)
+		    != Success)) {
+	result = 12;
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+    if (BrowserQueueKeyEventFields(KeyPress, child, keycode, XK_a, 0,
+	    26, 27, 1020, 0)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	result = 13;
+	goto cleanup;
+    }
+    if (X11WasmQueuePointerEvent(ButtonPress, browserDisplay.rootWindow,
+	    Button1, 0, 26, 27, 1021)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	result = 14;
+	goto cleanup;
+    }
+    if (X11WasmQueuePointerEvent(MotionNotify, browserDisplay.rootWindow,
+	    0, 0, 27, 28, 1022)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	result = 15;
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    BrowserClearEventQueue();
+    browserDisplay.pointerCaptureWindow = None;
+    BrowserSyncPointerState();
+    if (child != None) {
+	(void)XDestroyWindow(display, child);
+    }
+    if (parent != None) {
+	(void)XDestroyWindow(display, parent);
+    }
+    BrowserClearEventQueue();
+    return result;
 }
 
 EMSCRIPTEN_KEEPALIVE int
