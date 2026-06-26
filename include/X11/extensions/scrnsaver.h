@@ -8,28 +8,11 @@
 #define _X11_EXTENSIONS_SCRNSAVER_H
 
 #include <X11/Xlib.h>
+#include <X11/extensions/saver.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#define ScreenSaverName "MIT-SCREEN-SAVER"
-#define ScreenSaverMajorVersion 1
-#define ScreenSaverMinorVersion 1
-
-#define ScreenSaverNotifyMask (1L << 0)
-#define ScreenSaverCycleMask (1L << 1)
-
-#define ScreenSaverNotify 0
-#define ScreenSaverCycle 1
-
-#define ScreenSaverOff 0
-#define ScreenSaverOn 1
-#define ScreenSaverDisabled 2
-
-#define ScreenSaverBlanked 0
-#define ScreenSaverInternal 1
-#define ScreenSaverExternal 2
 
 typedef struct {
     int type;
@@ -73,6 +56,19 @@ extern void XScreenSaverSelectInput(
 extern void XScreenSaverSuspend(
     Display *display,
     Bool suspend);
+extern Status XScreenSaverRegister(
+    Display *display,
+    int screen,
+    XID xid,
+    Atom type);
+extern Status XScreenSaverUnregister(
+    Display *display,
+    int screen);
+extern Status XScreenSaverGetRegistered(
+    Display *display,
+    int screen,
+    XID *xid,
+    Atom *type);
 
 #ifdef __cplusplus
 }

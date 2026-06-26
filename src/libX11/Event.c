@@ -3042,6 +3042,112 @@ XScreenSaverSuspend(
     (void)XNoOp(display);
 }
 
+static Window
+BrowserScreenSaverRootWindow(
+    Display **displayPtr,
+    int screen)
+{
+    Display *display = *displayPtr;
+
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+	*displayPtr = display;
+    }
+    BrowserInitDisplay();
+    if ((screen < 0) || (screen >= ScreenCount(display))) {
+	return None;
+    }
+    return RootWindow(display, screen);
+}
+
+Status
+XScreenSaverRegister(
+    Display *display,
+    int screen,
+    XID xid,
+    Atom type)
+{
+    Window root;
+    Atom property;
+    uint32_t value = (uint32_t)xid;
+
+    root = BrowserScreenSaverRootWindow(&display, screen);
+    if (root == None) {
+	return False;
+    }
+    property = XInternAtom(display, ScreenSaverPropertyName, False);
+    if (property == None) {
+	return False;
+    }
+    return XChangeProperty(display, root, property, type, 32,
+	    PropModeReplace, (const unsigned char *)&value, 1) == Success;
+}
+
+Status
+XScreenSaverUnregister(
+    Display *display,
+    int screen)
+{
+    Window root;
+    Atom property;
+
+    root = BrowserScreenSaverRootWindow(&display, screen);
+    if (root == None) {
+	return False;
+    }
+    property = XInternAtom(display, ScreenSaverPropertyName, False);
+    if (property == None) {
+	return False;
+    }
+    return XDeleteProperty(display, root, property) == Success;
+}
+
+Status
+XScreenSaverGetRegistered(
+    Display *display,
+    int screen,
+    XID *xidPtr,
+    Atom *typePtr)
+{
+    Window root;
+    Atom property;
+    Atom actualType = None;
+    int actualFormat = 0;
+    unsigned long nitems = 0;
+    unsigned long bytesAfter = 0;
+    unsigned char *data = NULL;
+    int status;
+    uint32_t value;
+
+    root = BrowserScreenSaverRootWindow(&display, screen);
+    if (root == None) {
+	return False;
+    }
+    property = XInternAtom(display, ScreenSaverPropertyName, False);
+    if (property == None) {
+	return False;
+    }
+    status = XGetWindowProperty(display, root, property, 0, 1, False,
+	    AnyPropertyType, &actualType, &actualFormat, &nitems,
+	    &bytesAfter, &data);
+    if ((status != Success) || (actualFormat != 32) || (nitems != 1)
+	    || (bytesAfter != 0) || (data == NULL)) {
+	if (data != NULL) {
+	    XFree(data);
+	}
+	return False;
+    }
+    memcpy(&value, data, sizeof(value));
+    XFree(data);
+    if (xidPtr != NULL) {
+	*xidPtr = (XID)value;
+    }
+    if (typePtr != NULL) {
+	*typePtr = actualType;
+    }
+    return True;
+}
+
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestSetScreenSaverSettings(int enabled)
 {
@@ -3072,6 +3178,73 @@ X11WasmTestSuspendScreenSaver(int suspended)
     BrowserInitDisplay();
     XScreenSaverSuspend(&browserDisplay.display, suspended ? True : False);
     return Success;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestScreenSaverRegistration(void)
+{
+    Display *display = &browserDisplay.display;
+    Atom property;
+    Atom type;
+    Atom actualType = None;
+    XID actualXid = None;
+    Atom *properties = NULL;
+    int propertyCount = 0;
+    int found = 0;
+    int i;
+    int result = 0;
+
+    BrowserInitDisplay();
+    property = XInternAtom(display, ScreenSaverPropertyName, False);
+    type = XInternAtom(display, "_X11_WASM_TEST_SCREEN_SAVER", False);
+    if ((property == None) || (type == None)
+	    || (ScreenSaverCycle != 2) || (ScreenSaverDisabled != 3)
+	    || (ScreenSaverNumberEvents != 1)) {
+	goto cleanup;
+    }
+    if (XScreenSaverUnregister(display, DefaultScreen(display)) != True) {
+	goto cleanup;
+    }
+    if (XScreenSaverGetRegistered(display, DefaultScreen(display),
+	    &actualXid, &actualType) != False) {
+	goto cleanup;
+    }
+    if (XScreenSaverRegister(display, DefaultScreen(display),
+	    browserDisplay.rootWindow, type) != True) {
+	goto cleanup;
+    }
+    if ((XScreenSaverGetRegistered(display, DefaultScreen(display),
+		    &actualXid, &actualType) != True)
+	    || (actualXid != browserDisplay.rootWindow)
+	    || (actualType != type)) {
+	goto cleanup;
+    }
+    properties = XListProperties(display, browserDisplay.rootWindow,
+	    &propertyCount);
+    for (i = 0; i < propertyCount; i++) {
+	if (properties[i] == property) {
+	    found = 1;
+	    break;
+	}
+    }
+    if (!found) {
+	goto cleanup;
+    }
+    if (XScreenSaverUnregister(display, DefaultScreen(display)) != True) {
+	goto cleanup;
+    }
+    if (XScreenSaverGetRegistered(display, DefaultScreen(display),
+	    &actualXid, &actualType) != False) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    if (properties != NULL) {
+	XFree(properties);
+    }
+    (void)XScreenSaverUnregister(display, DefaultScreen(display));
+    return result;
 }
 
 EMSCRIPTEN_KEEPALIVE int

@@ -150,6 +150,25 @@ test("XScreenSaverSuspend updates browser suspended metadata", async ({
   });
 });
 
+test("XScreenSaverRegister stores registered saver metadata", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestScreenSaverRegistration?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestScreenSaverRegistration) {
+      throw new Error("missing screen saver registration test hook");
+    }
+    return module._X11WasmTestScreenSaverRegistration();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XSetScreenSaver uses browser wake lock when blanking is disabled", async ({
   page,
 }) => {

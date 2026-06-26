@@ -432,6 +432,7 @@ declare const Module: {
   _X11WasmTestForceScreenSaverState?: () => number;
   _X11WasmTestSetScreenSaverWakeLock?: (enabled: number) => number;
   _X11WasmTestSuspendScreenSaver?: (suspended: number) => number;
+  _X11WasmTestScreenSaverRegistration?: () => number;
   _X11WasmTestSetHostAccessControl?: (configured: number) => number;
   _X11WasmTestSetServerGrabDepth?: (depth: number) => number;
   _X11WasmTestSetPrimarySelectionOwner?: (
