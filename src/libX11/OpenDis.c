@@ -60,7 +60,7 @@ BrowserInitDisplay(void)
     }
     memset(state, 0, sizeof(*state));
 
-    state->rootWindow = 1;
+    state->rootWindow = X11_WASM_ROOT_WINDOW;
     state->focusWindow = state->rootWindow;
     state->focusRevertTo = RevertToParent;
     state->focusTime = CurrentTime;

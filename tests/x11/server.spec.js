@@ -1114,6 +1114,12 @@ test("X passive wildcard grabs support partial ungrab", async ({ page }) => {
       throw new Error("missing passive wildcard grab test hooks");
     }
 
+    const xGrabButton = module._XGrabButton;
+    const xUngrabButton = module._XUngrabButton;
+    const xGrabKey = module._XGrabKey;
+    const xUngrabKey = module._XUngrabKey;
+    const queuePointerEvent = module._X11WasmQueuePointerEvent;
+    const queueKeyEvent = module._X11WasmQueueKeyEvent;
     const rootWindow = backend.rootWindow || 1;
     const anyKey = 0;
     const anyButton = 0;
@@ -1146,7 +1152,7 @@ test("X passive wildcard grabs support partial ungrab", async ({ page }) => {
       window: backend.keyboardGrabWindow,
     });
     const grabButton = (button, modifiers) =>
-      module._XGrabButton(
+      xGrabButton(
         0,
         button,
         modifiers,
@@ -1159,9 +1165,9 @@ test("X passive wildcard grabs support partial ungrab", async ({ page }) => {
         0,
       );
     const ungrabButton = (button, modifiers) =>
-      module._XUngrabButton(0, button, modifiers, grabWindowId);
+      xUngrabButton(0, button, modifiers, grabWindowId);
     const queueButton = (type, button, state, time) =>
-      module._X11WasmQueuePointerEvent(
+      queuePointerEvent(
         type,
         rootWindow,
         button,
@@ -1171,7 +1177,7 @@ test("X passive wildcard grabs support partial ungrab", async ({ page }) => {
         time,
       );
     const grabKey = (keycode, modifiers) =>
-      module._XGrabKey(
+      xGrabKey(
         0,
         keycode,
         modifiers,
@@ -1181,9 +1187,9 @@ test("X passive wildcard grabs support partial ungrab", async ({ page }) => {
         grabModeAsync,
       );
     const ungrabKey = (keycode, modifiers) =>
-      module._XUngrabKey(0, keycode, modifiers, rootWindow);
+      xUngrabKey(0, keycode, modifiers, rootWindow);
     const queueKey = (type, keysym, state, time) =>
-      module._X11WasmQueueKeyEvent(type, rootWindow, keysym, state, time);
+      queueKeyEvent(type, rootWindow, keysym, state, time);
 
     return {
       rootWindow,

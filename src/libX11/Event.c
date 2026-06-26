@@ -1186,12 +1186,20 @@ X11WasmTestXSendEventTargets(
     Display *display = &browserDisplay.display;
     Window focusWindow = (Window)focusWindowId;
     Window pointerWindow = (Window)pointerWindowId;
+    Window rootWindow;
+    Window returnedFocus;
     XEvent event;
     XEvent received;
+    int returnedRevert;
     int rootX = 0;
     int rootY = 0;
 
     BrowserInitDisplay();
+    rootWindow = RootWindow(display, DefaultScreen(display));
+    if ((rootWindow == None) || (rootWindow == PointerWindow)
+	    || (rootWindow == InputFocus) || (rootWindow == PointerRoot)) {
+	return 0;
+    }
     if (!BrowserWindowCanReceiveEvents(focusWindow)
 	    || !BrowserWindowCanReceiveEvents(pointerWindow)) {
 	return 0;
@@ -1211,6 +1219,9 @@ X11WasmTestXSendEventTargets(
 	    &received)) {
 	/* Drain stale matching events before checking the sent event. */
     }
+    while (BrowserPopMatchingEvent(rootWindow, KeyPressMask, &received)) {
+	/* Drain stale matching events before checking the sent event. */
+    }
 
     memset(&event, 0, sizeof(event));
     event.type = KeyPress;
@@ -1224,6 +1235,33 @@ X11WasmTestXSendEventTargets(
 	    || (received.type != KeyPress)
 	    || (received.xany.window != focusWindow)
 	    || (received.xany.send_event != True)) {
+	return 0;
+    }
+
+    memset(&event, 0, sizeof(event));
+    event.type = KeyPress;
+    event.xkey.display = display;
+    event.xkey.window = rootWindow;
+    event.xkey.root = rootWindow;
+    event.xkey.keycode = XKeysymToKeycode(display, XK_b);
+    if ((XSendEvent(display, rootWindow, False, KeyPressMask, &event)
+		    != True)
+	    || !BrowserPopMatchingEvent(rootWindow, KeyPressMask, &received)
+	    || (received.type != KeyPress)
+	    || (received.xany.window != rootWindow)
+	    || (received.xany.send_event != True)) {
+	return 0;
+    }
+
+    if ((XSetInputFocus(display, rootWindow, RevertToParent, CurrentTime)
+		    != Success)
+	    || (browserDisplay.focusWindow != rootWindow)) {
+	return 0;
+    }
+    (void)XGetInputFocus(display, &returnedFocus, &returnedRevert);
+    if ((returnedFocus != rootWindow) || (returnedRevert != RevertToParent)
+	    || (XSetInputFocus(display, focusWindow, RevertToParent,
+		    CurrentTime) != Success)) {
 	return 0;
     }
 
