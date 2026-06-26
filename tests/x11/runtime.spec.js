@@ -613,23 +613,29 @@ test("XEventsQueued QueuedAfterFlush flushes browser updates", async ({
     const dirtyAfterCreate = backend.dirtyResources.size;
     const queuedAlready = eventsQueued(0, 0);
     const dirtyAfterAlready = backend.dirtyResources.size;
+    const queuedAfterReading = eventsQueued(0, 1);
+    const dirtyAfterReading = backend.dirtyResources.size;
     const queuedAfterFlush = eventsQueued(0, 2);
 
     return {
       dirtyAfterCreate,
       dirtyAfterAlready,
+      dirtyAfterReading,
       dirtyAfterFlush: backend.dirtyResources.size,
       flushScheduled: backend.flushScheduled,
       queuedAlready,
+      queuedAfterReading,
       queuedAfterFlush,
     };
   });
 
   expect(state.dirtyAfterCreate).toBeGreaterThan(0);
   expect(state.dirtyAfterAlready).toBe(state.dirtyAfterCreate);
+  expect(state.dirtyAfterReading).toBe(state.dirtyAfterCreate);
   expect(state.dirtyAfterFlush).toBe(0);
   expect(state.flushScheduled).toBe(false);
   expect(state.queuedAlready).toBeGreaterThanOrEqual(0);
+  expect(state.queuedAfterReading).toBeGreaterThanOrEqual(0);
   expect(state.queuedAfterFlush).toBeGreaterThanOrEqual(0);
 });
 
