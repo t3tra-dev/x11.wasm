@@ -567,6 +567,23 @@ test("XSendEvent resolves InputFocus and PointerWindow targets", async ({
   expect(result).toBe(1);
 });
 
+test("XKillClient removes retained temporary resources", async ({ page }) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestTemporaryResourceKill?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestTemporaryResourceKill) {
+      throw new Error("missing temporary resource kill test hook");
+    }
+    return module._X11WasmTestTemporaryResourceKill();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("external clipboard selection returns target-specific text properties", async ({
   page,
 }) => {

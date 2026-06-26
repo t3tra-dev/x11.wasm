@@ -70,6 +70,7 @@ typedef struct X11WasmResource {
     Window metadataTarget;
     int metadataRootToplevelSet;
     int metadataIsRootToplevel;
+    int temporary;
 } X11WasmResource;
 
 typedef struct _XRegion {
@@ -129,6 +130,7 @@ typedef struct X11WasmDisplayState {
     unsigned long flushSerial;
     unsigned long syncSerial;
     unsigned long closeSerial;
+    int closeDownMode;
     int screenSaverTimeout;
     int screenSaverInterval;
     int screenSaverPreferBlanking;

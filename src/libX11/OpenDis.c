@@ -67,6 +67,7 @@ BrowserInitDisplay(void)
     state->pointerWindow = state->rootWindow;
     state->defaultColormap = 2;
     state->nextXId = 100;
+    state->closeDownMode = DestroyAll;
     state->screenSaverTimeout = 600;
     state->screenSaverInterval = 600;
     state->screenSaverPreferBlanking = DefaultBlanking;

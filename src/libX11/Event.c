@@ -2459,6 +2459,47 @@ int XUngrabServer(Display *display)
     return XFlush(display);
 }
 
+static void
+BrowserDeleteTemporaryResource(
+    X11WasmResource *resourcePtr)
+{
+    XID id;
+
+    if ((resourcePtr == NULL) || (resourcePtr == &browserDisplay.rootResource)) {
+	return;
+    }
+    id = resourcePtr->id;
+    if (resourcePtr->type == X11_WASM_RESOURCE_WINDOW) {
+	(void)BrowserDestroyWindowResource(resourcePtr);
+	return;
+    }
+    if ((resourcePtr->type == X11_WASM_RESOURCE_PIXMAP)
+	    || (resourcePtr->type == X11_WASM_RESOURCE_CURSOR)) {
+	(void)X11WasmJsDestroyResource(BrowserJsXId(id));
+    }
+    X11WasmDeleteResource(id);
+}
+
+static void
+BrowserKillTemporaryResources(void)
+{
+    X11WasmResource *resourcePtr;
+
+    for (;;) {
+	for (resourcePtr = browserDisplay.resourceList; resourcePtr != NULL;
+		resourcePtr = resourcePtr->nextPtr) {
+	    if ((resourcePtr != &browserDisplay.rootResource)
+		    && resourcePtr->temporary) {
+		break;
+	    }
+	}
+	if (resourcePtr == NULL) {
+	    return;
+	}
+	BrowserDeleteTemporaryResource(resourcePtr);
+    }
+}
+
 static int
 BrowserChangeSaveSet(
     Display *display,
@@ -2523,6 +2564,9 @@ XSetCloseDownMode(
 	    X11_WASM_XREQ_SET_CLOSE_DOWN_MODE)) {
 	return Success;
     }
+    if (display == &browserDisplay.display) {
+	browserDisplay.closeDownMode = mode;
+    }
     return XNoOp(display);
 }
 
@@ -2542,7 +2586,100 @@ XKillClient(
 		X11_WASM_XREQ_KILL_CLIENT);
 	return Success;
     }
+    if ((display == &browserDisplay.display) && (resource == AllTemporary)) {
+	BrowserKillTemporaryResources();
+    }
     return XNoOp(display);
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestTemporaryResourceKill(void)
+{
+    Display *display = &browserDisplay.display;
+    int screen;
+    Window permanentWindow = None;
+    Window temporaryWindow = None;
+    Window laterWindow = None;
+    Pixmap temporaryPixmap = None;
+    Colormap temporaryColormap = None;
+    Font temporaryFont = None;
+    int result = 0;
+
+    BrowserInitDisplay();
+    screen = DefaultScreen(display);
+    (void)XSetCloseDownMode(display, DestroyAll);
+    permanentWindow = XCreateWindow(display, browserDisplay.rootWindow, 0, 0,
+	    11, 11, 0, CopyFromParent, InputOutput,
+	    DefaultVisual(display, screen), 0, NULL);
+    if (permanentWindow == None) {
+	goto cleanup;
+    }
+    if (XSetCloseDownMode(display, RetainTemporary) != Success) {
+	goto cleanup;
+    }
+    temporaryWindow = XCreateWindow(display, browserDisplay.rootWindow, 1, 1,
+	    12, 12, 0, CopyFromParent, InputOutput,
+	    DefaultVisual(display, screen), 0, NULL);
+    temporaryPixmap = XCreatePixmap(display, browserDisplay.rootWindow, 2, 2,
+	    DefaultDepth(display, screen));
+    temporaryColormap = XCreateColormap(display, browserDisplay.rootWindow,
+	    DefaultVisual(display, screen), AllocNone);
+    temporaryFont = XLoadFont(display, "fixed");
+    if ((temporaryWindow == None) || (temporaryPixmap == None)
+	    || (temporaryColormap == None) || (temporaryFont == None)) {
+	goto cleanup;
+    }
+    if (XSetCloseDownMode(display, DestroyAll) != Success) {
+	goto cleanup;
+    }
+    laterWindow = XCreateWindow(display, browserDisplay.rootWindow, 2, 2,
+	    13, 13, 0, CopyFromParent, InputOutput,
+	    DefaultVisual(display, screen), 0, NULL);
+    if (laterWindow == None) {
+	goto cleanup;
+    }
+    if ((X11WasmFindResource((XID)permanentWindow) == NULL)
+	    || (X11WasmFindResource((XID)temporaryWindow) == NULL)
+	    || (X11WasmFindResource((XID)temporaryPixmap) == NULL)
+	    || (X11WasmFindResource((XID)temporaryColormap) == NULL)
+	    || (X11WasmFindResource((XID)temporaryFont) == NULL)
+	    || (X11WasmFindResource((XID)laterWindow) == NULL)) {
+	goto cleanup;
+    }
+    if (XKillClient(display, AllTemporary) != Success) {
+	goto cleanup;
+    }
+    if ((X11WasmFindResource((XID)temporaryWindow) != NULL)
+	    || (X11WasmFindResource((XID)temporaryPixmap) != NULL)
+	    || (X11WasmFindResource((XID)temporaryColormap) != NULL)
+	    || (X11WasmFindResource((XID)temporaryFont) != NULL)
+	    || (X11WasmFindResource((XID)permanentWindow) == NULL)
+	    || (X11WasmFindResource((XID)laterWindow) == NULL)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    (void)XSetCloseDownMode(display, DestroyAll);
+    if (X11WasmFindResource((XID)temporaryFont) != NULL) {
+	(void)XUnloadFont(display, temporaryFont);
+    }
+    if (X11WasmFindResource((XID)temporaryColormap) != NULL) {
+	(void)XFreeColormap(display, temporaryColormap);
+    }
+    if (X11WasmFindResource((XID)temporaryPixmap) != NULL) {
+	(void)XFreePixmap(display, temporaryPixmap);
+    }
+    if (X11WasmFindResource((XID)temporaryWindow) != NULL) {
+	(void)XDestroyWindow(display, temporaryWindow);
+    }
+    if (X11WasmFindResource((XID)laterWindow) != NULL) {
+	(void)XDestroyWindow(display, laterWindow);
+    }
+    if (X11WasmFindResource((XID)permanentWindow) != NULL) {
+	(void)XDestroyWindow(display, permanentWindow);
+    }
+    return result;
 }
 
 void

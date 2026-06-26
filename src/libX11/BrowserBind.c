@@ -541,6 +541,7 @@ X11WasmCreateResource(
     resourcePtr->atts.win_gravity = NorthWestGravity;
     resourcePtr->atts.backing_store = NotUseful;
     resourcePtr->atts.backing_planes = ~0UL;
+    resourcePtr->temporary = browserDisplay.closeDownMode == RetainTemporary;
     resourcePtr->nextPtr = browserDisplay.resourceList;
     browserDisplay.resourceList = resourcePtr;
     return resourcePtr;
