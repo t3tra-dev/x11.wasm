@@ -9359,6 +9359,7 @@ static int
 BrowserTestXrmDatabaseApis(void)
 {
     Display *display;
+    const char binaryData[] = { 'A', '\0', 'B', 'C' };
     const char resourceText[] =
 	    "! ignored comment\n"
 	    "*geometry: global-geometry\n"
@@ -9370,6 +9371,11 @@ BrowserTestXrmDatabaseApis(void)
 	    "wish.empty:\n";
     XrmDatabase database = NULL;
     XrmDatabase emptyDatabase = NULL;
+    XrmDatabase putDatabase = NULL;
+    XrmDatabase mergeDatabase = NULL;
+    XrmValue binaryValue;
+    XrmValue readValue;
+    char *resourceType = NULL;
     int result = 0;
 
     BrowserInitDisplay();
@@ -9413,6 +9419,56 @@ BrowserTestXrmDatabaseApis(void)
 	    || (XrmGetStringDatabase(NULL) != NULL)) {
 	goto cleanup;
     }
+    XrmPutStringResource(&putDatabase, "wish.geometry", "put-geometry");
+    XrmPutStringResource(&putDatabase, "wish.geometry",
+	    "put-geometry-override");
+    XrmPutLineResource(&putDatabase, "wish*foreground: put-foreground");
+    XrmPutLineResource(&putDatabase, "! ignored");
+    XrmPutLineResource(&putDatabase, "wish.empty:");
+    binaryValue.addr = (XPointer)binaryData;
+    binaryValue.size = (unsigned int)sizeof(binaryData);
+    XrmPutResource(&putDatabase, "wish.binary", "Binary", &binaryValue);
+    if (!BrowserTestXrmResourceEquals(putDatabase, "wish.geometry",
+	    "Wish.Geometry", "put-geometry-override")
+	    || !BrowserTestXrmResourceEquals(putDatabase,
+		    "wish.main.foreground", "Wish.Main.Foreground",
+		    "put-foreground")
+	    || !BrowserTestXrmResourceEquals(putDatabase, "wish.empty",
+		    "Wish.Empty", "")) {
+	goto cleanup;
+    }
+    readValue.size = 0U;
+    readValue.addr = NULL;
+    if (!XrmGetResource(putDatabase, "wish.binary", "Wish.Binary",
+	    &resourceType, &readValue)
+	    || (resourceType == NULL) || (strcmp(resourceType, "Binary") != 0)
+	    || (readValue.size != sizeof(binaryData))
+	    || (readValue.addr == NULL)
+	    || (memcmp(readValue.addr, binaryData, sizeof(binaryData)) != 0)) {
+	goto cleanup;
+    }
+    mergeDatabase = XrmGetStringDatabase(
+	    "wish.geometry: combine-skipped\n"
+	    "wish.background: combine-background\n");
+    XrmCombineDatabase(mergeDatabase, &putDatabase, False);
+    mergeDatabase = NULL;
+    if (!BrowserTestXrmResourceEquals(putDatabase, "wish.geometry",
+	    "Wish.Geometry", "put-geometry-override")
+	    || !BrowserTestXrmResourceEquals(putDatabase, "wish.background",
+		    "Wish.Background", "combine-background")) {
+	goto cleanup;
+    }
+    mergeDatabase = XrmGetStringDatabase(
+	    "wish.geometry: merge-override\n"
+	    "wish.border: merge-border\n");
+    XrmMergeDatabases(mergeDatabase, &putDatabase);
+    mergeDatabase = NULL;
+    if (!BrowserTestXrmResourceEquals(putDatabase, "wish.geometry",
+	    "Wish.Geometry", "merge-override")
+	    || !BrowserTestXrmResourceEquals(putDatabase, "wish.border",
+		    "Wish.Border", "merge-border")) {
+	goto cleanup;
+    }
     XrmSetDatabase(display, database);
     if ((XCloseDisplay(display) != Success)
 	    || (XrmGetDatabase(display) != NULL)) {
@@ -9423,6 +9479,12 @@ BrowserTestXrmDatabaseApis(void)
 
 cleanup:
     XrmSetDatabase(display, NULL);
+    if (mergeDatabase != NULL) {
+	XrmDestroyDatabase(mergeDatabase);
+    }
+    if (putDatabase != NULL) {
+	XrmDestroyDatabase(putDatabase);
+    }
     if (emptyDatabase != NULL) {
 	XrmDestroyDatabase(emptyDatabase);
     }

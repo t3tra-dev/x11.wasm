@@ -6,6 +6,7 @@ typedef struct BrowserXrmEntry {
     char *binding;
     char *value;
     char *type;
+    unsigned int valueSize;
     struct BrowserXrmEntry *nextPtr;
 } BrowserXrmEntry;
 
@@ -165,6 +166,40 @@ BrowserDupRange(
 	memcpy(copy, start, length);
     }
     copy[length] = '\0';
+    return copy;
+}
+
+static XrmDatabase
+BrowserXrmNewDatabase(void)
+{
+    XrmDatabase database = (XrmDatabase)ckalloc(sizeof(*database));
+
+    database->firstEntryPtr = NULL;
+    database->lastEntryPtr = NULL;
+    return database;
+}
+
+static char *
+BrowserDupValue(
+    const XrmValue *valuePtr,
+    unsigned int *sizePtr)
+{
+    unsigned int size = 0U;
+    char *copy;
+
+    if (valuePtr != NULL) {
+	size = valuePtr->size;
+    }
+    copy = (char *)ckalloc((size_t)size + 1U);
+    if ((size > 0U) && (valuePtr != NULL) && (valuePtr->addr != NULL)) {
+	memcpy(copy, valuePtr->addr, (size_t)size);
+    } else if (size > 0U) {
+	memset(copy, 0, (size_t)size);
+    }
+    copy[size] = '\0';
+    if (sizePtr != NULL) {
+	*sizePtr = size;
+    }
     return copy;
 }
 
@@ -409,17 +444,55 @@ BrowserXrmEntryScore(
 }
 
 static void
-BrowserXrmAppendEntry(
+BrowserXrmFreeEntryFields(
+    BrowserXrmEntry *entryPtr)
+{
+    if (entryPtr->binding != NULL) {
+	ckfree(entryPtr->binding);
+    }
+    if (entryPtr->value != NULL) {
+	ckfree(entryPtr->value);
+    }
+    if (entryPtr->type != NULL) {
+	ckfree(entryPtr->type);
+    }
+}
+
+static void
+BrowserXrmDestroyEntry(
+    BrowserXrmEntry *entryPtr)
+{
+    if (entryPtr == NULL) {
+	return;
+    }
+    BrowserXrmFreeEntryFields(entryPtr);
+    ckfree(entryPtr);
+}
+
+static BrowserXrmEntry *
+BrowserXrmFindExactEntry(
     XrmDatabase database,
-    char *binding,
-    char *value)
+    const char *binding)
 {
     BrowserXrmEntry *entryPtr;
 
-    entryPtr = (BrowserXrmEntry *)ckalloc(sizeof(*entryPtr));
-    entryPtr->binding = binding;
-    entryPtr->value = value;
-    entryPtr->type = BrowserDupString("String");
+    if ((database == NULL) || (binding == NULL)) {
+	return NULL;
+    }
+    for (entryPtr = database->firstEntryPtr; entryPtr != NULL;
+	    entryPtr = entryPtr->nextPtr) {
+	if (strcmp(entryPtr->binding, binding) == 0) {
+	    return entryPtr;
+	}
+    }
+    return NULL;
+}
+
+static void
+BrowserXrmAppendEntryObject(
+    XrmDatabase database,
+    BrowserXrmEntry *entryPtr)
+{
     entryPtr->nextPtr = NULL;
     if (database->lastEntryPtr != NULL) {
 	database->lastEntryPtr->nextPtr = entryPtr;
@@ -427,6 +500,81 @@ BrowserXrmAppendEntry(
 	database->firstEntryPtr = entryPtr;
     }
     database->lastEntryPtr = entryPtr;
+}
+
+static void
+BrowserXrmStoreEntry(
+    XrmDatabase database,
+    char *binding,
+    char *type,
+    char *value,
+    unsigned int valueSize)
+{
+    BrowserXrmEntry *entryPtr;
+
+    entryPtr = BrowserXrmFindExactEntry(database, binding);
+    if (entryPtr != NULL) {
+	ckfree(entryPtr->binding);
+	if (entryPtr->type != NULL) {
+	    ckfree(entryPtr->type);
+	}
+	if (entryPtr->value != NULL) {
+	    ckfree(entryPtr->value);
+	}
+	entryPtr->binding = binding;
+	entryPtr->type = type;
+	entryPtr->value = value;
+	entryPtr->valueSize = valueSize;
+	return;
+    }
+    entryPtr = (BrowserXrmEntry *)ckalloc(sizeof(*entryPtr));
+    entryPtr->binding = binding;
+    entryPtr->value = value;
+    entryPtr->type = type;
+    entryPtr->valueSize = valueSize;
+    BrowserXrmAppendEntryObject(database, entryPtr);
+}
+
+static void
+BrowserXrmStoreStringEntry(
+    XrmDatabase database,
+    char *binding,
+    char *value)
+{
+    BrowserXrmStoreEntry(database, binding, BrowserDupString("String"), value,
+	    (unsigned int)strlen(value) + 1U);
+}
+
+static int
+BrowserXrmParseLineIntoDatabase(
+    XrmDatabase database,
+    const char *lineStart,
+    const char *lineEnd)
+{
+    const char *colon;
+    const char *bindingStart;
+    const char *bindingEnd;
+    const char *valueStart;
+    const char *valueEnd;
+
+    bindingStart = BrowserSkipDefaultSpaces(lineStart, lineEnd);
+    if ((bindingStart == lineEnd) || (*bindingStart == '!')) {
+	return 0;
+    }
+    colon = memchr(bindingStart, ':', (size_t)(lineEnd - bindingStart));
+    if (colon == NULL) {
+	return 0;
+    }
+    bindingEnd = BrowserTrimDefaultSpaces(bindingStart, colon);
+    if (bindingEnd == bindingStart) {
+	return 0;
+    }
+    valueStart = BrowserSkipDefaultSpaces(colon + 1, lineEnd);
+    valueEnd = BrowserTrimDefaultSpaces(valueStart, lineEnd);
+    BrowserXrmStoreStringEntry(database,
+	    BrowserDupRange(bindingStart, bindingEnd),
+	    BrowserDupRange(valueStart, valueEnd));
+    return 1;
 }
 
 char *
@@ -569,6 +717,65 @@ XrmSetDatabase(
     }
 }
 
+void
+XrmPutResource(
+    XrmDatabase *databasePtr,
+    _Xconst char *specifier,
+    _Xconst char *type,
+    XrmValue *value)
+{
+    char *valueCopy;
+    unsigned int valueSize = 0U;
+
+    if ((databasePtr == NULL) || (specifier == NULL)
+	    || (specifier[0] == '\0')) {
+	return;
+    }
+    if (*databasePtr == NULL) {
+	*databasePtr = BrowserXrmNewDatabase();
+    }
+    valueCopy = BrowserDupValue(value, &valueSize);
+    BrowserXrmStoreEntry(*databasePtr, BrowserDupString(specifier),
+	    (type != NULL) ? BrowserDupString(type) : NULL,
+	    valueCopy, valueSize);
+}
+
+void
+XrmPutStringResource(
+    XrmDatabase *databasePtr,
+    _Xconst char *specifier,
+    _Xconst char *value)
+{
+    XrmValue xrmValue;
+
+    if (value == NULL) {
+	value = "";
+    }
+    xrmValue.addr = (XPointer)value;
+    xrmValue.size = (unsigned int)strlen(value) + 1U;
+    XrmPutResource(databasePtr, specifier, "String", &xrmValue);
+}
+
+void
+XrmPutLineResource(
+    XrmDatabase *databasePtr,
+    _Xconst char *line)
+{
+    const char *lineEnd;
+
+    if ((databasePtr == NULL) || (line == NULL)) {
+	return;
+    }
+    if (*databasePtr == NULL) {
+	*databasePtr = BrowserXrmNewDatabase();
+    }
+    lineEnd = line;
+    while ((*lineEnd != '\0') && (*lineEnd != '\n')) {
+	lineEnd++;
+    }
+    (void)BrowserXrmParseLineIntoDatabase(*databasePtr, line, lineEnd);
+}
+
 XrmDatabase
 XrmGetStringDatabase(
     _Xconst char *data)
@@ -579,40 +786,14 @@ XrmGetStringDatabase(
     if (data == NULL) {
 	return NULL;
     }
-    database = (XrmDatabase)ckalloc(sizeof(*database));
-    database->firstEntryPtr = NULL;
-    database->lastEntryPtr = NULL;
+    database = BrowserXrmNewDatabase();
     for (lineStart = data; *lineStart != '\0'; ) {
 	const char *lineEnd = lineStart;
-	const char *colon;
-	const char *bindingStart;
-	const char *bindingEnd;
-	const char *valueStart;
-	const char *valueEnd;
 
 	while ((*lineEnd != '\0') && (*lineEnd != '\n')) {
 	    lineEnd++;
 	}
-	bindingStart = BrowserSkipDefaultSpaces(lineStart, lineEnd);
-	if ((bindingStart == lineEnd) || (*bindingStart == '!')) {
-	    lineStart = (*lineEnd == '\n') ? lineEnd + 1 : lineEnd;
-	    continue;
-	}
-	colon = memchr(bindingStart, ':', (size_t)(lineEnd - bindingStart));
-	if (colon == NULL) {
-	    lineStart = (*lineEnd == '\n') ? lineEnd + 1 : lineEnd;
-	    continue;
-	}
-	bindingEnd = BrowserTrimDefaultSpaces(bindingStart, colon);
-	if (bindingEnd == bindingStart) {
-	    lineStart = (*lineEnd == '\n') ? lineEnd + 1 : lineEnd;
-	    continue;
-	}
-	valueStart = BrowserSkipDefaultSpaces(colon + 1, lineEnd);
-	valueEnd = BrowserTrimDefaultSpaces(valueStart, lineEnd);
-	BrowserXrmAppendEntry(database,
-		BrowserDupRange(bindingStart, bindingEnd),
-		BrowserDupRange(valueStart, valueEnd));
+	(void)BrowserXrmParseLineIntoDatabase(database, lineStart, lineEnd);
 	lineStart = (*lineEnd == '\n') ? lineEnd + 1 : lineEnd;
     }
     return database;
@@ -657,7 +838,7 @@ XrmGetResource(
 	    *resourceTypeReturn = bestEntryPtr->type;
 	}
 	if (valueReturn != NULL) {
-	    valueReturn->size = (unsigned int)strlen(bestEntryPtr->value) + 1U;
+	    valueReturn->size = bestEntryPtr->valueSize;
 	    valueReturn->addr = bestEntryPtr->value;
 	}
     }
@@ -684,13 +865,57 @@ XrmDestroyDatabase(
     for (entryPtr = database->firstEntryPtr; entryPtr != NULL; ) {
 	BrowserXrmEntry *nextPtr = entryPtr->nextPtr;
 
-	ckfree(entryPtr->binding);
-	ckfree(entryPtr->value);
-	ckfree(entryPtr->type);
-	ckfree(entryPtr);
+	BrowserXrmDestroyEntry(entryPtr);
 	entryPtr = nextPtr;
     }
     ckfree(database);
+}
+
+void
+XrmCombineDatabase(
+    XrmDatabase sourceDatabase,
+    XrmDatabase *targetDatabasePtr,
+    Bool override)
+{
+    BrowserXrmEntry *entryPtr;
+
+    if ((targetDatabasePtr == NULL) || (sourceDatabase == NULL)) {
+	return;
+    }
+    if (*targetDatabasePtr == sourceDatabase) {
+	return;
+    }
+    if (*targetDatabasePtr == NULL) {
+	*targetDatabasePtr = sourceDatabase;
+	return;
+    }
+    for (entryPtr = sourceDatabase->firstEntryPtr; entryPtr != NULL; ) {
+	BrowserXrmEntry *nextPtr = entryPtr->nextPtr;
+	BrowserXrmEntry *targetEntryPtr;
+
+	entryPtr->nextPtr = NULL;
+	targetEntryPtr = BrowserXrmFindExactEntry(*targetDatabasePtr,
+		entryPtr->binding);
+	if (targetEntryPtr == NULL) {
+	    BrowserXrmAppendEntryObject(*targetDatabasePtr, entryPtr);
+	} else if (override) {
+	    BrowserXrmStoreEntry(*targetDatabasePtr, entryPtr->binding,
+		    entryPtr->type, entryPtr->value, entryPtr->valueSize);
+	    ckfree(entryPtr);
+	} else {
+	    BrowserXrmDestroyEntry(entryPtr);
+	}
+	entryPtr = nextPtr;
+    }
+    ckfree(sourceDatabase);
+}
+
+void
+XrmMergeDatabases(
+    XrmDatabase sourceDatabase,
+    XrmDatabase *targetDatabasePtr)
+{
+    XrmCombineDatabase(sourceDatabase, targetDatabasePtr, True);
 }
 
 EMSCRIPTEN_KEEPALIVE int
