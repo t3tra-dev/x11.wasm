@@ -222,6 +222,12 @@ Window
 BrowserGetFocusWindow(void)
 {
     BrowserInitDisplay();
+    if (browserDisplay.focusWindow == PointerRoot) {
+	if (BrowserWindowCanReceiveEvents(browserDisplay.pointerWindow)) {
+	    return browserDisplay.pointerWindow;
+	}
+	return browserDisplay.rootWindow;
+    }
     return browserDisplay.focusWindow;
 }
 

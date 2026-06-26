@@ -679,10 +679,9 @@ XGetInputFocus(
     if (display == NULL) {
 	display = X11WasmGetDisplay(NULL);
     }
+    BrowserInitDisplay();
     if (focusReturn) {
-	*focusReturn = (browserDisplay.focusWindow != None)
-		? browserDisplay.focusWindow
-		: RootWindow(display, DefaultScreen(display));
+	*focusReturn = browserDisplay.focusWindow;
     }
     if (revertReturn) *revertReturn = browserDisplay.focusRevertTo;
     return Success;
@@ -1213,8 +1212,9 @@ XSetInputFocus(
     int revertTo,
     Time time)
 {
-    Window oldFocus;
+    Window oldFocusWindow;
     Window newFocus;
+    Window newFocusWindow;
     X11WasmResource *resourcePtr = NULL;
     Time effectiveTime;
 
@@ -1227,9 +1227,11 @@ XSetInputFocus(
 	    X11_WASM_XREQ_SET_INPUT_FOCUS)) {
 	return Success;
     }
-    oldFocus = browserDisplay.focusWindow;
-    if ((focus == None) || (focus == PointerRoot)) {
+    oldFocusWindow = BrowserGetFocusWindow();
+    if (focus == None) {
 	newFocus = None;
+    } else if (focus == PointerRoot) {
+	newFocus = PointerRoot;
     } else {
 	resourcePtr = BrowserWindowResourceOrError(&display, focus,
 		X11_WASM_XREQ_SET_INPUT_FOCUS);
@@ -1250,10 +1252,12 @@ XSetInputFocus(
     browserDisplay.focusRevertTo = revertTo;
     browserDisplay.focusWindow = newFocus;
     BrowserRecordFocusChangeTime(effectiveTime);
-    (void)X11WasmJsSetInputFocus(newFocus != None, (unsigned int)newFocus);
-    if (oldFocus != newFocus) {
-	(void)BrowserQueueRawFocusEvent(oldFocus, FocusOut, effectiveTime);
-	(void)BrowserQueueRawFocusEvent(newFocus, FocusIn, effectiveTime);
+    newFocusWindow = BrowserGetFocusWindow();
+    (void)X11WasmJsSetInputFocus(newFocusWindow != None,
+	    (unsigned int)newFocusWindow);
+    if (oldFocusWindow != newFocusWindow) {
+	(void)BrowserQueueRawFocusEvent(oldFocusWindow, FocusOut, effectiveTime);
+	(void)BrowserQueueRawFocusEvent(newFocusWindow, FocusIn, effectiveTime);
     }
     (void)display;
     return Success;

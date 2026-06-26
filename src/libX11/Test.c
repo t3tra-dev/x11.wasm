@@ -1432,6 +1432,9 @@ X11WasmTestXlibApis(void)
     Window focusAfterStaleTime = None;
     Window focusAfterFutureTime = None;
     Window focusAfterCurrentTime = None;
+    Window focusAfterNoneWindow = None;
+    Window focusAfterPointerRootWindow = None;
+    Window focusPointerRootEventWindow = None;
     Window destroyParentWindow = None;
     Window destroyChildWindow = None;
     Window destroyGrandchildWindow = None;
@@ -1578,6 +1581,10 @@ X11WasmTestXlibApis(void)
     int focusAfterStaleRevert = 0;
     int focusAfterFutureRevert = 0;
     int focusAfterCurrentRevert = 0;
+    int focusAfterNoneRevert = 0;
+    int focusAfterPointerRootRevert = 0;
+    int focusPointerRootX = 0;
+    int focusPointerRootY = 0;
     KeyCode passiveGrabKeycode = 0;
     int inheritedBackgroundHasPixel = 0;
     int inheritedBorderHasPixel = 0;
@@ -4228,12 +4235,37 @@ X11WasmTestXlibApis(void)
 	    || (focusAfterFutureTime != gravitySouthEastWindow)
 	    || (focusAfterFutureRevert != RevertToParent)
 	    || (focusAfterCurrentTime != gravityCenterWindow)
-	    || (focusAfterCurrentRevert != RevertToNone)
+	    || (focusAfterCurrentRevert != RevertToNone)) {
+	goto cleanup;
+    }
+    if (XSetInputFocus(&browserDisplay.display, None, RevertToPointerRoot,
+	    CurrentTime) != Success) {
+	goto cleanup;
+    }
+    (void)XGetInputFocus(&browserDisplay.display, &focusAfterNoneWindow,
+	    &focusAfterNoneRevert);
+    BrowserWindowRootOffset(gravitySouthEastWindow, &focusPointerRootX,
+	    &focusPointerRootY);
+    BrowserUpdatePointerState(gravitySouthEastWindow, focusPointerRootX + 1,
+	    focusPointerRootY + 1, 0);
+    if (XSetInputFocus(&browserDisplay.display, PointerRoot, RevertToNone,
+	    CurrentTime) != Success) {
+	goto cleanup;
+    }
+    (void)XGetInputFocus(&browserDisplay.display,
+	    &focusAfterPointerRootWindow, &focusAfterPointerRootRevert);
+    focusPointerRootEventWindow = BrowserGetFocusWindow();
+    if ((focusAfterNoneWindow != None)
+	    || (focusAfterNoneRevert != RevertToPointerRoot)
+	    || (focusAfterPointerRootWindow != PointerRoot)
+	    || (focusAfterPointerRootRevert != RevertToNone)
+	    || (focusPointerRootEventWindow != gravitySouthEastWindow)
 	    || (XSetInputFocus(&browserDisplay.display,
 		    browserDisplay.rootWindow, RevertToParent,
 		    CurrentTime) != Success)) {
 	goto cleanup;
     }
+    BrowserUpdatePointerState(browserDisplay.rootWindow, 0, 0, 0);
     BrowserClearEventQueue();
 
     memset(&attributes, 0, sizeof(attributes));
