@@ -239,7 +239,7 @@ BrowserStoreExternalClipboardTarget(
     Atom property,
     Time time)
 {
-    unsigned int targets[7];
+    unsigned int targets[8];
     Time timestamp = externalClipboardTime;
 
     if ((property == None) || (BrowserWindowResource(requestor) == NULL)) {
@@ -253,6 +253,7 @@ BrowserStoreExternalClipboardTarget(
 	targets[4] = (unsigned int)BrowserTargetsAtom();
 	targets[5] = (unsigned int)BrowserTimestampAtom();
 	targets[6] = (unsigned int)BrowserMultipleAtom();
+	targets[7] = (unsigned int)BrowserLengthAtom();
 	(void)XChangeProperty(&browserDisplay.display, requestor,
 		property, XA_ATOM, 32, PropModeReplace,
 		(const unsigned char *)targets,
@@ -269,6 +270,17 @@ BrowserStoreExternalClipboardTarget(
 	(void)XChangeProperty(&browserDisplay.display, requestor,
 		property, XA_INTEGER, 32, PropModeReplace,
 		(const unsigned char *)&timestampValue, 1);
+	return 1;
+    }
+    if (target == BrowserLengthAtom()) {
+	unsigned int lengthValue = 0;
+
+	if (externalClipboardText != NULL) {
+	    lengthValue = (unsigned int)strlen(externalClipboardText);
+	}
+	(void)XChangeProperty(&browserDisplay.display, requestor,
+		property, XA_INTEGER, 32, PropModeReplace,
+		(const unsigned char *)&lengthValue, 1);
 	return 1;
     }
     if (!BrowserSelectionTargetIsText(target)) {

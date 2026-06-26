@@ -821,6 +821,12 @@ BrowserTargetsAtom(void)
 }
 
 Atom
+BrowserLengthAtom(void)
+{
+    return XInternAtom(X11WasmGetDisplay(NULL), "LENGTH", False);
+}
+
+Atom
 BrowserTimestampAtom(void)
 {
     return XInternAtom(X11WasmGetDisplay(NULL), "TIMESTAMP", False);

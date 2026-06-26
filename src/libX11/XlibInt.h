@@ -628,6 +628,7 @@ int BrowserCompleteRequest(
 const char *BrowserCompositionEventName(
     int phase);
 Atom BrowserCompoundTextAtom(void);
+Atom BrowserLengthAtom(void);
 Atom BrowserMultipleAtom(void);
 int BrowserConvertExternalClipboardSelection(
     Window requestor,
