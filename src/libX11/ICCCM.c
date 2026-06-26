@@ -2922,6 +2922,26 @@ X11WasmTestPropertyMutationApis(void)
 	    PropModeReplace, partialText, (int)sizeof(partialText)) != Success) {
 	goto cleanup;
     }
+    if ((XGetWindowProperty(display, window, property, 0, 0, True,
+		    XA_STRING, &actualType, &actualFormat, &nitems,
+		    &bytesAfter, &data) != Success)
+	    || (actualType != XA_STRING) || (actualFormat != 8)
+	    || (nitems != 0) || (bytesAfter != sizeof(partialText))
+	    || (data == NULL) || (data[0] != '\0')) {
+	goto cleanup;
+    }
+    XFree(data);
+    data = NULL;
+    if ((XGetWindowProperty(display, window, property, 0, 1, True,
+		    XA_ATOM, &actualType, &actualFormat, &nitems,
+		    &bytesAfter, &data) != Success)
+	    || (actualType != XA_STRING) || (actualFormat != 8)
+	    || (nitems != 0) || (bytesAfter != sizeof(partialText))
+	    || (data == NULL) || (data[0] != '\0')) {
+	goto cleanup;
+    }
+    XFree(data);
+    data = NULL;
     if ((XGetWindowProperty(display, window, property, 1, 1, True,
 		    XA_STRING, &actualType, &actualFormat, &nitems,
 		    &bytesAfter, &data) != Success)
