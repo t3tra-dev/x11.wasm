@@ -2229,6 +2229,82 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestTranslateCoordinatesApis(void)
+{
+    Display *display;
+    Window parent = None;
+    Window child = None;
+    Window grandchild = None;
+    Window childReturn = None;
+    int destX = -1;
+    int destY = -1;
+    int result = 0;
+    int screen;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+    parent = XCreateWindow(display, browserDisplay.rootWindow, 10, 20, 40,
+	    30, 0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL);
+    child = XCreateWindow(display, parent, 5, 7, 20, 15, 0, CopyFromParent,
+	    InputOutput, DefaultVisual(display, screen), 0, NULL);
+    grandchild = XCreateWindow(display, child, 1, 1, 5, 5, 0, CopyFromParent,
+	    InputOutput, DefaultVisual(display, screen), 0, NULL);
+    if ((parent == None) || (child == None) || (grandchild == None)
+	    || (XMapWindow(display, parent) != Success)
+	    || (XMapWindow(display, child) != Success)
+	    || (XMapWindow(display, grandchild) != Success)) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+
+    childReturn = None;
+    destX = destY = -1;
+    if (!XTranslateCoordinates(display, browserDisplay.rootWindow, parent,
+	    16, 28, &destX, &destY, &childReturn)
+	    || (destX != 6) || (destY != 8)
+	    || (childReturn != child)) {
+	goto cleanup;
+    }
+
+    childReturn = None;
+    destX = destY = -1;
+    if (!XTranslateCoordinates(display, parent, child, 7, 9, &destX,
+	    &destY, &childReturn)
+	    || (destX != 2) || (destY != 2)
+	    || (childReturn != grandchild)) {
+	goto cleanup;
+    }
+
+    childReturn = None;
+    destX = destY = -1;
+    if (!XTranslateCoordinates(display, child, browserDisplay.rootWindow,
+	    2, 3, &destX, &destY, &childReturn)
+	    || (destX != 17) || (destY != 30)
+	    || (childReturn != parent)) {
+	goto cleanup;
+    }
+
+    childReturn = None;
+    destX = destY = -1;
+    if (!XTranslateCoordinates(display, browserDisplay.rootWindow, child,
+	    1, 2, &destX, &destY, &childReturn)
+	    || (destX != -14) || (destY != -25)
+	    || (childReturn != None)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    BrowserClearEventQueue();
+    if (parent != None) {
+	(void)XDestroyWindow(display, parent);
+    }
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestSubstructureNotifyApis(void)
 {
     Display *display;

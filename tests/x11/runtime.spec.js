@@ -397,6 +397,25 @@ test("focus events preserve hierarchy details", async ({ page }) => {
   expect(result).toBe(1);
 });
 
+test("XTranslateCoordinates preserves nested window coordinates", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestTranslateCoordinatesApis?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestTranslateCoordinatesApis) {
+      throw new Error("missing translate coordinates test export");
+    }
+    return module._X11WasmTestTranslateCoordinatesApis();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XIC spot location anchors the browser input context", async ({ page }) => {
   await waitForX11Runtime(page);
   const windowId = await createMappedWindow(page);
