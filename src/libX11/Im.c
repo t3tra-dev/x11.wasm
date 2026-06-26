@@ -134,6 +134,27 @@ X11WasmTestXICLookupFocus(void)
 	    || (lookupSym != NoSymbol)) {
 	goto cleanup;
     }
+
+    lookupEvent.state = X11_WASM_PINNED_KEY_EVENT_STATE;
+    memset(buffer, 0, sizeof(buffer));
+    lookupSym = NoSymbol;
+    lookupStatus = 0;
+    lookupLength = Xutf8LookupString(inputContext, &lookupEvent, buffer,
+	    (int)sizeof(buffer), &lookupSym, &lookupStatus);
+    if ((lookupLength != 1) || (lookupStatus != XLookupBoth)
+	    || (lookupSym != XK_a) || (buffer[0] != 'a')) {
+	goto cleanup;
+    }
+
+    lookupEvent.window = (Window)0x7fffffebUL;
+    lookupSym = XK_a;
+    lookupStatus = XLookupBoth;
+    lookupLength = Xutf8LookupString(inputContext, &lookupEvent, buffer,
+	    (int)sizeof(buffer), &lookupSym, &lookupStatus);
+    if ((lookupLength != 0) || (lookupStatus != XLookupNone)
+	    || (lookupSym != NoSymbol)) {
+	goto cleanup;
+    }
     result = 1;
 
 cleanup:
