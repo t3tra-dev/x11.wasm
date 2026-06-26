@@ -70,6 +70,7 @@
       "setPointerState",
       "setRequestState",
       "setScreenSaverSettings",
+      "setScreenSaverSuspended",
       "setSelectionOwner",
       "setServerGrabState",
       "setSynchronizeState",

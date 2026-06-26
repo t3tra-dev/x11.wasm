@@ -70,6 +70,9 @@ extern void XScreenSaverSelectInput(
     Display *display,
     Drawable drawable,
     unsigned long event_mask);
+extern void XScreenSaverSuspend(
+    Display *display,
+    Bool suspend);
 
 #ifdef __cplusplus
 }

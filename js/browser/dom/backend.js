@@ -227,6 +227,7 @@
       this.screenSaverInterval = 600;
       this.screenSaverPreferBlanking = 2;
       this.screenSaverAllowExposures = 2;
+      this.screenSaverSuspended = false;
       this.screenWakeLockStatus = "idle";
       this.screenWakeLockError = "";
       this.screenWakeLockType = "";

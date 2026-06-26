@@ -3011,6 +3011,37 @@ XScreenSaverSelectInput(
     }
 }
 
+void
+XScreenSaverSuspend(
+    Display *display,
+    Bool suspend)
+{
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    }
+    BrowserInitDisplay();
+    if (display == &browserDisplay.display) {
+	if (suspend) {
+	    if (browserDisplay.screenSaverSuspendCount < INT_MAX) {
+		browserDisplay.screenSaverSuspendCount++;
+	    }
+	    if (browserDisplay.screenSaverSuspendCount == 1) {
+		(void)X11WasmJsSetScreenSaverSuspended(True);
+	    }
+	} else if (browserDisplay.screenSaverSuspendCount > 0) {
+	    browserDisplay.screenSaverSuspendCount--;
+	    if (browserDisplay.screenSaverSuspendCount == 0) {
+		if (!browserDisplay.screenSaverActive) {
+		    browserDisplay.screenSaverTimerResetIdle =
+			    BrowserScreenSaverIdle();
+		}
+		(void)X11WasmJsSetScreenSaverSuspended(False);
+	    }
+	}
+    }
+    (void)XNoOp(display);
+}
+
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestSetScreenSaverSettings(int enabled)
 {
@@ -3033,6 +3064,14 @@ X11WasmTestSetScreenSaverWakeLock(int enabled)
     }
     return XSetScreenSaver(&browserDisplay.display, 120, 30,
 	    DontPreferBlanking, AllowExposures);
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestSuspendScreenSaver(int suspended)
+{
+    BrowserInitDisplay();
+    XScreenSaverSuspend(&browserDisplay.display, suspended ? True : False);
+    return Success;
 }
 
 EMSCRIPTEN_KEEPALIVE int
@@ -3070,6 +3109,28 @@ X11WasmTestForceScreenSaverState(void)
 	    || (info.til_or_since > 120000UL)) {
 	goto cleanup;
     }
+
+    XScreenSaverSuspend(display, True);
+    XScreenSaverSuspend(display, True);
+    if (browserDisplay.screenSaverSuspendCount != 2) {
+	goto cleanup;
+    }
+    XScreenSaverSuspend(display, False);
+    if ((browserDisplay.screenSaverSuspendCount != 1)
+	    || (XScreenSaverQueryInfo(display, browserDisplay.rootWindow,
+		    &info) != True)
+	    || (info.state != ScreenSaverOff)
+	    || (XActivateScreenSaver(display) != Success)
+	    || (XScreenSaverQueryInfo(display, browserDisplay.rootWindow,
+		    &info) != True)
+	    || (info.state != ScreenSaverOn)) {
+	goto cleanup;
+    }
+    XScreenSaverSuspend(display, False);
+    if (browserDisplay.screenSaverSuspendCount != 0) {
+	goto cleanup;
+    }
+    (void)XResetScreenSaver(display);
 
     XScreenSaverSelectInput(display, browserDisplay.rootWindow,
 	    ScreenSaverNotifyMask);
@@ -3198,6 +3259,9 @@ X11WasmTestForceScreenSaverState(void)
     result = 1;
 
 cleanup:
+    while (browserDisplay.screenSaverSuspendCount > 0) {
+	XScreenSaverSuspend(display, False);
+    }
     (void)XResetScreenSaver(display);
     XScreenSaverSelectInput(display, browserDisplay.rootWindow, 0);
     (void)XSetScreenSaver(display, -1, -1, DefaultBlanking, DefaultExposures);

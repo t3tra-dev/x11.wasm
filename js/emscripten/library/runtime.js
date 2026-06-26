@@ -71,6 +71,11 @@
     );
   },
 
+  X11WasmJsSetScreenSaverSuspended__deps: ["$X11WasmBridge"],
+  X11WasmJsSetScreenSaverSuspended: function (suspended) {
+    return X11WasmBridge.call("setScreenSaverSuspended", [suspended]) | 0;
+  },
+
   X11WasmJsSetHostAccessControl__deps: ["$X11WasmBridge"],
   X11WasmJsSetHostAccessControl: function (
     enabled,

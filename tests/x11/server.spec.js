@@ -103,6 +103,53 @@ test("XForceScreenSaver updates query state and input resets it", async ({
   expect(result).toBe(1);
 });
 
+test("XScreenSaverSuspend updates browser suspended metadata", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+
+  const suspended = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestSuspendScreenSaver?: Function, x11WasmBackend?: X11WasmBackendSnapshot } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    const root = document.getElementById("x11-wasm-root");
+    if (!module?._X11WasmTestSuspendScreenSaver || !backend || !root) {
+      throw new Error("missing screen saver suspend test hooks");
+    }
+
+    const setResult = module._X11WasmTestSuspendScreenSaver(1);
+    const afterSet = {
+      backendSuspended: backend.screenSaverSuspended,
+      rootSuspended: root.getAttribute(
+        "data-x11-wasm-screensaver-suspended",
+      ),
+    };
+    const clearResult = module._X11WasmTestSuspendScreenSaver(0);
+    const afterClear = {
+      backendSuspended: backend.screenSaverSuspended,
+      rootSuspended: root.getAttribute(
+        "data-x11-wasm-screensaver-suspended",
+      ),
+    };
+    return { afterClear, afterSet, clearResult, setResult };
+  });
+
+  expect(suspended).toEqual({
+    setResult: 0,
+    clearResult: 0,
+    afterSet: {
+      backendSuspended: true,
+      rootSuspended: "1",
+    },
+    afterClear: {
+      backendSuspended: false,
+      rootSuspended: "0",
+    },
+  });
+});
+
 test("XSetScreenSaver uses browser wake lock when blanking is disabled", async ({
   page,
 }) => {

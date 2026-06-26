@@ -132,6 +132,7 @@ interface X11WasmBackend {
   screenSaverInterval: number;
   screenSaverPreferBlanking: number;
   screenSaverAllowExposures: number;
+  screenSaverSuspended: boolean;
   screenWakeLockStatus: string;
   screenWakeLockError: string;
   screenWakeLockType: string;
@@ -430,6 +431,7 @@ declare const Module: {
   _X11WasmTestSetScreenSaverSettings?: (enabled: number) => number;
   _X11WasmTestForceScreenSaverState?: () => number;
   _X11WasmTestSetScreenSaverWakeLock?: (enabled: number) => number;
+  _X11WasmTestSuspendScreenSaver?: (suspended: number) => number;
   _X11WasmTestSetHostAccessControl?: (configured: number) => number;
   _X11WasmTestSetServerGrabDepth?: (depth: number) => number;
   _X11WasmTestSetPrimarySelectionOwner?: (

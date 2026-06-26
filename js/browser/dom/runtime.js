@@ -331,6 +331,21 @@
       return 0;
     },
 
+    /**
+     * @param {number} suspended
+     * @returns {number}
+     */
+    setScreenSaverSuspended(suspended) {
+      this.screenSaverSuspended = Math.trunc(suspended) !== 0;
+      if (!this.screenSaverSuspended && this.lastScreenSaverMode !== 1) {
+        this.recordUserActivity();
+      } else {
+        this.applyRootScreenSaverState();
+      }
+      this.updateScreenWakeLock();
+      return 0;
+    },
+
     applyRootScreenSaverState() {
       const root = this.rootElement;
       if (!root) {
@@ -365,6 +380,10 @@
         String(this.screenSaverAllowExposures),
       );
       root.setAttribute(
+        "data-x11-wasm-screensaver-suspended",
+        this.screenSaverSuspended ? "1" : "0",
+      );
+      root.setAttribute(
         "data-x11-wasm-screen-wake-lock-status",
         this.screenWakeLockStatus,
       );
@@ -386,13 +405,14 @@
       }
     },
 
-screenSaverWantsWakeLock() {
+    screenSaverWantsWakeLock() {
       return (
-        this.screenSaverPreferBlanking === 0 && this.lastScreenSaverMode !== 1
+        this.lastScreenSaverMode !== 1 &&
+        (this.screenSaverSuspended || this.screenSaverPreferBlanking === 0)
       );
     },
 
-updateScreenWakeLock() {
+    updateScreenWakeLock() {
       if (this.screenSaverWantsWakeLock()) {
         this.requestScreenWakeLock();
       } else {
@@ -402,7 +422,7 @@ updateScreenWakeLock() {
       }
     },
 
-requestScreenWakeLock() {
+    requestScreenWakeLock() {
       const view = this.document && this.document.defaultView;
       const navigatorObject =
         (view && view.navigator) ||

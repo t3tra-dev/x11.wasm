@@ -138,6 +138,7 @@ typedef struct X11WasmDisplayState {
     int screenSaverAllowExposures;
     unsigned long screenSaverEventMask;
     int screenSaverActive;
+    int screenSaverSuspendCount;
     unsigned long screenSaverTimerResetIdle;
     unsigned long screenSaverActivatedIdle;
     int keyClickPercent;
@@ -269,6 +270,7 @@ extern int X11WasmJsForceScreenSaver(int mode);
 extern int X11WasmJsGetUserIdleTime(void);
 extern int X11WasmJsSetScreenSaverSettings(int timeout, int interval,
 	int preferBlanking, int allowExposures);
+extern int X11WasmJsSetScreenSaverSuspended(int suspended);
 extern int X11WasmJsSetHostAccessControl(int enabled,
 	const char *hostsUtf8, int hostsUtf8Length, int count);
 extern int X11WasmJsSetServerGrabState(int depth);
@@ -496,6 +498,12 @@ X11WasmJsSetScreenSaverSettings(int timeout, int interval, int preferBlanking,
     (void)interval;
     (void)preferBlanking;
     (void)allowExposures;
+    return 0;
+}
+static inline int
+X11WasmJsSetScreenSaverSuspended(int suspended)
+{
+    (void)suspended;
     return 0;
 }
 static inline int
