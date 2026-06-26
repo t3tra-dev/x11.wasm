@@ -993,10 +993,13 @@ X11WasmTestCrossingEventHierarchy(void)
     XEvent event;
     Window parent = None;
     Window child = None;
+    Window mapTarget = None;
     int parentRootX = 0;
     int parentRootY = 0;
     int childRootX = 0;
     int childRootY = 0;
+    int mapTargetRootX = 0;
+    int mapTargetRootY = 0;
     int result = 0;
     int screen;
 
@@ -1191,12 +1194,48 @@ X11WasmTestCrossingEventHierarchy(void)
 	result = 25;
 	goto cleanup;
     }
+
+    mapTarget = XCreateWindow(display, browserDisplay.rootWindow, 180, 30,
+	    40, 30, 0, CopyFromParent, InputOutput,
+	    DefaultVisual(display, screen), 0, NULL);
+    if ((mapTarget == None)
+	    || (XSelectInput(display, mapTarget, EnterWindowMask)
+		    != Success)) {
+	result = 26;
+	goto cleanup;
+    }
+    BrowserWindowRootOffset(mapTarget, &mapTargetRootX, &mapTargetRootY);
+    BrowserUpdatePointerState(browserDisplay.rootWindow, mapTargetRootX + 10,
+	    mapTargetRootY + 12, 0);
+    BrowserClearEventQueue();
+    if (XMapWindow(display, mapTarget) != Success) {
+	result = 27;
+	goto cleanup;
+    }
+    if (!BrowserPopEvent(&event, NULL)
+	    || (event.type != EnterNotify)
+	    || (event.xcrossing.window != mapTarget)
+	    || (event.xcrossing.detail != NotifyAncestor)
+	    || (event.xcrossing.x != 10)
+	    || (event.xcrossing.y != 12)
+	    || (event.xcrossing.x_root != mapTargetRootX + 10)
+	    || (event.xcrossing.y_root != mapTargetRootY + 12)) {
+	result = 28;
+	goto cleanup;
+    }
+    if (XEventsQueued(display, QueuedAlready) != 0) {
+	result = 29;
+	goto cleanup;
+    }
     result = 1;
 
 cleanup:
     (void)XUngrabPointer(display, CurrentTime);
     BrowserClearEventQueue();
     BrowserUpdatePointerState(browserDisplay.rootWindow, 0, 0, 0);
+    if (mapTarget != None) {
+	(void)XDestroyWindow(display, mapTarget);
+    }
     if (child != None) {
 	(void)XDestroyWindow(display, child);
     }

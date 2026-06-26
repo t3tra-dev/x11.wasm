@@ -501,6 +501,8 @@ XMapWindow(
 	(void)BrowserQueueExpose(resourcePtr, 0, 0, resourcePtr->width,
 		resourcePtr->height);
     }
+    (void)BrowserQueuePointerCrossingEvents(browserDisplay.pointerState,
+	    browserDisplay.pointerX, browserDisplay.pointerY, CurrentTime);
     return Success;
 }
 
@@ -554,6 +556,8 @@ BrowserUnmapWindowResource(
     resourcePtr->mapped = 0;
     (void)X11WasmJsUnmapWindow(BrowserJsXId(resourcePtr->id));
     (void)BrowserQueueUnmapNotify(resourcePtr, fromConfigure);
+    (void)BrowserQueuePointerCrossingEvents(browserDisplay.pointerState,
+	    browserDisplay.pointerX, browserDisplay.pointerY, CurrentTime);
     return Success;
 }
 
@@ -692,6 +696,8 @@ XConfigureWindow(
 	(void)BrowserQueueExpose(resourcePtr, 0, 0, resourcePtr->width,
 		resourcePtr->height);
     }
+    (void)BrowserQueuePointerCrossingEvents(browserDisplay.pointerState,
+	    browserDisplay.pointerX, browserDisplay.pointerY, CurrentTime);
     return Success;
 }
 
