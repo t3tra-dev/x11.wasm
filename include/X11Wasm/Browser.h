@@ -136,6 +136,7 @@ typedef struct X11WasmDisplayState {
     int screenSaverInterval;
     int screenSaverPreferBlanking;
     int screenSaverAllowExposures;
+    unsigned long screenSaverEventMask;
     int screenSaverActive;
     unsigned long screenSaverTimerResetIdle;
     unsigned long screenSaverActivatedIdle;

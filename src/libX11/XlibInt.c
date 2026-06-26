@@ -207,7 +207,7 @@ const X11WasmExtensionInfo browserExtensions[] = {
     {
 	ScreenSaverName,
 	X11_WASM_SCREENSAVER_MAJOR_OPCODE,
-	0,
+	X11_WASM_SCREENSAVER_EVENT_BASE,
 	0
     }
 };

@@ -2099,7 +2099,8 @@ X11WasmTestXlibApis(void)
 	    &firstError) != True) {
 	return 0;
     }
-    if ((firstEvent != 0) || (firstError != 0)) {
+    if ((firstEvent != X11_WASM_SCREENSAVER_EVENT_BASE)
+	    || (firstError != 0)) {
 	return 0;
     }
     if (XQueryExtension(&browserDisplay.display, ScreenSaverName,
@@ -2107,7 +2108,8 @@ X11WasmTestXlibApis(void)
 	return 0;
     }
     if ((majorOpcode != X11_WASM_SCREENSAVER_MAJOR_OPCODE)
-	    || (firstEvent != 0) || (firstError != 0)) {
+	    || (firstEvent != X11_WASM_SCREENSAVER_EVENT_BASE)
+	    || (firstError != 0)) {
 	return 0;
     }
     if ((XScreenSaverQueryVersion(&browserDisplay.display, &screenSaverMajor,

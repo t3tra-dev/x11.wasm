@@ -57,21 +57,61 @@ BrowserScreenSaverIdle(void)
     return (idle > 0) ? (unsigned long)idle : 0UL;
 }
 
+static int
+BrowserScreenSaverEventMaskIsValid(
+    unsigned long eventMask)
+{
+    const unsigned long allowedMask = ScreenSaverNotifyMask
+	    | ScreenSaverCycleMask;
+
+    return (eventMask & ~allowedMask) == 0UL;
+}
+
+static int
+BrowserQueueScreenSaverNotify(
+    int state,
+    int forced)
+{
+    XEvent event;
+    XScreenSaverNotifyEvent *notifyPtr;
+
+    if ((browserDisplay.screenSaverEventMask & ScreenSaverNotifyMask) == 0) {
+	return 0;
+    }
+    BrowserSetCommonEventFields(&event,
+	    X11_WASM_SCREENSAVER_EVENT_BASE + ScreenSaverNotify,
+	    browserDisplay.rootWindow, CurrentTime);
+    notifyPtr = (XScreenSaverNotifyEvent *)&event;
+    notifyPtr->root = browserDisplay.rootWindow;
+    notifyPtr->state = state;
+    notifyPtr->kind = ScreenSaverInternal;
+    notifyPtr->forced = forced ? True : False;
+    notifyPtr->time = eventTime;
+    return BrowserQueueEvent(&event);
+}
+
 static void
 BrowserForceScreenSaverMode(
     int mode)
 {
     unsigned long idle = BrowserScreenSaverIdle();
+    int wasActive = browserDisplay.screenSaverActive;
 
     if (mode == ScreenSaverActive) {
 	if (!browserDisplay.screenSaverActive) {
 	    browserDisplay.screenSaverActivatedIdle = idle;
 	}
 	browserDisplay.screenSaverActive = 1;
+	if (!wasActive) {
+	    (void)BrowserQueueScreenSaverNotify(ScreenSaverOn, True);
+	}
     } else {
 	browserDisplay.screenSaverActive = 0;
 	browserDisplay.screenSaverActivatedIdle = 0UL;
 	browserDisplay.screenSaverTimerResetIdle = idle;
+	if (wasActive) {
+	    (void)BrowserQueueScreenSaverNotify(ScreenSaverOff, True);
+	}
     }
     (void)X11WasmJsForceScreenSaver(mode);
 }
@@ -85,6 +125,7 @@ BrowserResetScreenSaverForInput(void)
     browserDisplay.screenSaverActivatedIdle = 0UL;
     browserDisplay.screenSaverTimerResetIdle = BrowserScreenSaverIdle();
     if (wasActive) {
+	(void)BrowserQueueScreenSaverNotify(ScreenSaverOff, False);
 	(void)X11WasmJsForceScreenSaver(ScreenSaverReset);
     }
 }
@@ -2932,8 +2973,42 @@ XScreenSaverQueryInfo(
 	infoPtr->til_or_since = (timeout > elapsed) ? (timeout - elapsed) : 0UL;
     }
     infoPtr->idle = idle;
-    infoPtr->eventMask = 0;
+    infoPtr->eventMask = browserDisplay.screenSaverEventMask;
     return True;
+}
+
+void
+XScreenSaverSelectInput(
+    Display *display,
+    Drawable drawable,
+    unsigned long eventMask)
+{
+    X11WasmResource *resourcePtr;
+
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    }
+    BrowserInitDisplay();
+    resourcePtr = X11WasmFindResource(drawable);
+    if ((resourcePtr == NULL)
+	    || ((resourcePtr->type != X11_WASM_RESOURCE_WINDOW)
+		    && (resourcePtr->type != X11_WASM_RESOURCE_PIXMAP))
+	    || ((resourcePtr->type == X11_WASM_RESOURCE_WINDOW)
+		    && (resourcePtr->c_class == InputOnly))) {
+	(void)BrowserReportXError(display, BadDrawable, (XID)drawable,
+		X11_WASM_SCREENSAVER_MAJOR_OPCODE,
+		X11_WASM_SCREENSAVER_SELECT_INPUT_MINOR_OPCODE);
+	return;
+    }
+    if (!BrowserScreenSaverEventMaskIsValid(eventMask)) {
+	(void)BrowserReportXError(display, BadValue, (XID)eventMask,
+		X11_WASM_SCREENSAVER_MAJOR_OPCODE,
+		X11_WASM_SCREENSAVER_SELECT_INPUT_MINOR_OPCODE);
+	return;
+    }
+    if (display == &browserDisplay.display) {
+	browserDisplay.screenSaverEventMask = eventMask;
+    }
 }
 
 EMSCRIPTEN_KEEPALIVE int
@@ -2964,12 +3039,26 @@ EMSCRIPTEN_KEEPALIVE int
 X11WasmTestForceScreenSaverState(void)
 {
     Display *display = &browserDisplay.display;
+    XEvent event;
     XScreenSaverInfo info;
+    XScreenSaverNotifyEvent *notifyPtr;
+    XErrorHandler oldHandler;
+    int eventBase = -1;
+    int errorBase = -1;
+    int eventType;
     unsigned int keycode;
     int result = 0;
 
     BrowserInitDisplay();
     (void)XResetScreenSaver(display);
+    XScreenSaverSelectInput(display, browserDisplay.rootWindow, 0);
+    BrowserClearEventQueue();
+    if ((XScreenSaverQueryExtension(display, &eventBase, &errorBase) != True)
+	    || (eventBase != X11_WASM_SCREENSAVER_EVENT_BASE)
+	    || (errorBase != 0)) {
+	goto cleanup;
+    }
+    eventType = eventBase + ScreenSaverNotify;
     if ((XSetScreenSaver(display, 120, 30, PreferBlanking, AllowExposures)
 		    != Success)
 	    || (XScreenSaverQueryInfo(display, browserDisplay.rootWindow,
@@ -2977,7 +3066,66 @@ X11WasmTestForceScreenSaverState(void)
 	    || (info.window != browserDisplay.rootWindow)
 	    || (info.state != ScreenSaverOff)
 	    || (info.kind != ScreenSaverInternal)
+	    || (info.eventMask != 0UL)
 	    || (info.til_or_since > 120000UL)) {
+	goto cleanup;
+    }
+
+    XScreenSaverSelectInput(display, browserDisplay.rootWindow,
+	    ScreenSaverNotifyMask);
+    if ((XScreenSaverQueryInfo(display, browserDisplay.rootWindow,
+		    &info) != True)
+	    || (info.eventMask != ScreenSaverNotifyMask)) {
+	goto cleanup;
+    }
+    oldHandler = XSetErrorHandler(BrowserTestXErrorHandler);
+    browserTestLastErrorCode = Success;
+    browserTestLastRequestCode = 0;
+    browserTestLastResourceId = None;
+    browserTestLastSerial = 0;
+    XScreenSaverSelectInput(display, browserDisplay.rootWindow,
+	    ScreenSaverNotifyMask | (1UL << 7));
+    (void)XSetErrorHandler(oldHandler);
+    if ((browserTestLastErrorCode != BadValue)
+	    || (browserTestLastRequestCode != X11_WASM_SCREENSAVER_MAJOR_OPCODE)
+	    || (browserTestLastResourceId != (XID)(ScreenSaverNotifyMask
+		    | (1UL << 7)))) {
+	goto cleanup;
+    }
+    if ((XScreenSaverQueryInfo(display, browserDisplay.rootWindow,
+		    &info) != True)
+	    || (info.eventMask != ScreenSaverNotifyMask)) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+    if ((XActivateScreenSaver(display) != Success)
+	    || (XCheckTypedEvent(display, eventType, &event) != True)) {
+	goto cleanup;
+    }
+    notifyPtr = (XScreenSaverNotifyEvent *)&event;
+    if ((notifyPtr->window != browserDisplay.rootWindow)
+	    || (notifyPtr->root != browserDisplay.rootWindow)
+	    || (notifyPtr->state != ScreenSaverOn)
+	    || (notifyPtr->kind != ScreenSaverInternal)
+	    || (notifyPtr->forced != True)) {
+	goto cleanup;
+    }
+    if ((XResetScreenSaver(display) != Success)
+	    || (XCheckTypedEvent(display, eventType, &event) != True)) {
+	goto cleanup;
+    }
+    notifyPtr = (XScreenSaverNotifyEvent *)&event;
+    if ((notifyPtr->state != ScreenSaverOff)
+	    || (notifyPtr->kind != ScreenSaverInternal)
+	    || (notifyPtr->forced != True)) {
+	goto cleanup;
+    }
+    XScreenSaverSelectInput(display, browserDisplay.rootWindow,
+	    ScreenSaverNotifyMask | ScreenSaverCycleMask);
+    if ((XScreenSaverQueryInfo(display, browserDisplay.rootWindow,
+		    &info) != True)
+	    || (info.eventMask != (ScreenSaverNotifyMask
+		    | ScreenSaverCycleMask))) {
 	goto cleanup;
     }
 
@@ -3018,13 +3166,22 @@ X11WasmTestForceScreenSaverState(void)
 	    || (info.state != ScreenSaverOn)) {
 	goto cleanup;
     }
+    BrowserClearEventQueue();
     (void)X11WasmQueuePointerEvent(MotionNotify, browserDisplay.rootWindow,
 	    0, 0, 4, 5, CurrentTime);
     if ((XScreenSaverQueryInfo(display, browserDisplay.rootWindow, &info)
 		    != True)
-	    || (info.state != ScreenSaverOff)) {
+	    || (info.state != ScreenSaverOff)
+	    || (XCheckTypedEvent(display, eventType, &event) != True)) {
 	goto cleanup;
     }
+    notifyPtr = (XScreenSaverNotifyEvent *)&event;
+    if ((notifyPtr->state != ScreenSaverOff)
+	    || (notifyPtr->kind != ScreenSaverInternal)
+	    || (notifyPtr->forced != False)) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
 
     keycode = (unsigned int)display->min_keycode;
     if ((XActivateScreenSaver(display) != Success) || (keycode == 0)) {
@@ -3042,7 +3199,9 @@ X11WasmTestForceScreenSaverState(void)
 
 cleanup:
     (void)XResetScreenSaver(display);
+    XScreenSaverSelectInput(display, browserDisplay.rootWindow, 0);
     (void)XSetScreenSaver(display, -1, -1, DefaultBlanking, DefaultExposures);
+    BrowserClearEventQueue();
     return result;
 }
 

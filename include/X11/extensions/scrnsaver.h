@@ -32,6 +32,19 @@ extern "C" {
 #define ScreenSaverExternal 2
 
 typedef struct {
+    int type;
+    unsigned long serial;
+    Bool send_event;
+    Display *display;
+    Window window;
+    Window root;
+    int state;
+    int kind;
+    Bool forced;
+    Time time;
+} XScreenSaverNotifyEvent;
+
+typedef struct {
     Window window;
     int state;
     int kind;
@@ -53,6 +66,10 @@ extern Status XScreenSaverQueryInfo(
     Display *display,
     Drawable drawable,
     XScreenSaverInfo *saver_info);
+extern void XScreenSaverSelectInput(
+    Display *display,
+    Drawable drawable,
+    unsigned long event_mask);
 
 #ifdef __cplusplus
 }
