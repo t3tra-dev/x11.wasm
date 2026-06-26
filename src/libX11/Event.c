@@ -2096,17 +2096,19 @@ XUngrabKeyboard(
 {
     Time effectiveTime;
 
-    (void)display;
-    if (!BrowserRequestTimeIsValid(time, browserDisplay.keyboardGrabTime)) {
-	return Success;
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
     }
-    if (browserDisplay.keyboardGrabWindow == None) {
-	return Success;
+    if ((display == &browserDisplay.display)
+	    && BrowserRequestTimeIsValid(time, browserDisplay.keyboardGrabTime)
+	    && (browserDisplay.keyboardGrabWindow != None)) {
+	effectiveTime = BrowserRequestEffectiveTime(time);
+	BrowserDeactivateKeyboardGrab();
+	browserDisplay.keyboardGrabTime = effectiveTime;
     }
-    effectiveTime = BrowserRequestEffectiveTime(time);
-    BrowserDeactivateKeyboardGrab();
-    browserDisplay.keyboardGrabTime = effectiveTime;
-    return Success;
+    return XNoOp(display);
 }
 EMSCRIPTEN_KEEPALIVE int
 XUngrabPointer(
@@ -2115,17 +2117,19 @@ XUngrabPointer(
 {
     Time effectiveTime;
 
-    (void)display;
-    if (!BrowserRequestTimeIsValid(time, browserDisplay.pointerGrabTime)) {
-	return Success;
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    } else {
+	BrowserInitDisplay();
     }
-    if (browserDisplay.pointerGrabWindow == None) {
-	return Success;
+    if ((display == &browserDisplay.display)
+	    && BrowserRequestTimeIsValid(time, browserDisplay.pointerGrabTime)
+	    && (browserDisplay.pointerGrabWindow != None)) {
+	effectiveTime = BrowserRequestEffectiveTime(time);
+	BrowserDeactivatePointerGrab();
+	browserDisplay.pointerGrabTime = effectiveTime;
     }
-    effectiveTime = BrowserRequestEffectiveTime(time);
-    BrowserDeactivatePointerGrab();
-    browserDisplay.pointerGrabTime = effectiveTime;
-    return Success;
+    return XNoOp(display);
 }
 int
 XWarpPointer(

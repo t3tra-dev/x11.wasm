@@ -702,6 +702,61 @@ test("X request completion updates browser request metadata", async ({
   expect(state.after.rootSyncSerial).toBe(String(state.after.syncSerial));
 });
 
+test("X ungrab requests update browser request metadata", async ({ page }) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const state = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _XUngrabKeyboard?: Function, _XUngrabPointer?: Function, x11WasmBackend?: X11WasmBackendSnapshot } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    const root = document.getElementById("x11-wasm-root");
+    if (
+      !module?._XUngrabKeyboard ||
+      !module._XUngrabPointer ||
+      !backend ||
+      !root
+    ) {
+      throw new Error("missing ungrab request metadata test hooks");
+    }
+    const read = () => ({
+      flushSerial: backend.flushSerial,
+      requestSerial: backend.requestSerial,
+      rootFlushSerial: root.getAttribute("data-x11-wasm-flush-serial"),
+      rootRequestSerial: root.getAttribute("data-x11-wasm-request-serial"),
+    });
+
+    const before = read();
+    const pointerResult = module._XUngrabPointer(0, 0);
+    const afterPointer = read();
+    const keyboardResult = module._XUngrabKeyboard(0, 0);
+    const afterKeyboard = read();
+    return {
+      afterKeyboard,
+      afterPointer,
+      before,
+      keyboardResult,
+      pointerResult,
+    };
+  });
+
+  expect(state.pointerResult).toBe(0);
+  expect(state.keyboardResult).toBe(0);
+  expect(state.afterPointer.requestSerial - state.before.requestSerial).toBe(1);
+  expect(state.afterKeyboard.requestSerial - state.before.requestSerial).toBe(2);
+  expect(state.afterKeyboard.flushSerial).toBe(state.before.flushSerial);
+  expect(state.afterKeyboard.rootRequestSerial).toBe(
+    String(state.afterKeyboard.requestSerial),
+  );
+  expect(state.afterKeyboard.rootFlushSerial).toBe(
+    String(state.afterKeyboard.flushSerial),
+  );
+});
+
 test("XSynchronize updates browser synchronize metadata", async ({ page }) => {
   await page.goto("/x11.html");
   await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
