@@ -270,6 +270,7 @@ X11WasmTestEventQueueAndKeycodeApis(void)
     XKeyboardControl keyboardControl;
     XKeyboardState keyboardState;
     XTimeCoord *motionEvents;
+    Window motionWindow = None;
     char keymap[32];
     unsigned char pointerMap[5];
     unsigned char remappedPointerMap[5] = {
@@ -548,12 +549,18 @@ X11WasmTestEventQueueAndKeycodeApis(void)
     if ((motionEvents != NULL) || (motionEventCount != 0)) {
 	return 101;
     }
+    motionWindow = XCreateSimpleWindow(display, browserDisplay.rootWindow,
+	    10, 20, 50, 40, 0, 0, 0);
+    if (motionWindow == None) {
+	return 110;
+    }
     if (!X11WasmQueuePointerEvent(MotionNotify, browserDisplay.rootWindow, 0,
 	    0, 11, 13, firstMotionTime)
 	    || !X11WasmQueuePointerEvent(MotionNotify, browserDisplay.rootWindow,
 		    0, 0, 21, 23, secondMotionTime)
 	    || !X11WasmQueuePointerEvent(MotionNotify, browserDisplay.rootWindow,
 		    0, 0, 31, 33, thirdMotionTime)) {
+	(void)XDestroyWindow(display, motionWindow);
 	return 102;
     }
     motionEventCount = -1;
@@ -567,9 +574,27 @@ X11WasmTestEventQueueAndKeycodeApis(void)
 	if (motionEvents != NULL) {
 	    XFree(motionEvents);
 	}
+	(void)XDestroyWindow(display, motionWindow);
 	return 103;
     }
     XFree(motionEvents);
+    motionEvents = NULL;
+    motionEventCount = -1;
+    motionEvents = XGetMotionEvents(display, motionWindow, secondMotionTime,
+	    thirdMotionTime, &motionEventCount);
+    if ((motionEvents == NULL) || (motionEventCount != 2)
+	    || (motionEvents[0].time != secondMotionTime)
+	    || (motionEvents[0].x != 11) || (motionEvents[0].y != 3)
+	    || (motionEvents[1].time != thirdMotionTime)
+	    || (motionEvents[1].x != 21) || (motionEvents[1].y != 13)) {
+	if (motionEvents != NULL) {
+	    XFree(motionEvents);
+	}
+	(void)XDestroyWindow(display, motionWindow);
+	return 111;
+    }
+    XFree(motionEvents);
+    motionEvents = NULL;
     motionEventCount = -1;
     motionEvents = XGetMotionEvents(display, browserDisplay.rootWindow,
 	    firstMotionTime + 1, secondMotionTime - 1, &motionEventCount);
@@ -577,7 +602,11 @@ X11WasmTestEventQueueAndKeycodeApis(void)
 	if (motionEvents != NULL) {
 	    XFree(motionEvents);
 	}
+	(void)XDestroyWindow(display, motionWindow);
 	return 104;
+    }
+    if (XDestroyWindow(display, motionWindow) != Success) {
+	return 112;
     }
     BrowserClearEventQueue();
 
