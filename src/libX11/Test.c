@@ -722,6 +722,19 @@ X11WasmTestEventQueueAndKeycodeApis(void)
 	    || (XEventsQueued(display, QueuedAlready) != 0)) {
 	return 27;
     }
+    if (!BrowserQueueEvent(&firstEvent)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || (XSync(display, True) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	return 28;
+    }
+    if (!BrowserQueueEvent(&firstEvent)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || (XSync(display, False) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)) {
+	return 29;
+    }
+    BrowserClearEventQueue();
 
     if (!BrowserQueueEvent(&firstEvent) || !BrowserQueueEvent(&secondEvent)) {
 	return 30;
@@ -4728,6 +4741,12 @@ X11WasmTestXlibApis(void)
 		    (unsigned int)stackImage.depth))
 	    || (stackImage.bytes_per_line != BrowserImageBytesPerLine(
 		    2U, stackImage.bits_per_pixel, stackImage.bitmap_pad))
+	    || (stackImage.f.get_pixel == NULL)) {
+	goto cleanup;
+    }
+    memset(&stackImage.f, 0, sizeof(stackImage.f));
+    if ((_XInitImageFuncPtrs(NULL) != Success)
+	    || (_XInitImageFuncPtrs(&stackImage) != Success)
 	    || (stackImage.f.get_pixel == NULL)
 	    || (XPutPixel(&stackImage, 0, 0, 0x123456UL) != Success)
 	    || (XPutPixel(&stackImage, 1, 0, 0xabcdefUL) != Success)
