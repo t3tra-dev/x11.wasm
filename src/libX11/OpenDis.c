@@ -68,8 +68,8 @@ BrowserInitDisplay(void)
     state->defaultColormap = 2;
     state->nextXId = 100;
     state->closeDownMode = DestroyAll;
-    state->screenSaverTimeout = 600;
-    state->screenSaverInterval = 600;
+    state->screenSaverTimeout = X11_WASM_DEFAULT_SCREEN_SAVER_TIMEOUT;
+    state->screenSaverInterval = X11_WASM_DEFAULT_SCREEN_SAVER_INTERVAL;
     state->screenSaverPreferBlanking = DefaultBlanking;
     state->screenSaverAllowExposures = DefaultExposures;
     state->keyClickPercent = 0;

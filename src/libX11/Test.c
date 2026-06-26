@@ -5955,8 +5955,8 @@ X11WasmTestXlibApis(void)
     if ((XGetScreenSaver(&browserDisplay.display, &screenSaverTimeout,
 	    &screenSaverInterval, &screenSaverPreferBlanking,
 	    &screenSaverAllowExposures) != Success)
-	    || (screenSaverTimeout != 600)
-	    || (screenSaverInterval != 600)
+	    || (screenSaverTimeout != X11_WASM_DEFAULT_SCREEN_SAVER_TIMEOUT)
+	    || (screenSaverInterval != X11_WASM_DEFAULT_SCREEN_SAVER_INTERVAL)
 	    || (screenSaverPreferBlanking != DefaultBlanking)
 	    || (screenSaverAllowExposures != DefaultExposures)) {
 	goto cleanup;
@@ -5972,6 +5972,19 @@ X11WasmTestXlibApis(void)
 	    || (screenSaverAllowExposures != AllowExposures)) {
 	goto cleanup;
     }
+    if ((XSetScreenSaver(&browserDisplay.display, -1, -1,
+		    DefaultBlanking, DefaultExposures) != Success)
+	    || (XGetScreenSaver(&browserDisplay.display, &screenSaverTimeout,
+		    &screenSaverInterval, &screenSaverPreferBlanking,
+		    &screenSaverAllowExposures) != Success)
+	    || (screenSaverTimeout != X11_WASM_DEFAULT_SCREEN_SAVER_TIMEOUT)
+	    || (screenSaverInterval != X11_WASM_DEFAULT_SCREEN_SAVER_INTERVAL)
+	    || (screenSaverPreferBlanking != DefaultBlanking)
+	    || (screenSaverAllowExposures != DefaultExposures)) {
+	goto cleanup;
+    }
+    (void)XSetScreenSaver(&browserDisplay.display, 120, 30,
+	    PreferBlanking, AllowExposures);
     result = 75;
     screenSaverInfo = XScreenSaverAllocInfo();
     if (screenSaverInfo == NULL) {
@@ -6349,11 +6362,13 @@ cleanup:
     browserDisplay.afterFunction = NULL;
     browserDisplay.runningAfterFunction = 0;
     BrowserSyncSynchronizeState(&browserDisplay.display);
-    browserDisplay.screenSaverTimeout = 600;
-    browserDisplay.screenSaverInterval = 600;
+    browserDisplay.screenSaverTimeout = X11_WASM_DEFAULT_SCREEN_SAVER_TIMEOUT;
+    browserDisplay.screenSaverInterval = X11_WASM_DEFAULT_SCREEN_SAVER_INTERVAL;
     browserDisplay.screenSaverPreferBlanking = DefaultBlanking;
     browserDisplay.screenSaverAllowExposures = DefaultExposures;
-    (void)X11WasmJsSetScreenSaverSettings(600, 600, DefaultBlanking,
+    (void)X11WasmJsSetScreenSaverSettings(
+	    X11_WASM_DEFAULT_SCREEN_SAVER_TIMEOUT,
+	    X11_WASM_DEFAULT_SCREEN_SAVER_INTERVAL, DefaultBlanking,
 	    DefaultExposures);
     BrowserResetHostAccessControl();
     if (copyExposurePixmap != None) {
@@ -7671,7 +7686,7 @@ X11WasmTestXErrorHandler(void)
 	duplicateModifierMap = NULL;
     }
     bellValidationResult = XBell(&browserDisplay.display, 101);
-    (void)XSetScreenSaver(&browserDisplay.display, -1, 30,
+    (void)XSetScreenSaver(&browserDisplay.display, -2, 30,
 	    PreferBlanking, AllowExposures);
     (void)XForceScreenSaver(&browserDisplay.display, ScreenSaverActive + 1);
     if (configureWindow != None) {

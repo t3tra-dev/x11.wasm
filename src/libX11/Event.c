@@ -2806,9 +2806,9 @@ XSetScreenSaver(
 	display = X11WasmGetDisplay(NULL);
     }
     BrowserInitDisplay();
-    if (!BrowserValueOrError(&display, timeout, timeout >= 0,
+    if (!BrowserValueOrError(&display, timeout, timeout >= -1,
 	    X11_WASM_XREQ_SET_SCREEN_SAVER)
-	    || !BrowserValueOrError(&display, interval, interval >= 0,
+	    || !BrowserValueOrError(&display, interval, interval >= -1,
 		    X11_WASM_XREQ_SET_SCREEN_SAVER)
 	    || !BrowserValidateScreenSaverPreferBlanking(&display,
 		    preferBlanking, X11_WASM_XREQ_SET_SCREEN_SAVER)
@@ -2817,6 +2817,10 @@ XSetScreenSaver(
 	return Success;
     }
     if (display == &browserDisplay.display) {
+	timeout = (timeout == -1) ? X11_WASM_DEFAULT_SCREEN_SAVER_TIMEOUT
+		: timeout;
+	interval = (interval == -1) ? X11_WASM_DEFAULT_SCREEN_SAVER_INTERVAL
+		: interval;
 	browserDisplay.screenSaverTimeout = timeout;
 	browserDisplay.screenSaverInterval = interval;
 	browserDisplay.screenSaverPreferBlanking = preferBlanking;
@@ -2937,7 +2941,7 @@ X11WasmTestSetScreenSaverSettings(int enabled)
 {
     BrowserInitDisplay();
     if (!enabled) {
-	return XSetScreenSaver(&browserDisplay.display, 600, 600,
+	return XSetScreenSaver(&browserDisplay.display, -1, -1,
 		DefaultBlanking, DefaultExposures);
     }
     return XSetScreenSaver(&browserDisplay.display, 120, 30,
@@ -2949,7 +2953,7 @@ X11WasmTestSetScreenSaverWakeLock(int enabled)
 {
     BrowserInitDisplay();
     if (!enabled) {
-	return XSetScreenSaver(&browserDisplay.display, 600, 600,
+	return XSetScreenSaver(&browserDisplay.display, -1, -1,
 		DefaultBlanking, DefaultExposures);
     }
     return XSetScreenSaver(&browserDisplay.display, 120, 30,
@@ -3038,8 +3042,7 @@ X11WasmTestForceScreenSaverState(void)
 
 cleanup:
     (void)XResetScreenSaver(display);
-    (void)XSetScreenSaver(display, 600, 600, DefaultBlanking,
-	    DefaultExposures);
+    (void)XSetScreenSaver(display, -1, -1, DefaultBlanking, DefaultExposures);
     return result;
 }
 
