@@ -7774,6 +7774,9 @@ X11WasmTestXlibApis(void)
     }
     queryGC = XCreateGC(&browserDisplay.display, (Drawable)pixmap, 0, NULL);
     if ((queryGC == NULL)
+	    || (XGetGCValues(&browserDisplay.display, queryGC, GCLineWidth,
+		    &stateGCValues) != True)
+	    || (stateGCValues.line_width != 0)
 	    || (XSetFont(&browserDisplay.display, queryGC, queryFont)
 		    != Success)) {
 	goto cleanup;

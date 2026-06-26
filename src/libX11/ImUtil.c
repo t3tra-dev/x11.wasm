@@ -1058,7 +1058,7 @@ BrowserInitGC(
     gc->plane_mask = AllPlanes;
     gc->foreground = BlackPixel(display, DefaultScreen(display));
     gc->background = WhitePixel(display, DefaultScreen(display));
-    gc->line_width = 1;
+    gc->line_width = 0;
     gc->line_style = LineSolid;
     gc->fill_style = FillSolid;
     gc->fill_rule = EvenOddRule;
