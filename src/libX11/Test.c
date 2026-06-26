@@ -9383,6 +9383,7 @@ BrowserTestXrmDatabaseApis(void)
     XrmDatabase fileDatabase = NULL;
     XrmDatabase outputDatabase = NULL;
     XrmDatabase roundTripDatabase = NULL;
+    XrmDatabase parseDatabase = NULL;
     XrmValue binaryValue;
     XrmValue readValue;
     XrmBinding qBindings[8];
@@ -9392,6 +9393,23 @@ BrowserTestXrmDatabaseApis(void)
     XrmRepresentation qType = NULLQUARK;
     char *resourceType = NULL;
     FILE *file = NULL;
+    XrmOptionDescRec parseOptions[] = {
+	{ "-rv", ".reverse", XrmoptionNoArg, (XPointer)"on" },
+	{ "-title", ".title", XrmoptionSepArg, NULL },
+	{ "-geom", ".geometry", XrmoptionStickyArg, NULL },
+	{ "-self", ".self", XrmoptionIsArg, NULL },
+	{ "-xrm", NULL, XrmoptionResArg, NULL },
+	{ "-skip", NULL, XrmoptionSkipArg, NULL },
+	{ "-skipline", NULL, XrmoptionSkipLine, NULL },
+	{ "-skipn", NULL, XrmoptionSkipNArgs, (XPointer)2 }
+    };
+    char *parseArgv[] = {
+	"wish", "-rv", "-tit", "Window Title", "-geom120x40+1+2",
+	"-selfValue", "-xrm", "wish.extra: extra-value",
+	"-skip", "skip-value", "-skipn", "n1", "n2", "left",
+	"-skipline", "tail1", "tail2", NULL
+    };
+    int parseArgc = 17;
     int result = 0;
 
     (void)remove(xrmFilePath);
@@ -9517,6 +9535,33 @@ BrowserTestXrmDatabaseApis(void)
 	    || (memcmp(readValue.addr, binaryData, sizeof(binaryData)) != 0)) {
 	goto cleanup;
     }
+    XrmParseCommand(&parseDatabase, parseOptions,
+	    (int)(sizeof(parseOptions) / sizeof(parseOptions[0])), "wish",
+	    &parseArgc, parseArgv);
+    if ((parseArgc != 10)
+	    || (strcmp(parseArgv[0], "wish") != 0)
+	    || (strcmp(parseArgv[1], "-skip") != 0)
+	    || (strcmp(parseArgv[2], "skip-value") != 0)
+	    || (strcmp(parseArgv[3], "-skipn") != 0)
+	    || (strcmp(parseArgv[4], "n1") != 0)
+	    || (strcmp(parseArgv[5], "n2") != 0)
+	    || (strcmp(parseArgv[6], "left") != 0)
+	    || (strcmp(parseArgv[7], "-skipline") != 0)
+	    || (strcmp(parseArgv[8], "tail1") != 0)
+	    || (strcmp(parseArgv[9], "tail2") != 0)
+	    || (parseArgv[10] != NULL)
+	    || !BrowserTestXrmResourceEquals(parseDatabase, "wish.reverse",
+		    "Wish.Reverse", "on")
+	    || !BrowserTestXrmResourceEquals(parseDatabase, "wish.title",
+		    "Wish.Title", "Window Title")
+	    || !BrowserTestXrmResourceEquals(parseDatabase, "wish.geometry",
+		    "Wish.Geometry", "120x40+1+2")
+	    || !BrowserTestXrmResourceEquals(parseDatabase, "wish.self",
+		    "Wish.Self", "-selfValue")
+	    || !BrowserTestXrmResourceEquals(parseDatabase, "wish.extra",
+		    "Wish.Extra", "extra-value")) {
+	goto cleanup;
+    }
     mergeDatabase = XrmGetStringDatabase(
 	    "wish.geometry: combine-skipped\n"
 	    "wish.background: combine-background\n");
@@ -9616,6 +9661,9 @@ cleanup:
     }
     if (fileDatabase != NULL) {
 	XrmDestroyDatabase(fileDatabase);
+    }
+    if (parseDatabase != NULL) {
+	XrmDestroyDatabase(parseDatabase);
     }
     if (mergeDatabase != NULL) {
 	XrmDestroyDatabase(mergeDatabase);

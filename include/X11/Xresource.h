@@ -46,6 +46,24 @@ typedef XrmQuarkList XrmClassList;
 #define XrmStringToClassList(str, c_class) \
     XrmStringToQuarkList((str), (c_class))
 
+typedef enum {
+    XrmoptionNoArg,
+    XrmoptionIsArg,
+    XrmoptionStickyArg,
+    XrmoptionSepArg,
+    XrmoptionResArg,
+    XrmoptionSkipArg,
+    XrmoptionSkipLine,
+    XrmoptionSkipNArgs
+} XrmOptionKind;
+
+typedef struct {
+    char *option;
+    char *specifier;
+    XrmOptionKind argKind;
+    XPointer value;
+} XrmOptionDescRec, *XrmOptionDescList;
+
 extern void XrmStringToQuarkList(
     _Xconst char *string,
     XrmQuarkList quarks_return);
@@ -115,6 +133,13 @@ extern void XrmCombineDatabase(
     XrmDatabase source_database,
     XrmDatabase *target_database,
     Bool override);
+extern void XrmParseCommand(
+    XrmDatabase *database,
+    XrmOptionDescList table,
+    int table_count,
+    _Xconst char *name,
+    int *argc_in_out,
+    char **argv_in_out);
 
 #ifdef __cplusplus
 }

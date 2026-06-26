@@ -1261,6 +1261,195 @@ XrmMergeDatabases(
     XrmCombineDatabase(sourceDatabase, targetDatabasePtr, True);
 }
 
+static int
+BrowserXrmOptionMatch(
+    const XrmOptionDescRec *optionPtr,
+    const char *argument,
+    const char **stickyValuePtr)
+{
+    const char *option = optionPtr->option;
+    size_t optionLength;
+    size_t argumentLength;
+
+    if ((option == NULL) || (argument == NULL)) {
+	return 0;
+    }
+    optionLength = strlen(option);
+    argumentLength = strlen(argument);
+    if ((optionLength == 0U) || (argumentLength == 0U)
+	    || (argumentLength > optionLength
+		    && optionPtr->argKind != XrmoptionStickyArg
+		    && optionPtr->argKind != XrmoptionIsArg)) {
+	return 0;
+    }
+    if (strncmp(argument, option, argumentLength) == 0) {
+	if (argumentLength == optionLength) {
+	    if (stickyValuePtr != NULL) {
+		*stickyValuePtr = argument + optionLength;
+	    }
+	    return 1;
+	}
+	return 2;
+    }
+    if (((optionPtr->argKind == XrmoptionStickyArg)
+	    || (optionPtr->argKind == XrmoptionIsArg))
+	    && (argumentLength > optionLength)
+	    && (strncmp(argument, option, optionLength) == 0)) {
+	if (stickyValuePtr != NULL) {
+	    *stickyValuePtr = argument + optionLength;
+	}
+	return 1;
+    }
+    return 0;
+}
+
+static int
+BrowserXrmFindOption(
+    XrmOptionDescList options,
+    int optionCount,
+    const char *argument,
+    const char **stickyValuePtr)
+{
+    int index;
+    int matches = 0;
+    int foundIndex = -1;
+
+    if ((options == NULL) || (optionCount <= 0) || (argument == NULL)) {
+	return -1;
+    }
+    for (index = 0; index < optionCount; index++) {
+	const char *stickyValue = NULL;
+	int match = BrowserXrmOptionMatch(&options[index], argument,
+		&stickyValue);
+
+	if (match == 1) {
+	    if (stickyValuePtr != NULL) {
+		*stickyValuePtr = stickyValue;
+	    }
+	    return index;
+	}
+	if (match == 2) {
+	    matches++;
+	    foundIndex = index;
+	}
+    }
+    return (matches == 1) ? foundIndex : -1;
+}
+
+static void
+BrowserXrmPutCommandResource(
+    XrmDatabase *databasePtr,
+    const char *name,
+    const XrmOptionDescRec *optionPtr,
+    const char *value)
+{
+    XrmBinding bindings[100];
+    XrmQuark quarks[100];
+
+    if ((databasePtr == NULL) || (optionPtr == NULL)
+	    || (optionPtr->specifier == NULL) || (value == NULL)) {
+	return;
+    }
+    bindings[0] = XrmBindTightly;
+    quarks[0] = XrmStringToName((name != NULL) ? name : "");
+    XrmStringToBindingQuarkList(optionPtr->specifier, bindings + 1,
+	    quarks + 1);
+    XrmQPutStringResource(databasePtr, bindings, quarks, value);
+}
+
+void
+XrmParseCommand(
+    XrmDatabase *databasePtr,
+    XrmOptionDescList options,
+    int optionCount,
+    _Xconst char *name,
+    int *argcPtr,
+    char **argv)
+{
+    int argc;
+    int readIndex;
+    int writeIndex = 1;
+
+    if ((argcPtr == NULL) || (argv == NULL) || (*argcPtr <= 1)) {
+	return;
+    }
+    argc = *argcPtr;
+    for (readIndex = 1; readIndex < argc; readIndex++) {
+	char *argument = argv[readIndex];
+	const char *stickyValue = NULL;
+	int optionIndex = BrowserXrmFindOption(options, optionCount, argument,
+		&stickyValue);
+	XrmOptionDescRec *optionPtr;
+
+	if (optionIndex < 0) {
+	    argv[writeIndex++] = argv[readIndex];
+	    continue;
+	}
+	optionPtr = &options[optionIndex];
+	switch (optionPtr->argKind) {
+	case XrmoptionNoArg:
+	    BrowserXrmPutCommandResource(databasePtr, name, optionPtr,
+		    (const char *)optionPtr->value);
+	    break;
+	case XrmoptionIsArg:
+	    BrowserXrmPutCommandResource(databasePtr, name, optionPtr,
+		    argument);
+	    break;
+	case XrmoptionStickyArg:
+	    BrowserXrmPutCommandResource(databasePtr, name, optionPtr,
+		    (stickyValue != NULL) ? stickyValue : "");
+	    break;
+	case XrmoptionSepArg:
+	    if (readIndex + 1 < argc) {
+		readIndex++;
+		BrowserXrmPutCommandResource(databasePtr, name, optionPtr,
+			argv[readIndex]);
+	    } else {
+		argv[writeIndex++] = argv[readIndex];
+	    }
+	    break;
+	case XrmoptionResArg:
+	    if (readIndex + 1 < argc) {
+		readIndex++;
+		XrmPutLineResource(databasePtr, argv[readIndex]);
+	    } else {
+		argv[writeIndex++] = argv[readIndex];
+	    }
+	    break;
+	case XrmoptionSkipArg:
+	    argv[writeIndex++] = argv[readIndex];
+	    if (readIndex + 1 < argc) {
+		readIndex++;
+		argv[writeIndex++] = argv[readIndex];
+	    }
+	    break;
+	case XrmoptionSkipLine:
+	    for (; readIndex < argc; readIndex++) {
+		argv[writeIndex++] = argv[readIndex];
+	    }
+	    break;
+	case XrmoptionSkipNArgs: {
+	    int count = 1 + (int)(intptr_t)optionPtr->value;
+	    int copied;
+
+	    for (copied = 0; copied < count && readIndex < argc; copied++,
+		    readIndex++) {
+		argv[writeIndex++] = argv[readIndex];
+	    }
+	    readIndex--;
+	    break;
+	}
+	default:
+	    argv[writeIndex++] = argv[readIndex];
+	    break;
+	}
+    }
+    if (writeIndex < argc) {
+	argv[writeIndex] = NULL;
+    }
+    *argcPtr = writeIndex;
+}
+
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestOpenDisplayNames(void)
 {

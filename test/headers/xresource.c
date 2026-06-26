@@ -40,9 +40,12 @@ X11WasmHeaderXresourcePrototypeTest(void)
 	    XrmStringToQuarkList;
     void (*stringToBindingQuarkList)(_Xconst char *, XrmBindingList,
 	    XrmQuarkList) = XrmStringToBindingQuarkList;
+    void (*parseCommand)(XrmDatabase *, XrmOptionDescList, int,
+	    _Xconst char *, int *, char **) = XrmParseCommand;
     XrmDatabase database = NULL;
     XrmBinding bindings[2];
     XrmQuark quarks[2];
+    XrmOptionDescRec option;
     XrmName name = XrmStringToName("name");
     XrmClass class = XrmStringToClass("Class");
     XrmRepresentation representation = XrmStringToRepresentation("String");
@@ -60,12 +63,14 @@ X11WasmHeaderXresourcePrototypeTest(void)
 	    && (qPutResource != 0) && (qPutStringResource != 0)
 	    && (qGetResource != 0)
 	    && (stringToQuarkList != 0) && (stringToBindingQuarkList != 0)
+	    && (parseCommand != 0)
 	    && (destroyDatabase != 0) && (database == NULL)
 	    && (mergeDatabases != 0) && (combineDatabase != 0)
 	    && (XrmNameToString(name) != NULLSTRING)
 	    && (XrmClassToString(class) != NULLSTRING)
 	    && (XrmRepresentationToString(representation) != NULLSTRING)
 	    && (bindings[0] = XrmBindTightly) == XrmBindTightly
+	    && (option.argKind = XrmoptionNoArg) == XrmoptionNoArg
 	    && (quarks[0] = NULLQUARK) == NULLQUARK
 	    && (resourceType == NULL) && (value.addr == NULL);
 }
