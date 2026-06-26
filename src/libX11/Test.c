@@ -9333,6 +9333,82 @@ cleanup:
     return result;
 }
 
+static int
+BrowserTestXrmResourceEquals(
+    XrmDatabase database,
+    const char *resourceName,
+    const char *resourceClass,
+    const char *expectedValue)
+{
+    XrmValue value;
+    char *resourceType = NULL;
+
+    value.size = 0U;
+    value.addr = NULL;
+    if (!XrmGetResource(database, resourceName, resourceClass,
+	    &resourceType, &value)) {
+	return 0;
+    }
+    return (resourceType != NULL) && (strcmp(resourceType, "String") == 0)
+	    && (value.addr != NULL)
+	    && (strcmp((const char *)value.addr, expectedValue) == 0)
+	    && (value.size == ((unsigned int)strlen(expectedValue) + 1U));
+}
+
+static int
+BrowserTestXrmDatabaseApis(void)
+{
+    const char resourceText[] =
+	    "! ignored comment\n"
+	    "*geometry: global-geometry\n"
+	    "wish*geometry: wildcard-geometry\n"
+	    "wish.geometry: exact-geometry\n"
+	    "wish*foreground: wildcard-foreground\n"
+	    "*Background: class-background\n"
+	    "wish.geometry: last-geometry\n"
+	    "wish.empty:\n";
+    XrmDatabase database = NULL;
+    XrmDatabase emptyDatabase = NULL;
+    int result = 0;
+
+    database = XrmGetStringDatabase(resourceText);
+    if (database == NULL) {
+	goto cleanup;
+    }
+    if (!BrowserTestXrmResourceEquals(database, "wish.geometry",
+	    "Wish.Geometry", "last-geometry")
+	    || !BrowserTestXrmResourceEquals(database, "wish.main.foreground",
+		    "Wish.Main.Foreground", "wildcard-foreground")
+	    || !BrowserTestXrmResourceEquals(database, "other.background",
+		    "Other.Background", "class-background")
+	    || !BrowserTestXrmResourceEquals(database, "wish.empty",
+		    "Wish.Empty", "")) {
+	goto cleanup;
+    }
+    if (XrmGetResource(database, "wish.missing", "Wish.Missing",
+	    NULL, NULL) != False) {
+	goto cleanup;
+    }
+    emptyDatabase = XrmGetStringDatabase("");
+    if ((emptyDatabase == NULL)
+	    || (XrmGetResource(emptyDatabase, "wish.geometry",
+		    "Wish.Geometry", NULL, NULL) != False)
+	    || (XrmGetStringDatabase(NULL) != NULL)) {
+	goto cleanup;
+    }
+    XrmDestroyDatabase(NULL);
+    result = 1;
+
+cleanup:
+    if (emptyDatabase != NULL) {
+	XrmDestroyDatabase(emptyDatabase);
+    }
+    if (database != NULL) {
+	XrmDestroyDatabase(database);
+    }
+    return result;
+}
+
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestResourceManagerApis(void)
 {
@@ -9362,6 +9438,9 @@ X11WasmTestResourceManagerApis(void)
 	    XA_RESOURCE_MANAGER);
     (void)XDeleteProperty(display, browserDisplay.rootWindow,
 	    screenResourcesAtom);
+    if (!BrowserTestXrmDatabaseApis()) {
+	return 0;
+    }
     if ((XResourceManagerString(display) != NULL)
 	    || (XScreenResourceString(DefaultScreenOfDisplay(display)) != NULL)
 	    || (XGetDefault(display, "wish", "geometry") != NULL)) {

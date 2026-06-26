@@ -62,6 +62,7 @@ build $x11wasm_xlib_common_deps: phony $
   $x11wasm_root/include/X11/Xfuncproto.h $
   $x11wasm_root/include/X11/Xlib.h $
   $x11wasm_root/include/X11/XlibWasm.h $
+  $x11wasm_root/include/X11/Xresource.h $
   $x11wasm_root/include/X11/Xutil.h $
   $x11wasm_root/include/X11/cursorfont.h $
   $x11wasm_root/include/X11/extensions/saver.h $
@@ -136,6 +137,7 @@ build $x11wasm_builddir/Event.o: x11wasm_compile_c $x11wasm_root/src/libX11/Even
 build $x11wasm_builddir/Test.o: x11wasm_compile_c $x11wasm_root/src/libX11/Test.c | $x11wasm_xlib_common_deps
 build $x11wasm_builddir/ICCCM.o: x11wasm_compile_c $x11wasm_root/src/libX11/ICCCM.c | $x11wasm_xlib_common_deps
 build $x11wasm_builddir/header-xlib-only.o: x11wasm_compile_c $x11wasm_root/test/headers/xlib_only.c | $x11wasm_xlib_common_deps
+build $x11wasm_builddir/header-xresource.o: x11wasm_compile_c $x11wasm_root/test/headers/xresource.c | $x11wasm_xlib_common_deps
 build $x11wasm_lib: x11wasm_archive $x11wasm_xlib_objects
 build $x11wasm_js_library: x11wasm_bundle_library_js $
   $x11wasm_js_library_bridge $
@@ -159,5 +161,5 @@ build $x11wasm_js_pre: x11wasm_bundle_dom_js $
 
 build x11wasm_lib: phony $x11wasm_lib
 build x11wasm_js: phony $x11wasm_js_library $x11wasm_js_pre
-build x11wasm_header_tests: phony $x11wasm_builddir/header-xlib-only.o
+build x11wasm_header_tests: phony $x11wasm_builddir/header-xlib-only.o $x11wasm_builddir/header-xresource.o
 build x11wasm: phony $x11wasm_lib $x11wasm_js_library $x11wasm_js_pre x11wasm_header_tests

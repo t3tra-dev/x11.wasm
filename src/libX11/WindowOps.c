@@ -2,6 +2,29 @@
 
 static char *browserDefaultValue = NULL;
 
+typedef struct BrowserXrmEntry {
+    char *binding;
+    char *value;
+    char *type;
+    struct BrowserXrmEntry *nextPtr;
+} BrowserXrmEntry;
+
+struct _XrmHashBucketRec {
+    BrowserXrmEntry *firstEntryPtr;
+    BrowserXrmEntry *lastEntryPtr;
+};
+
+typedef struct BrowserXrmComponent {
+    const char *start;
+    const char *end;
+} BrowserXrmComponent;
+
+typedef struct BrowserXrmBindingPart {
+    const char *start;
+    const char *end;
+    char separator;
+} BrowserXrmBindingPart;
+
 Display *
 XOpenDisplay(
     _Xconst char *displayName)
@@ -130,6 +153,282 @@ BrowserRememberDefaultValue(
     return browserDefaultValue;
 }
 
+static char *
+BrowserDupRange(
+    const char *start,
+    const char *end)
+{
+    size_t length = (size_t)(end - start);
+    char *copy = (char *)ckalloc(length + 1U);
+
+    if (length > 0U) {
+	memcpy(copy, start, length);
+    }
+    copy[length] = '\0';
+    return copy;
+}
+
+static int
+BrowserXrmComponentCount(
+    const char *text)
+{
+    int count = 0;
+    const char *p;
+
+    if (text == NULL) {
+	return 0;
+    }
+    for (p = text; *p != '\0'; ) {
+	const char *start;
+
+	while ((*p == '.') || (*p == '*')) {
+	    p++;
+	}
+	start = p;
+	while ((*p != '\0') && (*p != '.') && (*p != '*')) {
+	    p++;
+	}
+	if (p > start) {
+	    count++;
+	}
+    }
+    return count;
+}
+
+static BrowserXrmComponent *
+BrowserXrmSplitComponents(
+    const char *text,
+    int *countPtr)
+{
+    BrowserXrmComponent *parts;
+    int count;
+    int index = 0;
+    const char *p;
+
+    count = BrowserXrmComponentCount(text);
+    if (countPtr != NULL) {
+	*countPtr = count;
+    }
+    if (count == 0) {
+	return NULL;
+    }
+    parts = (BrowserXrmComponent *)ckalloc(sizeof(*parts) * (size_t)count);
+    for (p = text; *p != '\0'; ) {
+	const char *start;
+
+	while ((*p == '.') || (*p == '*')) {
+	    p++;
+	}
+	start = p;
+	while ((*p != '\0') && (*p != '.') && (*p != '*')) {
+	    p++;
+	}
+	if (p > start) {
+	    parts[index].start = start;
+	    parts[index].end = p;
+	    index++;
+	}
+    }
+    return parts;
+}
+
+static int
+BrowserXrmBindingPartCount(
+    const char *binding)
+{
+    int count = 0;
+    const char *p;
+
+    if (binding == NULL) {
+	return 0;
+    }
+    for (p = binding; *p != '\0'; ) {
+	if ((*p == '.') || (*p == '*')) {
+	    p++;
+	    continue;
+	}
+	while ((*p != '\0') && (*p != '.') && (*p != '*')) {
+	    p++;
+	}
+	count++;
+    }
+    return count;
+}
+
+static BrowserXrmBindingPart *
+BrowserXrmSplitBinding(
+    const char *binding,
+    int *countPtr,
+    int *dotCountPtr,
+    int *starCountPtr)
+{
+    BrowserXrmBindingPart *parts;
+    int count;
+    int index = 0;
+    char separator = '\0';
+    const char *p;
+
+    if (dotCountPtr != NULL) {
+	*dotCountPtr = 0;
+    }
+    if (starCountPtr != NULL) {
+	*starCountPtr = 0;
+    }
+    count = BrowserXrmBindingPartCount(binding);
+    if (countPtr != NULL) {
+	*countPtr = count;
+    }
+    if (count == 0) {
+	return NULL;
+    }
+    parts = (BrowserXrmBindingPart *)ckalloc(sizeof(*parts) * (size_t)count);
+    for (p = binding; *p != '\0'; ) {
+	const char *start;
+
+	if ((*p == '.') || (*p == '*')) {
+	    separator = *p;
+	    if (separator == '.') {
+		if (dotCountPtr != NULL) {
+		    (*dotCountPtr)++;
+		}
+	    } else if (starCountPtr != NULL) {
+		(*starCountPtr)++;
+	    }
+	    p++;
+	    continue;
+	}
+	start = p;
+	while ((*p != '\0') && (*p != '.') && (*p != '*')) {
+	    p++;
+	}
+	parts[index].start = start;
+	parts[index].end = p;
+	parts[index].separator = separator;
+	index++;
+	separator = '\0';
+    }
+    return parts;
+}
+
+static int
+BrowserXrmRangeEquals(
+    const char *firstStart,
+    const char *firstEnd,
+    const char *secondStart,
+    const char *secondEnd)
+{
+    size_t firstLength = (size_t)(firstEnd - firstStart);
+    size_t secondLength = (size_t)(secondEnd - secondStart);
+
+    return (firstLength == secondLength)
+	    && (strncmp(firstStart, secondStart, firstLength) == 0);
+}
+
+static int
+BrowserXrmPartMatchesComponent(
+    const BrowserXrmBindingPart *partPtr,
+    const BrowserXrmComponent *nameParts,
+    int nameCount,
+    const BrowserXrmComponent *classParts,
+    int classCount,
+    int componentIndex)
+{
+    if ((componentIndex < 0) || (componentIndex >= nameCount)) {
+	return 0;
+    }
+    if (BrowserXrmRangeEquals(partPtr->start, partPtr->end,
+	    nameParts[componentIndex].start, nameParts[componentIndex].end)) {
+	return 1;
+    }
+    return (componentIndex < classCount)
+	    && BrowserXrmRangeEquals(partPtr->start, partPtr->end,
+		    classParts[componentIndex].start,
+		    classParts[componentIndex].end);
+}
+
+static int
+BrowserXrmBindingMatchesAt(
+    const BrowserXrmBindingPart *parts,
+    int partCount,
+    int partIndex,
+    const BrowserXrmComponent *nameParts,
+    int nameCount,
+    const BrowserXrmComponent *classParts,
+    int classCount,
+    int componentIndex)
+{
+    if (partIndex >= partCount) {
+	return componentIndex == nameCount;
+    }
+    if (parts[partIndex].separator == '*') {
+	int index;
+
+	for (index = componentIndex; index < nameCount; index++) {
+	    if (BrowserXrmPartMatchesComponent(&parts[partIndex], nameParts,
+		    nameCount, classParts, classCount, index)
+		    && BrowserXrmBindingMatchesAt(parts, partCount,
+			    partIndex + 1, nameParts, nameCount, classParts,
+			    classCount, index + 1)) {
+		return 1;
+	    }
+	}
+	return 0;
+    }
+    return BrowserXrmPartMatchesComponent(&parts[partIndex], nameParts,
+	    nameCount, classParts, classCount, componentIndex)
+	    && BrowserXrmBindingMatchesAt(parts, partCount, partIndex + 1,
+		    nameParts, nameCount, classParts, classCount,
+		    componentIndex + 1);
+}
+
+static int
+BrowserXrmEntryScore(
+    BrowserXrmEntry *entryPtr,
+    const BrowserXrmComponent *nameParts,
+    int nameCount,
+    const BrowserXrmComponent *classParts,
+    int classCount)
+{
+    BrowserXrmBindingPart *parts;
+    int partCount = 0;
+    int dotCount = 0;
+    int starCount = 0;
+    int score = 0;
+
+    parts = BrowserXrmSplitBinding(entryPtr->binding, &partCount, &dotCount,
+	    &starCount);
+    if ((parts != NULL) && (nameCount > 0)
+	    && BrowserXrmBindingMatchesAt(parts, partCount, 0, nameParts,
+		    nameCount, classParts, classCount, 0)) {
+	score = (partCount * 20) + (dotCount * 5) - starCount;
+    }
+    if (parts != NULL) {
+	ckfree(parts);
+    }
+    return score;
+}
+
+static void
+BrowserXrmAppendEntry(
+    XrmDatabase database,
+    char *binding,
+    char *value)
+{
+    BrowserXrmEntry *entryPtr;
+
+    entryPtr = (BrowserXrmEntry *)ckalloc(sizeof(*entryPtr));
+    entryPtr->binding = binding;
+    entryPtr->value = value;
+    entryPtr->type = BrowserDupString("String");
+    entryPtr->nextPtr = NULL;
+    if (database->lastEntryPtr != NULL) {
+	database->lastEntryPtr->nextPtr = entryPtr;
+    } else {
+	database->firstEntryPtr = entryPtr;
+    }
+    database->lastEntryPtr = entryPtr;
+}
+
 char *
 XGetDefault(
     Display *display,
@@ -248,6 +547,130 @@ BrowserNotifyColormapInstallState(
 void
 XrmInitialize(void)
 {
+}
+
+XrmDatabase
+XrmGetStringDatabase(
+    _Xconst char *data)
+{
+    XrmDatabase database;
+    const char *lineStart;
+
+    if (data == NULL) {
+	return NULL;
+    }
+    database = (XrmDatabase)ckalloc(sizeof(*database));
+    database->firstEntryPtr = NULL;
+    database->lastEntryPtr = NULL;
+    for (lineStart = data; *lineStart != '\0'; ) {
+	const char *lineEnd = lineStart;
+	const char *colon;
+	const char *bindingStart;
+	const char *bindingEnd;
+	const char *valueStart;
+	const char *valueEnd;
+
+	while ((*lineEnd != '\0') && (*lineEnd != '\n')) {
+	    lineEnd++;
+	}
+	bindingStart = BrowserSkipDefaultSpaces(lineStart, lineEnd);
+	if ((bindingStart == lineEnd) || (*bindingStart == '!')) {
+	    lineStart = (*lineEnd == '\n') ? lineEnd + 1 : lineEnd;
+	    continue;
+	}
+	colon = memchr(bindingStart, ':', (size_t)(lineEnd - bindingStart));
+	if (colon == NULL) {
+	    lineStart = (*lineEnd == '\n') ? lineEnd + 1 : lineEnd;
+	    continue;
+	}
+	bindingEnd = BrowserTrimDefaultSpaces(bindingStart, colon);
+	if (bindingEnd == bindingStart) {
+	    lineStart = (*lineEnd == '\n') ? lineEnd + 1 : lineEnd;
+	    continue;
+	}
+	valueStart = BrowserSkipDefaultSpaces(colon + 1, lineEnd);
+	valueEnd = BrowserTrimDefaultSpaces(valueStart, lineEnd);
+	BrowserXrmAppendEntry(database,
+		BrowserDupRange(bindingStart, bindingEnd),
+		BrowserDupRange(valueStart, valueEnd));
+	lineStart = (*lineEnd == '\n') ? lineEnd + 1 : lineEnd;
+    }
+    return database;
+}
+
+Bool
+XrmGetResource(
+    XrmDatabase database,
+    _Xconst char *resourceName,
+    _Xconst char *resourceClass,
+    char **resourceTypeReturn,
+    XrmValue *valueReturn)
+{
+    BrowserXrmEntry *entryPtr;
+    BrowserXrmEntry *bestEntryPtr = NULL;
+    BrowserXrmComponent *nameParts;
+    BrowserXrmComponent *classParts;
+    int nameCount = 0;
+    int classCount = 0;
+    int bestScore = 0;
+
+    if ((database == NULL) || (resourceName == NULL)) {
+	return False;
+    }
+    nameParts = BrowserXrmSplitComponents(resourceName, &nameCount);
+    classParts = BrowserXrmSplitComponents(resourceClass, &classCount);
+    if (nameCount == 0) {
+	goto cleanup;
+    }
+    for (entryPtr = database->firstEntryPtr; entryPtr != NULL;
+	    entryPtr = entryPtr->nextPtr) {
+	int score = BrowserXrmEntryScore(entryPtr, nameParts, nameCount,
+		classParts, classCount);
+
+	if (score >= bestScore) {
+	    bestScore = score;
+	    bestEntryPtr = (score > 0) ? entryPtr : bestEntryPtr;
+	}
+    }
+    if (bestEntryPtr != NULL) {
+	if (resourceTypeReturn != NULL) {
+	    *resourceTypeReturn = bestEntryPtr->type;
+	}
+	if (valueReturn != NULL) {
+	    valueReturn->size = (unsigned int)strlen(bestEntryPtr->value) + 1U;
+	    valueReturn->addr = bestEntryPtr->value;
+	}
+    }
+
+cleanup:
+    if (nameParts != NULL) {
+	ckfree(nameParts);
+    }
+    if (classParts != NULL) {
+	ckfree(classParts);
+    }
+    return (bestEntryPtr != NULL) ? True : False;
+}
+
+void
+XrmDestroyDatabase(
+    XrmDatabase database)
+{
+    BrowserXrmEntry *entryPtr;
+
+    if (database == NULL) {
+	return;
+    }
+    for (entryPtr = database->firstEntryPtr; entryPtr != NULL; ) {
+	BrowserXrmEntry *nextPtr = entryPtr->nextPtr;
+
+	ckfree(entryPtr->binding);
+	ckfree(entryPtr->value);
+	ckfree(entryPtr->type);
+	ckfree(entryPtr);
+	entryPtr = nextPtr;
+    }
+    ckfree(database);
 }
 
 EMSCRIPTEN_KEEPALIVE int
