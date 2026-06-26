@@ -321,12 +321,85 @@ BrowserQueueImplicitPointerCrossingEvents(
     int rootY,
     unsigned int time);
 
-int
-BrowserQueuePointerEventFields(
+static unsigned int
+BrowserMappedPointerButton(
+    unsigned int button)
+{
+    if ((button >= Button1)
+	    && (button <= (unsigned int)browserDisplay.pointerMapCount)) {
+	return browserDisplay.pointerMap[button - Button1];
+    }
+    return button;
+}
+
+static unsigned int
+BrowserMappedPointerState(
+    unsigned int state)
+{
+    unsigned int mappedState = state
+	    & ~(Button1Mask | Button2Mask | Button3Mask | Button4Mask
+		    | Button5Mask);
+    unsigned int button;
+
+    for (button = Button1; button <= Button5; button++) {
+	if (state & BrowserPointerButtonMask(button)) {
+	    mappedState |= BrowserPointerButtonMask(
+		    BrowserMappedPointerButton(button));
+	}
+    }
+    return mappedState;
+}
+
+static unsigned int
+BrowserPointerPostStateForButtonEvent(
+    int type,
+    unsigned int button,
+    unsigned int state)
+{
+    unsigned int mask = BrowserPointerButtonMask(button);
+
+    if (type == ButtonPress) {
+	return state | mask;
+    }
+    if (type == ButtonRelease) {
+	return state & ~mask;
+    }
+    return state;
+}
+
+static void
+BrowserUpdatePointerStateForSuppressedEvent(
+    int type,
+    unsigned int window,
+    unsigned int state,
+    int x,
+    int y,
+    unsigned int time,
+    int resetScreenSaver)
+{
+    Window target;
+    int rootX = x;
+    int rootY = y;
+
+    if (resetScreenSaver) {
+	BrowserResetScreenSaverForInput();
+    }
+    BrowserClampPointerToGrabConfine(&rootX, &rootY);
+    x = rootX;
+    y = rootY;
+    BrowserQueueImplicitPointerCrossingEvents(type, state, rootX, rootY,
+	    time);
+    target = BrowserResolvePointerEventWindow((Window)window, &x, &y);
+    BrowserUpdatePointerState(target, rootX, rootY, state);
+}
+
+static int
+BrowserQueuePointerEventFieldsWithState(
     int type,
     unsigned int window,
     unsigned int button,
     unsigned int state,
+    unsigned int pointerState,
     int x,
     int y,
     unsigned int time,
@@ -361,7 +434,7 @@ BrowserQueuePointerEventFields(
     }
     target = BrowserResolvePointerEventWindow((Window)window, &x, &y);
     captureTarget = target;
-    BrowserUpdatePointerState(target, rootX, rootY, state);
+    BrowserUpdatePointerState(target, rootX, rootY, pointerState);
 
     BrowserSetCommonEventFields(&event, type, target, (Time)time);
     if (type == MotionNotify) {
@@ -395,7 +468,7 @@ BrowserQueuePointerEventFields(
     if (!BrowserPointerGrabAllowsEvent(&event)) {
 	if (type == ButtonRelease) {
 	    BrowserReleasePassivePointerGrabIfIdle(
-		    state & ~BrowserPointerButtonMask(button));
+		    pointerState);
 	}
 	return 0;
     }
@@ -412,7 +485,7 @@ BrowserQueuePointerEventFields(
     if (deliveryTarget == None) {
 	if (type == ButtonRelease) {
 	    BrowserReleasePassivePointerGrabIfIdle(
-		    state & ~BrowserPointerButtonMask(button));
+		    pointerState);
 	}
 	return 0;
     }
@@ -434,10 +507,24 @@ BrowserQueuePointerEventFields(
     }
     queued = BrowserQueueEvent(&event);
     if (type == ButtonRelease) {
-	BrowserReleasePassivePointerGrabIfIdle(
-		state & ~BrowserPointerButtonMask(button));
+	BrowserReleasePassivePointerGrabIfIdle(pointerState);
     }
     return queued;
+}
+
+int
+BrowserQueuePointerEventFields(
+    int type,
+    unsigned int window,
+    unsigned int button,
+    unsigned int state,
+    int x,
+    int y,
+    unsigned int time,
+    int resetScreenSaver)
+{
+    return BrowserQueuePointerEventFieldsWithState(type, window, button, state,
+	    state, x, y, time, resetScreenSaver);
 }
 
 static void
@@ -476,8 +563,30 @@ X11WasmQueuePointerEvent(
     int y,
     unsigned int time)
 {
-    return BrowserQueuePointerEventFields(type, window, button, state, x, y,
-	    time, 1);
+    unsigned int mappedButton;
+    unsigned int mappedState;
+    unsigned int pointerState;
+
+    if ((type != ButtonPress) && (type != ButtonRelease)
+	    && (type != MotionNotify)) {
+	return 0;
+    }
+    BrowserInitDisplay();
+    mappedState = BrowserMappedPointerState(state);
+    if (type == MotionNotify) {
+	return BrowserQueuePointerEventFieldsWithState(type, window, button,
+		mappedState, mappedState, x, y, time, 1);
+    }
+    mappedButton = BrowserMappedPointerButton(button);
+    pointerState = BrowserMappedPointerState(
+	    BrowserPointerPostStateForButtonEvent(type, button, state));
+    if (mappedButton == 0) {
+	BrowserUpdatePointerStateForSuppressedEvent(type, window, pointerState,
+		x, y, time, 1);
+	return 0;
+    }
+    return BrowserQueuePointerEventFieldsWithState(type, window, mappedButton,
+	    mappedState, pointerState, x, y, time, 1);
 }
 
 static int
@@ -714,6 +823,8 @@ X11WasmQueueCrossingEvent(
     if ((type != EnterNotify) && (type != LeaveNotify)) {
 	return 0;
     }
+    BrowserInitDisplay();
+    state = BrowserMappedPointerState(state);
     (void)window;
     BrowserClampPointerToGrabConfine(&rootX, &rootY);
     oldTarget = browserDisplay.pointerWindow;
@@ -819,6 +930,8 @@ X11WasmQueueWheelEvent(
     if (delta == 0) {
 	return 0;
     }
+    BrowserInitDisplay();
+    state = BrowserMappedPointerState(state);
     BrowserClampPointerToGrabConfine(&rootX, &rootY);
     x = rootX;
     y = rootY;

@@ -455,10 +455,10 @@ test("X pointer events update browser pointer state metadata", async ({
   expect(metadata.releaseResult).toBe(1);
   expect(metadata.afterPress).toEqual({
     backendCaptureWindow: windowId,
-    backendPointerState: 0,
+    backendPointerState: 256,
     backendPointerWindow: windowId,
     rootCaptureWindow: String(windowId),
-    rootPointerState: "0",
+    rootPointerState: "256",
     rootPointerWindow: String(windowId),
     rootX: "12",
     rootY: "14",

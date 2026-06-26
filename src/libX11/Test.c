@@ -476,6 +476,28 @@ X11WasmTestEventQueueAndKeycodeApis(void)
 		    sizeof(pointerMap)) != 0)) {
 	return 97;
     }
+    BrowserClearEventQueue();
+    if (!X11WasmQueuePointerEvent(ButtonPress, browserDisplay.rootWindow,
+	    Button1, 0, 41, 43, 100)
+	    || !BrowserPopMatchingEvent(browserDisplay.rootWindow,
+		    ButtonPressMask, &readEvent)
+	    || (readEvent.type != ButtonPress)
+	    || (readEvent.xbutton.button != Button2)
+	    || (readEvent.xbutton.state != 0)
+	    || (browserDisplay.pointerState != Button2Mask)) {
+	return 108;
+    }
+    if (!X11WasmQueuePointerEvent(ButtonRelease, browserDisplay.rootWindow,
+	    Button1, Button1Mask, 41, 43, 101)
+	    || !BrowserPopMatchingEvent(browserDisplay.rootWindow,
+		    ButtonReleaseMask, &readEvent)
+	    || (readEvent.type != ButtonRelease)
+	    || (readEvent.xbutton.button != Button2)
+	    || (readEvent.xbutton.state != Button2Mask)
+	    || (browserDisplay.pointerState != 0)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	return 109;
+    }
     if ((XSetPointerMapping(display, duplicatePointerMap, 5)
 		    != MappingFailed)
 	    || (XGetPointerMapping(display, pointerMap, (int)sizeof(pointerMap))

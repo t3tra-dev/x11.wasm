@@ -66,6 +66,8 @@
     BUTTON1_MASK,
     BUTTON2_MASK,
     BUTTON3_MASK,
+    BUTTON4_MASK,
+    BUTTON5_MASK,
     UNICODE_KEYSYM_BASE,
     COMPOSITION_START,
     COMPOSITION_UPDATE,
@@ -541,6 +543,12 @@
     if (buttons & 2) {
       state |= BUTTON3_MASK;
     }
+    if (buttons & 8) {
+      state |= BUTTON4_MASK;
+    }
+    if (buttons & 16) {
+      state |= BUTTON5_MASK;
+    }
     return state;
   }
 
@@ -562,6 +570,12 @@
     }
     if (button === 2) {
       return 2;
+    }
+    if (button === 3) {
+      return 8;
+    }
+    if (button === 4) {
+      return 16;
     }
     return 1;
   }
@@ -649,6 +663,12 @@
     }
     if (event.button === 2) {
       return 3;
+    }
+    if (event.button === 3) {
+      return 4;
+    }
+    if (event.button === 4) {
+      return 5;
     }
     return 1;
   }
