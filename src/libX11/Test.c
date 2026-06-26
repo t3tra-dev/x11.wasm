@@ -1787,6 +1787,81 @@ BrowserTestPopConfigureEvent(
 }
 
 static int
+BrowserTestPopConfigureGeometryEvent(
+    Window window,
+    int x,
+    int y,
+    int width,
+    int height,
+    int borderWidth,
+    Window above)
+{
+    XEvent event;
+
+    memset(&event, 0, sizeof(event));
+    if (!BrowserPopMatchingEvent(window, StructureNotifyMask, &event)
+	    || (event.type != ConfigureNotify)
+	    || (event.xconfigure.event != window)
+	    || (event.xconfigure.window != window)
+	    || (event.xconfigure.x != x)
+	    || (event.xconfigure.y != y)
+	    || (event.xconfigure.width != width)
+	    || (event.xconfigure.height != height)
+	    || (event.xconfigure.border_width != borderWidth)
+	    || (event.xconfigure.above != above)
+	    || (event.xconfigure.override_redirect != False)) {
+	return 0;
+    }
+    return 1;
+}
+
+static int
+BrowserTestWindowGeometryAttributes(
+    Display *display,
+    Window window,
+    int x,
+    int y,
+    int width,
+    int height,
+    int borderWidth)
+{
+    XWindowAttributes attributes;
+
+    memset(&attributes, 0, sizeof(attributes));
+    if (!XGetWindowAttributes(display, window, &attributes)
+	    || (attributes.x != x)
+	    || (attributes.y != y)
+	    || (attributes.width != width)
+	    || (attributes.height != height)
+	    || (attributes.border_width != borderWidth)) {
+	return 0;
+    }
+    return 1;
+}
+
+static int
+BrowserTestPopExposeEvent(
+    Window window,
+    int width,
+    int height)
+{
+    XEvent event;
+
+    memset(&event, 0, sizeof(event));
+    if (!BrowserPopMatchingEvent(window, ExposureMask, &event)
+	    || (event.type != Expose)
+	    || (event.xexpose.window != window)
+	    || (event.xexpose.x != 0)
+	    || (event.xexpose.y != 0)
+	    || (event.xexpose.width != width)
+	    || (event.xexpose.height != height)
+	    || (event.xexpose.count != 0)) {
+	return 0;
+    }
+    return 1;
+}
+
+static int
 BrowserTestPopCirculateEvent(
     Window eventWindow,
     Window window,
@@ -1813,7 +1888,6 @@ X11WasmTestConfigureStackingApis(void)
     Display *display;
     XSetWindowAttributes attributes;
     XWindowChanges changes;
-    XWindowAttributes returnedAttributes;
     XEvent event;
     Window parent = None;
     Window bottom = None;
@@ -2085,28 +2159,63 @@ X11WasmTestConfigureStackingApis(void)
 	    != Success) {
 	goto cleanup;
     }
-    memset(&event, 0, sizeof(event));
-    if (!BrowserPopEvent(&event, NULL)
-	    || (event.type != ConfigureNotify)
-	    || (event.xconfigure.event != top)
-	    || (event.xconfigure.window != top)
-	    || (event.xconfigure.x != 5)
-	    || (event.xconfigure.y != 7)
-	    || (event.xconfigure.width != 21)
-	    || (event.xconfigure.height != 13)
-	    || (event.xconfigure.border_width != 2)
-	    || (event.xconfigure.above != None)
-	    || (event.xconfigure.override_redirect != False)
+    if (!BrowserTestPopConfigureGeometryEvent(top, 5, 7, 21, 13, 2, None)
 	    || (XEventsQueued(display, QueuedAlready) != 0)) {
 	goto cleanup;
     }
-    memset(&returnedAttributes, 0, sizeof(returnedAttributes));
-    if (!XGetWindowAttributes(display, top, &returnedAttributes)
-	    || (returnedAttributes.x != 5)
-	    || (returnedAttributes.y != 7)
-	    || (returnedAttributes.width != 21)
-	    || (returnedAttributes.height != 13)
-	    || (returnedAttributes.border_width != 2)) {
+    if (!BrowserTestWindowGeometryAttributes(display, top, 5, 7, 21, 13,
+	    2)) {
+	goto cleanup;
+    }
+
+    if (XMoveWindow(display, top, 9, 11) != Success
+	    || !BrowserTestPopConfigureGeometryEvent(top, 9, 11, 21, 13, 2,
+		    None)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    if (!BrowserTestWindowGeometryAttributes(display, top, 9, 11, 21, 13,
+	    2)) {
+	goto cleanup;
+    }
+
+    if (XSetWindowBorderWidth(display, top, 4) != Success
+	    || !BrowserTestPopConfigureGeometryEvent(top, 9, 11, 21, 13, 4,
+		    None)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    if (!BrowserTestWindowGeometryAttributes(display, top, 9, 11, 21, 13,
+	    4)) {
+	goto cleanup;
+    }
+
+    if (XSelectInput(display, top, StructureNotifyMask | ExposureMask)
+	    != Success) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+    if (XMoveResizeWindow(display, top, 13, 17, 29, 31) != Success
+	    || !BrowserTestPopConfigureGeometryEvent(top, 13, 17, 29, 31, 4,
+		    None)
+	    || !BrowserTestPopExposeEvent(top, 29, 31)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    if (!BrowserTestWindowGeometryAttributes(display, top, 13, 17, 29, 31,
+	    4)) {
+	goto cleanup;
+    }
+
+    if (XResizeWindow(display, top, 33, 35) != Success
+	    || !BrowserTestPopConfigureGeometryEvent(top, 13, 17, 33, 35, 4,
+		    None)
+	    || !BrowserTestPopExposeEvent(top, 33, 35)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    if (!BrowserTestWindowGeometryAttributes(display, top, 13, 17, 33, 35,
+	    4)) {
 	goto cleanup;
     }
     result = 1;
