@@ -1031,9 +1031,88 @@ X11WasmTestCrossingEventHierarchy(void)
 	result = 14;
 	goto cleanup;
     }
+
+    BrowserUpdatePointerState(browserDisplay.rootWindow, 0, 0, 0);
+    BrowserClearEventQueue();
+    if (XGrabPointer(display, child, True,
+	    ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
+	    GrabModeAsync, GrabModeAsync, None, None, CurrentTime)
+	    != GrabSuccess) {
+	result = 15;
+	goto cleanup;
+    }
+    if (!BrowserQueuePointerCrossingEvents(0, childRootX + 3,
+	    childRootY + 3, 2003)) {
+	result = 16;
+	goto cleanup;
+    }
+    if (!BrowserPopEvent(&event, NULL)
+	    || (event.type != EnterNotify)
+	    || (event.xcrossing.window != parent)
+	    || (event.xcrossing.detail != NotifyVirtual)) {
+	result = 17;
+	goto cleanup;
+    }
+    if (!BrowserPopEvent(&event, NULL)
+	    || (event.type != EnterNotify)
+	    || (event.xcrossing.window != child)
+	    || (event.xcrossing.detail != NotifyAncestor)
+	    || (event.xcrossing.x != 3)
+	    || (event.xcrossing.y != 3)) {
+	result = 18;
+	goto cleanup;
+    }
+    if ((XEventsQueued(display, QueuedAlready) != 0)
+	    || (XUngrabPointer(display, CurrentTime) != Success)) {
+	result = 19;
+	goto cleanup;
+    }
+
+    if (XSelectInput(display, child,
+	    EnterWindowMask | LeaveWindowMask | PointerMotionMask)
+	    != Success) {
+	result = 20;
+	goto cleanup;
+    }
+    BrowserUpdatePointerState(browserDisplay.rootWindow, 0, 0, 0);
+    BrowserClearEventQueue();
+    if (!X11WasmQueuePointerEvent(MotionNotify, browserDisplay.rootWindow, 0,
+	    0, childRootX + 4, childRootY + 4, 2004)) {
+	result = 21;
+	goto cleanup;
+    }
+    if (!BrowserPopEvent(&event, NULL)
+	    || (event.type != EnterNotify)
+	    || (event.xcrossing.window != parent)
+	    || (event.xcrossing.detail != NotifyVirtual)) {
+	result = 22;
+	goto cleanup;
+    }
+    if (!BrowserPopEvent(&event, NULL)
+	    || (event.type != EnterNotify)
+	    || (event.xcrossing.window != child)
+	    || (event.xcrossing.detail != NotifyAncestor)
+	    || (event.xcrossing.x != 4)
+	    || (event.xcrossing.y != 4)) {
+	result = 23;
+	goto cleanup;
+    }
+    if (!BrowserPopEvent(&event, NULL)
+	    || (event.type != MotionNotify)
+	    || (event.xmotion.window != child)
+	    || (event.xmotion.x != 4)
+	    || (event.xmotion.y != 4)) {
+	result = 24;
+	goto cleanup;
+    }
+    if (XEventsQueued(display, QueuedAlready) != 0) {
+	result = 25;
+	goto cleanup;
+    }
     result = 1;
 
 cleanup:
+    (void)XUngrabPointer(display, CurrentTime);
     BrowserClearEventQueue();
     BrowserUpdatePointerState(browserDisplay.rootWindow, 0, 0, 0);
     if (child != None) {

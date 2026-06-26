@@ -603,8 +603,15 @@ BrowserPointerGrabAllowsEvent(
 	return 1;
     }
     eventMask = BrowserEventMask(eventPtr);
-    return (eventMask == NoEventMask)
-	    || ((browserDisplay.pointerGrabEventMask & eventMask) != 0);
+    if (eventMask == NoEventMask) {
+	return 1;
+    }
+    if (browserDisplay.pointerGrabOwnerEvents
+	    && (BrowserSelectedEventTarget(BrowserEventWindow(eventPtr),
+		    eventMask, 1) != None)) {
+	return 1;
+    }
+    return (browserDisplay.pointerGrabEventMask & eventMask) != 0;
 }
 
 int

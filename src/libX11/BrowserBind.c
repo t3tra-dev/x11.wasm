@@ -184,6 +184,14 @@ X11WasmQueueWindowProtocol(
     return BrowserQueueEvent(&event);
 }
 
+static void
+BrowserQueueImplicitPointerCrossingEvents(
+    int type,
+    unsigned int state,
+    int rootX,
+    int rootY,
+    unsigned int time);
+
 int
 BrowserQueuePointerEventFields(
     int type,
@@ -214,6 +222,7 @@ BrowserQueuePointerEventFields(
     BrowserClampPointerToGrabConfine(&rootX, &rootY);
     x = rootX;
     y = rootY;
+    BrowserQueueImplicitPointerCrossingEvents(type, state, rootX, rootY, time);
     if (type == ButtonPress) {
 	Window passiveWindow = BrowserHitTestRoot(rootX, rootY, NULL, NULL);
 
@@ -293,6 +302,30 @@ BrowserQueuePointerEventFields(
 		state & ~BrowserPointerButtonMask(button));
     }
     return queued;
+}
+
+static void
+BrowserQueueImplicitPointerCrossingEvents(
+    int type,
+    unsigned int state,
+    int rootX,
+    int rootY,
+    unsigned int time)
+{
+    Window target;
+
+    if ((type != ButtonPress) && (type != ButtonRelease)
+	    && (type != MotionNotify)) {
+	return;
+    }
+    if (BrowserWindowCanReceiveEvents(browserDisplay.pointerCaptureWindow)) {
+	return;
+    }
+    target = BrowserHitTestRoot(rootX, rootY, NULL, NULL);
+    if (target == browserDisplay.pointerWindow) {
+	return;
+    }
+    (void)BrowserQueuePointerCrossingEvents(state, rootX, rootY, time);
 }
 
 EMSCRIPTEN_KEEPALIVE int
