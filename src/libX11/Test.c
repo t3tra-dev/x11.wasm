@@ -1413,8 +1413,13 @@ X11WasmTestXlibApis(void)
     Screen *defaultDisplayScreen = NULL;
     unsigned int bestWidth = 0;
     unsigned int bestHeight = 0;
+    XErrorHandler oldErrorHandler;
     unsigned long accessorSerial = 0;
     int result = 0;
+    int queryBestBadDrawableOk = 0;
+    int queryBestBadShapeOk = 0;
+    int queryBestBadWidthOk = 0;
+    int queryBestBadHeightOk = 0;
     Bool hostAccessEnabled = False;
     XHostAddress hostAddresses[2];
     XHostAddress *hostList = NULL;
@@ -2103,6 +2108,52 @@ X11WasmTestXlibApis(void)
 	return 0;
     }
     if (LastKnownRequestProcessed(&browserDisplay.display) != accessorSerial) {
+	return 0;
+    }
+    oldErrorHandler = XSetErrorHandler(BrowserTestXErrorHandler);
+    browserTestXErrorCount = 0;
+    browserTestLastErrorCode = Success;
+    browserTestLastRequestCode = 0;
+    browserTestLastResourceId = None;
+    if (XQueryBestCursor(&browserDisplay.display, (Drawable)0x7ffffffeUL,
+	    1, 1, &bestWidth, &bestHeight) == False) {
+	queryBestBadDrawableOk = (browserTestXErrorCount == 1)
+		&& (browserTestLastErrorCode == BadDrawable)
+		&& (browserTestLastRequestCode
+			== X11_WASM_XREQ_QUERY_BEST_SIZE)
+		&& (browserTestLastResourceId == (XID)0x7ffffffeUL);
+    }
+    if (XQueryBestSize(&browserDisplay.display, 99,
+	    (Drawable)browserDisplay.rootWindow, 1, 1, &bestWidth,
+	    &bestHeight) == False) {
+	queryBestBadShapeOk = (browserTestXErrorCount == 2)
+		&& (browserTestLastErrorCode == BadValue)
+		&& (browserTestLastRequestCode
+			== X11_WASM_XREQ_QUERY_BEST_SIZE)
+		&& (browserTestLastResourceId == (XID)99);
+    }
+    if (XQueryBestTile(&browserDisplay.display,
+	    (Drawable)browserDisplay.rootWindow, (unsigned int)USHRT_MAX + 1U,
+	    1, &bestWidth, &bestHeight) == False) {
+	queryBestBadWidthOk = (browserTestXErrorCount == 3)
+		&& (browserTestLastErrorCode == BadValue)
+		&& (browserTestLastRequestCode
+			== X11_WASM_XREQ_QUERY_BEST_SIZE)
+		&& (browserTestLastResourceId == (XID)USHRT_MAX + 1U);
+    }
+    if (XQueryBestStipple(&browserDisplay.display,
+	    (Drawable)browserDisplay.rootWindow, 1,
+	    (unsigned int)USHRT_MAX + 1U, &bestWidth,
+	    &bestHeight) == False) {
+	queryBestBadHeightOk = (browserTestXErrorCount == 4)
+		&& (browserTestLastErrorCode == BadValue)
+		&& (browserTestLastRequestCode
+			== X11_WASM_XREQ_QUERY_BEST_SIZE)
+		&& (browserTestLastResourceId == (XID)USHRT_MAX + 1U);
+    }
+    (void)XSetErrorHandler(oldErrorHandler);
+    if (!queryBestBadDrawableOk || !queryBestBadShapeOk
+	    || !queryBestBadWidthOk || !queryBestBadHeightOk) {
 	return 0;
     }
     if ((XGetErrorText(&browserDisplay.display, BadWindow, buffer,
