@@ -2305,6 +2305,102 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestQueryPointerApis(void)
+{
+    Display *display;
+    Window parent = None;
+    Window child = None;
+    Window grandchild = None;
+    Window rootReturn = None;
+    Window childReturn = None;
+    int rootX = -1;
+    int rootY = -1;
+    int winX = -1;
+    int winY = -1;
+    unsigned int mask = 0;
+    int result = 0;
+    int screen;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+    parent = XCreateWindow(display, browserDisplay.rootWindow, 10, 20, 40,
+	    30, 0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL);
+    child = XCreateWindow(display, parent, 5, 7, 20, 15, 0, CopyFromParent,
+	    InputOutput, DefaultVisual(display, screen), 0, NULL);
+    grandchild = XCreateWindow(display, child, 1, 1, 5, 5, 0,
+	    CopyFromParent, InputOutput, DefaultVisual(display, screen), 0,
+	    NULL);
+    if ((parent == None) || (child == None) || (grandchild == None)
+	    || (XMapWindow(display, parent) != Success)
+	    || (XMapWindow(display, child) != Success)
+	    || (XMapWindow(display, grandchild) != Success)) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+    BrowserUpdatePointerState(grandchild, 17, 30, Button1Mask | ShiftMask);
+
+    if (!XQueryPointer(display, browserDisplay.rootWindow, &rootReturn,
+	    &childReturn, &rootX, &rootY, &winX, &winY, &mask)
+	    || (rootReturn != browserDisplay.rootWindow)
+	    || (childReturn != parent)
+	    || (rootX != 17) || (rootY != 30)
+	    || (winX != 17) || (winY != 30)
+	    || (mask != (Button1Mask | ShiftMask))) {
+	goto cleanup;
+    }
+
+    rootReturn = childReturn = None;
+    rootX = rootY = winX = winY = -1;
+    mask = 0;
+    if (!XQueryPointer(display, parent, &rootReturn, &childReturn, &rootX,
+	    &rootY, &winX, &winY, &mask)
+	    || (rootReturn != browserDisplay.rootWindow)
+	    || (childReturn != child)
+	    || (rootX != 17) || (rootY != 30)
+	    || (winX != 7) || (winY != 10)
+	    || (mask != (Button1Mask | ShiftMask))) {
+	goto cleanup;
+    }
+
+    rootReturn = childReturn = None;
+    rootX = rootY = winX = winY = -1;
+    mask = 0;
+    if (!XQueryPointer(display, child, &rootReturn, &childReturn, &rootX,
+	    &rootY, &winX, &winY, &mask)
+	    || (rootReturn != browserDisplay.rootWindow)
+	    || (childReturn != grandchild)
+	    || (rootX != 17) || (rootY != 30)
+	    || (winX != 2) || (winY != 3)
+	    || (mask != (Button1Mask | ShiftMask))) {
+	goto cleanup;
+    }
+
+    rootReturn = childReturn = None;
+    rootX = rootY = winX = winY = -1;
+    mask = 0;
+    if (!XQueryPointer(display, grandchild, &rootReturn, &childReturn,
+	    &rootX, &rootY, &winX, &winY, &mask)
+	    || (rootReturn != browserDisplay.rootWindow)
+	    || (childReturn != None)
+	    || (rootX != 17) || (rootY != 30)
+	    || (winX != 1) || (winY != 2)
+	    || (mask != (Button1Mask | ShiftMask))) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    BrowserClearEventQueue();
+    BrowserUpdatePointerState(browserDisplay.rootWindow, 0, 0, 0);
+    if (parent != None) {
+	(void)XDestroyWindow(display, parent);
+    }
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestSubstructureNotifyApis(void)
 {
     Display *display;

@@ -416,6 +416,25 @@ test("XTranslateCoordinates preserves nested window coordinates", async ({
   expect(result).toBe(1);
 });
 
+test("XQueryPointer reports nested child coordinates and mask", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestQueryPointerApis?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestQueryPointerApis) {
+      throw new Error("missing query pointer test export");
+    }
+    return module._X11WasmTestQueryPointerApis();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XIC spot location anchors the browser input context", async ({ page }) => {
   await waitForX11Runtime(page);
   const windowId = await createMappedWindow(page);
