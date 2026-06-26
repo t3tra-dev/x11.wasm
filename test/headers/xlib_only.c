@@ -15,6 +15,22 @@ X11WasmHeaderXlibOnlyPrototypeTest(void)
 	    unsigned int, unsigned int, int, unsigned int, Visual *,
 	    unsigned long, XSetWindowAttributes *) = XCreateWindow;
     int (*eventsQueued)(Display *, int) = XEventsQueued;
+    int (*displayKeycodes)(Display *, int *, int *) = XDisplayKeycodes;
+    int (*changeKeyboardControl)(Display *, unsigned long,
+	    XKeyboardControl *) = XChangeKeyboardControl;
+    int (*getKeyboardControl)(Display *, XKeyboardState *) =
+	    XGetKeyboardControl;
+    int (*autoRepeatOff)(Display *) = XAutoRepeatOff;
+    int (*autoRepeatOn)(Display *) = XAutoRepeatOn;
+    int (*queryKeymap)(Display *, char[32]) = XQueryKeymap;
+    int (*changePointerControl)(Display *, Bool, Bool, int, int, int) =
+	    XChangePointerControl;
+    int (*getPointerControl)(Display *, int *, int *, int *) =
+	    XGetPointerControl;
+    int (*getPointerMapping)(Display *, unsigned char *, int) =
+	    XGetPointerMapping;
+    int (*setPointerMapping)(Display *, _Xconst unsigned char *, int) =
+	    XSetPointerMapping;
     XTimeCoord *(*getMotionEvents)(Display *, Window, Time, Time, int *) =
 	    XGetMotionEvents;
     int (*readBitmapFile)(Display *, Drawable, _Xconst char *,
@@ -38,6 +54,11 @@ X11WasmHeaderXlibOnlyPrototypeTest(void)
 
     return (openDisplay != 0) && (closeDisplay != 0)
 	    && (createWindow != 0) && (eventsQueued != 0)
+	    && (displayKeycodes != 0) && (changeKeyboardControl != 0)
+	    && (getKeyboardControl != 0) && (autoRepeatOff != 0)
+	    && (autoRepeatOn != 0) && (queryKeymap != 0)
+	    && (changePointerControl != 0) && (getPointerControl != 0)
+	    && (getPointerMapping != 0) && (setPointerMapping != 0)
 	    && (getMotionEvents != 0) && (readBitmapFile != 0)
 	    && (readBitmapFileData != 0) && (writeBitmapFile != 0)
 	    && (initImage != 0) && (loadQueryFont != 0)
