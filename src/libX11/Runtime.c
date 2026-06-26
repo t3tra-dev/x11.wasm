@@ -162,7 +162,9 @@ X11WasmUtfToCodepoint(
     const char *src,
     X11WasmCodepoint *chPtr)
 {
-    unsigned char c;
+    unsigned char b0, b1, b2, b3;
+    X11WasmCodepoint ch = 0xfffdU;
+    int length = 1;
 
     if ((src == NULL) || (src[0] == '\0')) {
 	if (chPtr != NULL) {
@@ -170,30 +172,59 @@ X11WasmUtfToCodepoint(
 	}
 	return 0;
     }
-    c = (unsigned char)src[0];
-    if (c < 0x80) {
-	if (chPtr != NULL) {
-	    *chPtr = c;
+    b0 = UCHAR(src[0]);
+    if (b0 < 0x80U) {
+	ch = b0;
+    } else if ((b0 >= 0xc2U) && (b0 <= 0xdfU)) {
+	b1 = UCHAR(src[1]);
+	if ((b1 & 0xc0U) == 0x80U) {
+	    ch = (X11WasmCodepoint)(((b0 & 0x1fU) << 6)
+		    | (b1 & 0x3fU));
+	    length = 2;
 	}
-	return 1;
-    }
-    if ((c & 0xe0) == 0xc0) {
-	if (chPtr != NULL) {
-	    *chPtr = (X11WasmCodepoint)(((c & 0x1f) << 6)
-		    | ((unsigned char)src[1] & 0x3f));
+    } else if ((b0 >= 0xe0U) && (b0 <= 0xefU)) {
+	b1 = UCHAR(src[1]);
+	if ((b1 & 0xc0U) == 0x80U) {
+	    b2 = UCHAR(src[2]);
+	} else {
+	    b2 = 0;
 	}
-	return 2;
-    }
-    if ((c & 0xf0) == 0xe0) {
-	if (chPtr != NULL) {
-	    *chPtr = (X11WasmCodepoint)(((c & 0x0f) << 12)
-		    | (((unsigned char)src[1] & 0x3f) << 6)
-		    | ((unsigned char)src[2] & 0x3f));
+	if ((b2 & 0xc0U) == 0x80U) {
+	    ch = (X11WasmCodepoint)(((b0 & 0x0fU) << 12)
+		    | ((b1 & 0x3fU) << 6)
+		    | (b2 & 0x3fU));
+	    if ((ch >= 0x800U) && ((ch < 0xd800U) || (ch > 0xdfffU))) {
+		length = 3;
+	    } else {
+		ch = 0xfffdU;
+	    }
 	}
-	return 3;
+    } else if ((b0 >= 0xf0U) && (b0 <= 0xf4U)) {
+	b1 = UCHAR(src[1]);
+	if ((b1 & 0xc0U) == 0x80U) {
+	    b2 = UCHAR(src[2]);
+	} else {
+	    b2 = 0;
+	}
+	if ((b2 & 0xc0U) == 0x80U) {
+	    b3 = UCHAR(src[3]);
+	} else {
+	    b3 = 0;
+	}
+	if ((b3 & 0xc0U) == 0x80U) {
+	    ch = (X11WasmCodepoint)(((b0 & 0x07U) << 18)
+		    | ((b1 & 0x3fU) << 12)
+		    | ((b2 & 0x3fU) << 6)
+		    | (b3 & 0x3fU));
+	    if ((ch >= 0x10000U) && (ch <= 0x10ffffU)) {
+		length = 4;
+	    } else {
+		ch = 0xfffdU;
+	    }
+	}
     }
     if (chPtr != NULL) {
-	*chPtr = (X11WasmCodepoint)'?';
+	*chPtr = ch;
     }
-    return 1;
+    return length;
 }

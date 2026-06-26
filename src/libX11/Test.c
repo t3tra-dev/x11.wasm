@@ -1497,6 +1497,7 @@ X11WasmTestXlibApis(void)
     char *utf8Values[1];
     char *stdValues[1];
     wchar_t wideValue[7];
+    wchar_t astralWideValue[2];
     wchar_t *wideValues[1];
     wchar_t fontWideText[3] = {'O', 'K', 0};
     wchar_t fontDrawWideText[2] = {'W', 0};
@@ -1671,6 +1672,8 @@ X11WasmTestXlibApis(void)
     Status lookupStatus = 0;
     char lookupBuffer[8];
     int lookupLength = 0;
+    X11WasmCodepoint utf8Codepoint = 0;
+    int utf8CodepointLength = 0;
     long filterEventsReturn = 0;
     Window icClientWindowReturn = None;
     Window icFocusWindowReturn = None;
@@ -1886,6 +1889,8 @@ X11WasmTestXlibApis(void)
     wideValue[4] = (wchar_t)' ';
     wideValue[5] = (wchar_t)0x2603U;
     wideValue[6] = 0;
+    astralWideValue[0] = (wchar_t)0x1f600U;
+    astralWideValue[1] = 0;
     hostAddresses[0].family = FamilyInternet;
     hostAddresses[0].length = (int)sizeof(hostAddressOne);
     hostAddresses[0].address = (char *)hostAddressOne;
@@ -4522,6 +4527,15 @@ X11WasmTestXlibApis(void)
 	    || (memcmp(lookupBuffer, "\xc3\xa9", 2) != 0)) {
 	goto cleanup;
     }
+    utf8CodepointLength = X11WasmUtfToCodepoint("\360\237\230\200",
+	    &utf8Codepoint);
+    if ((utf8CodepointLength != 4) || (utf8Codepoint != 0x1f600U)) {
+	goto cleanup;
+    }
+    utf8CodepointLength = X11WasmUtfToCodepoint("\360(", &utf8Codepoint);
+    if ((utf8CodepointLength != 1) || (utf8Codepoint != 0xfffdU)) {
+	goto cleanup;
+    }
 
     listValues[0] = (char *)"alpha";
     listValues[1] = (char *)"beta";
@@ -4596,6 +4610,23 @@ X11WasmTestXlibApis(void)
     XFreeStringList(stringList);
     stringList = NULL;
     stringCount = -1;
+    XFree(stdProp.value);
+    memset(&stdProp, 0, sizeof(stdProp));
+    stdValues[0] = (char *)"\360\237\230\200";
+    if ((Xutf8TextListToTextProperty(&browserDisplay.display, stdValues, 1,
+	    XStdICCTextStyle, &stdProp) != Success)
+	    || (stdProp.encoding != BrowserCompoundTextAtom())
+	    || (Xutf8TextPropertyToTextList(&browserDisplay.display, &stdProp,
+		    &stringList, &stringCount) != Success)
+	    || (stringCount != 1)
+	    || (strcmp(stringList[0], "\360\237\230\200") != 0)) {
+	goto cleanup;
+    }
+    XFreeStringList(stringList);
+    stringList = NULL;
+    stringCount = -1;
+    XFree(stdProp.value);
+    memset(&stdProp, 0, sizeof(stdProp));
     if ((Xutf8TextListToTextProperty(&browserDisplay.display, utf8Values, 1,
 	    XUTF8StringStyle, &utf8Prop) != Success)
 	    || (utf8Prop.encoding != BrowserUtf8StringAtom())
@@ -4614,6 +4645,21 @@ X11WasmTestXlibApis(void)
 	    || (XwcTextPropertyToTextList(&browserDisplay.display, &wideProp,
 		    &wideList, &wideCount) != Success)
 	    || (wideCount != 1) || (wcscmp(wideList[0], wideValue) != 0)) {
+	goto cleanup;
+    }
+    XwcFreeStringList(wideList);
+    wideList = NULL;
+    wideCount = -1;
+    XFree(wideProp.value);
+    memset(&wideProp, 0, sizeof(wideProp));
+    wideValues[0] = astralWideValue;
+    if ((XwcTextListToTextProperty(&browserDisplay.display, wideValues, 1,
+	    XUTF8StringStyle, &wideProp) != Success)
+	    || (wideProp.encoding != BrowserUtf8StringAtom())
+	    || (XwcTextPropertyToTextList(&browserDisplay.display, &wideProp,
+		    &wideList, &wideCount) != Success)
+	    || (wideCount != 1)
+	    || (wcscmp(wideList[0], astralWideValue) != 0)) {
 	goto cleanup;
     }
     XwcFreeStringList(wideList);
