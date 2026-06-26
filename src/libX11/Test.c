@@ -2092,6 +2092,68 @@ cleanup:
     return result;
 }
 
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestCopyRequestsComplete(void)
+{
+    Display *display;
+    GC gc = NULL;
+    Window source = None;
+    Window target = None;
+    unsigned long before;
+    unsigned long afterArea;
+    unsigned long afterPlane;
+    int result = 0;
+    int screen;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+    source = XCreateWindow(display, browserDisplay.rootWindow, 0, 0, 8, 6, 0,
+	    CopyFromParent, InputOutput, DefaultVisual(display, screen), 0, NULL);
+    target = XCreateWindow(display, browserDisplay.rootWindow, 10, 0, 8, 6, 0,
+	    CopyFromParent, InputOutput, DefaultVisual(display, screen), 0, NULL);
+    gc = (source != None) ? XCreateGC(display, source, 0, NULL) : NULL;
+    if ((source == None) || (target == None) || (gc == NULL)
+	    || (XMapWindow(display, source) != Success)
+	    || (XMapWindow(display, target) != Success)
+	    || (XSetGraphicsExposures(display, gc, False) != Success)
+	    || (XSetForeground(display, gc, 0x00ff00UL) != Success)
+	    || (XFillRectangle(display, source, gc, 0, 0, 8, 6)
+		    != Success)) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+    before = LastKnownRequestProcessed(display);
+    if (XCopyArea(display, source, target, gc, 0, 0, 4, 3, 1, 1)
+	    != Success) {
+	goto cleanup;
+    }
+    afterArea = LastKnownRequestProcessed(display);
+    if (XCopyPlane(display, source, target, gc, 0, 0, 4, 3, 1, 1, 1)
+	    != Success) {
+	goto cleanup;
+    }
+    afterPlane = LastKnownRequestProcessed(display);
+    if ((afterArea != before + 1UL) || (afterPlane != before + 2UL)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    BrowserClearEventQueue();
+    if (gc != NULL) {
+	(void)XFreeGC(display, gc);
+    }
+    if (target != None) {
+	(void)XDestroyWindow(display, target);
+    }
+    if (source != None) {
+	(void)XDestroyWindow(display, source);
+    }
+    BrowserClearEventQueue();
+    return result;
+}
+
 static int
 BrowserTestPopCirculateEvent(
     Window eventWindow,

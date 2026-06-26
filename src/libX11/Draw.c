@@ -259,7 +259,7 @@ int XCopyArea(Display *d, Drawable s, Drawable t, GC g, int sx, int sy,
     BrowserMarkResourceDamage(targetPtr, dx, dy, w, h);
     (void)BrowserQueueCopyExposureEvents(sourcePtr, targetPtr, t, g, sx, sy,
 	    w, h, dx, dy, X11_WASM_XREQ_COPY_AREA);
-    return Success;
+    return XNoOp(d);
 }
 int XCopyPlane(Display *d, Drawable s, Drawable t, GC g, int sx, int sy,
 	unsigned int w, unsigned int h, int dx, int dy, unsigned long p)
@@ -294,7 +294,7 @@ int XCopyPlane(Display *d, Drawable s, Drawable t, GC g, int sx, int sy,
     BrowserMarkResourceDamage(targetPtr, dx, dy, w, h);
     (void)BrowserQueueCopyExposureEvents(sourcePtr, targetPtr, t, g, sx, sy,
 	    w, h, dx, dy, X11_WASM_XREQ_COPY_PLANE);
-    return Success;
+    return XNoOp(d);
 }
 int XDrawArc(Display *d, Drawable dr, GC g, int x, int y, unsigned int w,
 	unsigned int h, int a1, int a2)
