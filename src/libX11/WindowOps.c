@@ -301,6 +301,8 @@ XCloseDisplay(
 	browserDisplay.serverGrabDepth = 0;
 	BrowserSyncServerGrabState();
 	browserDisplay.synchronize = 0;
+	browserDisplay.threadsInitialized = 0;
+	browserDisplay.displayLockDepth = 0;
 	browserDisplay.afterFunction = NULL;
 	browserDisplay.runningAfterFunction = 0;
 	BrowserSyncSynchronizeState(display);
@@ -1427,12 +1429,17 @@ XScreenNumberOfScreen(
 Status
 XInitThreads(void)
 {
+    BrowserInitDisplay();
+    browserDisplay.threadsInitialized = 1;
     return True;
 }
 
 Status
 XFreeThreads(void)
 {
+    BrowserInitDisplay();
+    browserDisplay.threadsInitialized = 0;
+    browserDisplay.displayLockDepth = 0;
     return True;
 }
 
@@ -1440,14 +1447,25 @@ void
 XLockDisplay(
     Display *display)
 {
-    (void)display;
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    }
+    if (display == &browserDisplay.display) {
+	browserDisplay.displayLockDepth++;
+    }
 }
 
 void
 XUnlockDisplay(
     Display *display)
 {
-    (void)display;
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    }
+    if ((display == &browserDisplay.display)
+	    && (browserDisplay.displayLockDepth > 0)) {
+	browserDisplay.displayLockDepth--;
+    }
 }
 
 Bool

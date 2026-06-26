@@ -2056,11 +2056,42 @@ X11WasmTestXlibApis(void)
     XFlushGC(&browserDisplay.display,
 	    DefaultGC(&browserDisplay.display, screen));
     XFlushGC(NULL, NULL);
+    if ((browserDisplay.threadsInitialized != 0)
+	    || (browserDisplay.displayLockDepth != 0)) {
+	return 0;
+    }
+    if (XInitThreads() != True) {
+	return 0;
+    }
+    if ((browserDisplay.threadsInitialized != 1)
+	    || (browserDisplay.displayLockDepth != 0)) {
+	return 0;
+    }
     XLockDisplay(&browserDisplay.display);
+    XLockDisplay(&browserDisplay.display);
+    if (browserDisplay.displayLockDepth != 2) {
+	return 0;
+    }
     XUnlockDisplay(&browserDisplay.display);
+    if (browserDisplay.displayLockDepth != 1) {
+	return 0;
+    }
     XLockDisplay(NULL);
+    if (browserDisplay.displayLockDepth != 2) {
+	return 0;
+    }
     XUnlockDisplay(NULL);
-    if ((XInitThreads() != True) || (XFreeThreads() != True)
+    if (browserDisplay.displayLockDepth != 1) {
+	return 0;
+    }
+    XUnlockDisplay(&browserDisplay.display);
+    XUnlockDisplay(&browserDisplay.display);
+    if (browserDisplay.displayLockDepth != 0) {
+	return 0;
+    }
+    if ((XFreeThreads() != True)
+	    || (browserDisplay.threadsInitialized != 0)
+	    || (browserDisplay.displayLockDepth != 0)
 	    || (XSupportsLocale() != True)) {
 	return 0;
     }
@@ -3312,6 +3343,8 @@ X11WasmTestXlibApis(void)
     }
     oldCloseSerial = browserDisplay.closeSerial;
     (void)XSynchronize(&browserDisplay.display, True);
+    (void)XInitThreads();
+    XLockDisplay(&browserDisplay.display);
     (void)XGrabServer(&browserDisplay.display);
     serialBeforeWait = LastKnownRequestProcessed(&browserDisplay.display);
     if (!XRegisterIMInstantiateCallback(&browserDisplay.display, NULL, NULL,
@@ -3322,6 +3355,8 @@ X11WasmTestXlibApis(void)
 	    || (browserDisplay.closeSerial <= oldCloseSerial)
 	    || (browserDisplay.serverGrabDepth != 0)
 	    || (browserDisplay.synchronize != 0)
+	    || (browserDisplay.threadsInitialized != 0)
+	    || (browserDisplay.displayLockDepth != 0)
 	    || (browserDisplay.afterFunction != NULL)
 	    || XUnregisterIMInstantiateCallback(&browserDisplay.display,
 		    NULL, NULL, NULL, BrowserTestIMInstantiateCallback,

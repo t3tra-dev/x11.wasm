@@ -142,6 +142,8 @@ typedef struct X11WasmDisplayState {
     X11WasmPassiveKeyGrab *passiveKeyGrabs;
     int serverGrabDepth;
     int synchronize;
+    int threadsInitialized;
+    int displayLockDepth;
     XAfterFunction afterFunction;
     int runningAfterFunction;
     unsigned long flushSerial;
