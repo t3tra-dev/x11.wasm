@@ -984,7 +984,7 @@ test("X resource manager defaults are stable", async ({ page }) => {
   expect(result).toBe(1);
 });
 
-test("XSendEvent resolves InputFocus and PointerWindow targets", async ({
+test("XSendEvent resolves targets and propagation masks", async ({
   page,
 }) => {
   await waitForX11Runtime(page);

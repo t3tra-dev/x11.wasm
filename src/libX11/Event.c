@@ -1413,10 +1413,13 @@ X11WasmTestXSendEventTargets(
     Display *display = &browserDisplay.display;
     Window focusWindow = (Window)focusWindowId;
     Window pointerWindow = (Window)pointerWindowId;
+    Window propagationChild = None;
     Window rootWindow;
     Window returnedFocus;
+    XSetWindowAttributes attributes;
     XEvent event;
     XEvent received;
+    int propagationOk = 0;
     int returnedRevert;
     int rootX = 0;
     int rootY = 0;
@@ -1484,6 +1487,84 @@ X11WasmTestXSendEventTargets(
 	    || (received.type != KeyPress)
 	    || (received.xany.window != rootWindow)
 	    || (received.xany.send_event != True)) {
+	return 0;
+    }
+
+    propagationChild = XCreateWindow(display, focusWindow, 2, 3, 16, 12, 0,
+	    CopyFromParent, InputOutput, DefaultVisual(display,
+		    DefaultScreen(display)), 0, NULL);
+    if ((propagationChild == None)
+	    || (XMapWindow(display, propagationChild) != Success)) {
+	goto xsendPropagationCleanup;
+    }
+    BrowserClearEventQueue();
+    if (XSelectInput(display, propagationChild, NoEventMask) != Success) {
+	goto xsendPropagationCleanup;
+    }
+    memset(&event, 0, sizeof(event));
+    event.type = KeyPress;
+    event.xkey.display = display;
+    event.xkey.window = propagationChild;
+    event.xkey.root = rootWindow;
+    event.xkey.keycode = XKeysymToKeycode(display, XK_c);
+    if ((XSendEvent(display, propagationChild, True, KeyPressMask, &event)
+		    != True)
+	    || !BrowserPopMatchingEvent(focusWindow, KeyPressMask, &received)
+	    || (received.type != KeyPress)
+	    || (received.xany.window != focusWindow)
+	    || (received.xany.send_event != True)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto xsendPropagationCleanup;
+    }
+
+    memset(&attributes, 0, sizeof(attributes));
+    attributes.do_not_propagate_mask = KeyPressMask;
+    if (XChangeWindowAttributes(display, propagationChild, CWDontPropagate,
+	    &attributes) != Success) {
+	goto xsendPropagationCleanup;
+    }
+    BrowserClearEventQueue();
+    memset(&event, 0, sizeof(event));
+    event.type = KeyPress;
+    event.xkey.display = display;
+    event.xkey.window = propagationChild;
+    event.xkey.root = rootWindow;
+    event.xkey.keycode = XKeysymToKeycode(display, XK_d);
+    if ((XSendEvent(display, propagationChild, True, KeyPressMask, &event)
+		    != False)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto xsendPropagationCleanup;
+    }
+
+    if (XSelectInput(display, propagationChild, KeyPressMask) != Success) {
+	goto xsendPropagationCleanup;
+    }
+    BrowserClearEventQueue();
+    memset(&event, 0, sizeof(event));
+    event.type = KeyPress;
+    event.xkey.display = display;
+    event.xkey.window = propagationChild;
+    event.xkey.root = rootWindow;
+    event.xkey.keycode = XKeysymToKeycode(display, XK_e);
+    if ((XSendEvent(display, propagationChild, True, KeyPressMask, &event)
+		    != True)
+	    || !BrowserPopMatchingEvent(propagationChild, KeyPressMask,
+		    &received)
+	    || (received.type != KeyPress)
+	    || (received.xany.window != propagationChild)
+	    || (received.xany.send_event != True)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto xsendPropagationCleanup;
+    }
+    propagationOk = 1;
+
+xsendPropagationCleanup:
+    if (propagationChild != None) {
+	(void)XDestroyWindow(display, propagationChild);
+	propagationChild = None;
+    }
+    BrowserClearEventQueue();
+    if (!propagationOk) {
 	return 0;
     }
 
