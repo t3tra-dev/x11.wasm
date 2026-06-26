@@ -2543,6 +2543,114 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestPropertyMutationApis(void)
+{
+    static const unsigned char replaceText[] = {'B'};
+    static const unsigned char appendText[] = {'C', 'D'};
+    static const unsigned char prependText[] = {'A'};
+    static const unsigned char partialText[] = {
+	'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'
+    };
+    Display *display;
+    Window window = None;
+    Atom property;
+    Atom actualType = None;
+    int actualFormat = 0;
+    unsigned long nitems = 0;
+    unsigned long bytesAfter = 0;
+    unsigned char *data = NULL;
+    int result = 0;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    property = XInternAtom(display, "_X11_WASM_PROPERTY_MUTATION_TEST", False);
+    window = XCreateSimpleWindow(display, browserDisplay.rootWindow, 0, 0,
+	    4, 4, 0, 0, 0);
+    if ((property == None) || (window == None)) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+
+    if ((XChangeProperty(display, window, property, XA_STRING, 8,
+		    PropModeReplace, replaceText, 1) != Success)
+	    || (XChangeProperty(display, window, property, XA_STRING, 8,
+		    PropModeAppend, appendText, 2) != Success)
+	    || (XChangeProperty(display, window, property, XA_STRING, 8,
+		    PropModePrepend, prependText, 1) != Success)) {
+	goto cleanup;
+    }
+    if ((XGetWindowProperty(display, window, property, 0, 1, False,
+		    AnyPropertyType, &actualType, &actualFormat, &nitems,
+		    &bytesAfter, &data) != Success)
+	    || (actualType != XA_STRING) || (actualFormat != 8)
+	    || (nitems != 4) || (bytesAfter != 0) || (data == NULL)
+	    || (memcmp(data, "ABCD", 4) != 0) || (data[4] != '\0')) {
+	goto cleanup;
+    }
+    XFree(data);
+    data = NULL;
+
+    if (XChangeProperty(display, window, property, XA_STRING, 8,
+	    PropModeReplace, partialText, (int)sizeof(partialText)) != Success) {
+	goto cleanup;
+    }
+    if ((XGetWindowProperty(display, window, property, 1, 1, True,
+		    XA_STRING, &actualType, &actualFormat, &nitems,
+		    &bytesAfter, &data) != Success)
+	    || (actualType != XA_STRING) || (actualFormat != 8)
+	    || (nitems != 4) || (bytesAfter != 4) || (data == NULL)
+	    || (memcmp(data, "EFGH", 4) != 0) || (data[4] != '\0')) {
+	goto cleanup;
+    }
+    XFree(data);
+    data = NULL;
+
+    if ((XGetWindowProperty(display, window, property, 0, 3, False,
+		    XA_STRING, &actualType, &actualFormat, &nitems,
+		    &bytesAfter, &data) != Success)
+	    || (actualType != XA_STRING) || (actualFormat != 8)
+	    || (nitems != sizeof(partialText)) || (bytesAfter != 0)
+	    || (data == NULL)
+	    || (memcmp(data, partialText, sizeof(partialText)) != 0)
+	    || (data[sizeof(partialText)] != '\0')) {
+	goto cleanup;
+    }
+    XFree(data);
+    data = NULL;
+
+    if ((XGetWindowProperty(display, window, property, 2, 1, True,
+		    XA_STRING, &actualType, &actualFormat, &nitems,
+		    &bytesAfter, &data) != Success)
+	    || (actualType != XA_STRING) || (actualFormat != 8)
+	    || (nitems != 4) || (bytesAfter != 0) || (data == NULL)
+	    || (memcmp(data, "IJKL", 4) != 0) || (data[4] != '\0')) {
+	goto cleanup;
+    }
+    XFree(data);
+    data = NULL;
+
+    if ((XGetWindowProperty(display, window, property, 0, 1, False,
+		    AnyPropertyType, &actualType, &actualFormat, &nitems,
+		    &bytesAfter, &data) != Success)
+	    || (actualType != None) || (actualFormat != 0) || (nitems != 0)
+	    || (bytesAfter != 0) || (data == NULL) || (data[0] != '\0')) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    if (data != NULL) {
+	XFree(data);
+    }
+    BrowserClearEventQueue();
+    if (window != None) {
+	(void)XDestroyWindow(display, window);
+    }
+    BrowserClearEventQueue();
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestSetClipboardText(int clear)
 {
     static const char clipboardText[] = "x11.wasm clipboard api";

@@ -791,6 +791,28 @@ test("Xlib extension and error text compatibility APIs are stable", async ({
   expect(result).toBe(1);
 });
 
+test("XChangeProperty appends, prepends, and partially retrieves data", async ({
+  page,
+}) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestPropertyMutationApis?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestPropertyMutationApis) {
+      throw new Error("missing property mutation test hook");
+    }
+    return module._X11WasmTestPropertyMutationApis();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XRecolorCursor resyncs window cursor styles", async ({ page }) => {
   await page.goto("/x11.html");
   await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
