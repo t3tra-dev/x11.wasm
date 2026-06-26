@@ -820,6 +820,68 @@ test("XRecolorCursor resyncs window cursor styles", async ({ page }) => {
   expect(state.cursor).toContain("data:image/png");
 });
 
+test("window style setters resync inherited child styles", async ({ page }) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const state = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestInheritedWindowStyleSync?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    if (!module?._X11WasmTestInheritedWindowStyleSync || !backend) {
+      throw new Error("missing inherited window style test hooks");
+    }
+    const pixelChildId = module._X11WasmTestInheritedWindowStyleSync(0);
+    const pixmapChildId = module._X11WasmTestInheritedWindowStyleSync(1);
+    backend.flush?.();
+    const pixelChild =
+      /** @type {X11WasmResource & { backgroundColor?: string | null, backgroundPixmap?: number, borderColor?: string | null, borderPixmap?: number } | undefined} */ (
+        backend.resources.get(pixelChildId)
+      );
+    const pixmapChild =
+      /** @type {X11WasmResource & { backgroundColor?: string | null, backgroundPixmap?: number, borderColor?: string | null, borderPixmap?: number } | undefined} */ (
+        backend.resources.get(pixmapChildId)
+      );
+    return {
+      pixelChildId,
+      pixmapChildId,
+      pixel: pixelChild
+        ? {
+            backgroundColor: pixelChild.backgroundColor,
+            backgroundPixmap: pixelChild.backgroundPixmap,
+            borderColor: pixelChild.borderColor,
+            borderPixmap: pixelChild.borderPixmap,
+          }
+        : null,
+      pixmap: pixmapChild
+        ? {
+            backgroundColor: pixmapChild.backgroundColor,
+            backgroundPixmap: pixmapChild.backgroundPixmap,
+            borderColor: pixmapChild.borderColor,
+            borderPixmap: pixmapChild.borderPixmap,
+          }
+        : null,
+    };
+  });
+
+  expect(state.pixelChildId).toBeGreaterThan(0);
+  expect(state.pixmapChildId).toBeGreaterThan(0);
+  expect(state.pixel).toEqual({
+    backgroundColor: "rgb(17 34 51)",
+    backgroundPixmap: 0,
+    borderColor: "rgb(68 85 102)",
+    borderPixmap: 0,
+  });
+  expect(state.pixmap?.backgroundColor).toBeNull();
+  expect(state.pixmap?.borderColor).toBeNull();
+  expect(state.pixmap?.backgroundPixmap).toBeGreaterThan(0);
+  expect(state.pixmap?.borderPixmap).toBeGreaterThan(0);
+});
+
 test("Xlib colormap compatibility APIs are stable", async ({ page }) => {
   await page.goto("/x11.html");
   await expect(page.locator("#x11-wasm-status")).toHaveText("running", {

@@ -8060,6 +8060,68 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE unsigned int
+X11WasmTestInheritedWindowStyleSync(int usePixmap)
+{
+    Display *display;
+    Window parent = None;
+    Window child = None;
+    Pixmap backgroundPixmap = None;
+    Pixmap borderPixmap = None;
+    int screen;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+    parent = XCreateWindow(display, browserDisplay.rootWindow, 12, 12, 32,
+	    24, 0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL);
+    child = XCreateWindow(display, parent, 4, 4, 16, 12, 0,
+	    CopyFromParent, InputOutput, DefaultVisual(display, screen), 0,
+	    NULL);
+    if ((parent == None) || (child == None)
+	    || (XMapWindow(display, parent) != Success)
+	    || (XMapWindow(display, child) != Success)
+	    || (XSetWindowBackgroundPixmap(display, child,
+		    (Pixmap)ParentRelative) != Success)
+	    || (XSetWindowBorderPixmap(display, child,
+		    (Pixmap)CopyFromParent) != Success)) {
+	goto error;
+    }
+
+    if (usePixmap) {
+	backgroundPixmap = XCreatePixmap(display, browserDisplay.rootWindow, 2,
+		2, (unsigned int)DefaultDepth(display, screen));
+	borderPixmap = XCreatePixmap(display, browserDisplay.rootWindow, 2, 2,
+		(unsigned int)DefaultDepth(display, screen));
+	if ((backgroundPixmap == None) || (borderPixmap == None)
+		|| (XSetWindowBackgroundPixmap(display, parent,
+			backgroundPixmap) != Success)
+		|| (XSetWindowBorderPixmap(display, parent, borderPixmap)
+			!= Success)) {
+	    goto error;
+	}
+    } else if ((XSetWindowBackground(display, parent, 0x112233UL)
+	    != Success)
+	    || (XSetWindowBorder(display, parent, 0x445566UL) != Success)) {
+	goto error;
+    }
+
+    return BrowserJsXId(child);
+
+error:
+    if (parent != None) {
+	(void)XDestroyWindow(display, parent);
+    }
+    if (backgroundPixmap != None) {
+	(void)XFreePixmap(display, backgroundPixmap);
+    }
+    if (borderPixmap != None) {
+	(void)XFreePixmap(display, borderPixmap);
+    }
+    return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE unsigned int
 X11WasmTestRecolorCursorWindowStyle(void)
 {
     Window window = None;
