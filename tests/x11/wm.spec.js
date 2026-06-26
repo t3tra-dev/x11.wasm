@@ -851,6 +851,77 @@ test("metadata target properties forward ICCCM metadata to another window", asyn
   });
 });
 
+test("metadata target API reapplies existing ICCCM metadata", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+  const [sourceId, targetId] = await createMappedWindows(page, 2);
+
+  const metadata = await page.evaluate(({ sourceId, targetId }) => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestSetWindowMetadataProperties?: Function, _X11WasmTestSetWindowMetadataTargetApi?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    if (
+      !module?._X11WasmTestSetWindowMetadataProperties ||
+      !module._X11WasmTestSetWindowMetadataTargetApi ||
+      !backend
+    ) {
+      throw new Error("missing metadata target API test hooks");
+    }
+
+    const metadataResult = module._X11WasmTestSetWindowMetadataProperties(
+      sourceId,
+      1,
+    );
+    backend.flush?.();
+    document.title = "metadata target API sentinel";
+    const targetResult = module._X11WasmTestSetWindowMetadataTargetApi(
+      sourceId,
+      targetId,
+      1,
+      1,
+    );
+    backend.flush?.();
+
+    const target = backend.resources.get(targetId);
+    const targetElement = target?.element;
+    if (!(targetElement instanceof HTMLElement) || !target) {
+      throw new Error("missing metadata target API test element");
+    }
+    return {
+      documentTitle: document.title,
+      metadataResult,
+      target: {
+        className: target.wmClassName,
+        classNameAttr: targetElement.getAttribute(
+          "data-x11-wasm-class-name",
+        ),
+        command: target.command,
+        commandAttr: targetElement.getAttribute("data-x11-wasm-command"),
+        title: target.title,
+        titleAttr: targetElement.getAttribute("data-x11-wasm-title"),
+      },
+      targetResult,
+    };
+  }, { sourceId, targetId });
+
+  expect(metadata).toEqual({
+    documentTitle: "X11Wasm Metadata Title",
+    metadataResult: 1,
+    target: {
+      className: "metadata",
+      classNameAttr: "metadata",
+      command: "x11wasm-test --metadata",
+      commandAttr: "x11wasm-test --metadata",
+      title: "X11Wasm Metadata Title",
+      titleAttr: "X11Wasm Metadata Title",
+    },
+    targetResult: 1,
+  });
+});
+
 test("browser backend reflects WM_HINTS relationships in DOM state", async ({
   page,
 }) => {

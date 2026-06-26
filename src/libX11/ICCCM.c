@@ -781,6 +781,19 @@ X11WasmTestSetWindowMetadataTargetProperty(
     return 1;
 }
 
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestSetWindowMetadataTargetApi(
+    unsigned int window,
+    unsigned int target,
+    int isRootToplevel,
+    int useDefaultDisplay)
+{
+    BrowserInitDisplay();
+    return X11WasmSetWindowMetadataTarget(
+	    useDefaultDisplay ? NULL : &browserDisplay.display, (Window)window,
+	    (Window)target, isRootToplevel);
+}
+
 void
 XSetWMSizeHints(
     Display *display,

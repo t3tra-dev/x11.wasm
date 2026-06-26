@@ -688,6 +688,7 @@ X11WasmSetWindowMetadataTarget(
     resourcePtr->metadataTarget = target;
     resourcePtr->metadataRootToplevelSet = 1;
     resourcePtr->metadataIsRootToplevel = isRootToplevel ? 1 : 0;
+    BrowserReapplyWindowMetadataProperties(window, resourcePtr);
     return 1;
 }
 
