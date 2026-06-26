@@ -6672,6 +6672,30 @@ X11WasmTestXlibApis(void)
 	    || (colormapWindowsReturn != NULL)) {
 	goto cleanup;
     }
+    if ((XChangeProperty(&browserDisplay.display, window,
+		    BrowserWmColormapWindowsAtom(), XA_ATOM, 32,
+		    PropModeReplace, (const unsigned char *)colormapWindowList, 1)
+	    != Success)) {
+	goto cleanup;
+    }
+    colormapWindowCount = -1;
+    if (XGetWMColormapWindows(&browserDisplay.display, window,
+	    &colormapWindowsReturn, &colormapWindowCount)
+	    || (colormapWindowCount != 0) || (colormapWindowsReturn != NULL)) {
+	goto cleanup;
+    }
+    if ((XChangeProperty(&browserDisplay.display, window,
+		    BrowserWmColormapWindowsAtom(), XA_WINDOW, 8,
+		    PropModeReplace, (const unsigned char *)"bad", 3)
+	    != Success)) {
+	goto cleanup;
+    }
+    colormapWindowCount = -1;
+    if (XGetWMColormapWindows(&browserDisplay.display, window,
+	    &colormapWindowsReturn, &colormapWindowCount)
+	    || (colormapWindowCount != 0) || (colormapWindowsReturn != NULL)) {
+	goto cleanup;
+    }
 
     protocolAtoms[0] = XInternAtom(&browserDisplay.display,
 	    "X11_WASM_TEST_PROTOCOL_ONE", False);
@@ -6696,6 +6720,28 @@ X11WasmTestXlibApis(void)
 		    &protocolAtomsReturn, &protocolAtomCount)
 	    || (protocolAtomCount != 0)
 	    || (protocolAtomsReturn != NULL)) {
+	goto cleanup;
+    }
+    if ((XChangeProperty(&browserDisplay.display, window,
+		    BrowserWmProtocolsAtom(), XA_STRING, 8, PropModeReplace,
+		    (const unsigned char *)"bad", 3) != Success)) {
+	goto cleanup;
+    }
+    protocolAtomCount = -1;
+    if (XGetWMProtocols(&browserDisplay.display, window,
+	    &protocolAtomsReturn, &protocolAtomCount)
+	    || (protocolAtomCount != 0) || (protocolAtomsReturn != NULL)) {
+	goto cleanup;
+    }
+    if ((XChangeProperty(&browserDisplay.display, window,
+		    BrowserWmProtocolsAtom(), XA_ATOM, 8, PropModeReplace,
+		    (const unsigned char *)"bad", 3) != Success)) {
+	goto cleanup;
+    }
+    protocolAtomCount = -1;
+    if (XGetWMProtocols(&browserDisplay.display, window,
+	    &protocolAtomsReturn, &protocolAtomCount)
+	    || (protocolAtomCount != 0) || (protocolAtomsReturn != NULL)) {
 	goto cleanup;
     }
 
