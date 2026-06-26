@@ -224,3 +224,20 @@ test("XSetSelectionOwner updates browser selection metadata", async ({
     },
   ]);
 });
+
+test("XConvertSelection delivers local owner requests", async ({ page }) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestLocalSelectionConversion?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestLocalSelectionConversion) {
+      throw new Error("missing local selection conversion test hook");
+    }
+    return module._X11WasmTestLocalSelectionConversion();
+  });
+
+  expect(result).toBe(1);
+});

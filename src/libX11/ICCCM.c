@@ -2579,6 +2579,99 @@ X11WasmTestSetPrimarySelectionOwner(unsigned int window, int enabled)
 	    enabled ? (Window)window : None, CurrentTime);
 }
 
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestLocalSelectionConversion(void)
+{
+    Display *display;
+    Window owner = None;
+    Window requestor = None;
+    Atom selection;
+    Atom target;
+    Atom property;
+    Time requestTime;
+    XEvent event;
+    int result = 0;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    selection = XInternAtom(display, "_X11_WASM_LOCAL_SELECTION", False);
+    target = XInternAtom(display, "_X11_WASM_LOCAL_SELECTION_TARGET", False);
+    property = XInternAtom(display, "_X11_WASM_LOCAL_SELECTION_PROPERTY",
+	    False);
+    owner = XCreateSimpleWindow(display, browserDisplay.rootWindow, 1, 1,
+	    4, 4, 0, 0, 0);
+    requestor = XCreateSimpleWindow(display, browserDisplay.rootWindow, 8, 1,
+	    4, 4, 0, 0, 0);
+    if ((selection == None) || (target == None) || (property == None)
+	    || (owner == None) || (requestor == None)) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+
+    if ((XSetSelectionOwner(display, selection, owner, CurrentTime)
+		    != Success)
+	    || (XGetSelectionOwner(display, selection) != owner)) {
+	goto cleanup;
+    }
+    requestTime = eventTime + 1;
+    if (XConvertSelection(display, selection, target, property, requestor,
+	    requestTime) != Success) {
+	goto cleanup;
+    }
+    memset(&event, 0, sizeof(event));
+    if ((XNextEvent(display, &event) != Success)
+	    || (event.type != SelectionRequest)
+	    || (event.xselectionrequest.owner != owner)
+	    || (event.xselectionrequest.requestor != requestor)
+	    || (event.xselectionrequest.selection != selection)
+	    || (event.xselectionrequest.target != target)
+	    || (event.xselectionrequest.property != property)
+	    || (event.xselectionrequest.time != requestTime)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    if ((XSetSelectionOwner(display, selection, owner, CurrentTime)
+		    != Success)
+	    || (XGetSelectionOwner(display, selection) != owner)) {
+	goto cleanup;
+    }
+    requestTime = eventTime + 1;
+    if (XConvertSelection(display, selection, target, property, requestor,
+	    requestTime) != Success) {
+	goto cleanup;
+    }
+    if (XDestroyWindow(display, owner) != Success) {
+	goto cleanup;
+    }
+    owner = None;
+    memset(&event, 0, sizeof(event));
+    if ((XNextEvent(display, &event) != Success)
+	    || (event.type != SelectionNotify)
+	    || (event.xselection.requestor != requestor)
+	    || (event.xselection.selection != selection)
+	    || (event.xselection.target != target)
+	    || (event.xselection.property != None)
+	    || (event.xselection.time != requestTime)
+	    || (XGetSelectionOwner(display, selection) != None)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    BrowserClearEventQueue();
+    if (owner != None) {
+	(void)XDestroyWindow(display, owner);
+    }
+    if (requestor != None) {
+	(void)XDestroyWindow(display, requestor);
+    }
+    BrowserClearEventQueue();
+    return result;
+}
+
 int XSetWindowBackground(Display *display, Window window, unsigned long pixel)
 {
     X11WasmResource *resourcePtr = BrowserWindowResourceOrError(&display,
