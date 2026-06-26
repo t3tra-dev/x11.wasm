@@ -2755,6 +2755,7 @@ X11WasmTestXlibApis(void)
     XSizeHints customHints;
     XSizeHints customHintsReturn;
     unsigned int oldSizeHints[15];
+    unsigned int malformedPropertyData[4];
     XWMHints wmHints;
     XWMHints *wmHintsReturn = NULL;
     XWindowAttributes inputOnlyAttributesReturn;
@@ -6349,6 +6350,30 @@ X11WasmTestXlibApis(void)
     XFree(classHintReturn.res_name);
     XFree(classHintReturn.res_class);
     memset(&classHintReturn, 0, sizeof(classHintReturn));
+    malformedPropertyData[0] = (unsigned int)XA_WM_CLASS;
+    malformedPropertyData[1] = (unsigned int)XA_WM_COMMAND;
+    malformedPropertyData[2] = (unsigned int)XA_WM_HINTS;
+    malformedPropertyData[3] = (unsigned int)XA_WM_NORMAL_HINTS;
+    if ((XChangeProperty(&browserDisplay.display, window, XA_WM_CLASS,
+		    XA_ATOM, 32, PropModeReplace,
+		    (const unsigned char *)malformedPropertyData, 1)
+	    != Success)
+	    || XGetClassHint(&browserDisplay.display, window,
+		    &classHintReturn)
+	    || (classHintReturn.res_name != NULL)
+	    || (classHintReturn.res_class != NULL)) {
+	goto cleanup;
+    }
+    if ((XChangeProperty(&browserDisplay.display, window, XA_WM_CLASS,
+		    XA_STRING, 32, PropModeReplace,
+		    (const unsigned char *)malformedPropertyData, 1)
+	    != Success)
+	    || XGetClassHint(&browserDisplay.display, window,
+		    &classHintReturn)
+	    || (classHintReturn.res_name != NULL)
+	    || (classHintReturn.res_class != NULL)) {
+	goto cleanup;
+    }
     if (!XGetCommand(&browserDisplay.display, window, &commandArgvReturn,
 	    &commandArgcReturn)
 	    || (commandArgcReturn != 2)
@@ -6359,6 +6384,30 @@ X11WasmTestXlibApis(void)
     XFreeStringList(commandArgvReturn);
     commandArgvReturn = NULL;
     commandArgcReturn = -1;
+    if ((XChangeProperty(&browserDisplay.display, window, XA_WM_COMMAND,
+		    XA_ATOM, 32, PropModeReplace,
+		    (const unsigned char *)malformedPropertyData, 1)
+	    != Success)
+	    || XGetCommand(&browserDisplay.display, window,
+		    &commandArgvReturn, &commandArgcReturn)
+	    || (commandArgcReturn != 0) || (commandArgvReturn != NULL)) {
+	goto cleanup;
+    }
+    commandArgcReturn = -1;
+    if ((XChangeProperty(&browserDisplay.display, window, XA_WM_COMMAND,
+		    XA_STRING, 32, PropModeReplace,
+		    (const unsigned char *)malformedPropertyData, 1)
+	    != Success)
+	    || XGetCommand(&browserDisplay.display, window,
+		    &commandArgvReturn, &commandArgcReturn)
+	    || (commandArgcReturn != 0) || (commandArgvReturn != NULL)) {
+	goto cleanup;
+    }
+    if (XSetCommand(&browserDisplay.display, window, commandArgv, 2)
+	    != Success) {
+	goto cleanup;
+    }
+    commandArgcReturn = -1;
     wmHintsReturn = XGetWMHints(&browserDisplay.display, window);
     if ((wmHintsReturn == NULL)
 	    || (wmHintsReturn->flags != wmHints.flags)
@@ -6368,6 +6417,29 @@ X11WasmTestXlibApis(void)
     }
     XFree(wmHintsReturn);
     wmHintsReturn = NULL;
+    if ((XChangeProperty(&browserDisplay.display, window, XA_WM_HINTS,
+		    XA_ATOM, 32, PropModeReplace,
+		    (const unsigned char *)malformedPropertyData, 1)
+	    != Success)
+	    || (XGetWMHints(&browserDisplay.display, window) != NULL)) {
+	goto cleanup;
+    }
+    if ((XChangeProperty(&browserDisplay.display, window, XA_WM_HINTS,
+		    XA_WM_HINTS, 8, PropModeReplace,
+		    (const unsigned char *)"bad", 3) != Success)
+	    || (XGetWMHints(&browserDisplay.display, window) != NULL)) {
+	goto cleanup;
+    }
+    if ((XChangeProperty(&browserDisplay.display, window, XA_WM_HINTS,
+		    XA_WM_HINTS, 32, PropModeReplace,
+		    (const unsigned char *)malformedPropertyData, 1)
+	    != Success)
+	    || (XGetWMHints(&browserDisplay.display, window) != NULL)) {
+	goto cleanup;
+    }
+    if (XSetWMHints(&browserDisplay.display, window, &wmHints) != Success) {
+	goto cleanup;
+    }
     if (XSetWMHints(&browserDisplay.display, window, NULL) != Success) {
 	goto cleanup;
     }
@@ -6401,6 +6473,39 @@ X11WasmTestXlibApis(void)
 	    || (normalHintsReturn.base_height != 11)) {
 	goto cleanup;
     }
+    suppliedHints = -1;
+    memset(&normalHintsReturn, 0xff, sizeof(normalHintsReturn));
+    if ((XChangeProperty(&browserDisplay.display, window, XA_WM_NORMAL_HINTS,
+		    XA_ATOM, 32, PropModeReplace,
+		    (const unsigned char *)malformedPropertyData, 1)
+	    != Success)
+	    || XGetWMNormalHints(&browserDisplay.display, window,
+		    &normalHintsReturn, &suppliedHints)
+	    || (suppliedHints != 0) || (normalHintsReturn.flags != 0)) {
+	goto cleanup;
+    }
+    suppliedHints = -1;
+    memset(&normalHintsReturn, 0xff, sizeof(normalHintsReturn));
+    if ((XChangeProperty(&browserDisplay.display, window, XA_WM_NORMAL_HINTS,
+		    XA_WM_SIZE_HINTS, 8, PropModeReplace,
+		    (const unsigned char *)"bad", 3) != Success)
+	    || XGetWMNormalHints(&browserDisplay.display, window,
+		    &normalHintsReturn, &suppliedHints)
+	    || (suppliedHints != 0) || (normalHintsReturn.flags != 0)) {
+	goto cleanup;
+    }
+    suppliedHints = -1;
+    memset(&normalHintsReturn, 0xff, sizeof(normalHintsReturn));
+    if ((XChangeProperty(&browserDisplay.display, window, XA_WM_NORMAL_HINTS,
+		    XA_WM_SIZE_HINTS, 32, PropModeReplace,
+		    (const unsigned char *)malformedPropertyData, 1)
+	    != Success)
+	    || XGetWMNormalHints(&browserDisplay.display, window,
+		    &normalHintsReturn, &suppliedHints)
+	    || (suppliedHints != 0) || (normalHintsReturn.flags != 0)) {
+	goto cleanup;
+    }
+    XSetWMNormalHints(&browserDisplay.display, window, &normalHints);
     memset(oldSizeHints, 0, sizeof(oldSizeHints));
     oldSizeHintsFlags = USPosition | USSize | PMinSize | PMaxSize
 	    | PResizeInc | PAspect | PBaseSize | PWinGravity | (1L << 30);
