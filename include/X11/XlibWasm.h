@@ -563,6 +563,7 @@ EXTERN int XSetFillStyle(Display *display, GC gc, int fill_style);
 EXTERN int XSetFunction(Display *display, GC gc, int function);
 EXTERN int XSetLineAttributes(Display *display, GC gc,
 	unsigned int line_width, int line_style, int cap_style, int join_style);
+EXTERN Status XInitImage(XImage *image);
 EXTERN int _XInitImageFuncPtrs(XImage *image);
 EXTERN XIC XCreateIC(XIM xim, ...);
 EXTERN XVisualInfo *XGetVisualInfo(Display *display, long vinfo_mask,

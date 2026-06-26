@@ -2673,6 +2673,70 @@ _XInitImageFuncPtrs(
     return Success;
 }
 
+Status
+XInitImage(
+    XImage *image)
+{
+    int bitmapPad;
+    int bitsPerPixel;
+    int minBytesPerLine;
+    unsigned long long xyBitsPerLine;
+
+    if ((image == NULL) || (image->width <= 0) || (image->height <= 0)
+	    || (image->depth <= 0) || (image->depth > 32)
+	    || !BrowserImageFormatIsValid(image->format)
+	    || ((image->format == XYBitmap) && (image->depth != 1))
+	    || (image->xoffset < 0)
+	    || ((image->byte_order != LSBFirst)
+		    && (image->byte_order != MSBFirst))
+	    || ((image->bitmap_bit_order != LSBFirst)
+		    && (image->bitmap_bit_order != MSBFirst))) {
+	return 0;
+    }
+    bitmapPad = (image->bitmap_pad != 0) ? image->bitmap_pad : 32;
+    if ((bitmapPad != 8) && (bitmapPad != 16) && (bitmapPad != 32)) {
+	return 0;
+    }
+    bitsPerPixel = (image->bits_per_pixel != 0) ? image->bits_per_pixel
+	    : ((image->format == ZPixmap)
+		    ? BrowserImageBitsPerPixel((unsigned int)image->depth) : 1);
+    if ((bitsPerPixel <= 0) || (bitsPerPixel > 32)
+	    || ((bitsPerPixel != 1) && ((bitsPerPixel % 8) != 0))
+	    || ((image->format == ZPixmap) && (bitsPerPixel < image->depth))
+	    || (((image->format == XYBitmap) || (image->format == XYPixmap))
+		    && (bitsPerPixel != 1))) {
+	return 0;
+    }
+    if ((image->format == XYBitmap) || (image->format == XYPixmap)) {
+	xyBitsPerLine = (unsigned long long)image->width
+		+ (unsigned long long)image->xoffset;
+	if (xyBitsPerLine > (unsigned long long)INT_MAX) {
+	    return 0;
+	}
+	minBytesPerLine = BrowserImageBytesPerLine((unsigned int)xyBitsPerLine,
+		1, bitmapPad);
+    } else {
+	minBytesPerLine = BrowserImageBytesPerLine((unsigned int)image->width,
+		bitsPerPixel, bitmapPad);
+    }
+    if ((minBytesPerLine <= 0)
+	    || ((image->bytes_per_line != 0)
+		    && (image->bytes_per_line < minBytesPerLine))) {
+	return 0;
+    }
+    image->bitmap_pad = bitmapPad;
+    if (image->bitmap_unit == 0) {
+	image->bitmap_unit = 32;
+    }
+    image->bits_per_pixel = bitsPerPixel;
+    if (image->bytes_per_line == 0) {
+	image->bytes_per_line = minBytesPerLine;
+    }
+    BrowserSetImageMasks(image);
+    BrowserInitImageFuncs(image);
+    return 1;
+}
+
 int
 BrowserGetImageDrawableMatches(
     Display **displayPtr,

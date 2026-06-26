@@ -1693,10 +1693,12 @@ X11WasmTestXlibApis(void)
     XImage *xyPixmapWindowReadback = NULL;
     XImage *xyBitmapSubImage = NULL;
     XImage *bitmapDataReadback = NULL;
+    XImage *stackImageReadback = NULL;
     XImage *textReadback = NULL;
     Window xyPixmapWindow = None;
     Pixmap xyBitmapPixmap = None;
     Pixmap bitmapDataPixmap = None;
+    Pixmap stackImagePixmap = None;
     GC xyPixmapWindowGC = NULL;
     GC xyBitmapGC = NULL;
     unsigned char image16Data[8];
@@ -1704,6 +1706,10 @@ X11WasmTestXlibApis(void)
     unsigned char xyPixmapData[3];
     unsigned char xyBitmapData[1];
     unsigned char xyBitmapSubImageData[16];
+    unsigned char stackImageData[16];
+    XImage stackImage;
+    XImage invalidStackImage;
+    XImage invalidBitsImage;
     int keysymsPerKeycode = -1;
     KeySym changedKeyboardMapping[2] = {XK_F13, XK_F14};
     KeySym unicodeSnowman =
@@ -2597,6 +2603,60 @@ X11WasmTestXlibApis(void)
 	    || (XGetPixel(image16, 2, 0) != 0x001fUL)
 	    || (XGetPixel(bitmapImage, 16, 0) != 1UL)
 	    || (bitmapImageData[2] != 1U)) {
+	goto cleanup;
+    }
+    memset(stackImageData, 0, sizeof(stackImageData));
+    memset(&stackImage, 0, sizeof(stackImage));
+    stackImage.width = 2;
+    stackImage.height = 1;
+    stackImage.format = ZPixmap;
+    stackImage.data = (char *)stackImageData;
+    stackImage.byte_order = LSBFirst;
+    stackImage.bitmap_bit_order = LSBFirst;
+    stackImage.depth = DefaultDepth(&browserDisplay.display,
+	    DefaultScreen(&browserDisplay.display));
+    memset(&invalidStackImage, 0, sizeof(invalidStackImage));
+    invalidStackImage.width = 2;
+    invalidStackImage.height = 1;
+    invalidStackImage.format = XYBitmap;
+    invalidStackImage.depth = 8;
+    invalidStackImage.byte_order = LSBFirst;
+    invalidStackImage.bitmap_bit_order = LSBFirst;
+    memset(&invalidBitsImage, 0, sizeof(invalidBitsImage));
+    invalidBitsImage.width = 2;
+    invalidBitsImage.height = 1;
+    invalidBitsImage.format = ZPixmap;
+    invalidBitsImage.depth = 8;
+    invalidBitsImage.bits_per_pixel = 7;
+    invalidBitsImage.byte_order = LSBFirst;
+    invalidBitsImage.bitmap_bit_order = LSBFirst;
+    if ((XInitImage(NULL) != 0) || (XInitImage(&invalidStackImage) != 0)
+	    || (XInitImage(&invalidBitsImage) != 0)
+	    || (XInitImage(&stackImage) == 0)
+	    || (stackImage.bits_per_pixel != BrowserImageBitsPerPixel(
+		    (unsigned int)stackImage.depth))
+	    || (stackImage.bytes_per_line != BrowserImageBytesPerLine(
+		    2U, stackImage.bits_per_pixel, stackImage.bitmap_pad))
+	    || (stackImage.f.get_pixel == NULL)
+	    || (XPutPixel(&stackImage, 0, 0, 0x123456UL) != Success)
+	    || (XPutPixel(&stackImage, 1, 0, 0xabcdefUL) != Success)
+	    || (XGetPixel(&stackImage, 0, 0) != 0x123456UL)
+	    || (XGetPixel(&stackImage, 1, 0) != 0xabcdefUL)) {
+	goto cleanup;
+    }
+    stackImagePixmap = XCreatePixmap(&browserDisplay.display,
+	    (Drawable)browserDisplay.rootWindow, 2, 1,
+	    (unsigned int)stackImage.depth);
+    if ((stackImagePixmap == None)
+	    || (XPutImage(&browserDisplay.display, stackImagePixmap, NULL,
+		    &stackImage, 0, 0, 0, 0, 2, 1) != Success)) {
+	goto cleanup;
+    }
+    stackImageReadback = XGetImage(&browserDisplay.display, stackImagePixmap,
+	    0, 0, 2, 1, AllPlanes, ZPixmap);
+    if ((stackImageReadback == NULL)
+	    || (XGetPixel(stackImageReadback, 0, 0) != 0x123456UL)
+	    || (XGetPixel(stackImageReadback, 1, 0) != 0xabcdefUL)) {
 	goto cleanup;
     }
     subImage16 = XSubImage(image16, 1, 0, 2, 1);
@@ -6302,6 +6362,9 @@ cleanup:
     if (bitmapDataReadback != NULL) {
 	(void)XDestroyImage(bitmapDataReadback);
     }
+    if (stackImageReadback != NULL) {
+	(void)XDestroyImage(stackImageReadback);
+    }
     if (xyBitmapImage != NULL) {
 	(void)XDestroyImage(xyBitmapImage);
     }
@@ -6325,6 +6388,9 @@ cleanup:
     }
     if (bitmapDataPixmap != None) {
 	(void)XFreePixmap(&browserDisplay.display, bitmapDataPixmap);
+    }
+    if (stackImagePixmap != None) {
+	(void)XFreePixmap(&browserDisplay.display, stackImagePixmap);
     }
     if (textPixmap != None) {
 	(void)XFreePixmap(&browserDisplay.display, textPixmap);

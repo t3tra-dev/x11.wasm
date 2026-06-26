@@ -24,6 +24,7 @@ X11WasmHeaderXlibOnlyPrototypeTest(void)
 	    unsigned char **, int *, int *) = XReadBitmapFileData;
     int (*writeBitmapFile)(Display *, _Xconst char *, Pixmap, unsigned int,
 	    unsigned int, int, int) = XWriteBitmapFile;
+    Status (*initImage)(XImage *) = XInitImage;
     XFontStruct *(*loadQueryFont)(Display *, _Xconst char *) =
 	    XLoadQueryFont;
     Region (*createRegion)(void) = XCreateRegion;
@@ -33,6 +34,6 @@ X11WasmHeaderXlibOnlyPrototypeTest(void)
 	    && (createWindow != 0) && (eventsQueued != 0)
 	    && (getMotionEvents != 0) && (readBitmapFile != 0)
 	    && (readBitmapFileData != 0) && (writeBitmapFile != 0)
-	    && (loadQueryFont != 0)
+	    && (initImage != 0) && (loadQueryFont != 0)
 	    && (createRegion != 0) && (freeData != 0);
 }
