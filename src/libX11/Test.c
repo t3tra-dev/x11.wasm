@@ -9390,6 +9390,9 @@ BrowserTestXrmDatabaseApis(void)
     XrmQuark qQuarks[8];
     XrmName qNames[8];
     XrmClass qClasses[8];
+    XrmHashTable searchList[8];
+    XrmHashTable shortSearchList[1];
+    XrmHashTable emptySearchList[2];
     XrmRepresentation qType = NULLQUARK;
     char *resourceType = NULL;
     FILE *file = NULL;
@@ -9471,6 +9474,58 @@ BrowserTestXrmDatabaseApis(void)
 	    || (readValue.addr == NULL)
 	    || (strcmp((const char *)readValue.addr,
 		    "wildcard-foreground") != 0)) {
+	goto cleanup;
+    }
+    XrmStringToNameList("wish.main", qNames);
+    XrmStringToClassList("Wish.Main", qClasses);
+    readValue.size = 0U;
+    readValue.addr = NULL;
+    qType = NULLQUARK;
+    if (!XrmQGetSearchList(database, qNames, qClasses, searchList,
+	    (int)(sizeof(searchList) / sizeof(searchList[0])))
+	    || (searchList[0] == NULL)
+	    || (XrmQGetSearchList(database, qNames, qClasses,
+		    shortSearchList, 1) != False)
+	    || !XrmQGetSearchList(NULL, qNames, qClasses, emptySearchList,
+		    (int)(sizeof(emptySearchList) / sizeof(emptySearchList[0])))
+	    || (emptySearchList[0] != NULL)
+	    || !XrmQGetSearchResource(searchList,
+		    XrmStringToName("foreground"),
+		    XrmStringToClass("Foreground"), &qType, &readValue)
+	    || (qType != XrmStringToRepresentation("String"))
+	    || (readValue.addr == NULL)
+	    || (strcmp((const char *)readValue.addr,
+		    "wildcard-foreground") != 0)) {
+	goto cleanup;
+    }
+    readValue.size = 0U;
+    readValue.addr = NULL;
+    qType = NULLQUARK;
+    if (!XrmQGetSearchResource(searchList, NULLQUARK,
+	    XrmStringToClass("Background"), &qType, &readValue)
+	    || (qType != XrmStringToRepresentation("String"))
+	    || (readValue.addr == NULL)
+	    || (strcmp((const char *)readValue.addr,
+		    "class-background") != 0)) {
+	goto cleanup;
+    }
+    readValue.size = 99U;
+    readValue.addr = (XPointer)"stale";
+    qType = XrmStringToRepresentation("Stale");
+    if ((XrmQGetSearchResource(searchList, XrmStringToName("missing"),
+	    XrmStringToClass("Missing"), &qType, &readValue) != False)
+	    || (qType != NULLQUARK) || (readValue.size != 0U)
+	    || (readValue.addr != NULL)) {
+	goto cleanup;
+    }
+    readValue.size = 99U;
+    readValue.addr = (XPointer)"stale";
+    qType = XrmStringToRepresentation("Stale");
+    if ((XrmQGetSearchResource(emptySearchList,
+	    XrmStringToName("foreground"), XrmStringToClass("Foreground"),
+	    &qType, &readValue) != False)
+	    || (qType != NULLQUARK) || (readValue.size != 0U)
+	    || (readValue.addr != NULL)) {
 	goto cleanup;
     }
     XrmPutStringResource(&putDatabase, "wish.geometry", "put-geometry");

@@ -17,6 +17,9 @@ extern "C" {
 #ifndef X11WASM_XRMDATABASE_DEFINED
 #define X11WASM_XRMDATABASE_DEFINED
 typedef struct _XrmHashBucketRec *XrmDatabase;
+typedef struct _XrmHashBucketRec *XrmHashBucket;
+typedef XrmHashBucket *XrmHashTable;
+typedef XrmHashTable XrmSearchList[];
 typedef XrmQuark XrmRepresentation;
 #define XrmStringToRepresentation(string) XrmStringToQuark(string)
 #define XrmRepresentationToString(type) XrmQuarkToString(type)
@@ -123,6 +126,18 @@ extern Bool XrmQGetResource(
     XrmNameList quark_name,
     XrmClassList quark_class,
     XrmRepresentation *quark_type_return,
+    XrmValue *value_return);
+extern Bool XrmQGetSearchList(
+    XrmDatabase database,
+    XrmNameList names,
+    XrmClassList classes,
+    XrmSearchList list_return,
+    int list_length);
+extern Bool XrmQGetSearchResource(
+    XrmSearchList list,
+    XrmName name,
+    XrmClass class,
+    XrmRepresentation *type_return,
     XrmValue *value_return);
 extern void XrmDestroyDatabase(
     XrmDatabase database);

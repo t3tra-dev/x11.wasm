@@ -32,6 +32,10 @@ X11WasmHeaderXresourcePrototypeTest(void)
 	    char **, XrmValue *) = XrmGetResource;
     Bool (*qGetResource)(XrmDatabase, XrmNameList, XrmClassList,
 	    XrmRepresentation *, XrmValue *) = XrmQGetResource;
+    Bool (*qGetSearchList)(XrmDatabase, XrmNameList, XrmClassList,
+	    XrmSearchList, int) = XrmQGetSearchList;
+    Bool (*qGetSearchResource)(XrmSearchList, XrmName, XrmClass,
+	    XrmRepresentation *, XrmValue *) = XrmQGetSearchResource;
     void (*destroyDatabase)(XrmDatabase) = XrmDestroyDatabase;
     void (*mergeDatabases)(XrmDatabase, XrmDatabase *) = XrmMergeDatabases;
     void (*combineDatabase)(XrmDatabase, XrmDatabase *, Bool) =
@@ -44,6 +48,7 @@ X11WasmHeaderXresourcePrototypeTest(void)
 	    _Xconst char *, int *, char **) = XrmParseCommand;
     XrmDatabase database = NULL;
     XrmBinding bindings[2];
+    XrmHashTable searchList[2];
     XrmQuark quarks[2];
     XrmOptionDescRec option;
     XrmName name = XrmStringToName("name");
@@ -62,6 +67,7 @@ X11WasmHeaderXresourcePrototypeTest(void)
 	    && (putLineResource != 0)
 	    && (qPutResource != 0) && (qPutStringResource != 0)
 	    && (qGetResource != 0)
+	    && (qGetSearchList != 0) && (qGetSearchResource != 0)
 	    && (stringToQuarkList != 0) && (stringToBindingQuarkList != 0)
 	    && (parseCommand != 0)
 	    && (destroyDatabase != 0) && (database == NULL)
@@ -71,6 +77,7 @@ X11WasmHeaderXresourcePrototypeTest(void)
 	    && (XrmRepresentationToString(representation) != NULLSTRING)
 	    && (bindings[0] = XrmBindTightly) == XrmBindTightly
 	    && (option.argKind = XrmoptionNoArg) == XrmoptionNoArg
+	    && (searchList[0] = NULL) == NULL
 	    && (quarks[0] = NULLQUARK) == NULLQUARK
 	    && (resourceType == NULL) && (value.addr == NULL);
 }

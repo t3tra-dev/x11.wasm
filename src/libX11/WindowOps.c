@@ -11,9 +11,17 @@ typedef struct BrowserXrmEntry {
     struct BrowserXrmEntry *nextPtr;
 } BrowserXrmEntry;
 
+typedef struct BrowserXrmSearchContext {
+    XrmDatabase database;
+    char *resourcePrefix;
+    char *classPrefix;
+    struct BrowserXrmSearchContext *nextPtr;
+} BrowserXrmSearchContext;
+
 struct _XrmHashBucketRec {
     BrowserXrmEntry *firstEntryPtr;
     BrowserXrmEntry *lastEntryPtr;
+    BrowserXrmSearchContext *firstSearchPtr;
 };
 
 typedef struct BrowserXrmComponent {
@@ -372,7 +380,72 @@ BrowserXrmNewDatabase(void)
 
     database->firstEntryPtr = NULL;
     database->lastEntryPtr = NULL;
+    database->firstSearchPtr = NULL;
     return database;
+}
+
+static void
+BrowserXrmDestroySearchContexts(
+    XrmDatabase database)
+{
+    BrowserXrmSearchContext *contextPtr;
+
+    if (database == NULL) {
+	return;
+    }
+    for (contextPtr = database->firstSearchPtr; contextPtr != NULL; ) {
+	BrowserXrmSearchContext *nextPtr = contextPtr->nextPtr;
+
+	if (contextPtr->resourcePrefix != NULL) {
+	    ckfree(contextPtr->resourcePrefix);
+	}
+	if (contextPtr->classPrefix != NULL) {
+	    ckfree(contextPtr->classPrefix);
+	}
+	ckfree(contextPtr);
+	contextPtr = nextPtr;
+    }
+    database->firstSearchPtr = NULL;
+}
+
+static char *
+BrowserXrmQuarkListToSearchString(
+    XrmQuarkList quarks)
+{
+    char *string = BrowserXrmQuarkListToBindingString(NULL, quarks);
+
+    return (string != NULL) ? string : BrowserDupString("");
+}
+
+static char *
+BrowserXrmJoinSearchPart(
+    const char *prefix,
+    const char *leaf)
+{
+    size_t prefixLength;
+    size_t leafLength;
+    char *string;
+    char *p;
+
+    if ((leaf == NULL) || (leaf[0] == '\0')) {
+	return NULL;
+    }
+    if (prefix == NULL) {
+	prefix = "";
+    }
+    prefixLength = strlen(prefix);
+    leafLength = strlen(leaf);
+    string = (char *)ckalloc(prefixLength + leafLength
+	    + ((prefixLength > 0U) ? 2U : 1U));
+    p = string;
+    if (prefixLength > 0U) {
+	memcpy(p, prefix, prefixLength);
+	p += prefixLength;
+	*p++ = '.';
+    }
+    memcpy(p, leaf, leafLength);
+    p[leafLength] = '\0';
+    return string;
 }
 
 static char *
@@ -1196,6 +1269,97 @@ cleanup:
     return result;
 }
 
+Bool
+XrmQGetSearchList(
+    XrmDatabase database,
+    XrmNameList names,
+    XrmClassList classes,
+    XrmSearchList listReturn,
+    int listLength)
+{
+    BrowserXrmSearchContext *contextPtr;
+
+    if ((listReturn == NULL) || (listLength <= 0)) {
+	return False;
+    }
+    listReturn[0] = NULL;
+    if (database == NULL) {
+	return True;
+    }
+    if (listLength < 2) {
+	return False;
+    }
+    contextPtr = (BrowserXrmSearchContext *)ckalloc(sizeof(*contextPtr));
+    contextPtr->database = database;
+    contextPtr->resourcePrefix = BrowserXrmQuarkListToSearchString(names);
+    contextPtr->classPrefix = BrowserXrmQuarkListToSearchString(classes);
+    contextPtr->nextPtr = database->firstSearchPtr;
+    database->firstSearchPtr = contextPtr;
+    listReturn[0] = (XrmHashTable)(void *)contextPtr;
+    listReturn[1] = NULL;
+    return True;
+}
+
+Bool
+XrmQGetSearchResource(
+    XrmSearchList list,
+    XrmName name,
+    XrmClass class,
+    XrmRepresentation *typeReturn,
+    XrmValue *valueReturn)
+{
+    BrowserXrmSearchContext *contextPtr;
+    const char *leafName = XrmNameToString(name);
+    const char *leafClass = XrmClassToString(class);
+    char *resourceName = NULL;
+    char *resourceClass = NULL;
+    char *resourceType = NULL;
+    Bool result = False;
+
+    if ((list == NULL) || (list[0] == NULL)) {
+	goto cleanup;
+    }
+    contextPtr = (BrowserXrmSearchContext *)(void *)list[0];
+    if (leafName != NULL) {
+	resourceName = BrowserXrmJoinSearchPart(contextPtr->resourcePrefix,
+		leafName);
+    } else if (leafClass != NULL) {
+	resourceName = BrowserXrmJoinSearchPart(contextPtr->resourcePrefix,
+		leafClass);
+    }
+    if (leafClass != NULL) {
+	resourceClass = BrowserXrmJoinSearchPart(contextPtr->classPrefix,
+		leafClass);
+    }
+    if (resourceName == NULL) {
+	goto cleanup;
+    }
+    result = XrmGetResource(contextPtr->database, resourceName,
+	    resourceClass, &resourceType, valueReturn);
+    if (typeReturn != NULL) {
+	*typeReturn = (result && (resourceType != NULL))
+		? XrmStringToRepresentation(resourceType) : NULLQUARK;
+    }
+
+cleanup:
+    if (!result) {
+	if (typeReturn != NULL) {
+	    *typeReturn = NULLQUARK;
+	}
+	if (valueReturn != NULL) {
+	    valueReturn->size = 0U;
+	    valueReturn->addr = NULL;
+	}
+    }
+    if (resourceName != NULL) {
+	ckfree(resourceName);
+    }
+    if (resourceClass != NULL) {
+	ckfree(resourceClass);
+    }
+    return result;
+}
+
 void
 XrmDestroyDatabase(
     XrmDatabase database)
@@ -1211,6 +1375,7 @@ XrmDestroyDatabase(
 	BrowserXrmDestroyEntry(entryPtr);
 	entryPtr = nextPtr;
     }
+    BrowserXrmDestroySearchContexts(database);
     ckfree(database);
 }
 
@@ -1250,6 +1415,7 @@ XrmCombineDatabase(
 	}
 	entryPtr = nextPtr;
     }
+    BrowserXrmDestroySearchContexts(sourceDatabase);
     ckfree(sourceDatabase);
 }
 
