@@ -55,6 +55,17 @@ extern void XrmStringToBindingQuarkList(
     XrmQuarkList quarks_return);
 extern XrmDatabase XrmGetStringDatabase(
     _Xconst char *data);
+extern XrmDatabase XrmGetFileDatabase(
+    _Xconst char *filename);
+extern Status XrmCombineFileDatabase(
+    _Xconst char *filename,
+    XrmDatabase *target_database,
+    Bool override);
+extern void XrmPutFileDatabase(
+    XrmDatabase database,
+    _Xconst char *filename);
+extern const char *XrmLocaleOfDatabase(
+    XrmDatabase database);
 extern XrmDatabase XrmGetDatabase(
     Display *display);
 extern void XrmSetDatabase(

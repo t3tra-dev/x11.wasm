@@ -9369,10 +9369,20 @@ BrowserTestXrmDatabaseApis(void)
 	    "*Background: class-background\n"
 	    "wish.geometry: last-geometry\n"
 	    "wish.empty:\n";
+    const char xrmFileText[] =
+	    "wish.geometry: file-geometry\n"
+	    "wish.file: file-value\n"
+	    "wish.escaped:\\ leading\\\\path\\nline\n";
+    const char xrmFilePath[] = "x11wasm-xrm-input.txt";
+    const char xrmOutputPath[] = "x11wasm-xrm-output.txt";
+    const char xrmMissingPath[] = "x11wasm-xrm-missing.txt";
     XrmDatabase database = NULL;
     XrmDatabase emptyDatabase = NULL;
     XrmDatabase putDatabase = NULL;
     XrmDatabase mergeDatabase = NULL;
+    XrmDatabase fileDatabase = NULL;
+    XrmDatabase outputDatabase = NULL;
+    XrmDatabase roundTripDatabase = NULL;
     XrmValue binaryValue;
     XrmValue readValue;
     XrmBinding qBindings[8];
@@ -9381,8 +9391,12 @@ BrowserTestXrmDatabaseApis(void)
     XrmClass qClasses[8];
     XrmRepresentation qType = NULLQUARK;
     char *resourceType = NULL;
+    FILE *file = NULL;
     int result = 0;
 
+    (void)remove(xrmFilePath);
+    (void)remove(xrmOutputPath);
+    (void)remove(xrmMissingPath);
     BrowserInitDisplay();
     display = &browserDisplay.display;
     XrmSetDatabase(display, NULL);
@@ -9525,6 +9539,62 @@ BrowserTestXrmDatabaseApis(void)
 		    "Wish.Border", "merge-border")) {
 	goto cleanup;
     }
+    file = fopen(xrmFilePath, "wb");
+    if (file == NULL) {
+	goto cleanup;
+    }
+    if (fwrite(xrmFileText, 1U, sizeof(xrmFileText) - 1U, file)
+	    != sizeof(xrmFileText) - 1U) {
+	(void)fclose(file);
+	file = NULL;
+	goto cleanup;
+    }
+    if (fclose(file) != 0) {
+	file = NULL;
+	goto cleanup;
+    }
+    file = NULL;
+    if (XrmGetFileDatabase(xrmMissingPath) != NULL) {
+	goto cleanup;
+    }
+    fileDatabase = XrmGetFileDatabase(xrmFilePath);
+    if ((fileDatabase == NULL)
+	    || (XrmLocaleOfDatabase(fileDatabase) == NULL)
+	    || (strcmp(XrmLocaleOfDatabase(fileDatabase), "C") != 0)
+	    || !BrowserTestXrmResourceEquals(fileDatabase, "wish.geometry",
+		    "Wish.Geometry", "file-geometry")
+	    || !BrowserTestXrmResourceEquals(fileDatabase, "wish.file",
+		    "Wish.File", "file-value")
+	    || !BrowserTestXrmResourceEquals(fileDatabase, "wish.escaped",
+		    "Wish.Escaped", " leading\\path\nline")) {
+	goto cleanup;
+    }
+    if ((XrmCombineFileDatabase(xrmMissingPath, &putDatabase, True) != 0)
+	    || (XrmCombineFileDatabase(xrmFilePath, &putDatabase, False)
+		    != 1)
+	    || !BrowserTestXrmResourceEquals(putDatabase, "wish.geometry",
+		    "Wish.Geometry", "merge-override")
+	    || !BrowserTestXrmResourceEquals(putDatabase, "wish.file",
+		    "Wish.File", "file-value")
+	    || (XrmCombineFileDatabase(xrmFilePath, &putDatabase, True)
+		    != 1)
+	    || !BrowserTestXrmResourceEquals(putDatabase, "wish.geometry",
+		    "Wish.Geometry", "file-geometry")) {
+	goto cleanup;
+    }
+    XrmPutStringResource(&outputDatabase, "wish.output",
+	    " leading\\path\nline");
+    XrmPutResource(&outputDatabase, "wish.outputBinary", "Binary",
+	    &binaryValue);
+    XrmPutFileDatabase(outputDatabase, xrmOutputPath);
+    roundTripDatabase = XrmGetFileDatabase(xrmOutputPath);
+    if ((roundTripDatabase == NULL)
+	    || !BrowserTestXrmResourceEquals(roundTripDatabase, "wish.output",
+		    "Wish.Output", " leading\\path\nline")
+	    || (XrmGetResource(roundTripDatabase, "wish.outputBinary",
+		    "Wish.OutputBinary", NULL, NULL) != False)) {
+	goto cleanup;
+    }
     XrmSetDatabase(display, database);
     if ((XCloseDisplay(display) != Success)
 	    || (XrmGetDatabase(display) != NULL)) {
@@ -9534,7 +9604,19 @@ BrowserTestXrmDatabaseApis(void)
     result = 1;
 
 cleanup:
+    if (file != NULL) {
+	(void)fclose(file);
+    }
     XrmSetDatabase(display, NULL);
+    if (roundTripDatabase != NULL) {
+	XrmDestroyDatabase(roundTripDatabase);
+    }
+    if (outputDatabase != NULL) {
+	XrmDestroyDatabase(outputDatabase);
+    }
+    if (fileDatabase != NULL) {
+	XrmDestroyDatabase(fileDatabase);
+    }
     if (mergeDatabase != NULL) {
 	XrmDestroyDatabase(mergeDatabase);
     }
@@ -9547,6 +9629,9 @@ cleanup:
     if (database != NULL) {
 	XrmDestroyDatabase(database);
     }
+    (void)remove(xrmFilePath);
+    (void)remove(xrmOutputPath);
+    (void)remove(xrmMissingPath);
     return result;
 }
 

@@ -217,6 +217,154 @@ BrowserXrmQuarkListToBindingString(
     return string;
 }
 
+static char *
+BrowserXrmReadFileString(
+    const char *filename)
+{
+    FILE *file;
+    long size;
+    size_t length;
+    char *buffer;
+
+    if (filename == NULL) {
+	return NULL;
+    }
+    file = fopen(filename, "rb");
+    if (file == NULL) {
+	return NULL;
+    }
+    if ((fseek(file, 0L, SEEK_END) != 0)
+	    || ((size = ftell(file)) < 0)
+	    || (fseek(file, 0L, SEEK_SET) != 0)) {
+	(void)fclose(file);
+	return NULL;
+    }
+    buffer = (char *)ckalloc((size_t)size + 1U);
+    length = fread(buffer, 1U, (size_t)size, file);
+    if ((ferror(file) != 0) || (length != (size_t)size)) {
+	(void)fclose(file);
+	ckfree(buffer);
+	return NULL;
+    }
+    if (fclose(file) != 0) {
+	ckfree(buffer);
+	return NULL;
+    }
+    buffer[length] = '\0';
+    return buffer;
+}
+
+static char *
+BrowserXrmDupResourceValue(
+    const char *start,
+    const char *end)
+{
+    char *copy = (char *)ckalloc((size_t)(end - start) + 1U);
+    char *out = copy;
+    const char *p;
+
+    for (p = start; p < end; p++) {
+	if (*p != '\\') {
+	    *out++ = *p;
+	    continue;
+	}
+	p++;
+	if (p >= end) {
+	    *out++ = '\\';
+	    break;
+	}
+	if (*p == 'n') {
+	    *out++ = '\n';
+	} else if ((*p >= '0') && (*p <= '7')) {
+	    int count = 0;
+	    unsigned int value = 0U;
+
+	    do {
+		value = (value * 8U) + (unsigned int)(*p - '0');
+		count++;
+		if ((count == 3) || (p + 1 >= end)
+			|| (p[1] < '0') || (p[1] > '7')) {
+		    break;
+		}
+		p++;
+	    } while (1);
+	    *out++ = (char)value;
+	} else {
+	    *out++ = *p;
+	}
+    }
+    *out = '\0';
+    return copy;
+}
+
+static int
+BrowserXrmWriteEscapedValue(
+    FILE *file,
+    const char *value,
+    unsigned int valueSize,
+    int stringValue)
+{
+    unsigned int index;
+    unsigned int limit = valueSize;
+
+    if (stringValue && (limit > 0U)) {
+	limit--;
+    }
+    if ((limit > 0U) && ((value[0] == ' ') || (value[0] == '\t'))
+	    && (fputc('\\', file) == EOF)) {
+	return 0;
+    }
+    for (index = 0U; index < limit; index++) {
+	unsigned char ch = UCHAR(value[index]);
+
+	if (ch == '\n') {
+	    if (fputs("\\n", file) == EOF) {
+		return 0;
+	    }
+	} else if (ch == '\\') {
+	    if (fputs("\\\\", file) == EOF) {
+		return 0;
+	    }
+	} else if (((ch < ' ') && (ch != '\t'))
+		|| ((ch >= 0x7fU) && (ch < 0xa0U))) {
+	    if (fprintf(file, "\\%03o", (unsigned int)ch) < 0) {
+		return 0;
+	    }
+	} else if (fputc((int)ch, file) == EOF) {
+	    return 0;
+	}
+    }
+    return 1;
+}
+
+static int
+BrowserXrmWriteFileEntry(
+    FILE *file,
+    const BrowserXrmEntry *entryPtr)
+{
+    int stringValue = (entryPtr->type != NULL)
+	    && (strcmp(entryPtr->type, "String") == 0);
+
+    if (!stringValue && (fputc('!', file) == EOF)) {
+	return 0;
+    }
+    if (fputs(entryPtr->binding, file) == EOF) {
+	return 0;
+    }
+    if (stringValue) {
+	if (fputs(":\t", file) == EOF) {
+	    return 0;
+	}
+    } else if (fprintf(file, "=%s:\t",
+	    (entryPtr->type != NULL) ? entryPtr->type : "") < 0) {
+	return 0;
+    }
+    return BrowserXrmWriteEscapedValue(file,
+	    (entryPtr->value != NULL) ? entryPtr->value : "",
+	    entryPtr->valueSize, stringValue)
+	    && (fputc('\n', file) != EOF);
+}
+
 static XrmDatabase
 BrowserXrmNewDatabase(void)
 {
@@ -621,7 +769,7 @@ BrowserXrmParseLineIntoDatabase(
     valueEnd = BrowserTrimDefaultSpaces(valueStart, lineEnd);
     BrowserXrmStoreStringEntry(database,
 	    BrowserDupRange(bindingStart, bindingEnd),
-	    BrowserDupRange(valueStart, valueEnd));
+	    BrowserXrmDupResourceValue(valueStart, valueEnd));
     return 1;
 }
 
@@ -879,6 +1027,79 @@ XrmGetStringDatabase(
 	lineStart = (*lineEnd == '\n') ? lineEnd + 1 : lineEnd;
     }
     return database;
+}
+
+XrmDatabase
+XrmGetFileDatabase(
+    _Xconst char *filename)
+{
+    char *data;
+    XrmDatabase database;
+
+    data = BrowserXrmReadFileString(filename);
+    if (data == NULL) {
+	return NULL;
+    }
+    database = XrmGetStringDatabase(data);
+    ckfree(data);
+    return database;
+}
+
+Status
+XrmCombineFileDatabase(
+    _Xconst char *filename,
+    XrmDatabase *targetDatabasePtr,
+    Bool override)
+{
+    XrmDatabase sourceDatabase;
+
+    if (targetDatabasePtr == NULL) {
+	return 0;
+    }
+    sourceDatabase = XrmGetFileDatabase(filename);
+    if (sourceDatabase == NULL) {
+	return 0;
+    }
+    XrmCombineDatabase(sourceDatabase, targetDatabasePtr, override);
+    return 1;
+}
+
+void
+XrmPutFileDatabase(
+    XrmDatabase database,
+    _Xconst char *filename)
+{
+    BrowserXrmEntry *entryPtr;
+    FILE *file;
+    int ok = 1;
+
+    if ((database == NULL) || (filename == NULL)) {
+	return;
+    }
+    file = fopen(filename, "wb");
+    if (file == NULL) {
+	return;
+    }
+    for (entryPtr = database->firstEntryPtr; entryPtr != NULL;
+	    entryPtr = entryPtr->nextPtr) {
+	if (!BrowserXrmWriteFileEntry(file, entryPtr)) {
+	    ok = 0;
+	    break;
+	}
+    }
+    if (fclose(file) != 0) {
+	ok = 0;
+    }
+    if (!ok) {
+	(void)remove(filename);
+    }
+}
+
+const char *
+XrmLocaleOfDatabase(
+    XrmDatabase database)
+{
+    return (database != NULL) ? "C" : NULL;
 }
 
 Bool

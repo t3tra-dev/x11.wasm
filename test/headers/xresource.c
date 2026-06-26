@@ -10,6 +10,12 @@ int
 X11WasmHeaderXresourcePrototypeTest(void)
 {
     XrmDatabase (*getStringDatabase)(_Xconst char *) = XrmGetStringDatabase;
+    XrmDatabase (*getFileDatabase)(_Xconst char *) = XrmGetFileDatabase;
+    Status (*combineFileDatabase)(_Xconst char *, XrmDatabase *, Bool) =
+	    XrmCombineFileDatabase;
+    void (*putFileDatabase)(XrmDatabase, _Xconst char *) =
+	    XrmPutFileDatabase;
+    const char *(*localeOfDatabase)(XrmDatabase) = XrmLocaleOfDatabase;
     XrmDatabase (*getDatabase)(Display *) = XrmGetDatabase;
     void (*setDatabase)(Display *, XrmDatabase) = XrmSetDatabase;
     void (*putResource)(XrmDatabase *, _Xconst char *, _Xconst char *,
@@ -45,7 +51,9 @@ X11WasmHeaderXresourcePrototypeTest(void)
 
     value.size = 0;
     value.addr = NULL;
-    return (getStringDatabase != 0) && (getResource != 0)
+    return (getStringDatabase != 0) && (getFileDatabase != 0)
+	    && (combineFileDatabase != 0) && (putFileDatabase != 0)
+	    && (localeOfDatabase != 0) && (getResource != 0)
 	    && (getDatabase != 0) && (setDatabase != 0)
 	    && (putResource != 0) && (putStringResource != 0)
 	    && (putLineResource != 0)
