@@ -345,6 +345,56 @@ test("browser backend applies clip rect to canvas drawing", async ({ page }) => 
   expect(samples.outside[3]).toBe(0);
 });
 
+test("Xlib GC clip rectangles and empty regions constrain drawing", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+
+  const samples = await page.evaluate(async () => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestGCClipRendering?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    if (!module?._X11WasmTestGCClipRendering || !backend) {
+      throw new Error("missing Xlib GC clip rendering test hooks");
+    }
+    const windowId = module._X11WasmTestGCClipRendering() >>> 0;
+    backend.flush?.();
+    const resource = backend.resources.get(windowId);
+    const canvas = resource?.canvas;
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      throw new Error("missing Xlib GC clip rendering canvas");
+    }
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("missing Xlib GC clip rendering context");
+    }
+    const pixel = (x, y) => Array.from(context.getImageData(x, y, 1, 1).data);
+    return {
+      firstClip: pixel(12, 12),
+      gap: pixel(34, 12),
+      secondClip: pixel(50, 12),
+      untouchedBase: pixel(70, 12),
+      windowId,
+    };
+  });
+
+  for (const sample of [samples.firstClip, samples.secondClip]) {
+    expect(sample[0]).toBeGreaterThan(180);
+    expect(sample[1]).toBeLessThan(80);
+    expect(sample[2]).toBeLessThan(80);
+    expect(sample[3]).toBe(255);
+  }
+  for (const sample of [samples.gap, samples.untouchedBase]) {
+    expect(sample[0]).toBeLessThan(80);
+    expect(sample[1]).toBeLessThan(80);
+    expect(sample[2]).toBeGreaterThan(180);
+    expect(sample[3]).toBe(255);
+  }
+  expect(samples.windowId).toBeGreaterThan(0);
+});
+
 test("browser backend applies GC raster operations", async ({
   page,
 }) => {

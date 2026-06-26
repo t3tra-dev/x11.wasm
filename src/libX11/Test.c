@@ -1861,6 +1861,75 @@ BrowserTestPopExposeEvent(
     return 1;
 }
 
+EMSCRIPTEN_KEEPALIVE unsigned int
+X11WasmTestGCClipRendering(void)
+{
+    Display *display;
+    GC gc = NULL;
+    Region emptyRegion = NULL;
+    Window window = None;
+    XRectangle clips[2];
+    unsigned int result = 0;
+    int screen;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+    window = XCreateWindow(display, browserDisplay.rootWindow, 0, 0, 80,
+	    40, 0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL);
+    gc = (window != None) ? XCreateGC(display, window, 0, NULL) : NULL;
+    emptyRegion = XCreateRegion();
+    if ((window == None) || (gc == NULL) || (emptyRegion == NULL)
+	    || (XMapWindow(display, window) != Success)) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+
+    if ((XSetForeground(display, gc, 0x0000ffUL) != Success)
+	    || (XFillRectangle(display, window, gc, 0, 0, 80, 40)
+		    != Success)) {
+	goto cleanup;
+    }
+    clips[0].x = 10;
+    clips[0].y = 10;
+    clips[0].width = 16;
+    clips[0].height = 18;
+    clips[1].x = 46;
+    clips[1].y = 10;
+    clips[1].width = 16;
+    clips[1].height = 18;
+    if ((XSetClipRectangles(display, gc, 0, 0, clips, 2, Unsorted)
+		    != Success)
+	    || (XSetForeground(display, gc, 0xff0000UL) != Success)
+	    || (XFillRectangle(display, window, gc, 0, 0, 80, 40)
+		    != Success)) {
+	goto cleanup;
+    }
+    if ((XSetRegion(display, gc, emptyRegion) != Success)
+	    || (XSetForeground(display, gc, 0x00ff00UL) != Success)
+	    || (XFillRectangle(display, window, gc, 0, 0, 80, 40)
+		    != Success)) {
+	goto cleanup;
+    }
+    result = (unsigned int)BrowserJsXId(window);
+    window = None;
+
+cleanup:
+    BrowserClearEventQueue();
+    if (emptyRegion != NULL) {
+	XDestroyRegion(emptyRegion);
+    }
+    if (gc != NULL) {
+	(void)XFreeGC(display, gc);
+    }
+    if (window != None) {
+	(void)XDestroyWindow(display, window);
+    }
+    BrowserClearEventQueue();
+    return result;
+}
+
 static int
 BrowserTestPopCirculateEvent(
     Window eventWindow,
