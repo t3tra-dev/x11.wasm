@@ -750,7 +750,7 @@ BrowserFindExactPassiveKeyGrab(
 }
 
 static void
-BrowserInstallPassiveButtonGrab(
+BrowserInstallExactPassiveButtonGrab(
     Window window,
     unsigned int button,
     unsigned int modifiers,
@@ -788,7 +788,46 @@ BrowserInstallPassiveButtonGrab(
 }
 
 static void
-BrowserInstallPassiveKeyGrab(
+BrowserInstallPassiveButtonGrab(
+    Window window,
+    unsigned int button,
+    unsigned int modifiers,
+    Bool ownerEvents,
+    unsigned int eventMask,
+    int pointerMode,
+    int keyboardMode,
+    Window confineTo,
+    Cursor cursor)
+{
+    unsigned int buttonValue;
+    unsigned int firstButton = (button == AnyButton) ? 1U : button;
+    unsigned int lastButton = (button == AnyButton) ? 255U : button;
+    unsigned int modifierMask = BrowserPassiveGrabModifierMask();
+
+    for (buttonValue = firstButton; buttonValue <= lastButton;
+	    buttonValue++) {
+	if (modifiers == AnyModifier) {
+	    unsigned int modifierValue;
+
+	    for (modifierValue = 0; modifierValue <= modifierMask;
+		    modifierValue++) {
+		if ((modifierValue & ~modifierMask) != 0) {
+		    continue;
+		}
+		BrowserInstallExactPassiveButtonGrab(window, buttonValue,
+			modifierValue, ownerEvents, eventMask, pointerMode,
+			keyboardMode, confineTo, cursor);
+	    }
+	} else {
+	    BrowserInstallExactPassiveButtonGrab(window, buttonValue,
+		    modifiers, ownerEvents, eventMask, pointerMode,
+		    keyboardMode, confineTo, cursor);
+	}
+    }
+}
+
+static void
+BrowserInstallExactPassiveKeyGrab(
     Window window,
     int keycode,
     unsigned int modifiers,
@@ -811,6 +850,41 @@ BrowserInstallPassiveKeyGrab(
     grabPtr->ownerEvents = ownerEvents ? 1 : 0;
     grabPtr->pointerMode = pointerMode;
     grabPtr->keyboardMode = keyboardMode;
+}
+
+static void
+BrowserInstallPassiveKeyGrab(
+    Display *display,
+    Window window,
+    int keycode,
+    unsigned int modifiers,
+    Bool ownerEvents,
+    int pointerMode,
+    int keyboardMode)
+{
+    int keycodeValue;
+    int firstKeycode = (keycode == AnyKey) ? display->min_keycode : keycode;
+    int lastKeycode = (keycode == AnyKey) ? display->max_keycode : keycode;
+    unsigned int modifierMask = BrowserPassiveGrabModifierMask();
+
+    for (keycodeValue = firstKeycode; keycodeValue <= lastKeycode;
+	    keycodeValue++) {
+	if (modifiers == AnyModifier) {
+	    unsigned int modifierValue;
+
+	    for (modifierValue = 0; modifierValue <= modifierMask;
+		    modifierValue++) {
+		if ((modifierValue & ~modifierMask) != 0) {
+		    continue;
+		}
+		BrowserInstallExactPassiveKeyGrab(window, keycodeValue,
+			modifierValue, ownerEvents, pointerMode, keyboardMode);
+	    }
+	} else {
+	    BrowserInstallExactPassiveKeyGrab(window, keycodeValue,
+		    modifiers, ownerEvents, pointerMode, keyboardMode);
+	}
+    }
 }
 
 static int
@@ -1494,7 +1568,7 @@ XGrabKey(
 	return Success;
     }
     if (display == &browserDisplay.display) {
-	BrowserInstallPassiveKeyGrab(grabWindow, keycode, modifiers,
+	BrowserInstallPassiveKeyGrab(display, grabWindow, keycode, modifiers,
 		ownerEvents, pointerMode, keyboardMode);
     }
     return XNoOp(display);
