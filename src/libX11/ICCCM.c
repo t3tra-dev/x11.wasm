@@ -2840,12 +2840,18 @@ X11WasmTestSetPrimarySelectionOwner(unsigned int window, int enabled)
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestLocalSelectionConversion(void)
 {
+    static const unsigned char selectionData[] = {'o', 'k'};
     Display *display;
     Window owner = None;
     Window requestor = None;
     Atom selection;
     Atom target;
     Atom property;
+    Atom actualType = None;
+    int actualFormat = 0;
+    unsigned long nitems = 0;
+    unsigned long bytesAfter = 0;
+    unsigned char *data = NULL;
     Time requestTime;
     XEvent event;
     int result = 0;
@@ -2888,6 +2894,95 @@ X11WasmTestLocalSelectionConversion(void)
 	    || (XEventsQueued(display, QueuedAlready) != 0)) {
 	goto cleanup;
     }
+    if (XChangeProperty(display, requestor, property, target, 8,
+	    PropModeReplace, selectionData, (int)sizeof(selectionData))
+	    != Success) {
+	goto cleanup;
+    }
+    memset(&event, 0, sizeof(event));
+    event.xselection.type = SelectionNotify;
+    event.xselection.display = display;
+    event.xselection.requestor = requestor;
+    event.xselection.selection = selection;
+    event.xselection.target = target;
+    event.xselection.property = property;
+    event.xselection.time = requestTime;
+    if ((XSendEvent(display, requestor, False, NoEventMask, &event)
+		    != True)
+	    || (XNextEvent(display, &event) != Success)
+	    || (event.type != SelectionNotify)
+	    || (event.xselection.send_event != True)
+	    || (event.xselection.requestor != requestor)
+	    || (event.xselection.selection != selection)
+	    || (event.xselection.target != target)
+	    || (event.xselection.property != property)
+	    || (event.xselection.time != requestTime)
+	    || (XGetWindowProperty(display, requestor, property, 0,
+		    (long)sizeof(selectionData), False, target, &actualType,
+		    &actualFormat, &nitems, &bytesAfter, &data) != Success)
+	    || (actualType != target) || (actualFormat != 8)
+	    || (nitems != sizeof(selectionData)) || (bytesAfter != 0)
+	    || (data == NULL)
+	    || (memcmp(data, selectionData, sizeof(selectionData)) != 0)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    XFree(data);
+    data = NULL;
+
+    BrowserClearEventQueue();
+    requestTime++;
+    if (XConvertSelection(display, selection, target, None, requestor,
+	    requestTime) != Success) {
+	goto cleanup;
+    }
+    memset(&event, 0, sizeof(event));
+    if ((XNextEvent(display, &event) != Success)
+	    || (event.type != SelectionRequest)
+	    || (event.xselectionrequest.owner != owner)
+	    || (event.xselectionrequest.requestor != requestor)
+	    || (event.xselectionrequest.selection != selection)
+	    || (event.xselectionrequest.target != target)
+	    || (event.xselectionrequest.property != None)
+	    || (event.xselectionrequest.time != requestTime)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    if (XChangeProperty(display, requestor, target, target, 8,
+	    PropModeReplace, selectionData, (int)sizeof(selectionData))
+	    != Success) {
+	goto cleanup;
+    }
+    memset(&event, 0, sizeof(event));
+    event.xselection.type = SelectionNotify;
+    event.xselection.display = display;
+    event.xselection.requestor = requestor;
+    event.xselection.selection = selection;
+    event.xselection.target = target;
+    event.xselection.property = target;
+    event.xselection.time = requestTime;
+    if ((XSendEvent(display, requestor, False, NoEventMask, &event)
+		    != True)
+	    || (XNextEvent(display, &event) != Success)
+	    || (event.type != SelectionNotify)
+	    || (event.xselection.send_event != True)
+	    || (event.xselection.requestor != requestor)
+	    || (event.xselection.selection != selection)
+	    || (event.xselection.target != target)
+	    || (event.xselection.property != target)
+	    || (event.xselection.time != requestTime)
+	    || (XGetWindowProperty(display, requestor, target, 0,
+		    (long)sizeof(selectionData), False, target, &actualType,
+		    &actualFormat, &nitems, &bytesAfter, &data) != Success)
+	    || (actualType != target) || (actualFormat != 8)
+	    || (nitems != sizeof(selectionData)) || (bytesAfter != 0)
+	    || (data == NULL)
+	    || (memcmp(data, selectionData, sizeof(selectionData)) != 0)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    XFree(data);
+    data = NULL;
 
     BrowserClearEventQueue();
     if ((XSetSelectionOwner(display, selection, owner, CurrentTime)
@@ -2919,6 +3014,9 @@ X11WasmTestLocalSelectionConversion(void)
     result = 1;
 
 cleanup:
+    if (data != NULL) {
+	XFree(data);
+    }
     BrowserClearEventQueue();
     if (owner != None) {
 	(void)XDestroyWindow(display, owner);
