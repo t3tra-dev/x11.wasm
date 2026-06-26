@@ -585,6 +585,50 @@ X11WasmTestSetWindowMetadataProperties(unsigned int window, int enabled)
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestRotateWindowNameProperties(unsigned int window)
+{
+    Display *display;
+    Window xid = (Window)window;
+    Atom properties[2];
+    XTextProperty title;
+    XTextProperty iconName;
+    int result = 0;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    memset(&title, 0, sizeof(title));
+    memset(&iconName, 0, sizeof(iconName));
+    if (BrowserWindowResource(xid) == NULL) {
+	return 0;
+    }
+    properties[0] = XA_WM_NAME;
+    properties[1] = XA_WM_ICON_NAME;
+
+    if ((XStoreName(display, xid, "Rotated Title") != Success)
+	    || (XSetIconName(display, xid, "Rotated Icon") != Success)
+	    || (XRotateWindowProperties(display, xid, properties, 2, 1)
+		    != Success)
+	    || !XGetWMName(display, xid, &title)
+	    || !XGetWMIconName(display, xid, &iconName)
+	    || (title.value == NULL)
+	    || (iconName.value == NULL)
+	    || (strcmp((const char *)title.value, "Rotated Icon") != 0)
+	    || (strcmp((const char *)iconName.value, "Rotated Title") != 0)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    if (title.value != NULL) {
+	XFree(title.value);
+    }
+    if (iconName.value != NULL) {
+	XFree(iconName.value);
+    }
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestSetWindowNetWmNameProperties(unsigned int window, int mode)
 {
     static const char netTitle[] = "Net " "\xe2\x98\x83" " Title";

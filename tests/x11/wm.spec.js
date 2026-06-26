@@ -519,6 +519,52 @@ test("EWMH UTF-8 name properties override ICCCM title metadata", async ({
   });
 });
 
+test("XRotateWindowProperties reapplies browser name metadata", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+  const windowId = await createMappedWindow(page);
+
+  const metadata = await page.evaluate((windowId) => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestRotateWindowNameProperties?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    const resource = backend?.resources.get(windowId);
+    const element = resource?.element;
+    if (
+      !module?._X11WasmTestRotateWindowNameProperties ||
+      !backend ||
+      !resource ||
+      !(element instanceof HTMLElement)
+    ) {
+      throw new Error("missing window name rotation metadata test hooks");
+    }
+
+    const rotateResult =
+      module._X11WasmTestRotateWindowNameProperties(windowId);
+    backend.flush?.();
+    return {
+      attrIconName: element.getAttribute("data-x11-wasm-icon-name"),
+      attrTitle: element.getAttribute("data-x11-wasm-title"),
+      documentTitle: document.title,
+      resourceIconName: resource.iconName,
+      resourceTitle: resource.title,
+      rotateResult,
+    };
+  }, windowId);
+
+  expect(metadata).toEqual({
+    attrIconName: "Rotated Title",
+    attrTitle: "Rotated Icon",
+    documentTitle: "Rotated Icon",
+    resourceIconName: "Rotated Title",
+    resourceTitle: "Rotated Icon",
+    rotateResult: 1,
+  });
+});
+
 test("_NET_WM_WINDOW_TYPE updates browser window type metadata", async ({
   page,
 }) => {
