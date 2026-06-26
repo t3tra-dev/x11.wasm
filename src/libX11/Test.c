@@ -451,6 +451,17 @@ X11WasmTestEventQueueAndKeycodeApis(void)
     }
     BrowserClearEventQueue();
 
+    if (XAutoRepeatOff(display) != Success) {
+	return 28;
+    }
+    memset(&keyboardState, 0, sizeof(keyboardState));
+    if ((XGetKeyboardControl(display, &keyboardState) != Success)
+	    || (keyboardState.global_auto_repeat != AutoRepeatModeOff)) {
+	return 29;
+    }
+    if (XAutoRepeatOn(display) != Success) {
+	return 30;
+    }
     memset(&keyboardControl, 0, sizeof(keyboardControl));
     keyboardControl.key_click_percent = 0;
     keyboardControl.bell_percent = 50;
@@ -462,7 +473,7 @@ X11WasmTestEventQueueAndKeycodeApis(void)
     if (XChangeKeyboardControl(display, KBKeyClickPercent | KBBellPercent
 	    | KBBellPitch | KBBellDuration | KBLed | KBLedMode
 	    | KBAutoRepeatMode, &keyboardControl) != Success) {
-	return 28;
+	return 31;
     }
     if ((XGetPointerControl(display, &accelNumerator, &accelDenominator,
 		    &pointerThreshold) != Success)
@@ -4187,6 +4198,20 @@ X11WasmTestXlibApis(void)
     if ((XListHosts(&browserDisplay.display, &hostCount, &hostAccessEnabled)
 	    != NULL) || (hostCount != 0) || (hostAccessEnabled != True)) {
 	return 0;
+    }
+    if ((XSetAccessControl(&browserDisplay.display, DisableAccess)
+		    != Success)
+	    || (XListHosts(&browserDisplay.display, &hostCount,
+		    &hostAccessEnabled) != NULL)
+	    || (hostCount != 0) || (hostAccessEnabled != False)) {
+	goto cleanup;
+    }
+    if ((XSetAccessControl(&browserDisplay.display, EnableAccess)
+		    != Success)
+	    || (XListHosts(&browserDisplay.display, &hostCount,
+		    &hostAccessEnabled) != NULL)
+	    || (hostCount != 0) || (hostAccessEnabled != True)) {
+	goto cleanup;
     }
     if ((XDisableAccessControl(&browserDisplay.display) != Success)
 	    || (XListHosts(&browserDisplay.display, &hostCount,
