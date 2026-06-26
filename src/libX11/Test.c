@@ -9358,6 +9358,7 @@ BrowserTestXrmResourceEquals(
 static int
 BrowserTestXrmDatabaseApis(void)
 {
+    Display *display;
     const char resourceText[] =
 	    "! ignored comment\n"
 	    "*geometry: global-geometry\n"
@@ -9371,8 +9372,24 @@ BrowserTestXrmDatabaseApis(void)
     XrmDatabase emptyDatabase = NULL;
     int result = 0;
 
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    XrmSetDatabase(display, NULL);
+    if (XrmGetDatabase(display) != NULL) {
+	goto cleanup;
+    }
     database = XrmGetStringDatabase(resourceText);
     if (database == NULL) {
+	goto cleanup;
+    }
+    XrmSetDatabase(display, database);
+    if ((XrmGetDatabase(display) != database)
+	    || !BrowserTestXrmResourceEquals(XrmGetDatabase(display),
+		    "wish.geometry", "Wish.Geometry", "last-geometry")) {
+	goto cleanup;
+    }
+    XrmSetDatabase(display, NULL);
+    if (XrmGetDatabase(display) != NULL) {
 	goto cleanup;
     }
     if (!BrowserTestXrmResourceEquals(database, "wish.geometry",
@@ -9396,10 +9413,16 @@ BrowserTestXrmDatabaseApis(void)
 	    || (XrmGetStringDatabase(NULL) != NULL)) {
 	goto cleanup;
     }
+    XrmSetDatabase(display, database);
+    if ((XCloseDisplay(display) != Success)
+	    || (XrmGetDatabase(display) != NULL)) {
+	goto cleanup;
+    }
     XrmDestroyDatabase(NULL);
     result = 1;
 
 cleanup:
+    XrmSetDatabase(display, NULL);
     if (emptyDatabase != NULL) {
 	XrmDestroyDatabase(emptyDatabase);
     }

@@ -550,6 +550,26 @@ XrmInitialize(void)
 }
 
 XrmDatabase
+XrmGetDatabase(
+    Display *display)
+{
+    if (display == NULL) {
+	return NULL;
+    }
+    return (XrmDatabase)display->db;
+}
+
+void
+XrmSetDatabase(
+    Display *display,
+    XrmDatabase database)
+{
+    if (display != NULL) {
+	display->db = (struct _XrmHashBucketRec *)database;
+    }
+}
+
+XrmDatabase
 XrmGetStringDatabase(
     _Xconst char *data)
 {
@@ -728,6 +748,7 @@ XCloseDisplay(
 	browserDisplay.displayLockDepth = 0;
 	browserDisplay.afterFunction = NULL;
 	browserDisplay.runningAfterFunction = 0;
+	browserDisplay.display.db = NULL;
 	BrowserSyncSynchronizeState(display);
 	BrowserApplyCloseDownMode();
 	browserDisplay.closeDownMode = DestroyAll;

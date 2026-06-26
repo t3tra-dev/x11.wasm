@@ -26,6 +26,11 @@ typedef struct {
 
 extern XrmDatabase XrmGetStringDatabase(
     _Xconst char *data);
+extern XrmDatabase XrmGetDatabase(
+    Display *display);
+extern void XrmSetDatabase(
+    Display *display,
+    XrmDatabase database);
 extern Bool XrmGetResource(
     XrmDatabase database,
     _Xconst char *resource_name,
