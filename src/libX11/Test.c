@@ -9293,6 +9293,23 @@ X11WasmTestColormapApis(void)
 	    || (storedColor.blue != 0)) {
 	goto cleanup;
     }
+    storedColor.pixel = 0x010207UL;
+    storedColor.red = 0x1111;
+    storedColor.green = 0x2222;
+    storedColor.blue = 0x3333;
+    storedColor.flags = DoRed | DoGreen | DoBlue;
+    if ((XStoreColor(display, colormap, &storedColor) != Success)
+	    || (XStoreNamedColor(display, colormap, "red", storedColor.pixel,
+		    DoRed) != Success)) {
+	goto cleanup;
+    }
+    storedColor.pixel = 0x010207UL;
+    if ((XQueryColor(display, colormap, &storedColor) != Success)
+	    || (storedColor.red != 0xffff)
+	    || (storedColor.green != 0x2222)
+	    || (storedColor.blue != 0x3333)) {
+	goto cleanup;
+    }
 
     if (!XAllocColorCells(display, colormap, False, planeMasks, 2,
 	    allocatedPixels, 2)
