@@ -10290,6 +10290,9 @@ X11WasmTestXErrorHandler(void)
     int copyPlaneMultiplePlaneResult;
     int copyPlaneOutOfRangePlaneResult;
     int copyAreaDepthMismatchResult;
+    int drawGCDepthMismatchResult;
+    int copyPlaneGCDepthMismatchResult;
+    int putImageGCDepthMismatchResult;
     int drawResultSum;
     int drawValueValidationResultSum;
     int gcResultSum;
@@ -10330,6 +10333,9 @@ X11WasmTestXErrorHandler(void)
     int sawCopyPlaneZeroBadValue;
     int sawCopyPlaneMultipleBadValue;
     int sawCopyPlaneOutOfRangeBadValue;
+    int sawDrawGCDepthBadMatch;
+    int sawCopyPlaneGCDepthBadMatch;
+    int sawPutImageGCDepthBadMatch;
     int sawGrabButtonBadValue;
     int sawGrabButtonBadWindow;
     int sawGrabKeyBadValue;
@@ -10562,6 +10568,9 @@ X11WasmTestXErrorHandler(void)
     sawCopyPlaneZeroBadValue = 0;
     sawCopyPlaneMultipleBadValue = 0;
     sawCopyPlaneOutOfRangeBadValue = 0;
+    sawDrawGCDepthBadMatch = 0;
+    sawCopyPlaneGCDepthBadMatch = 0;
+    sawPutImageGCDepthBadMatch = 0;
     sawStoreBufferBadValue = 0;
     validRootPixmapResultSum = Success;
     rootPixmapErrorCount = 0;
@@ -10790,6 +10799,24 @@ X11WasmTestXErrorHandler(void)
 	    referenceGC, 0, 0, 1, 1, 0, 0);
     depthOneGC = XCreateGC(&browserDisplay.display,
 	    (Drawable)depthOnePixmap, 0, NULL);
+    drawGCDepthMismatchResult = XDrawPoint(&browserDisplay.display,
+	    (Drawable)browserDisplay.rootWindow, depthOneGC, 0, 0);
+    sawDrawGCDepthBadMatch = (browserTestLastErrorCode == BadMatch)
+	    && (browserTestLastRequestCode == X11_WASM_XREQ_POLY_POINT)
+	    && (browserTestLastResourceId == (XID)browserDisplay.rootWindow);
+    copyPlaneGCDepthMismatchResult = XCopyPlane(&browserDisplay.display,
+	    (Drawable)browserDisplay.rootWindow,
+	    (Drawable)browserDisplay.rootWindow, depthOneGC, 0, 0, 1, 1, 0, 0,
+	    1UL);
+    sawCopyPlaneGCDepthBadMatch = (browserTestLastErrorCode == BadMatch)
+	    && (browserTestLastRequestCode == X11_WASM_XREQ_COPY_PLANE)
+	    && (browserTestLastResourceId == (XID)browserDisplay.rootWindow);
+    putImageGCDepthMismatchResult = XPutImage(&browserDisplay.display,
+	    (Drawable)browserDisplay.rootWindow, depthOneGC,
+	    &depthMismatchPutImage, 0, 0, 0, 0, 1, 1);
+    sawPutImageGCDepthBadMatch = (browserTestLastErrorCode == BadMatch)
+	    && (browserTestLastRequestCode == X11_WASM_XREQ_PUT_IMAGE)
+	    && (browserTestLastResourceId == (XID)browserDisplay.rootWindow);
     depthMismatchPutImageResult = XPutImage(&browserDisplay.display,
 	    depthOnePixmap, depthOneGC, &depthMismatchPutImage,
 	    0, 0, 0, 0, 1, 1);
@@ -11550,6 +11577,12 @@ X11WasmTestXErrorHandler(void)
 	    || (referenceGC == NULL)
 	    || (depthOneGC == NULL)
 	    || (copyAreaDepthMismatchResult != Success)
+	    || (drawGCDepthMismatchResult != Success)
+	    || (copyPlaneGCDepthMismatchResult != Success)
+	    || (putImageGCDepthMismatchResult != Success)
+	    || !sawDrawGCDepthBadMatch
+	    || !sawCopyPlaneGCDepthBadMatch
+	    || !sawPutImageGCDepthBadMatch
 	    || (gcReferenceResultSum != Success)
 	    || (invalidDrawGCResultSum != Success)
 	    || (invalidCreateWindowResult != None)
@@ -11738,6 +11771,9 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_CHANGE_GC
 	    + X11_WASM_XREQ_CHANGE_GC
 	    + X11_WASM_XREQ_COPY_AREA
+	    + X11_WASM_XREQ_POLY_POINT
+	    + X11_WASM_XREQ_COPY_PLANE
+	    + X11_WASM_XREQ_PUT_IMAGE
 	    + X11_WASM_XREQ_COPY_GC
 	    + X11_WASM_XREQ_COPY_GC
 	    + X11_WASM_XREQ_CHANGE_GC
@@ -11946,7 +11982,7 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 245)
+    if ((browserTestXErrorCount != 248)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)

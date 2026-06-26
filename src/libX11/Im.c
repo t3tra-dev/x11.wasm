@@ -1771,7 +1771,8 @@ BrowserDrawUtf8ImageText(
     if (resourcePtr == NULL) {
 	return;
     }
-    if (!BrowserOptionalGCOrError(&display, gc, X11_WASM_XREQ_POLY_TEXT_8)) {
+    if (!BrowserDrawableGCDepthMatchesOrError(&display, resourcePtr, drawable,
+	    gc, X11_WASM_XREQ_POLY_TEXT_8)) {
 	return;
     }
     width = BrowserFontSetTextEscapement(fontSet, utf8, length);

@@ -268,7 +268,8 @@ int XCopyArea(Display *d, Drawable s, Drawable t, GC g, int sx, int sy,
 	    X11_WASM_XREQ_COPY_AREA)) {
 	return Success;
     }
-    if (!BrowserOptionalGCOrError(&d, g, X11_WASM_XREQ_COPY_AREA)) {
+    if (!BrowserDrawableGCDepthMatchesOrError(&d, targetPtr, t, g,
+	    X11_WASM_XREQ_COPY_AREA)) {
 	return Success;
     }
     if (!BrowserValidateDrawableDimensions(&d, w, h,
@@ -301,7 +302,8 @@ int XCopyPlane(Display *d, Drawable s, Drawable t, GC g, int sx, int sy,
     if (targetPtr == NULL) {
 	return Success;
     }
-    if (!BrowserOptionalGCOrError(&d, g, X11_WASM_XREQ_COPY_PLANE)) {
+    if (!BrowserDrawableGCDepthMatchesOrError(&d, targetPtr, t, g,
+	    X11_WASM_XREQ_COPY_PLANE)) {
 	return Success;
     }
     if (!BrowserValidateDrawableDimensions(&d, w, h,
@@ -346,7 +348,8 @@ BrowserDrawArc(
     if (resourcePtr == NULL) {
 	return 0;
     }
-    if (!BrowserOptionalGCOrError(displayPtr, gc, requestCode)) {
+    if (!BrowserDrawableGCDepthMatchesOrError(displayPtr, resourcePtr, drawable,
+	    gc, requestCode)) {
 	return 0;
     }
     if (!BrowserValidateDrawableDimensions(displayPtr, width, height,
@@ -418,7 +421,8 @@ BrowserDrawLine(
     if (resourcePtr == NULL) {
 	return 0;
     }
-    if (!BrowserOptionalGCOrError(displayPtr, gc, requestCode)) {
+    if (!BrowserDrawableGCDepthMatchesOrError(displayPtr, resourcePtr, drawable,
+	    gc, requestCode)) {
 	return 0;
     }
     BrowserApplyGCStyle(gc);
@@ -491,7 +495,8 @@ BrowserDrawPoint(
     if (resourcePtr == NULL) {
 	return 0;
     }
-    if (!BrowserOptionalGCOrError(displayPtr, gc, requestCode)) {
+    if (!BrowserDrawableGCDepthMatchesOrError(displayPtr, resourcePtr, drawable,
+	    gc, requestCode)) {
 	return 0;
     }
     BrowserApplyGCStyle(gc);
@@ -561,7 +566,8 @@ BrowserDrawRectangle(
     if (resourcePtr == NULL) {
 	return 0;
     }
-    if (!BrowserOptionalGCOrError(displayPtr, gc, requestCode)) {
+    if (!BrowserDrawableGCDepthMatchesOrError(displayPtr, resourcePtr, drawable,
+	    gc, requestCode)) {
 	return 0;
     }
     if (!BrowserValidateDrawableDimensions(displayPtr, width, height,
@@ -649,7 +655,8 @@ BrowserFillArc(
     if (resourcePtr == NULL) {
 	return 0;
     }
-    if (!BrowserOptionalGCOrError(displayPtr, gc, requestCode)) {
+    if (!BrowserDrawableGCDepthMatchesOrError(displayPtr, resourcePtr, drawable,
+	    gc, requestCode)) {
 	return 0;
     }
     if (!BrowserValidateDrawableDimensions(displayPtr, width, height,
@@ -729,7 +736,8 @@ BrowserFillPolygon(
 	    || !BrowserValidateCoordMode(displayPtr, mode, requestCode)) {
 	return 0;
     }
-    if (!BrowserOptionalGCOrError(displayPtr, gc, requestCode)) {
+    if (!BrowserDrawableGCDepthMatchesOrError(displayPtr, resourcePtr, drawable,
+	    gc, requestCode)) {
 	return 0;
     }
     fillRule = (gc != NULL) ? gc->fill_rule : EvenOddRule;
@@ -791,7 +799,8 @@ BrowserFillRectangle(
     if (resourcePtr == NULL) {
 	return 0;
     }
-    if (!BrowserOptionalGCOrError(displayPtr, gc, requestCode)) {
+    if (!BrowserDrawableGCDepthMatchesOrError(displayPtr, resourcePtr, drawable,
+	    gc, requestCode)) {
 	return 0;
     }
     if (!BrowserValidateDrawableDimensions(displayPtr, width, height,
@@ -2283,7 +2292,8 @@ BrowserDrawUtf8Text(
     if (resourcePtr == NULL) {
 	return Success;
     }
-    if (!BrowserOptionalGCOrError(&display, gc, requestCode)) {
+    if (!BrowserDrawableGCDepthMatchesOrError(&display, resourcePtr, drawable,
+	    gc, requestCode)) {
 	return Success;
     }
     width = BrowserFontResourceTextWidth(
@@ -2324,7 +2334,8 @@ BrowserDrawUtf8ImageString(
     if (resourcePtr == NULL) {
 	return Success;
     }
-    if (!BrowserOptionalGCOrError(&display, gc, requestCode)) {
+    if (!BrowserDrawableGCDepthMatchesOrError(&display, resourcePtr, drawable,
+	    gc, requestCode)) {
 	return Success;
     }
     if (gc != NULL) {

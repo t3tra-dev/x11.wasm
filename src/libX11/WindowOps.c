@@ -4626,7 +4626,8 @@ XPutImage(
     if (resourcePtr == NULL) {
 	return Success;
     }
-    if (!BrowserOptionalGCOrError(&display, gc, X11_WASM_XREQ_PUT_IMAGE)) {
+    if (!BrowserDrawableGCDepthMatchesOrError(&display, resourcePtr, drawable,
+	    gc, X11_WASM_XREQ_PUT_IMAGE)) {
 	return Success;
     }
     if (!BrowserValidateCard16(&display, (long)width, 1,

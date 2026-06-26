@@ -784,6 +784,12 @@ int BrowserDrawableDepthsMatchOrError(
     X11WasmResource *targetPtr,
     Drawable target,
     unsigned char requestCode);
+int BrowserDrawableGCDepthMatchesOrError(
+    Display **displayPtr,
+    X11WasmResource *resourcePtr,
+    Drawable drawable,
+    GC gc,
+    unsigned char requestCode);
 int BrowserActivatePassiveButtonGrab(
     Window eventWindow,
     unsigned int button,

@@ -1132,6 +1132,27 @@ BrowserGCDepthsMatchOrError(
 }
 
 int
+BrowserDrawableGCDepthMatchesOrError(
+    Display **displayPtr,
+    X11WasmResource *resourcePtr,
+    Drawable drawable,
+    GC gc,
+    unsigned char requestCode)
+{
+    if (gc == NULL) {
+	return 1;
+    }
+    if (BrowserGCOrError(displayPtr, gc, requestCode) == NULL) {
+	return 0;
+    }
+    if ((resourcePtr == NULL)
+	    || (BrowserGCDepth(gc) == resourcePtr->depth)) {
+	return 1;
+    }
+    return BrowserBadMatchOrError(displayPtr, (XID)drawable, requestCode);
+}
+
+int
 BrowserHexDigit(
     int ch)
 {
