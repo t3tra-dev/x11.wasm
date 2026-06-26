@@ -501,6 +501,35 @@ test("Xlib extension and error text compatibility APIs are stable", async ({
   expect(result).toBe(1);
 });
 
+test("XRecolorCursor resyncs window cursor styles", async ({ page }) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const state = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestRecolorCursorWindowStyle?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestRecolorCursorWindowStyle) {
+      throw new Error("missing cursor recolor style test hook");
+    }
+    const windowId = module._X11WasmTestRecolorCursorWindowStyle();
+    const element = document.querySelector(
+      `[data-x11-wasm-xid="${windowId}"]`,
+    );
+    return {
+      windowId,
+      cursor: element instanceof HTMLElement ? element.style.cursor : "",
+    };
+  });
+
+  expect(state.windowId).toBeGreaterThan(0);
+  expect(state.cursor).toContain("url(");
+  expect(state.cursor).toContain("data:image/png");
+});
+
 test("Xlib colormap compatibility APIs are stable", async ({ page }) => {
   await page.goto("/x11.html");
   await expect(page.locator("#x11-wasm-status")).toHaveText("running", {

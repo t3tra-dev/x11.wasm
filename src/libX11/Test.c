@@ -1699,12 +1699,16 @@ X11WasmTestXlibApis(void)
     Pixmap xyBitmapPixmap = None;
     Pixmap bitmapDataPixmap = None;
     Pixmap stackImagePixmap = None;
+    Pixmap cursorSourcePixmap = None;
+    Pixmap cursorMaskPixmap = None;
     GC xyPixmapWindowGC = NULL;
     GC xyBitmapGC = NULL;
     unsigned char image16Data[8];
     unsigned char bitmapImageData[4];
     unsigned char xyPixmapData[3];
     unsigned char xyBitmapData[1];
+    char cursorSourceData[1] = {1};
+    char cursorMaskData[1] = {1};
     unsigned char xyBitmapSubImageData[16];
     unsigned char stackImageData[16];
     XImage stackImage;
@@ -5760,6 +5764,31 @@ X11WasmTestXlibApis(void)
 	    || (X11WasmFindResource(window)->atts.cursor != testCursor)) {
 	goto cleanup;
     }
+    parsedColor.red = 0xffff;
+    parsedColor.green = 0;
+    parsedColor.blue = 0;
+    exactColor.red = 0;
+    exactColor.green = 0;
+    exactColor.blue = 0xffff;
+    if ((XRecolorCursor(&browserDisplay.display, testCursor, &parsedColor,
+		    &exactColor) != Success)
+	    || !X11WasmFindResource(testCursor)->hasCursorImage
+	    || (BrowserCursorShape(testCursor) != BrowserJsXId(testCursor))
+	    || (X11WasmFindResource(window)->atts.cursor != testCursor)) {
+	goto cleanup;
+    }
+    memset(&parsedColor, 0, sizeof(parsedColor));
+    memset(&exactColor, 0, sizeof(exactColor));
+    exactColor.red = 0xffff;
+    exactColor.green = 0xffff;
+    exactColor.blue = 0xffff;
+    if ((XRecolorCursor(&browserDisplay.display, testCursor, &parsedColor,
+		    &exactColor) != Success)
+	    || X11WasmFindResource(testCursor)->hasCursorImage
+	    || (BrowserCursorShape(testCursor) != XC_watch)
+	    || (X11WasmFindResource(window)->atts.cursor != testCursor)) {
+	goto cleanup;
+    }
     if ((XFreeCursor(&browserDisplay.display, testCursor) != Success)
 	    || (X11WasmFindResource(testCursor) == NULL)
 	    || (BrowserCursorShape(testCursor) != XC_watch)
@@ -5811,6 +5840,45 @@ X11WasmTestXlibApis(void)
 	    &exactColor);
     if ((cursorFont == None) || (cursorMaskFont == None)
 	    || (testCursor == None)
+	    || (X11WasmFindResource(testCursor) == NULL)
+	    || !X11WasmFindResource(testCursor)->hasCursorImage
+	    || (BrowserCursorShape(testCursor) != BrowserJsXId(testCursor))) {
+	goto cleanup;
+    }
+    (void)XFreeCursor(&browserDisplay.display, testCursor);
+    testCursor = None;
+    cursorSourcePixmap = XCreateBitmapFromData(&browserDisplay.display,
+	    browserDisplay.rootWindow, cursorSourceData, 1, 1);
+    cursorMaskPixmap = XCreateBitmapFromData(&browserDisplay.display,
+	    browserDisplay.rootWindow, cursorMaskData, 1, 1);
+    parsedColor.red = 0xffff;
+    parsedColor.green = 0;
+    parsedColor.blue = 0;
+    exactColor.red = 0;
+    exactColor.green = 0xffff;
+    exactColor.blue = 0;
+    testCursor = XCreatePixmapCursor(&browserDisplay.display,
+	    cursorSourcePixmap, cursorMaskPixmap, &parsedColor, &exactColor,
+	    0, 0);
+    if ((cursorSourcePixmap == None) || (cursorMaskPixmap == None)
+	    || (testCursor == None)
+	    || (X11WasmFindResource(testCursor) == NULL)
+	    || !X11WasmFindResource(testCursor)->hasCursorImage
+	    || (BrowserCursorShape(testCursor) != BrowserJsXId(testCursor))) {
+	goto cleanup;
+    }
+    (void)XFreePixmap(&browserDisplay.display, cursorSourcePixmap);
+    cursorSourcePixmap = None;
+    (void)XFreePixmap(&browserDisplay.display, cursorMaskPixmap);
+    cursorMaskPixmap = None;
+    parsedColor.red = 0;
+    parsedColor.green = 0;
+    parsedColor.blue = 0xffff;
+    exactColor.red = 0xffff;
+    exactColor.green = 0xffff;
+    exactColor.blue = 0;
+    if ((XRecolorCursor(&browserDisplay.display, testCursor, &parsedColor,
+		    &exactColor) != Success)
 	    || (X11WasmFindResource(testCursor) == NULL)
 	    || !X11WasmFindResource(testCursor)->hasCursorImage
 	    || (BrowserCursorShape(testCursor) != BrowserJsXId(testCursor))) {
@@ -6392,6 +6460,12 @@ cleanup:
     if (stackImagePixmap != None) {
 	(void)XFreePixmap(&browserDisplay.display, stackImagePixmap);
     }
+    if (cursorSourcePixmap != None) {
+	(void)XFreePixmap(&browserDisplay.display, cursorSourcePixmap);
+    }
+    if (cursorMaskPixmap != None) {
+	(void)XFreePixmap(&browserDisplay.display, cursorMaskPixmap);
+    }
     if (textPixmap != None) {
 	(void)XFreePixmap(&browserDisplay.display, textPixmap);
     }
@@ -6515,6 +6589,45 @@ cleanup:
 	(void)XFreeColormap(&browserDisplay.display, secondColormap);
     }
     return result;
+}
+
+EMSCRIPTEN_KEEPALIVE unsigned int
+X11WasmTestRecolorCursorWindowStyle(void)
+{
+    Window window = None;
+    Cursor cursor = None;
+    XColor foreground;
+    XColor background;
+
+    window = XCreateSimpleWindow(&browserDisplay.display,
+	    browserDisplay.rootWindow, 8, 8, 24, 24, 0, 0, 0);
+    cursor = XCreateFontCursor(&browserDisplay.display, XC_watch);
+    if ((window == None) || (cursor == None)
+	    || (XDefineCursor(&browserDisplay.display, window, cursor)
+		    != Success)) {
+	goto error;
+    }
+
+    foreground.red = 0xffff;
+    foreground.green = 0;
+    foreground.blue = 0;
+    background.red = 0;
+    background.green = 0;
+    background.blue = 0xffff;
+    if (XRecolorCursor(&browserDisplay.display, cursor, &foreground,
+	    &background) != Success) {
+	goto error;
+    }
+    return BrowserJsXId(window);
+
+error:
+    if (cursor != None) {
+	(void)XFreeCursor(&browserDisplay.display, cursor);
+    }
+    if (window != None) {
+	(void)XDestroyWindow(&browserDisplay.display, window);
+    }
+    return 0;
 }
 
 EMSCRIPTEN_KEEPALIVE int
@@ -7070,6 +7183,7 @@ X11WasmTestXErrorHandler(void)
     int sawAllowEventsBadValue;
     int sawChangeActivePointerGrabBadValue;
     int sawChangeActivePointerGrabBadCursor;
+    int sawRecolorCursorBadCursor;
     int invalidPointerMapLengthResult;
     int duplicatePointerMapResult;
     int sawPointerMapLengthBadValue;
@@ -7463,6 +7577,11 @@ X11WasmTestXErrorHandler(void)
 	    browserDisplay.rootWindow, (Cursor)invalidWindow);
     cursorResultSum += XFreeCursor(&browserDisplay.display,
 	    (Cursor)invalidWindow);
+    cursorResultSum += XRecolorCursor(&browserDisplay.display,
+	    (Cursor)invalidWindow, NULL, NULL);
+    sawRecolorCursorBadCursor = (browserTestLastErrorCode == BadCursor)
+	    && (browserTestLastRequestCode == X11_WASM_XREQ_RECOLOR_CURSOR)
+	    && (browserTestLastResourceId == (XID)invalidWindow);
     cursorResultSum += XUnloadFont(&browserDisplay.display,
 	    (Font)invalidWindow);
     depthOnePixmap = XCreatePixmap(&browserDisplay.display,
@@ -8289,6 +8408,7 @@ X11WasmTestXErrorHandler(void)
 	    || !sawAllowEventsBadValue
 	    || !sawChangeActivePointerGrabBadValue
 	    || !sawChangeActivePointerGrabBadCursor
+	    || !sawRecolorCursorBadCursor
 	    || (invalidPointerMapLengthResult != MappingFailed)
 	    || (duplicatePointerMapResult != MappingFailed)
 	    || !sawPointerMapLengthBadValue
@@ -8401,6 +8521,7 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
 	    + X11_WASM_XREQ_CHANGE_WINDOW_ATTRIBUTES
 	    + X11_WASM_XREQ_FREE_CURSOR
+	    + X11_WASM_XREQ_RECOLOR_CURSOR
 	    + X11_WASM_XREQ_CLOSE_FONT
 	    + X11_WASM_XREQ_CREATE_GC
 	    + X11_WASM_XREQ_CREATE_GC
@@ -8623,7 +8744,7 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 240)
+    if ((browserTestXErrorCount != 241)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)

@@ -22,6 +22,10 @@ typedef enum {
     X11_WASM_RESOURCE_FONT
 } X11WasmResourceType;
 
+#define X11_WASM_CURSOR_KIND_NONE 0
+#define X11_WASM_CURSOR_KIND_PIXMAP 1
+#define X11_WASM_CURSOR_KIND_GLYPH 2
+
 typedef struct X11WasmProperty X11WasmProperty;
 typedef struct X11WasmColorEntry X11WasmColorEntry;
 typedef struct X11WasmPassiveButtonGrab X11WasmPassiveButtonGrab;
@@ -59,6 +63,18 @@ typedef struct X11WasmResource {
     int hasBorderPixel;
     unsigned int cursorShape;
     int hasCursorImage;
+    int cursorKind;
+    XColor cursorForeground;
+    XColor cursorBackground;
+    unsigned int cursorSourceChar;
+    unsigned int cursorMaskChar;
+    unsigned int cursorHotX;
+    unsigned int cursorHotY;
+    unsigned int cursorBitmapWidth;
+    unsigned int cursorBitmapHeight;
+    int cursorBitmapBytesPerLine;
+    unsigned char *cursorSourceBits;
+    unsigned char *cursorMaskBits;
     unsigned int referenceCount;
     int clientReleased;
     char *fontFamily;

@@ -1208,6 +1208,28 @@ BrowserSyncPointerGrabState(void)
 }
 
 void
+BrowserSyncCursorUsers(
+    Cursor cursor)
+{
+    X11WasmResource *resourcePtr;
+
+    if (cursor == None) {
+	return;
+    }
+    for (resourcePtr = browserDisplay.resourceList; resourcePtr != NULL;
+	    resourcePtr = resourcePtr->nextPtr) {
+	if ((resourcePtr->type == X11_WASM_RESOURCE_WINDOW)
+		&& (resourcePtr->atts.cursor == cursor)) {
+	    BrowserSyncWindowStyle(resourcePtr);
+	}
+    }
+    if (browserDisplay.pointerGrabCursor == cursor) {
+	BrowserSyncPointerGrabCursor();
+	BrowserSyncPointerGrabState();
+    }
+}
+
+void
 BrowserSyncPointerState(void)
 {
     (void)X11WasmJsSetPointerState(browserDisplay.pointerX,

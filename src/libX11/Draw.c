@@ -2203,6 +2203,229 @@ BrowserCursorColorByte(
     return (unsigned char)(value >> 8);
 }
 
+static void
+BrowserStoreCursorColors(
+    X11WasmResource *cursorPtr,
+    XColor _Xconst *foreground,
+    XColor _Xconst *background)
+{
+    memset(&cursorPtr->cursorForeground, 0, sizeof(cursorPtr->cursorForeground));
+    memset(&cursorPtr->cursorBackground, 0, sizeof(cursorPtr->cursorBackground));
+    if (foreground != NULL) {
+	cursorPtr->cursorForeground = *foreground;
+    }
+    if (background != NULL) {
+	cursorPtr->cursorBackground = *background;
+    } else {
+	cursorPtr->cursorBackground.red = 0xffff;
+	cursorPtr->cursorBackground.green = 0xffff;
+	cursorPtr->cursorBackground.blue = 0xffff;
+    }
+}
+
+static int
+BrowserEnsureCursorPixmapBitmap(
+    Display *display,
+    X11WasmResource *pixmapPtr,
+    Pixmap pixmap)
+{
+    XImage *imagePtr;
+
+    if ((pixmapPtr == NULL) || (pixmapPtr->bitmapData != NULL)) {
+	return pixmapPtr != NULL;
+    }
+    imagePtr = XGetImage(display, pixmap, 0, 0, pixmapPtr->width,
+	    pixmapPtr->height, 1UL, XYPixmap);
+    if (imagePtr != NULL) {
+	BrowserStoreBitmapImage(pixmapPtr, imagePtr, 0, 0, 0, 0,
+		pixmapPtr->width, pixmapPtr->height);
+	(void)BrowserImageDestroy(imagePtr);
+    }
+    return pixmapPtr->bitmapData != NULL;
+}
+
+void
+BrowserFreeCursorSnapshot(
+    X11WasmResource *resourcePtr)
+{
+    if (resourcePtr == NULL) {
+	return;
+    }
+    if (resourcePtr->cursorSourceBits != NULL) {
+	ckfree(resourcePtr->cursorSourceBits);
+	resourcePtr->cursorSourceBits = NULL;
+    }
+    if (resourcePtr->cursorMaskBits != NULL) {
+	ckfree(resourcePtr->cursorMaskBits);
+	resourcePtr->cursorMaskBits = NULL;
+    }
+    resourcePtr->cursorKind = X11_WASM_CURSOR_KIND_NONE;
+    memset(&resourcePtr->cursorForeground, 0,
+	    sizeof(resourcePtr->cursorForeground));
+    memset(&resourcePtr->cursorBackground, 0,
+	    sizeof(resourcePtr->cursorBackground));
+    resourcePtr->cursorSourceChar = 0;
+    resourcePtr->cursorMaskChar = 0;
+    resourcePtr->cursorHotX = 0;
+    resourcePtr->cursorHotY = 0;
+    resourcePtr->cursorBitmapWidth = 0;
+    resourcePtr->cursorBitmapHeight = 0;
+    resourcePtr->cursorBitmapBytesPerLine = 0;
+    resourcePtr->hasCursorImage = 0;
+}
+
+static int
+BrowserCopyCursorBits(
+    unsigned char **destPtr,
+    const unsigned char *source,
+    int bytesPerLine,
+    unsigned int height)
+{
+    unsigned long byteCount;
+
+    if ((destPtr == NULL) || (source == NULL) || (bytesPerLine <= 0)) {
+	return 0;
+    }
+    byteCount = (unsigned long)bytesPerLine * (unsigned long)height;
+    if ((byteCount == 0UL) || (byteCount > (unsigned long)UINT_MAX)) {
+	return 0;
+    }
+    *destPtr = (unsigned char *)ckalloc((unsigned int)byteCount);
+    memcpy(*destPtr, source, (unsigned int)byteCount);
+    return 1;
+}
+
+static int
+BrowserStorePixmapCursorSnapshot(
+    X11WasmResource *cursorPtr,
+    X11WasmResource *sourcePtr,
+    X11WasmResource *maskPtr,
+    XColor *foreground,
+    XColor *background,
+    unsigned int hotX,
+    unsigned int hotY)
+{
+    if ((cursorPtr == NULL) || (sourcePtr == NULL) || (maskPtr == NULL)
+	    || (sourcePtr->bitmapData == NULL) || (maskPtr->bitmapData == NULL)
+	    || (sourcePtr->bitmapBytesPerLine <= 0)
+	    || (maskPtr->bitmapBytesPerLine <= 0)) {
+	return 0;
+    }
+
+    BrowserFreeCursorSnapshot(cursorPtr);
+    cursorPtr->cursorKind = X11_WASM_CURSOR_KIND_PIXMAP;
+    BrowserStoreCursorColors(cursorPtr, foreground, background);
+    cursorPtr->cursorHotX = hotX;
+    cursorPtr->cursorHotY = hotY;
+    cursorPtr->cursorBitmapWidth = sourcePtr->width;
+    cursorPtr->cursorBitmapHeight = sourcePtr->height;
+    cursorPtr->cursorBitmapBytesPerLine = sourcePtr->bitmapBytesPerLine;
+    if (!BrowserCopyCursorBits(&cursorPtr->cursorSourceBits,
+	    sourcePtr->bitmapData, sourcePtr->bitmapBytesPerLine,
+	    sourcePtr->height)) {
+	BrowserFreeCursorSnapshot(cursorPtr);
+	return 0;
+    }
+    if (!BrowserCopyCursorBits(&cursorPtr->cursorMaskBits, maskPtr->bitmapData,
+	    maskPtr->bitmapBytesPerLine, maskPtr->height)) {
+	BrowserFreeCursorSnapshot(cursorPtr);
+	return 0;
+    }
+    return 1;
+}
+
+static int
+BrowserCursorSnapshotBit(
+    const unsigned char *data,
+    int bytesPerLine,
+    unsigned int x,
+    unsigned int y)
+{
+    unsigned int bitOffset;
+
+    if ((data == NULL) || (bytesPerLine <= 0)) {
+	return 0;
+    }
+    bitOffset = y * (unsigned int)bytesPerLine * 8U + x;
+    return (data[bitOffset >> 3] >> (bitOffset & 7U)) & 1U;
+}
+
+static int
+BrowserCreatePixmapCursorImageFromSnapshot(
+    X11WasmResource *cursorPtr)
+{
+    unsigned char *rgba;
+    unsigned long pixelCount;
+    int dataLength;
+    unsigned int width;
+    unsigned int height;
+    unsigned int x, y;
+    unsigned char fgRed, fgGreen, fgBlue;
+    unsigned char bgRed, bgGreen, bgBlue;
+
+    if ((cursorPtr == NULL)
+	    || (cursorPtr->cursorKind != X11_WASM_CURSOR_KIND_PIXMAP)
+	    || (cursorPtr->cursorSourceBits == NULL)
+	    || (cursorPtr->cursorMaskBits == NULL)
+	    || (cursorPtr->cursorBitmapWidth == 0)
+	    || (cursorPtr->cursorBitmapHeight == 0)
+	    || (cursorPtr->cursorBitmapBytesPerLine <= 0)) {
+	return 0;
+    }
+    width = cursorPtr->cursorBitmapWidth;
+    height = cursorPtr->cursorBitmapHeight;
+    pixelCount = (unsigned long)width * (unsigned long)height;
+    if (pixelCount > ((unsigned long)0x7fffffff / 4UL)) {
+	return 0;
+    }
+    dataLength = (int)(pixelCount * 4UL);
+
+    rgba = (unsigned char *)ckalloc((unsigned int)dataLength);
+    memset(rgba, 0, (unsigned int)dataLength);
+    fgRed = BrowserCursorColorByte(cursorPtr->cursorForeground.red);
+    fgGreen = BrowserCursorColorByte(cursorPtr->cursorForeground.green);
+    fgBlue = BrowserCursorColorByte(cursorPtr->cursorForeground.blue);
+    bgRed = BrowserCursorColorByte(cursorPtr->cursorBackground.red);
+    bgGreen = BrowserCursorColorByte(cursorPtr->cursorBackground.green);
+    bgBlue = BrowserCursorColorByte(cursorPtr->cursorBackground.blue);
+
+    for (y = 0; y < height; y++) {
+	for (x = 0; x < width; x++) {
+	    unsigned char *pixelPtr = rgba + ((y * width + x) * 4U);
+
+	    if (!BrowserCursorSnapshotBit(cursorPtr->cursorMaskBits,
+		    cursorPtr->cursorBitmapBytesPerLine, x, y)) {
+		continue;
+	    }
+	    if (BrowserCursorSnapshotBit(cursorPtr->cursorSourceBits,
+		    cursorPtr->cursorBitmapBytesPerLine, x, y)) {
+		pixelPtr[0] = fgRed;
+		pixelPtr[1] = fgGreen;
+		pixelPtr[2] = fgBlue;
+	    } else {
+		pixelPtr[0] = bgRed;
+		pixelPtr[1] = bgGreen;
+		pixelPtr[2] = bgBlue;
+	    }
+	    pixelPtr[3] = 255;
+	}
+    }
+
+    x = cursorPtr->cursorHotX;
+    y = cursorPtr->cursorHotY;
+    if (x >= width) {
+	x = width - 1;
+    }
+    if (y >= height) {
+	y = height - 1;
+    }
+    (void)X11WasmJsCreateCursor(BrowserJsXId(cursorPtr->id), rgba,
+	    dataLength, width, height, x, y);
+    cursorPtr->hasCursorImage = 1;
+    ckfree(rgba);
+    return 1;
+}
+
 int
 BrowserCreatePixmapCursorImage(
     X11WasmResource *cursorPtr,
@@ -2215,14 +2438,6 @@ BrowserCreatePixmapCursorImage(
 {
     X11WasmResource *sourcePtr = X11WasmFindResource(source);
     X11WasmResource *maskPtr;
-    XImage *imagePtr;
-    unsigned char *rgba;
-    unsigned long pixelCount;
-    int dataLength;
-    unsigned int width, height;
-    unsigned int x, y;
-    unsigned char fgRed, fgGreen, fgBlue;
-    unsigned char bgRed, bgGreen, bgBlue;
 
     if ((cursorPtr == NULL) || (sourcePtr == NULL)
 	    || (sourcePtr->type != X11_WASM_RESOURCE_PIXMAP)
@@ -2240,76 +2455,16 @@ BrowserCreatePixmapCursorImage(
 	return 0;
     }
 
-    width = sourcePtr->width;
-    height = sourcePtr->height;
-    if (sourcePtr->bitmapData == NULL) {
-	imagePtr = XGetImage(cursorPtr->display, source, 0, 0, width, height,
-		1UL, XYPixmap);
-	if (imagePtr != NULL) {
-	    BrowserStoreBitmapImage(sourcePtr, imagePtr, 0, 0, 0, 0,
-		    width, height);
-	    (void)BrowserImageDestroy(imagePtr);
-	}
-    }
-    if ((maskPtr->bitmapData == NULL) && (maskPtr != sourcePtr)) {
-	imagePtr = XGetImage(cursorPtr->display, mask, 0, 0, width, height,
-		1UL, XYPixmap);
-	if (imagePtr != NULL) {
-	    BrowserStoreBitmapImage(maskPtr, imagePtr, 0, 0, 0, 0,
-		    width, height);
-	    (void)BrowserImageDestroy(imagePtr);
-	}
-    }
-    if ((sourcePtr->bitmapData == NULL) || (maskPtr->bitmapData == NULL)) {
+    if (!BrowserEnsureCursorPixmapBitmap(cursorPtr->display, sourcePtr, source)
+	    || !BrowserEnsureCursorPixmapBitmap(cursorPtr->display, maskPtr,
+		    mask)) {
 	return 0;
     }
-
-    pixelCount = (unsigned long)width * (unsigned long)height;
-    if (pixelCount > ((unsigned long)0x7fffffff / 4UL)) {
+    if (!BrowserStorePixmapCursorSnapshot(cursorPtr, sourcePtr, maskPtr,
+	    foreground, background, hotX, hotY)) {
 	return 0;
     }
-    dataLength = (int)(pixelCount * 4UL);
-
-    rgba = (unsigned char *)ckalloc((unsigned int)dataLength);
-    memset(rgba, 0, (unsigned int)dataLength);
-    fgRed = (foreground != NULL) ? BrowserCursorColorByte(foreground->red) : 0;
-    fgGreen = (foreground != NULL) ? BrowserCursorColorByte(foreground->green) : 0;
-    fgBlue = (foreground != NULL) ? BrowserCursorColorByte(foreground->blue) : 0;
-    bgRed = (background != NULL) ? BrowserCursorColorByte(background->red) : 255;
-    bgGreen = (background != NULL) ? BrowserCursorColorByte(background->green) : 255;
-    bgBlue = (background != NULL) ? BrowserCursorColorByte(background->blue) : 255;
-
-    for (y = 0; y < height; y++) {
-	for (x = 0; x < width; x++) {
-	    unsigned char *pixelPtr = rgba + ((y * width + x) * 4U);
-
-	    if (!BrowserBitmapGetPixel(maskPtr, x, y)) {
-		continue;
-	    }
-	    if (BrowserBitmapGetPixel(sourcePtr, x, y)) {
-		pixelPtr[0] = fgRed;
-		pixelPtr[1] = fgGreen;
-		pixelPtr[2] = fgBlue;
-	    } else {
-		pixelPtr[0] = bgRed;
-		pixelPtr[1] = bgGreen;
-		pixelPtr[2] = bgBlue;
-	    }
-	    pixelPtr[3] = 255;
-	}
-    }
-
-    if (hotX >= width) {
-	hotX = width - 1;
-    }
-    if (hotY >= height) {
-	hotY = height - 1;
-    }
-    (void)X11WasmJsCreateCursor(BrowserJsXId(cursorPtr->id), rgba,
-	    dataLength, width, height, hotX, hotY);
-    cursorPtr->hasCursorImage = 1;
-    ckfree(rgba);
-    return 1;
+    return BrowserCreatePixmapCursorImageFromSnapshot(cursorPtr);
 }
 
 int
@@ -2346,6 +2501,17 @@ BrowserGlyphCursorUsesDefaultColors(
     return ((foreground == NULL) || BrowserCursorColorIsDefaultBlack(foreground))
 	    && ((background == NULL)
 		    || BrowserCursorColorIsDefaultWhite(background));
+}
+
+static void
+BrowserDestroyCursorImage(
+    X11WasmResource *cursorPtr)
+{
+    if ((cursorPtr == NULL) || !cursorPtr->hasCursorImage) {
+	return;
+    }
+    (void)X11WasmJsDestroyResource(BrowserJsXId(cursorPtr->id));
+    cursorPtr->hasCursorImage = 0;
 }
 
 int
@@ -2434,6 +2600,21 @@ BrowserXCursorGlyphHotspot(
 	    | (unsigned int)data[65U + offset];
 }
 
+static void
+BrowserStoreGlyphCursorSnapshot(
+    X11WasmResource *cursorPtr,
+    unsigned int sourceChar,
+    unsigned int maskChar,
+    XColor _Xconst *foreground,
+    XColor _Xconst *background)
+{
+    BrowserFreeCursorSnapshot(cursorPtr);
+    cursorPtr->cursorKind = X11_WASM_CURSOR_KIND_GLYPH;
+    cursorPtr->cursorSourceChar = sourceChar;
+    cursorPtr->cursorMaskChar = maskChar;
+    BrowserStoreCursorColors(cursorPtr, foreground, background);
+}
+
 int
 BrowserCreateGlyphCursorImage(
     X11WasmResource *cursorPtr,
@@ -2452,7 +2633,8 @@ BrowserCreateGlyphCursorImage(
 	return 0;
     }
     if (BrowserGlyphCursorUsesDefaultColors(foreground, background)) {
-	return 0;
+	BrowserDestroyCursorImage(cursorPtr);
+	return 1;
     }
 
     rgba = (unsigned char *)ckalloc((unsigned int)dataLength);
@@ -2489,6 +2671,26 @@ BrowserCreateGlyphCursorImage(
     cursorPtr->hasCursorImage = 1;
     ckfree(rgba);
     return 1;
+}
+
+int
+BrowserRecreateCursorImage(
+    X11WasmResource *cursorPtr)
+{
+    if ((cursorPtr == NULL)
+	    || (cursorPtr->type != X11_WASM_RESOURCE_CURSOR)) {
+	return 0;
+    }
+    switch (cursorPtr->cursorKind) {
+    case X11_WASM_CURSOR_KIND_PIXMAP:
+	return BrowserCreatePixmapCursorImageFromSnapshot(cursorPtr);
+    case X11_WASM_CURSOR_KIND_GLYPH:
+	return BrowserCreateGlyphCursorImage(cursorPtr,
+		cursorPtr->cursorSourceChar, cursorPtr->cursorMaskChar,
+		&cursorPtr->cursorForeground, &cursorPtr->cursorBackground);
+    default:
+	return 1;
+    }
 }
 
 Cursor
@@ -2601,6 +2803,9 @@ XCreateGlyphCursor(
     if ((maskFont == None) || (maskFont == sourceFont)
 	    || (BrowserCursorFontResource(sourcePtr)
 		    && BrowserCursorFontResource(maskPtr))) {
+	BrowserStoreGlyphCursorSnapshot(resourcePtr, sourceChar,
+		(maskFont == None) ? sourceChar : maskChar, foreground,
+		background);
 	(void)BrowserCreateGlyphCursorImage(resourcePtr, sourceChar,
 		(maskFont == None) ? sourceChar : maskChar, foreground,
 		background);
@@ -2648,6 +2853,26 @@ int XFreeCursor(Display *display, Cursor cursor)
     }
     (void)X11WasmJsDestroyResource(BrowserJsXId(cursor));
     X11WasmDeleteResource(cursor);
+    return Success;
+}
+
+int
+XRecolorCursor(
+    Display *display,
+    Cursor cursor,
+    XColor *foreground,
+    XColor *background)
+{
+    X11WasmResource *resourcePtr;
+
+    resourcePtr = BrowserCursorResourceOrError(&display, cursor,
+	    X11_WASM_XREQ_RECOLOR_CURSOR);
+    if (resourcePtr == NULL) {
+	return Success;
+    }
+    BrowserStoreCursorColors(resourcePtr, foreground, background);
+    (void)BrowserRecreateCursorImage(resourcePtr);
+    BrowserSyncCursorUsers(cursor);
     return Success;
 }
 

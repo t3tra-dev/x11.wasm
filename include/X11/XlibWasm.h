@@ -226,6 +226,7 @@ EXTERN int XFreeColormap(Display *d, Colormap c);
 EXTERN int XFreeColors(Display *d, Colormap c, unsigned long *ulp, int i,
 	unsigned long ul);
 EXTERN int XFreeCursor(Display *d, Cursor c);
+EXTERN int XRecolorCursor(Display *d, Cursor c, XColor *x1, XColor *x2);
 EXTERN int XFreeFont(Display *d, XFontStruct *font_struct);
 	EXTERN int XFreeFontNames(char **list);
 	EXTERN void XFreeExtensionList(char **list);

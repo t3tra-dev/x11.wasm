@@ -161,6 +161,7 @@
 #define X11_WASM_XREQ_CREATE_CURSOR 93
 #define X11_WASM_XREQ_CREATE_GLYPH_CURSOR 94
 #define X11_WASM_XREQ_FREE_CURSOR 95
+#define X11_WASM_XREQ_RECOLOR_CURSOR 96
 #define X11_WASM_XREQ_QUERY_BEST_SIZE 97
 #define X11_WASM_XREQ_CHANGE_KEYBOARD_MAPPING 100
 #define X11_WASM_XREQ_GET_KEYBOARD_MAPPING 101
@@ -658,6 +659,10 @@ int BrowserCreatePixmapCursorImage(
     XColor *background,
     unsigned int hotX,
     unsigned int hotY);
+void BrowserFreeCursorSnapshot(
+    X11WasmResource *resourcePtr);
+int BrowserRecreateCursorImage(
+    X11WasmResource *cursorPtr);
 X11WasmProperty *BrowserCreateProperty(
     X11WasmResource *resourcePtr,
     Atom atom);
@@ -1713,6 +1718,8 @@ void BrowserSyncInheritedChildStyles(
     X11WasmResource *resourcePtr);
 void BrowserSyncInputContext(
     XIC inputContext);
+void BrowserSyncCursorUsers(
+    Cursor cursor);
 void BrowserSyncKeyboardGrabState(void);
 void BrowserSyncPointerGrabCursor(void);
 void BrowserSyncPointerGrabState(void);

@@ -646,6 +646,9 @@ X11WasmDeleteResource(
 	    if (resourcePtr->bitmapData != NULL) {
 		ckfree(resourcePtr->bitmapData);
 	    }
+	    if (resourcePtr->type == X11_WASM_RESOURCE_CURSOR) {
+		BrowserFreeCursorSnapshot(resourcePtr);
+	    }
 	    if (resourcePtr->fontFamily != NULL) {
 		ckfree(resourcePtr->fontFamily);
 	    }
