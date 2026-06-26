@@ -184,15 +184,16 @@ X11WasmQueueWindowProtocol(
     return BrowserQueueEvent(&event);
 }
 
-EMSCRIPTEN_KEEPALIVE int
-X11WasmQueuePointerEvent(
+int
+BrowserQueuePointerEventFields(
     int type,
     unsigned int window,
     unsigned int button,
     unsigned int state,
     int x,
     int y,
-    unsigned int time)
+    unsigned int time,
+    int resetScreenSaver)
 {
     XEvent event;
     Window target;
@@ -203,6 +204,9 @@ X11WasmQueuePointerEvent(
     if ((type != ButtonPress) && (type != ButtonRelease)
 	    && (type != MotionNotify)) {
 	return 0;
+    }
+    if (resetScreenSaver) {
+	BrowserResetScreenSaverForInput();
     }
     BrowserClampPointerToGrabConfine(&rootX, &rootY);
     x = rootX;
@@ -262,6 +266,20 @@ X11WasmQueuePointerEvent(
 		state & ~BrowserPointerButtonMask(button));
     }
     return queued;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmQueuePointerEvent(
+    int type,
+    unsigned int window,
+    unsigned int button,
+    unsigned int state,
+    int x,
+    int y,
+    unsigned int time)
+{
+    return BrowserQueuePointerEventFields(type, window, button, state, x, y,
+	    time, 1);
 }
 
 EMSCRIPTEN_KEEPALIVE int

@@ -84,6 +84,25 @@ test("XSetScreenSaver updates browser root metadata", async ({ page }) => {
   });
 });
 
+test("XForceScreenSaver updates query state and input resets it", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestForceScreenSaverState?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestForceScreenSaverState) {
+      throw new Error("missing screen saver force-state test hook");
+    }
+    return module._X11WasmTestForceScreenSaverState();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XSetScreenSaver uses browser wake lock when blanking is disabled", async ({
   page,
 }) => {

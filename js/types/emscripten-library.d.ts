@@ -428,6 +428,7 @@ declare const Module: {
   ) => number;
   _X11WasmTestSetRootIconSizeAndWindowIcon?: () => number;
   _X11WasmTestSetScreenSaverSettings?: (enabled: number) => number;
+  _X11WasmTestForceScreenSaverState?: () => number;
   _X11WasmTestSetScreenSaverWakeLock?: (enabled: number) => number;
   _X11WasmTestSetHostAccessControl?: (configured: number) => number;
   _X11WasmTestSetServerGrabDepth?: (depth: number) => number;

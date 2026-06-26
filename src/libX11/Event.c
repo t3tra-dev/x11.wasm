@@ -49,6 +49,46 @@ BrowserKeyboardAutoRepeatModeIsValid(
 	    || (mode == AutoRepeatModeDefault);
 }
 
+static unsigned long
+BrowserScreenSaverIdle(void)
+{
+    int idle = X11WasmJsGetUserIdleTime();
+
+    return (idle > 0) ? (unsigned long)idle : 0UL;
+}
+
+static void
+BrowserForceScreenSaverMode(
+    int mode)
+{
+    unsigned long idle = BrowserScreenSaverIdle();
+
+    if (mode == ScreenSaverActive) {
+	if (!browserDisplay.screenSaverActive) {
+	    browserDisplay.screenSaverActivatedIdle = idle;
+	}
+	browserDisplay.screenSaverActive = 1;
+    } else {
+	browserDisplay.screenSaverActive = 0;
+	browserDisplay.screenSaverActivatedIdle = 0UL;
+	browserDisplay.screenSaverTimerResetIdle = idle;
+    }
+    (void)X11WasmJsForceScreenSaver(mode);
+}
+
+void
+BrowserResetScreenSaverForInput(void)
+{
+    int wasActive = browserDisplay.screenSaverActive;
+
+    browserDisplay.screenSaverActive = 0;
+    browserDisplay.screenSaverActivatedIdle = 0UL;
+    browserDisplay.screenSaverTimerResetIdle = BrowserScreenSaverIdle();
+    if (wasActive) {
+	(void)X11WasmJsForceScreenSaver(ScreenSaverReset);
+    }
+}
+
 static void
 BrowserSetKeyBit(
     char bits[32],
@@ -1784,8 +1824,9 @@ XWarpPointer(
 	rootY = browserDisplay.pointerY + destY;
     }
 
-    (void)X11WasmQueuePointerEvent(MotionNotify, browserDisplay.rootWindow,
-	    0, browserDisplay.pointerState, rootX, rootY, CurrentTime);
+    (void)BrowserQueuePointerEventFields(MotionNotify,
+	    browserDisplay.rootWindow, 0, browserDisplay.pointerState, rootX,
+	    rootY, CurrentTime, 0);
     (void)X11WasmJsWarpPointer(browserDisplay.pointerX,
 	    browserDisplay.pointerY, (unsigned int)browserDisplay.pointerWindow,
 	    (unsigned int)eventTime);
@@ -2744,7 +2785,7 @@ int XForceScreenSaver(Display *display, int mode)
 	return Success;
     }
     if (display == &browserDisplay.display) {
-	(void)X11WasmJsForceScreenSaver(mode);
+	BrowserForceScreenSaverMode(mode);
     }
     return XNoOp(display);
 }
@@ -2857,6 +2898,7 @@ XScreenSaverQueryInfo(
 {
     X11WasmResource *resourcePtr;
     unsigned long idle;
+    unsigned long elapsed;
     unsigned long timeout;
 
     if (infoPtr == NULL) {
@@ -2867,14 +2909,24 @@ XScreenSaverQueryInfo(
     if (resourcePtr == NULL) {
 	return False;
     }
-    idle = (unsigned long)X11WasmJsGetUserIdleTime();
+    idle = BrowserScreenSaverIdle();
     timeout = (unsigned long)browserDisplay.screenSaverTimeout * 1000UL;
     memset(infoPtr, 0, sizeof(*infoPtr));
     infoPtr->window = (Window)resourcePtr->id;
-    infoPtr->state = (browserDisplay.screenSaverTimeout == 0)
-	    ? ScreenSaverDisabled : ScreenSaverOff;
     infoPtr->kind = ScreenSaverInternal;
-    infoPtr->til_or_since = (timeout > idle) ? (timeout - idle) : 0UL;
+    if (browserDisplay.screenSaverActive) {
+	infoPtr->state = ScreenSaverOn;
+	infoPtr->til_or_since = (idle >= browserDisplay.screenSaverActivatedIdle)
+		? (idle - browserDisplay.screenSaverActivatedIdle) : 0UL;
+    } else if (browserDisplay.screenSaverTimeout == 0) {
+	infoPtr->state = ScreenSaverDisabled;
+	infoPtr->til_or_since = 0UL;
+    } else {
+	infoPtr->state = ScreenSaverOff;
+	elapsed = (idle >= browserDisplay.screenSaverTimerResetIdle)
+		? (idle - browserDisplay.screenSaverTimerResetIdle) : 0UL;
+	infoPtr->til_or_since = (timeout > elapsed) ? (timeout - elapsed) : 0UL;
+    }
     infoPtr->idle = idle;
     infoPtr->eventMask = 0;
     return True;
@@ -2902,6 +2954,93 @@ X11WasmTestSetScreenSaverWakeLock(int enabled)
     }
     return XSetScreenSaver(&browserDisplay.display, 120, 30,
 	    DontPreferBlanking, AllowExposures);
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestForceScreenSaverState(void)
+{
+    Display *display = &browserDisplay.display;
+    XScreenSaverInfo info;
+    unsigned int keycode;
+    int result = 0;
+
+    BrowserInitDisplay();
+    (void)XResetScreenSaver(display);
+    if ((XSetScreenSaver(display, 120, 30, PreferBlanking, AllowExposures)
+		    != Success)
+	    || (XScreenSaverQueryInfo(display, browserDisplay.rootWindow,
+		    &info) != True)
+	    || (info.window != browserDisplay.rootWindow)
+	    || (info.state != ScreenSaverOff)
+	    || (info.kind != ScreenSaverInternal)
+	    || (info.til_or_since > 120000UL)) {
+	goto cleanup;
+    }
+
+    if ((XActivateScreenSaver(display) != Success)
+	    || (XScreenSaverQueryInfo(display, browserDisplay.rootWindow,
+		    &info) != True)
+	    || (info.state != ScreenSaverOn)
+	    || (info.kind != ScreenSaverInternal)
+	    || (info.til_or_since > info.idle)) {
+	goto cleanup;
+    }
+
+    if ((XSetScreenSaver(display, 0, 30, PreferBlanking, AllowExposures)
+		    != Success)
+	    || (XScreenSaverQueryInfo(display, browserDisplay.rootWindow,
+		    &info) != True)
+	    || (info.state != ScreenSaverOn)) {
+	goto cleanup;
+    }
+
+    if ((XResetScreenSaver(display) != Success)
+	    || (XScreenSaverQueryInfo(display, browserDisplay.rootWindow,
+		    &info) != True)
+	    || (info.state != ScreenSaverDisabled)
+	    || (info.til_or_since != 0UL)) {
+	goto cleanup;
+    }
+
+    if ((XSetScreenSaver(display, 120, 30, PreferBlanking, AllowExposures)
+		    != Success)
+	    || (XActivateScreenSaver(display) != Success)) {
+	goto cleanup;
+    }
+    if ((XWarpPointer(display, None, browserDisplay.rootWindow, 0, 0, 0, 0,
+		    2, 3) != Success)
+	    || (XScreenSaverQueryInfo(display, browserDisplay.rootWindow,
+		    &info) != True)
+	    || (info.state != ScreenSaverOn)) {
+	goto cleanup;
+    }
+    (void)X11WasmQueuePointerEvent(MotionNotify, browserDisplay.rootWindow,
+	    0, 0, 4, 5, CurrentTime);
+    if ((XScreenSaverQueryInfo(display, browserDisplay.rootWindow, &info)
+		    != True)
+	    || (info.state != ScreenSaverOff)) {
+	goto cleanup;
+    }
+
+    keycode = (unsigned int)display->min_keycode;
+    if ((XActivateScreenSaver(display) != Success) || (keycode == 0)) {
+	goto cleanup;
+    }
+    (void)BrowserQueueKeyEventFields(KeyPress, browserDisplay.rootWindow,
+	    keycode, NoSymbol, 0, 2, 3, CurrentTime, 0);
+    if ((XScreenSaverQueryInfo(display, browserDisplay.rootWindow, &info)
+		    != True)
+	    || (info.state != ScreenSaverOff)) {
+	goto cleanup;
+    }
+
+    result = 1;
+
+cleanup:
+    (void)XResetScreenSaver(display);
+    (void)XSetScreenSaver(display, 600, 600, DefaultBlanking,
+	    DefaultExposures);
+    return result;
 }
 
 XAfterFunction

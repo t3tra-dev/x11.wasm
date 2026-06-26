@@ -420,6 +420,16 @@ int X11WasmQueuePointerEvent(
     int x,
     int y,
     unsigned int time);
+int BrowserQueuePointerEventFields(
+    int type,
+    unsigned int window,
+    unsigned int button,
+    unsigned int state,
+    int x,
+    int y,
+    unsigned int time,
+    int resetScreenSaver);
+void BrowserResetScreenSaverForInput(void);
 int X11WasmQueueWheelEvent(
     unsigned int window,
     int delta,

@@ -1510,6 +1510,7 @@ BrowserQueueKeyEventFields(
     if ((type != KeyPress) && (type != KeyRelease)) {
 	return 0;
     }
+    BrowserResetScreenSaverForInput();
     resolvedKeycode = BrowserNormalizeKeycode(keycode, resolvedKeySym);
     target = BrowserResolveKeyEventWindow((Window)window);
     if (type == KeyPress) {
