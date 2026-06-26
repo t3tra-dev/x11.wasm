@@ -1610,26 +1610,23 @@ BrowserResolvePointerEventWindow(
     Window target;
     Window rawTarget;
     Window grabWindow;
-    int grabOwnerEvents = 1;
+    int hasGrab;
 
     (void)window;
     BrowserInitDisplay();
     rawTarget = BrowserHitTestRoot(rootX, rootY, NULL, NULL);
+    grabWindow = browserDisplay.pointerGrabWindow;
+    hasGrab = BrowserWindowCanReceiveEvents(grabWindow);
 
     target = rawTarget;
-    if (BrowserWindowCanReceiveEvents(browserDisplay.pointerCaptureWindow)) {
+    if (hasGrab && !browserDisplay.pointerGrabOwnerEvents) {
+	target = grabWindow;
+    } else if (!hasGrab
+	    && BrowserWindowCanReceiveEvents(
+		    browserDisplay.pointerCaptureWindow)) {
 	target = browserDisplay.pointerCaptureWindow;
     }
-    grabWindow = browserDisplay.pointerGrabWindow;
-    if (BrowserWindowCanReceiveEvents(grabWindow)) {
-	grabOwnerEvents = browserDisplay.pointerGrabOwnerEvents;
-    }
-
-    if (BrowserWindowCanReceiveEvents(grabWindow)) {
-	if (!grabOwnerEvents || !BrowserWindowInTree(rawTarget, grabWindow)) {
-	    target = grabWindow;
-	}
-    } else if (!BrowserWindowCanReceiveEvents(target)) {
+    if (!BrowserWindowCanReceiveEvents(target)) {
 	target = BrowserResolveEventWindow(target);
     }
     if (!BrowserWindowCanReceiveEvents(target)) {

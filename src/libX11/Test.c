@@ -758,6 +758,12 @@ X11WasmTestDomInputSelectionMasks(void)
     XEvent event;
     Window parent = None;
     Window child = None;
+    Window grabWindow = None;
+    Window ownerTarget = None;
+    int grabRootX = 0;
+    int grabRootY = 0;
+    int ownerTargetRootX = 0;
+    int ownerTargetRootY = 0;
     unsigned int keycode;
     int result = 0;
     int screen;
@@ -775,12 +781,24 @@ X11WasmTestDomInputSelectionMasks(void)
 	    0, NULL);
     child = XCreateWindow(display, parent, 5, 6, 30, 20, 0, CopyFromParent,
 	    InputOutput, DefaultVisual(display, screen), 0, NULL);
-    if ((parent == None) || (child == None)
+    grabWindow = XCreateWindow(display, browserDisplay.rootWindow, 140, 20,
+	    40, 40, 0, CopyFromParent, InputOutput,
+	    DefaultVisual(display, screen), 0, NULL);
+    ownerTarget = XCreateWindow(display, browserDisplay.rootWindow, 190, 20,
+	    40, 40, 0, CopyFromParent, InputOutput,
+	    DefaultVisual(display, screen), 0, NULL);
+    if ((parent == None) || (child == None) || (grabWindow == None)
+	    || (ownerTarget == None)
 	    || (XMapWindow(display, parent) != Success)
-	    || (XMapWindow(display, child) != Success)) {
+	    || (XMapWindow(display, child) != Success)
+	    || (XMapWindow(display, grabWindow) != Success)
+	    || (XMapWindow(display, ownerTarget) != Success)) {
 	result = 3;
 	goto cleanup;
     }
+    BrowserWindowRootOffset(grabWindow, &grabRootX, &grabRootY);
+    BrowserWindowRootOffset(ownerTarget, &ownerTargetRootX,
+	    &ownerTargetRootY);
 
     BrowserClearEventQueue();
     if ((XSelectInput(display, parent,
@@ -888,12 +906,76 @@ X11WasmTestDomInputSelectionMasks(void)
 	result = 15;
 	goto cleanup;
     }
+
+    if ((XSelectInput(display, ownerTarget,
+		    EnterWindowMask | ButtonReleaseMask | PointerMotionMask)
+		    != Success)
+	    || (XGrabPointer(display, grabWindow, True,
+		    ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
+		    GrabModeAsync, None, None, CurrentTime) != GrabSuccess)) {
+	result = 16;
+	goto cleanup;
+    }
+    BrowserUpdatePointerState(grabWindow, grabRootX + 1, grabRootY + 1,
+	    Button1Mask);
+    browserDisplay.pointerCaptureWindow = grabWindow;
+    BrowserSyncPointerState();
+    BrowserClearEventQueue();
+    if (!X11WasmQueuePointerEvent(MotionNotify, browserDisplay.rootWindow,
+	    0, Button1Mask, ownerTargetRootX + 2, ownerTargetRootY + 3,
+	    1030)
+	    || !BrowserPopMatchingEvent(ownerTarget, EnterWindowMask, &event)
+	    || (event.type != EnterNotify)
+	    || (event.xcrossing.window != ownerTarget)
+	    || (event.xcrossing.x != 2)
+	    || (event.xcrossing.y != 3)
+	    || !BrowserPopMatchingEvent(ownerTarget, PointerMotionMask, &event)
+	    || (event.type != MotionNotify)
+	    || (event.xmotion.window != ownerTarget)
+	    || (event.xmotion.x != 2)
+	    || (event.xmotion.y != 3)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	result = 17;
+	goto cleanup;
+    }
+    memset(&attributes, 0, sizeof(attributes));
+    attributes.do_not_propagate_mask = ButtonReleaseMask;
+    if ((XChangeWindowAttributes(display, ownerTarget, CWDontPropagate,
+		    &attributes) != Success)
+	    || (XSelectInput(display, ownerTarget, NoEventMask) != Success)) {
+	result = 18;
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+    if (!X11WasmQueuePointerEvent(ButtonRelease, browserDisplay.rootWindow,
+	    Button1, Button1Mask, ownerTargetRootX + 2, ownerTargetRootY + 3,
+	    1031)
+	    || !BrowserPopEvent(&event, NULL)
+	    || (event.type != ButtonRelease)
+	    || (event.xbutton.window != grabWindow)
+	    || (event.xbutton.x_root != ownerTargetRootX + 2)
+	    || (event.xbutton.y_root != ownerTargetRootY + 3)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	result = 19;
+	goto cleanup;
+    }
+    if (XUngrabPointer(display, CurrentTime) != Success) {
+	result = 20;
+	goto cleanup;
+    }
     result = 1;
 
 cleanup:
+    (void)XUngrabPointer(display, CurrentTime);
     BrowserClearEventQueue();
     browserDisplay.pointerCaptureWindow = None;
     BrowserSyncPointerState();
+    if (ownerTarget != None) {
+	(void)XDestroyWindow(display, ownerTarget);
+    }
+    if (grabWindow != None) {
+	(void)XDestroyWindow(display, grabWindow);
+    }
     if (child != None) {
 	(void)XDestroyWindow(display, child);
     }

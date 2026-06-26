@@ -210,7 +210,8 @@ BrowserQueuePointerEventFields(
     int rootX = x;
     int rootY = y;
     int queued;
-    int forceTarget;
+    int hasPointerGrab;
+    long eventMask;
 
     if ((type != ButtonPress) && (type != ButtonRelease)
 	    && (type != MotionNotify)) {
@@ -269,10 +270,16 @@ BrowserQueuePointerEventFields(
 	}
 	return 0;
     }
-    forceTarget = BrowserWindowCanReceiveEvents(browserDisplay.pointerGrabWindow)
-	    && !browserDisplay.pointerGrabOwnerEvents;
-    deliveryTarget = forceTarget ? target
-	    : BrowserSelectedEventTarget(target, BrowserEventMask(&event), 1);
+    hasPointerGrab =
+	    BrowserWindowCanReceiveEvents(browserDisplay.pointerGrabWindow);
+    eventMask = BrowserEventMask(&event);
+    deliveryTarget = (hasPointerGrab && !browserDisplay.pointerGrabOwnerEvents)
+	    ? target : BrowserSelectedEventTarget(target, eventMask, 1);
+    if ((deliveryTarget == None) && hasPointerGrab
+	    && browserDisplay.pointerGrabOwnerEvents
+	    && ((browserDisplay.pointerGrabEventMask & eventMask) != 0)) {
+	deliveryTarget = browserDisplay.pointerGrabWindow;
+    }
     if (deliveryTarget == None) {
 	if (type == ButtonRelease) {
 	    BrowserReleasePassivePointerGrabIfIdle(
@@ -318,7 +325,9 @@ BrowserQueueImplicitPointerCrossingEvents(
 	    && (type != MotionNotify)) {
 	return;
     }
-    if (BrowserWindowCanReceiveEvents(browserDisplay.pointerCaptureWindow)) {
+    if (BrowserWindowCanReceiveEvents(browserDisplay.pointerCaptureWindow)
+	    && (!BrowserWindowCanReceiveEvents(browserDisplay.pointerGrabWindow)
+		    || !browserDisplay.pointerGrabOwnerEvents)) {
 	return;
     }
     target = BrowserHitTestRoot(rootX, rootY, NULL, NULL);
