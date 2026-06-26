@@ -282,51 +282,27 @@ X11WasmQueuePointerEvent(
 	    time, 1);
 }
 
-EMSCRIPTEN_KEEPALIVE int
-X11WasmQueueCrossingEvent(
+static int
+BrowserQueueCrossingEventForTarget(
     int type,
-    unsigned int window,
+    Window target,
     unsigned int state,
-    int x,
-    int y,
-    unsigned int time)
+    int rootX,
+    int rootY,
+    Time time)
 {
     XEvent event;
-    Window target;
-    Window nextTarget;
-    int rootX = x;
-    int rootY = y;
+    int x = rootX;
+    int y = rootY;
 
     if ((type != EnterNotify) && (type != LeaveNotify)) {
 	return 0;
     }
-    (void)window;
-    BrowserClampPointerToGrabConfine(&rootX, &rootY);
-    x = rootX;
-    y = rootY;
-    nextTarget = BrowserHitTestRoot(rootX, rootY, NULL, NULL);
-    if (nextTarget == browserDisplay.pointerWindow) {
-	BrowserUpdatePointerState(nextTarget, rootX, rootY, state);
+    if (!BrowserWindowCanReceiveEvents(target)) {
 	return 0;
     }
-    if (type == LeaveNotify) {
-	if (!BrowserWindowCanReceiveEvents(browserDisplay.pointerWindow)) {
-	    BrowserUpdatePointerState(nextTarget, rootX, rootY, state);
-	    return 0;
-	}
-	target = browserDisplay.pointerWindow;
-	BrowserWindowCoordinatesFromRoot(target, rootX, rootY, &x, &y);
-    } else {
-	if (!BrowserWindowCanReceiveEvents(nextTarget)) {
-	    BrowserUpdatePointerState(nextTarget, rootX, rootY, state);
-	    return 0;
-	}
-	target = nextTarget;
-	BrowserWindowCoordinatesFromRoot(target, rootX, rootY, &x, &y);
-    }
-    BrowserUpdatePointerState(nextTarget, rootX, rootY, state);
-
-    BrowserSetCommonEventFields(&event, type, target, (Time)time);
+    BrowserWindowCoordinatesFromRoot(target, rootX, rootY, &x, &y);
+    BrowserSetCommonEventFields(&event, type, target, time);
     event.xcrossing.root = browserDisplay.rootWindow;
     event.xcrossing.subwindow = None;
     event.xcrossing.time = eventTime;
@@ -343,6 +319,75 @@ X11WasmQueueCrossingEvent(
 	return 0;
     }
     return BrowserQueueEvent(&event);
+}
+
+int
+BrowserQueuePointerCrossingEvents(
+    unsigned int state,
+    int rootX,
+    int rootY,
+    unsigned int time)
+{
+    Window oldTarget;
+    Window nextTarget;
+    int queued = 0;
+
+    BrowserInitDisplay();
+    BrowserClampPointerToGrabConfine(&rootX, &rootY);
+    oldTarget = browserDisplay.pointerWindow;
+    nextTarget = BrowserHitTestRoot(rootX, rootY, NULL, NULL);
+    if (nextTarget == oldTarget) {
+	BrowserUpdatePointerState(nextTarget, rootX, rootY, state);
+	return 0;
+    }
+    queued += BrowserQueueCrossingEventForTarget(LeaveNotify, oldTarget,
+	    state, rootX, rootY, (Time)time);
+    queued += BrowserQueueCrossingEventForTarget(EnterNotify, nextTarget,
+	    state, rootX, rootY, (Time)time);
+    BrowserUpdatePointerState(nextTarget, rootX, rootY, state);
+    return queued;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmQueueCrossingEvent(
+    int type,
+    unsigned int window,
+    unsigned int state,
+    int x,
+    int y,
+    unsigned int time)
+{
+    Window target;
+    Window nextTarget;
+    int rootX = x;
+    int rootY = y;
+
+    if ((type != EnterNotify) && (type != LeaveNotify)) {
+	return 0;
+    }
+    (void)window;
+    BrowserClampPointerToGrabConfine(&rootX, &rootY);
+    nextTarget = BrowserHitTestRoot(rootX, rootY, NULL, NULL);
+    if (nextTarget == browserDisplay.pointerWindow) {
+	BrowserUpdatePointerState(nextTarget, rootX, rootY, state);
+	return 0;
+    }
+    if (type == LeaveNotify) {
+	if (!BrowserWindowCanReceiveEvents(browserDisplay.pointerWindow)) {
+	    BrowserUpdatePointerState(nextTarget, rootX, rootY, state);
+	    return 0;
+	}
+	target = browserDisplay.pointerWindow;
+    } else {
+	if (!BrowserWindowCanReceiveEvents(nextTarget)) {
+	    BrowserUpdatePointerState(nextTarget, rootX, rootY, state);
+	    return 0;
+	}
+	target = nextTarget;
+    }
+    BrowserUpdatePointerState(nextTarget, rootX, rootY, state);
+    return BrowserQueueCrossingEventForTarget(type, target, state, rootX,
+	    rootY, (Time)time);
 }
 
 EMSCRIPTEN_KEEPALIVE int

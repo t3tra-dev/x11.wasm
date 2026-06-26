@@ -1290,9 +1290,11 @@ X11WasmTestXSendEventTargets(
 	return 0;
     }
     if ((XSelectInput(display, focusWindow,
-		    KeyPressMask | FocusChangeMask) != Success)
+		    KeyPressMask | FocusChangeMask | EnterWindowMask
+		    | PointerMotionMask) != Success)
 	    || (XSelectInput(display, pointerWindow,
-		    ButtonPressMask | PointerMotionMask) != Success)
+		    ButtonPressMask | PointerMotionMask | LeaveWindowMask)
+		    != Success)
 	    || (XSetInputFocus(display, focusWindow, RevertToParent,
 		    CurrentTime) != Success)) {
 	return 0;
@@ -1367,6 +1369,38 @@ X11WasmTestXSendEventTargets(
 	    || (received.type != ButtonPress)
 	    || (received.xany.window != pointerWindow)
 	    || (received.xany.send_event != True)) {
+	return 0;
+    }
+
+    BrowserClearEventQueue();
+    BrowserWindowRootOffset(pointerWindow, &rootX, &rootY);
+    BrowserUpdatePointerState(pointerWindow, rootX + 1, rootY + 1, 0);
+    BrowserWindowRootOffset(focusWindow, &rootX, &rootY);
+    if (XWarpPointer(display, None, focusWindow, 0, 0, 0, 0, 1, 1)
+	    != Success) {
+	return 0;
+    }
+    if (!BrowserPopEvent(&received, NULL)
+	    || (received.type != LeaveNotify)
+	    || (received.xany.window != pointerWindow)
+	    || (received.xcrossing.x_root != rootX + 1)
+	    || (received.xcrossing.y_root != rootY + 1)) {
+	return 0;
+    }
+    if (!BrowserPopEvent(&received, NULL)
+	    || (received.type != EnterNotify)
+	    || (received.xany.window != focusWindow)
+	    || (received.xcrossing.x != 1)
+	    || (received.xcrossing.y != 1)) {
+	return 0;
+    }
+    if (!BrowserPopEvent(&received, NULL)
+	    || (received.type != MotionNotify)
+	    || (received.xany.window != focusWindow)
+	    || (received.xmotion.x != 1)
+	    || (received.xmotion.y != 1)
+	    || (browserDisplay.pointerWindow != focusWindow)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
 	return 0;
     }
     return 1;
@@ -1869,6 +1903,8 @@ XWarpPointer(
 	rootY = browserDisplay.pointerY + destY;
     }
 
+    (void)BrowserQueuePointerCrossingEvents(browserDisplay.pointerState,
+	    rootX, rootY, CurrentTime);
     (void)BrowserQueuePointerEventFields(MotionNotify,
 	    browserDisplay.rootWindow, 0, browserDisplay.pointerState, rootX,
 	    rootY, CurrentTime, 0);
