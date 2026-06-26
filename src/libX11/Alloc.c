@@ -24,3 +24,10 @@ ckfree(
 {
     free(ptr);
 }
+
+char *
+Xpermalloc(
+    unsigned int size)
+{
+    return (char *)ckalloc((size_t)size);
+}

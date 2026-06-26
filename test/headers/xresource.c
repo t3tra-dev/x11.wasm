@@ -9,6 +9,7 @@
 int
 X11WasmHeaderXresourcePrototypeTest(void)
 {
+    char *(*permalloc)(unsigned int) = Xpermalloc;
     XrmDatabase (*getStringDatabase)(_Xconst char *) = XrmGetStringDatabase;
     XrmDatabase (*getFileDatabase)(_Xconst char *) = XrmGetFileDatabase;
     Status (*combineFileDatabase)(_Xconst char *, XrmDatabase *, Bool) =
@@ -63,7 +64,8 @@ X11WasmHeaderXresourcePrototypeTest(void)
 
     value.size = 0;
     value.addr = NULL;
-    return (getStringDatabase != 0) && (getFileDatabase != 0)
+    return (permalloc != 0)
+	    && (getStringDatabase != 0) && (getFileDatabase != 0)
 	    && (combineFileDatabase != 0) && (putFileDatabase != 0)
 	    && (localeOfDatabase != 0) && (getResource != 0)
 	    && (getDatabase != 0) && (setDatabase != 0)

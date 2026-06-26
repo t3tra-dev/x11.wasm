@@ -9479,6 +9479,7 @@ BrowserTestXrmDatabaseApis(void)
     XrmDatabase parseDatabase = NULL;
     XrmValue binaryValue;
     XrmValue readValue;
+    char *permanentAllocation = NULL;
     XrmBinding qBindings[8];
     XrmQuark qQuarks[8];
     XrmName qNames[8];
@@ -9553,6 +9554,19 @@ BrowserTestXrmDatabaseApis(void)
 	    NULL, NULL) != False) {
 	goto cleanup;
     }
+    permanentAllocation = Xpermalloc(4);
+    if (permanentAllocation == NULL) {
+	goto cleanup;
+    }
+    permanentAllocation[0] = 'x';
+    permanentAllocation[1] = 'r';
+    permanentAllocation[2] = 'm';
+    permanentAllocation[3] = '\0';
+    if (strcmp(permanentAllocation, "xrm") != 0) {
+	goto cleanup;
+    }
+    XFree(permanentAllocation);
+    permanentAllocation = NULL;
     emptyDatabase = XrmGetStringDatabase("");
     if ((emptyDatabase == NULL)
 	    || (XrmGetResource(emptyDatabase, "wish.geometry",
@@ -9857,6 +9871,9 @@ BrowserTestXrmDatabaseApis(void)
 cleanup:
     if (file != NULL) {
 	(void)fclose(file);
+    }
+    if (permanentAllocation != NULL) {
+	XFree(permanentAllocation);
     }
     XrmSetDatabase(display, NULL);
     if (roundTripDatabase != NULL) {

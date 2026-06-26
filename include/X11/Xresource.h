@@ -70,6 +70,8 @@ typedef struct {
 #define XrmEnumAllLevels 0
 #define XrmEnumOneLevel 1
 
+extern char *Xpermalloc(
+    unsigned int size);
 extern void XrmStringToQuarkList(
     _Xconst char *string,
     XrmQuarkList quarks_return);
