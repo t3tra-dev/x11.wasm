@@ -59,25 +59,115 @@ Xutf8LookupString(
     return XmbLookupString(inputContext, event, buffer, bytes, keySym, status);
 }
 
+int
+XwcLookupString(
+    XIC inputContext,
+    XKeyPressedEvent *event,
+    wchar_t *buffer,
+    int wchars,
+    KeySym *keySym,
+    Status *status)
+{
+    int index = ((event != NULL) && (event->state & ShiftMask)) ? 1 : 0;
+    KeySym sym = XLookupKeysym(event, index);
+    unsigned int codepoint = 0;
+    unsigned char latin1;
+
+    if (!BrowserICAllowsLookup(inputContext, event)) {
+	if (keySym != NULL) {
+	    *keySym = NoSymbol;
+	}
+	if (status != NULL) {
+	    *status = XLookupNone;
+	}
+	return 0;
+    }
+    if (keySym != NULL) {
+	*keySym = sym;
+    }
+    if (BrowserIsUnicodeKeySym(sym)) {
+	codepoint = ((unsigned int)sym & 0x00ffffffU);
+    } else if (BrowserLatin1FromKeySym(sym, &latin1)) {
+	codepoint = (unsigned int)latin1;
+    }
+    if (codepoint == 0U) {
+	if (status != NULL) {
+	    *status = BrowserLookupStatus(0, sym);
+	}
+	return 0;
+    }
+    if ((buffer == NULL) || (wchars < 1)) {
+	if (status != NULL) {
+	    *status = XBufferOverflow;
+	}
+	return 1;
+    }
+    if ((sizeof(wchar_t) < 4U) && (codepoint > 0xffffU)) {
+	codepoint = 0xfffdU;
+    }
+    buffer[0] = (wchar_t)codepoint;
+    if (status != NULL) {
+	*status = BrowserLookupStatus(1, sym);
+    }
+    return 1;
+}
+
+wchar_t *
+XwcResetIC(
+    XIC inputContext)
+{
+    (void)inputContext;
+    return NULL;
+}
+
+char *
+XmbResetIC(
+    XIC inputContext)
+{
+    (void)inputContext;
+    return NULL;
+}
+
+char *
+Xutf8ResetIC(
+    XIC inputContext)
+{
+    (void)inputContext;
+    return NULL;
+}
+
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestXICLookupFocus(void)
 {
     char buffer[8];
     char *savedLocaleModifiers = NULL;
+    const char *currentLocale = NULL;
     int result = 0;
     int lookupLength;
     KeySym lookupSym;
     Status lookupStatus;
+    wchar_t wideBuffer[4];
     XIC inputContext = NULL;
     XIM inputMethod = NULL;
     XKeyPressedEvent lookupEvent;
 
     BrowserInitDisplay();
+    currentLocale = setlocale(LC_CTYPE, NULL);
+    if (currentLocale == NULL) {
+	currentLocale = "C";
+    }
     savedLocaleModifiers = (localeModifiers != NULL)
 	    ? BrowserDupString(localeModifiers) : NULL;
     (void)XSetLocaleModifiers("@im=x11wasm");
     inputMethod = XOpenIM(&browserDisplay.display, NULL, NULL, NULL);
     if (inputMethod == NULL) {
+	goto cleanup;
+    }
+    if ((XDisplayOfIM(inputMethod) != &browserDisplay.display)
+	    || (XDisplayOfIM(NULL) != NULL)
+	    || (XLocaleOfIM(inputMethod) == NULL)
+	    || (strcmp(XLocaleOfIM(inputMethod), currentLocale) != 0)
+	    || (XLocaleOfIM(NULL) != NULL)) {
 	goto cleanup;
     }
     inputContext = XCreateIC(inputMethod,
@@ -86,6 +176,12 @@ X11WasmTestXICLookupFocus(void)
 	    XNFocusWindow, browserDisplay.rootWindow,
 	    NULL);
     if (inputContext == NULL) {
+	goto cleanup;
+    }
+    if ((XIMOfIC(inputContext) != inputMethod) || (XIMOfIC(NULL) != NULL)
+	    || (XmbResetIC(inputContext) != NULL)
+	    || (Xutf8ResetIC(inputContext) != NULL)
+	    || (XwcResetIC(inputContext) != NULL)) {
 	goto cleanup;
     }
     memset(&lookupEvent, 0, sizeof(lookupEvent));
@@ -102,6 +198,15 @@ X11WasmTestXICLookupFocus(void)
 	    || (lookupSym != NoSymbol)) {
 	goto cleanup;
     }
+    lookupSym = XK_a;
+    lookupStatus = XLookupBoth;
+    lookupLength = XwcLookupString(inputContext, &lookupEvent, wideBuffer,
+	    (int)(sizeof(wideBuffer) / sizeof(wideBuffer[0])), &lookupSym,
+	    &lookupStatus);
+    if ((lookupLength != 0) || (lookupStatus != XLookupNone)
+	    || (lookupSym != NoSymbol)) {
+	goto cleanup;
+    }
 
     XSetICFocus(inputContext);
     memset(buffer, 0, sizeof(buffer));
@@ -111,6 +216,24 @@ X11WasmTestXICLookupFocus(void)
 	    (int)sizeof(buffer), &lookupSym, &lookupStatus);
     if ((lookupLength != 1) || (lookupStatus != XLookupBoth)
 	    || (lookupSym != XK_a) || (buffer[0] != 'a')) {
+	goto cleanup;
+    }
+    memset(wideBuffer, 0, sizeof(wideBuffer));
+    lookupSym = NoSymbol;
+    lookupStatus = 0;
+    lookupLength = XwcLookupString(inputContext, &lookupEvent, wideBuffer,
+	    (int)(sizeof(wideBuffer) / sizeof(wideBuffer[0])), &lookupSym,
+	    &lookupStatus);
+    if ((lookupLength != 1) || (lookupStatus != XLookupBoth)
+	    || (lookupSym != XK_a) || (wideBuffer[0] != L'a')) {
+	goto cleanup;
+    }
+    lookupSym = NoSymbol;
+    lookupStatus = 0;
+    lookupLength = XwcLookupString(inputContext, &lookupEvent, wideBuffer,
+	    0, &lookupSym, &lookupStatus);
+    if ((lookupLength != 1) || (lookupStatus != XBufferOverflow)
+	    || (lookupSym != XK_a)) {
 	goto cleanup;
     }
 
@@ -482,6 +605,7 @@ XOpenIM(
     char *resourceClass)
 {
     XIM inputMethod;
+    const char *localeName;
 
     (void)rdb;
     (void)resourceName;
@@ -495,6 +619,9 @@ XOpenIM(
     inputMethod = (XIM)ckalloc(sizeof(*inputMethod));
     memset(inputMethod, 0, sizeof(*inputMethod));
     inputMethod->display = display;
+    localeName = setlocale(LC_CTYPE, NULL);
+    inputMethod->localeName = BrowserDupString(
+	    (localeName != NULL) ? localeName : "C");
     inputMethod->styleCount = 2;
     inputMethod->styles[0] = XIMPreeditPosition | XIMStatusNothing;
     inputMethod->styles[1] = XIMPreeditNothing | XIMStatusNothing;
@@ -511,9 +638,26 @@ XCloseIM(
 	    inputMethod->destroyCallback.callback(inputMethod,
 		    inputMethod->destroyCallback.client_data, NULL);
 	}
+	if (inputMethod->localeName != NULL) {
+	    ckfree(inputMethod->localeName);
+	}
 	ckfree(inputMethod);
     }
     return True;
+}
+
+Display *
+XDisplayOfIM(
+    XIM inputMethod)
+{
+    return (inputMethod != NULL) ? inputMethod->display : NULL;
+}
+
+char *
+XLocaleOfIM(
+    XIM inputMethod)
+{
+    return (inputMethod != NULL) ? inputMethod->localeName : NULL;
 }
 
 char *
@@ -644,6 +788,13 @@ XCreateIC(
 	return NULL;
     }
     return inputContext;
+}
+
+XIM
+XIMOfIC(
+    XIC inputContext)
+{
+    return (inputContext != NULL) ? inputContext->inputMethod : NULL;
 }
 
 void

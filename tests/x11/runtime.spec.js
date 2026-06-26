@@ -1317,7 +1317,9 @@ test("X error handler receives invalid resource errors", async ({ page }) => {
   expect(result).toBe(1);
 });
 
-test("XIC lookup honors focused input context", async ({ page }) => {
+test("XIC lookup and IM accessors honor focused input context", async ({
+  page,
+}) => {
   await page.goto("/x11.html");
   await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
     timeout: 15000,

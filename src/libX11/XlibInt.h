@@ -353,6 +353,7 @@ typedef struct X11WasmNestedList {
 
 struct _XIM {
     Display *display;
+    char *localeName;
     unsigned short styleCount;
     XIMStyle styles[2];
     int hasDestroyCallback;

@@ -49,6 +49,14 @@ X11WasmHeaderXlibOnlyPrototypeTest(void)
     char **(*getFontPath)(Display *, int *) = XGetFontPath;
     int (*setFontPath)(Display *, char **, int) = XSetFontPath;
     int (*freeFontPath)(char **) = XFreeFontPath;
+    Display *(*displayOfIM)(XIM) = XDisplayOfIM;
+    char *(*localeOfIM)(XIM) = XLocaleOfIM;
+    XIM (*imOfIC)(XIC) = XIMOfIC;
+    wchar_t *(*wcResetIC)(XIC) = XwcResetIC;
+    char *(*mbResetIC)(XIC) = XmbResetIC;
+    char *(*utf8ResetIC)(XIC) = Xutf8ResetIC;
+    int (*wcLookupString)(XIC, XKeyPressedEvent *, wchar_t *, int, KeySym *,
+	    Status *) = XwcLookupString;
     Region (*createRegion)(void) = XCreateRegion;
     int (*freeData)(void *) = XFree;
 
@@ -65,5 +73,8 @@ X11WasmHeaderXlibOnlyPrototypeTest(void)
 	    && (listFontsWithInfo != 0) && (freeFontInfo != 0)
 	    && (getFontPath != 0) && (setFontPath != 0)
 	    && (freeFontPath != 0)
+	    && (displayOfIM != 0) && (localeOfIM != 0)
+	    && (imOfIC != 0) && (wcResetIC != 0) && (mbResetIC != 0)
+	    && (utf8ResetIC != 0) && (wcLookupString != 0)
 	    && (createRegion != 0) && (freeData != 0);
 }

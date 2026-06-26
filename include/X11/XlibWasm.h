@@ -431,6 +431,8 @@ EXTERN void XUnsetICFocus(XIC xi);
 EXTERN XIM XOpenIM(Display *display, XPointer rdb, char *resourceName,
 	char *resourceClass);
 EXTERN Status XCloseIM(XIM xim);
+EXTERN Display *XDisplayOfIM(XIM xim);
+EXTERN char *XLocaleOfIM(XIM xim);
 EXTERN char *XSetLocaleModifiers(_Xconst char *modifierList);
 EXTERN Bool XRegisterIMInstantiateCallback(Display *display,
 	struct _XrmHashBucketRec *rdb, char *resourceName, char *resourceClass,
@@ -573,6 +575,12 @@ EXTERN int XSetLineAttributes(Display *display, GC gc,
 EXTERN Status XInitImage(XImage *image);
 EXTERN int _XInitImageFuncPtrs(XImage *image);
 EXTERN XIC XCreateIC(XIM xim, ...);
+EXTERN XIM XIMOfIC(XIC xic);
+EXTERN wchar_t *XwcResetIC(XIC xic);
+EXTERN char *XmbResetIC(XIC xic);
+EXTERN char *Xutf8ResetIC(XIC xic);
+EXTERN int XwcLookupString(XIC xic, XKeyPressedEvent *event,
+	wchar_t *buffer, int wchars, KeySym *keysym, Status *status);
 EXTERN XVisualInfo *XGetVisualInfo(Display *display, long vinfo_mask,
 	XVisualInfo *vinfo_template, int *nitems_return);
 EXTERN XPixmapFormatValues *XListPixmapFormats(Display *display,
