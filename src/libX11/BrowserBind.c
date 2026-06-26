@@ -665,6 +665,89 @@ X11WasmDeleteResource(
 }
 
 static void
+BrowserCloseDownWindowResource(
+    X11WasmResource *resourcePtr);
+
+static void
+BrowserRetainSaveSetWindow(
+    X11WasmResource *resourcePtr)
+{
+    Window oldParent;
+    int wasMapped;
+
+    if ((resourcePtr == NULL) || (resourcePtr == &browserDisplay.rootResource)
+	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)) {
+	return;
+    }
+    while (resourcePtr->firstChildPtr != NULL) {
+	X11WasmResource *childPtr = resourcePtr->firstChildPtr;
+
+	if (childPtr->inSaveSet) {
+	    BrowserRetainSaveSetWindow(childPtr);
+	} else {
+	    BrowserCloseDownWindowResource(childPtr);
+	}
+    }
+
+    oldParent = resourcePtr->parent;
+    wasMapped = resourcePtr->mapped;
+    if (wasMapped) {
+	resourcePtr->mapped = 0;
+	(void)X11WasmJsUnmapWindow(BrowserJsXId(resourcePtr->id));
+	(void)BrowserQueueUnmapNotify(resourcePtr, False);
+    }
+    if (oldParent != browserDisplay.rootWindow) {
+	BrowserUnlinkChild(resourcePtr);
+	resourcePtr->parent = browserDisplay.rootWindow;
+	resourcePtr->x = 0;
+	resourcePtr->y = 0;
+	BrowserLinkChildAtTop(resourcePtr, browserDisplay.rootWindow);
+	(void)X11WasmJsReparentWindow(BrowserJsXId(resourcePtr->id),
+		BrowserJsXId(browserDisplay.rootWindow), 0, 0);
+	BrowserSyncTransientStacking();
+	(void)BrowserQueueReparentNotify(resourcePtr, oldParent,
+		browserDisplay.rootWindow, 0, 0);
+    }
+    resourcePtr->retained = 1;
+    resourcePtr->temporary = 0;
+    resourcePtr->inSaveSet = 0;
+    if (!resourcePtr->mapped) {
+	resourcePtr->mapped = 1;
+	(void)X11WasmJsMapWindow(BrowserJsXId(resourcePtr->id));
+	(void)BrowserQueueMapNotify(resourcePtr);
+	BrowserNotifyVisibilityTree(resourcePtr, VisibilityUnobscured);
+	if (resourcePtr->c_class != InputOnly) {
+	    (void)BrowserQueueExpose(resourcePtr, 0, 0, resourcePtr->width,
+		    resourcePtr->height);
+	}
+    }
+}
+
+static void
+BrowserCloseDownWindowResource(
+    X11WasmResource *resourcePtr)
+{
+    if ((resourcePtr == NULL) || (resourcePtr == &browserDisplay.rootResource)
+	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)) {
+	return;
+    }
+    if (resourcePtr->inSaveSet) {
+	BrowserRetainSaveSetWindow(resourcePtr);
+	return;
+    }
+    while (resourcePtr->firstChildPtr != NULL) {
+	X11WasmResource *childPtr = resourcePtr->firstChildPtr;
+
+	if (childPtr->inSaveSet) {
+	    BrowserRetainSaveSetWindow(childPtr);
+	} else {
+	    BrowserCloseDownWindowResource(childPtr);
+	}
+    }
+    (void)BrowserDestroyWindowResource(resourcePtr);
+}
+
+static void
 BrowserDeleteCloseDownResource(
     X11WasmResource *resourcePtr)
 {
@@ -675,7 +758,7 @@ BrowserDeleteCloseDownResource(
     }
     id = resourcePtr->id;
     if (resourcePtr->type == X11_WASM_RESOURCE_WINDOW) {
-	(void)BrowserDestroyWindowResource(resourcePtr);
+	BrowserCloseDownWindowResource(resourcePtr);
 	return;
     }
     if ((resourcePtr->type == X11_WASM_RESOURCE_PIXMAP)
@@ -701,7 +784,12 @@ BrowserDeleteTemporaryResources(void)
 	if (resourcePtr == NULL) {
 	    return;
 	}
-	BrowserDeleteCloseDownResource(resourcePtr);
+	if (resourcePtr->inSaveSet
+		&& (resourcePtr->type == X11_WASM_RESOURCE_WINDOW)) {
+	    BrowserRetainSaveSetWindow(resourcePtr);
+	} else {
+	    BrowserDeleteCloseDownResource(resourcePtr);
+	}
     }
 }
 
@@ -722,7 +810,12 @@ BrowserApplyCloseDownMode(void)
 	    if (resourcePtr == NULL) {
 		return;
 	    }
-	    BrowserDeleteCloseDownResource(resourcePtr);
+	    if (resourcePtr->inSaveSet
+		    && (resourcePtr->type == X11_WASM_RESOURCE_WINDOW)) {
+		BrowserRetainSaveSetWindow(resourcePtr);
+	    } else {
+		BrowserDeleteCloseDownResource(resourcePtr);
+	    }
 	}
     }
 

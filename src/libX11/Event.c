@@ -2561,6 +2561,13 @@ BrowserChangeSaveSet(
 	    X11_WASM_XREQ_CHANGE_SAVE_SET) == NULL) {
 	return Success;
     }
+    if (display == &browserDisplay.display) {
+	X11WasmResource *resourcePtr = BrowserWindowResource(window);
+
+	if (resourcePtr != NULL) {
+	    resourcePtr->inSaveSet = (mode == SetModeInsert);
+	}
+    }
     return XNoOp(display);
 }
 
@@ -2640,6 +2647,8 @@ X11WasmTestTemporaryResourceKill(void)
     int screen;
     Window destroyWindow = None;
     Window permanentWindow = None;
+    Window saveSetParent = None;
+    Window saveSetWindow = None;
     Window temporaryWindow = None;
     Pixmap temporaryPixmap = None;
     Colormap temporaryColormap = None;
@@ -2673,6 +2682,34 @@ X11WasmTestTemporaryResourceKill(void)
 	    || resourcePtr->temporary
 	    || (XKillClient(display, AllTemporary) != Success)
 	    || (X11WasmFindResource((XID)permanentWindow) == NULL)) {
+	goto cleanup;
+    }
+
+    saveSetParent = XCreateWindow(display, browserDisplay.rootWindow, 0, 0,
+	    24, 24, 0, CopyFromParent, InputOutput,
+	    DefaultVisual(display, screen), 0, NULL);
+    saveSetWindow = XCreateWindow(display, saveSetParent, 2, 3, 12, 12, 0,
+	    CopyFromParent, InputOutput, DefaultVisual(display, screen), 0,
+	    NULL);
+    resourcePtr = X11WasmFindResource((XID)saveSetWindow);
+    if ((saveSetParent == None) || (saveSetWindow == None)
+	    || (XAddToSaveSet(display, saveSetWindow) != Success)
+	    || (resourcePtr == NULL) || !resourcePtr->inSaveSet
+	    || (XRemoveFromSaveSet(display, saveSetWindow) != Success)
+	    || resourcePtr->inSaveSet
+	    || (XChangeSaveSet(display, saveSetWindow, SetModeInsert)
+		    != Success)
+	    || !resourcePtr->inSaveSet
+	    || (XCloseDisplay(display) != Success)
+	    || (X11WasmFindResource((XID)saveSetParent) != NULL)) {
+	goto cleanup;
+    }
+    resourcePtr = X11WasmFindResource((XID)saveSetWindow);
+    if ((resourcePtr == NULL) || (resourcePtr->parent != browserDisplay.rootWindow)
+	    || (resourcePtr->parentPtr != &browserDisplay.rootResource)
+	    || (resourcePtr->x != 0) || (resourcePtr->y != 0)
+	    || !resourcePtr->mapped || !resourcePtr->retained
+	    || resourcePtr->temporary || resourcePtr->inSaveSet) {
 	goto cleanup;
     }
 
@@ -2730,6 +2767,12 @@ cleanup:
     (void)XSetCloseDownMode(display, DestroyAll);
     if (X11WasmFindResource((XID)destroyWindow) != NULL) {
 	(void)XDestroyWindow(display, destroyWindow);
+    }
+    if (X11WasmFindResource((XID)saveSetWindow) != NULL) {
+	(void)XDestroyWindow(display, saveSetWindow);
+    }
+    if (X11WasmFindResource((XID)saveSetParent) != NULL) {
+	(void)XDestroyWindow(display, saveSetParent);
     }
     if (X11WasmFindResource((XID)temporaryFont) != NULL) {
 	(void)XUnloadFont(display, temporaryFont);

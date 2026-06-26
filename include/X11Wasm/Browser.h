@@ -88,6 +88,7 @@ typedef struct X11WasmResource {
     int metadataIsRootToplevel;
     int retained;
     int temporary;
+    int inSaveSet;
 } X11WasmResource;
 
 typedef struct _XRegion {
