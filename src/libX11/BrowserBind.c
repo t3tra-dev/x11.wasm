@@ -541,7 +541,6 @@ X11WasmCreateResource(
     resourcePtr->atts.win_gravity = NorthWestGravity;
     resourcePtr->atts.backing_store = NotUseful;
     resourcePtr->atts.backing_planes = ~0UL;
-    resourcePtr->temporary = browserDisplay.closeDownMode == RetainTemporary;
     resourcePtr->nextPtr = browserDisplay.resourceList;
     browserDisplay.resourceList = resourcePtr;
     return resourcePtr;
@@ -641,6 +640,79 @@ X11WasmDeleteResource(
 	    return;
 	}
 	linkPtr = &resourcePtr->nextPtr;
+    }
+}
+
+static void
+BrowserDeleteCloseDownResource(
+    X11WasmResource *resourcePtr)
+{
+    XID id;
+
+    if ((resourcePtr == NULL) || (resourcePtr == &browserDisplay.rootResource)) {
+	return;
+    }
+    id = resourcePtr->id;
+    if (resourcePtr->type == X11_WASM_RESOURCE_WINDOW) {
+	(void)BrowserDestroyWindowResource(resourcePtr);
+	return;
+    }
+    if ((resourcePtr->type == X11_WASM_RESOURCE_PIXMAP)
+	    || (resourcePtr->type == X11_WASM_RESOURCE_CURSOR)) {
+	(void)X11WasmJsDestroyResource(BrowserJsXId(id));
+    }
+    X11WasmDeleteResource(id);
+}
+
+void
+BrowserDeleteTemporaryResources(void)
+{
+    X11WasmResource *resourcePtr;
+
+    for (;;) {
+	for (resourcePtr = browserDisplay.resourceList; resourcePtr != NULL;
+		resourcePtr = resourcePtr->nextPtr) {
+	    if ((resourcePtr != &browserDisplay.rootResource)
+		    && resourcePtr->retained && resourcePtr->temporary) {
+		break;
+	    }
+	}
+	if (resourcePtr == NULL) {
+	    return;
+	}
+	BrowserDeleteCloseDownResource(resourcePtr);
+    }
+}
+
+void
+BrowserApplyCloseDownMode(void)
+{
+    X11WasmResource *resourcePtr;
+
+    if (browserDisplay.closeDownMode == DestroyAll) {
+	for (;;) {
+	    for (resourcePtr = browserDisplay.resourceList;
+		    resourcePtr != NULL; resourcePtr = resourcePtr->nextPtr) {
+		if ((resourcePtr != &browserDisplay.rootResource)
+			&& !resourcePtr->retained) {
+		    break;
+		}
+	    }
+	    if (resourcePtr == NULL) {
+		return;
+	    }
+	    BrowserDeleteCloseDownResource(resourcePtr);
+	}
+    }
+
+    for (resourcePtr = browserDisplay.resourceList; resourcePtr != NULL;
+	    resourcePtr = resourcePtr->nextPtr) {
+	if ((resourcePtr != &browserDisplay.rootResource)
+		&& !resourcePtr->retained) {
+	    resourcePtr->retained = 1;
+	    resourcePtr->temporary =
+		    browserDisplay.closeDownMode == RetainTemporary;
+	}
     }
 }
 

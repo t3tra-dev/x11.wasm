@@ -70,6 +70,7 @@ typedef struct X11WasmResource {
     Window metadataTarget;
     int metadataRootToplevelSet;
     int metadataIsRootToplevel;
+    int retained;
     int temporary;
 } X11WasmResource;
 

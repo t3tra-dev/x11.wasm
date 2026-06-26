@@ -303,6 +303,8 @@ XCloseDisplay(
 	browserDisplay.afterFunction = NULL;
 	browserDisplay.runningAfterFunction = 0;
 	BrowserSyncSynchronizeState(display);
+	BrowserApplyCloseDownMode();
+	browserDisplay.closeDownMode = DestroyAll;
 	browserDisplay.closeSerial++;
 	BrowserSyncPointerGrabCursor();
 	BrowserSyncPointerGrabState();

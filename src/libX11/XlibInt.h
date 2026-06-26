@@ -687,6 +687,8 @@ void BrowserDeleteGCDashes(
 int BrowserDeleteProperty(
     X11WasmResource *resourcePtr,
     Atom atom);
+void BrowserApplyCloseDownMode(void);
+void BrowserDeleteTemporaryResources(void);
 void BrowserDeleteSelectionOwner(
     Atom selection);
 void BrowserDeleteSelectionOwnersForWindow(

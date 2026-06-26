@@ -567,7 +567,7 @@ test("XSendEvent resolves InputFocus and PointerWindow targets", async ({
   expect(result).toBe(1);
 });
 
-test("XKillClient removes retained temporary resources", async ({ page }) => {
+test("XCloseDisplay applies close-down resource modes", async ({ page }) => {
   await waitForX11Runtime(page);
 
   const result = await page.evaluate(() => {
