@@ -2219,6 +2219,244 @@ cleanup:
     return ok;
 }
 
+static int
+BrowserTestPropertyAtomListContains(
+    const unsigned char *data,
+    unsigned long count,
+    Atom atom)
+{
+    unsigned long i;
+
+    for (i = 0; i < count; i++) {
+	if (BrowserPropertyAtomAt(data, i) == atom) {
+	    return 1;
+	}
+    }
+    return 0;
+}
+
+static int
+BrowserTestExternalClipboardTargetList(void)
+{
+    Atom actualType = None;
+    Atom property;
+    XEvent event;
+    unsigned char *data = NULL;
+    int actualFormat = 0;
+    unsigned long nitems = 0;
+    unsigned long bytesAfter = 0;
+    int ok = 0;
+
+    property = XInternAtom(&browserDisplay.display,
+	    "_X11_WASM_TEST_CLIPBOARD_TARGET_LIST", False);
+    BrowserClearEventQueue();
+    (void)XDeleteProperty(&browserDisplay.display, browserDisplay.rootWindow,
+	    property);
+    (void)XConvertSelection(&browserDisplay.display,
+	    BrowserClipboardSelectionAtom(), BrowserTargetsAtom(), property,
+	    browserDisplay.rootWindow, CurrentTime);
+    if (!BrowserPopEvent(&event, NULL)
+	    || (event.type != SelectionNotify)
+	    || (event.xselection.selection != BrowserClipboardSelectionAtom())
+	    || (event.xselection.target != BrowserTargetsAtom())
+	    || (event.xselection.property != property)) {
+	goto cleanup;
+    }
+    if (XGetWindowProperty(&browserDisplay.display, browserDisplay.rootWindow,
+	    property, 0, 4096, False, XA_ATOM, &actualType, &actualFormat,
+	    &nitems, &bytesAfter, &data) != Success) {
+	goto cleanup;
+    }
+    if ((actualType != XA_ATOM) || (actualFormat != 32)
+	    || (bytesAfter != 0) || (nitems != 7)
+	    || !BrowserTestPropertyAtomListContains(data, nitems,
+		    XA_STRING)
+	    || !BrowserTestPropertyAtomListContains(data, nitems,
+		    BrowserUtf8StringAtom())
+	    || !BrowserTestPropertyAtomListContains(data, nitems,
+		    BrowserTextAtom())
+	    || !BrowserTestPropertyAtomListContains(data, nitems,
+		    BrowserCompoundTextAtom())
+	    || !BrowserTestPropertyAtomListContains(data, nitems,
+		    BrowserTargetsAtom())
+	    || !BrowserTestPropertyAtomListContains(data, nitems,
+		    BrowserTimestampAtom())
+	    || !BrowserTestPropertyAtomListContains(data, nitems,
+		    BrowserMultipleAtom())) {
+	goto cleanup;
+    }
+    ok = 1;
+
+cleanup:
+    if (data != NULL) {
+	XFree(data);
+    }
+    (void)XDeleteProperty(&browserDisplay.display, browserDisplay.rootWindow,
+	    property);
+    return ok;
+}
+
+static int
+BrowserTestExternalClipboardMultiple(
+    const unsigned char *expectedString,
+    unsigned long expectedStringCount,
+    const unsigned char *expectedUtf8,
+    unsigned long expectedUtf8Count)
+{
+    Atom actualType = None;
+    Atom multipleProperty;
+    Atom stringProperty;
+    Atom utf8Property;
+    Atom timestampProperty;
+    Atom unsupportedProperty;
+    Atom unsupportedTarget;
+    XEvent event;
+    unsigned int pairs[8];
+    unsigned char *data = NULL;
+    int actualFormat = 0;
+    unsigned long nitems = 0;
+    unsigned long bytesAfter = 0;
+    int ok = 0;
+
+    multipleProperty = XInternAtom(&browserDisplay.display,
+	    "_X11_WASM_TEST_CLIPBOARD_MULTIPLE", False);
+    stringProperty = XInternAtom(&browserDisplay.display,
+	    "_X11_WASM_TEST_CLIPBOARD_MULTIPLE_STRING", False);
+    utf8Property = XInternAtom(&browserDisplay.display,
+	    "_X11_WASM_TEST_CLIPBOARD_MULTIPLE_UTF8", False);
+    timestampProperty = XInternAtom(&browserDisplay.display,
+	    "_X11_WASM_TEST_CLIPBOARD_MULTIPLE_TIMESTAMP", False);
+    unsupportedProperty = XInternAtom(&browserDisplay.display,
+	    "_X11_WASM_TEST_CLIPBOARD_MULTIPLE_UNSUPPORTED_PROPERTY", False);
+    unsupportedTarget = XInternAtom(&browserDisplay.display,
+	    "_X11_WASM_TEST_CLIPBOARD_MULTIPLE_UNSUPPORTED_TARGET", False);
+
+    pairs[0] = (unsigned int)XA_STRING;
+    pairs[1] = (unsigned int)stringProperty;
+    pairs[2] = (unsigned int)BrowserUtf8StringAtom();
+    pairs[3] = (unsigned int)utf8Property;
+    pairs[4] = (unsigned int)BrowserTimestampAtom();
+    pairs[5] = (unsigned int)timestampProperty;
+    pairs[6] = (unsigned int)unsupportedTarget;
+    pairs[7] = (unsigned int)unsupportedProperty;
+
+    BrowserClearEventQueue();
+    (void)XDeleteProperty(&browserDisplay.display, browserDisplay.rootWindow,
+	    multipleProperty);
+    (void)XDeleteProperty(&browserDisplay.display, browserDisplay.rootWindow,
+	    stringProperty);
+    (void)XDeleteProperty(&browserDisplay.display, browserDisplay.rootWindow,
+	    utf8Property);
+    (void)XDeleteProperty(&browserDisplay.display, browserDisplay.rootWindow,
+	    timestampProperty);
+    (void)XDeleteProperty(&browserDisplay.display, browserDisplay.rootWindow,
+	    unsupportedProperty);
+
+    (void)XChangeProperty(&browserDisplay.display, browserDisplay.rootWindow,
+	    multipleProperty, BrowserAtomPairAtom(), 32, PropModeReplace,
+	    (const unsigned char *)pairs, (int)(sizeof(pairs) / sizeof(pairs[0])));
+    (void)XConvertSelection(&browserDisplay.display,
+	    BrowserClipboardSelectionAtom(), BrowserMultipleAtom(),
+	    multipleProperty, browserDisplay.rootWindow, CurrentTime);
+    if (!BrowserPopEvent(&event, NULL)
+	    || (event.type != SelectionNotify)
+	    || (event.xselection.selection != BrowserClipboardSelectionAtom())
+	    || (event.xselection.target != BrowserMultipleAtom())
+	    || (event.xselection.property != multipleProperty)) {
+	goto cleanup;
+    }
+
+    if (XGetWindowProperty(&browserDisplay.display, browserDisplay.rootWindow,
+	    multipleProperty, 0, 16, False, BrowserAtomPairAtom(),
+	    &actualType, &actualFormat, &nitems, &bytesAfter, &data)
+	    != Success) {
+	goto cleanup;
+    }
+    if ((actualType != BrowserAtomPairAtom()) || (actualFormat != 32)
+	    || (nitems != 8) || (bytesAfter != 0)
+	    || (BrowserPropertyAtomAt(data, 0) != XA_STRING)
+	    || (BrowserPropertyAtomAt(data, 1) != stringProperty)
+	    || (BrowserPropertyAtomAt(data, 2) != BrowserUtf8StringAtom())
+	    || (BrowserPropertyAtomAt(data, 3) != utf8Property)
+	    || (BrowserPropertyAtomAt(data, 4) != BrowserTimestampAtom())
+	    || (BrowserPropertyAtomAt(data, 5) != timestampProperty)
+	    || (BrowserPropertyAtomAt(data, 6) != unsupportedTarget)
+	    || (BrowserPropertyAtomAt(data, 7) != None)) {
+	goto cleanup;
+    }
+    XFree(data);
+    data = NULL;
+
+    actualType = None;
+    actualFormat = 0;
+    nitems = 0;
+    bytesAfter = 0;
+    if (XGetWindowProperty(&browserDisplay.display, browserDisplay.rootWindow,
+	    stringProperty, 0, 4096, False, AnyPropertyType, &actualType,
+	    &actualFormat, &nitems, &bytesAfter, &data) != Success) {
+	goto cleanup;
+    }
+    if ((actualType != XA_STRING) || (actualFormat != 8)
+	    || (nitems != expectedStringCount) || (bytesAfter != 0)
+	    || ((expectedStringCount > 0)
+		    && (memcmp(data, expectedString,
+			    (size_t)expectedStringCount) != 0))) {
+	goto cleanup;
+    }
+    XFree(data);
+    data = NULL;
+
+    actualType = None;
+    actualFormat = 0;
+    nitems = 0;
+    bytesAfter = 0;
+    if (XGetWindowProperty(&browserDisplay.display, browserDisplay.rootWindow,
+	    utf8Property, 0, 4096, False, AnyPropertyType, &actualType,
+	    &actualFormat, &nitems, &bytesAfter, &data) != Success) {
+	goto cleanup;
+    }
+    if ((actualType != BrowserUtf8StringAtom()) || (actualFormat != 8)
+	    || (nitems != expectedUtf8Count) || (bytesAfter != 0)
+	    || ((expectedUtf8Count > 0)
+		    && (memcmp(data, expectedUtf8,
+			    (size_t)expectedUtf8Count) != 0))) {
+	goto cleanup;
+    }
+    XFree(data);
+    data = NULL;
+
+    actualType = None;
+    actualFormat = 0;
+    nitems = 0;
+    bytesAfter = 0;
+    if (XGetWindowProperty(&browserDisplay.display, browserDisplay.rootWindow,
+	    timestampProperty, 0, 1, False, AnyPropertyType, &actualType,
+	    &actualFormat, &nitems, &bytesAfter, &data) != Success) {
+	goto cleanup;
+    }
+    if ((actualType != XA_INTEGER) || (actualFormat != 32)
+	    || (nitems != 1) || (bytesAfter != 0)) {
+	goto cleanup;
+    }
+    ok = 1;
+
+cleanup:
+    if (data != NULL) {
+	XFree(data);
+    }
+    (void)XDeleteProperty(&browserDisplay.display, browserDisplay.rootWindow,
+	    multipleProperty);
+    (void)XDeleteProperty(&browserDisplay.display, browserDisplay.rootWindow,
+	    stringProperty);
+    (void)XDeleteProperty(&browserDisplay.display, browserDisplay.rootWindow,
+	    utf8Property);
+    (void)XDeleteProperty(&browserDisplay.display, browserDisplay.rootWindow,
+	    timestampProperty);
+    (void)XDeleteProperty(&browserDisplay.display, browserDisplay.rootWindow,
+	    unsupportedProperty);
+    return ok;
+}
+
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestExternalClipboardTargets(void)
 {
@@ -2253,6 +2491,16 @@ X11WasmTestExternalClipboardTargets(void)
     if (!BrowserTestExternalClipboardTarget(BrowserCompoundTextAtom(),
 	    BrowserCompoundTextAtom(), NULL, 0, latin1Utf8)) {
 	result = 13;
+	goto cleanup;
+    }
+    if (!BrowserTestExternalClipboardTargetList()) {
+	result = 17;
+	goto cleanup;
+    }
+    if (!BrowserTestExternalClipboardMultiple(latin1String,
+	    (unsigned long)sizeof(latin1String), latin1Utf8Bytes,
+	    (unsigned long)sizeof(latin1Utf8Bytes))) {
+	result = 16;
 	goto cleanup;
     }
 

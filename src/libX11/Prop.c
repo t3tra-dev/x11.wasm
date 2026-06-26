@@ -803,6 +803,18 @@ BrowserCompoundTextAtom(void)
 }
 
 Atom
+BrowserMultipleAtom(void)
+{
+    return XInternAtom(X11WasmGetDisplay(NULL), "MULTIPLE", False);
+}
+
+Atom
+BrowserAtomPairAtom(void)
+{
+    return XInternAtom(X11WasmGetDisplay(NULL), "ATOM_PAIR", False);
+}
+
+Atom
 BrowserTargetsAtom(void)
 {
     return XInternAtom(X11WasmGetDisplay(NULL), "TARGETS", False);

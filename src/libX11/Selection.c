@@ -232,27 +232,17 @@ BrowserExternalClipboardTextProperty(
     return result;
 }
 
-int
-BrowserConvertExternalClipboardSelection(
+static int
+BrowserStoreExternalClipboardTarget(
     Window requestor,
-    Atom selection,
     Atom target,
     Atom property,
     Time time)
 {
-    unsigned int targets[6];
-    Atom effectiveProperty = property;
+    unsigned int targets[7];
     Time timestamp = externalClipboardTime;
 
-    if ((selection != BrowserClipboardSelectionAtom())
-	    || !externalClipboardAvailable) {
-	return 0;
-    }
-    if (effectiveProperty == None) {
-	effectiveProperty = target;
-    }
-    if ((effectiveProperty == None)
-	    || (BrowserWindowResource(requestor) == NULL)) {
+    if ((property == None) || (BrowserWindowResource(requestor) == NULL)) {
 	return 0;
     }
     if (target == BrowserTargetsAtom()) {
@@ -262,12 +252,11 @@ BrowserConvertExternalClipboardSelection(
 	targets[3] = (unsigned int)BrowserCompoundTextAtom();
 	targets[4] = (unsigned int)BrowserTargetsAtom();
 	targets[5] = (unsigned int)BrowserTimestampAtom();
+	targets[6] = (unsigned int)BrowserMultipleAtom();
 	(void)XChangeProperty(&browserDisplay.display, requestor,
-		effectiveProperty, XA_ATOM, 32, PropModeReplace,
+		property, XA_ATOM, 32, PropModeReplace,
 		(const unsigned char *)targets,
 		(int)(sizeof(targets) / sizeof(targets[0])));
-	(void)BrowserQueueSelectionNotify(requestor, selection, target,
-		effectiveProperty, time);
 	return 1;
     }
     if (target == BrowserTimestampAtom()) {
@@ -278,10 +267,8 @@ BrowserConvertExternalClipboardSelection(
 	}
 	timestampValue = (unsigned int)timestamp;
 	(void)XChangeProperty(&browserDisplay.display, requestor,
-		effectiveProperty, XA_INTEGER, 32, PropModeReplace,
+		property, XA_INTEGER, 32, PropModeReplace,
 		(const unsigned char *)&timestampValue, 1);
-	(void)BrowserQueueSelectionNotify(requestor, selection, target,
-		effectiveProperty, time);
 	return 1;
     }
     if (!BrowserSelectionTargetIsText(target)) {
@@ -299,12 +286,95 @@ BrowserConvertExternalClipboardSelection(
 	    return 0;
 	}
 	(void)XChangeProperty(&browserDisplay.display, requestor,
-		effectiveProperty, textProp.encoding, textProp.format,
+		property, textProp.encoding, textProp.format,
 		PropModeReplace, (const unsigned char *)textProp.value,
 		(int)textProp.nitems);
 	if (textProp.value != NULL) {
 	    XFree(textProp.value);
 	}
+    }
+    return 1;
+}
+
+static int
+BrowserConvertExternalClipboardMultiple(
+    Window requestor,
+    Atom property,
+    Time time)
+{
+    Atom actualType = None;
+    int actualFormat = 0;
+    unsigned long nitems = 0;
+    unsigned long bytesAfter = 0;
+    unsigned char *data = NULL;
+    unsigned int *pairs;
+    unsigned long i;
+    int ok = 0;
+
+    if ((property == None) || (BrowserWindowResource(requestor) == NULL)) {
+	return 0;
+    }
+    if (XGetWindowProperty(&browserDisplay.display, requestor, property, 0,
+	    (long)(LONG_MAX / 4L), False, BrowserAtomPairAtom(), &actualType,
+	    &actualFormat, &nitems, &bytesAfter, &data) != Success) {
+	goto cleanup;
+    }
+    if ((actualType != BrowserAtomPairAtom()) || (actualFormat != 32)
+	    || (bytesAfter != 0) || (data == NULL) || ((nitems % 2UL) != 0)
+	    || (nitems > (unsigned long)INT_MAX)) {
+	goto cleanup;
+    }
+    pairs = (unsigned int *)data;
+    for (i = 0; i < nitems; i += 2UL) {
+	Atom target = (Atom)pairs[i];
+	Atom targetProperty = (Atom)pairs[i + 1UL];
+
+	if ((target == BrowserMultipleAtom()) || (targetProperty == None)
+		|| !BrowserStoreExternalClipboardTarget(requestor, target,
+			targetProperty, time)) {
+	    pairs[i + 1UL] = (unsigned int)None;
+	}
+    }
+    (void)XChangeProperty(&browserDisplay.display, requestor, property,
+	    BrowserAtomPairAtom(), 32, PropModeReplace, data, (int)nitems);
+    ok = 1;
+
+cleanup:
+    if (data != NULL) {
+	XFree(data);
+    }
+    return ok;
+}
+
+int
+BrowserConvertExternalClipboardSelection(
+    Window requestor,
+    Atom selection,
+    Atom target,
+    Atom property,
+    Time time)
+{
+    Atom effectiveProperty = property;
+
+    if ((selection != BrowserClipboardSelectionAtom())
+	    || !externalClipboardAvailable) {
+	return 0;
+    }
+    if (target == BrowserMultipleAtom()) {
+	if (!BrowserConvertExternalClipboardMultiple(requestor, property,
+		time)) {
+	    return 0;
+	}
+	(void)BrowserQueueSelectionNotify(requestor, selection, target,
+		property, time);
+	return 1;
+    }
+    if (effectiveProperty == None) {
+	effectiveProperty = target;
+    }
+    if (!BrowserStoreExternalClipboardTarget(requestor, target,
+	    effectiveProperty, time)) {
+	return 0;
     }
     (void)BrowserQueueSelectionNotify(requestor, selection, target,
 	    effectiveProperty, time);

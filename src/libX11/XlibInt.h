@@ -571,6 +571,7 @@ X11WasmResource *BrowserCirculateSubwindow(
     X11WasmResource *parentPtr,
     int direction,
     int *placePtr);
+Atom BrowserAtomPairAtom(void);
 Atom BrowserClipboardSelectionAtom(void);
 int BrowserCollectVisualInfos(
     Display *display,
@@ -593,6 +594,7 @@ int BrowserCompleteRequest(
 const char *BrowserCompositionEventName(
     int phase);
 Atom BrowserCompoundTextAtom(void);
+Atom BrowserMultipleAtom(void);
 int BrowserConvertExternalClipboardSelection(
     Window requestor,
     Atom selection,
