@@ -4407,6 +4407,56 @@ BrowserConvertImageForPut(
     return convertedImage;
 }
 
+static unsigned int
+BrowserXYPixmapDepthForPlaneMask(
+    unsigned int drawableDepth,
+    unsigned long planeMask)
+{
+    unsigned long depthMask = BrowserDepthPlaneMask(drawableDepth);
+    unsigned long effectiveMask = planeMask & depthMask;
+    unsigned int planeCount = 0;
+
+    if ((planeMask == AllPlanes) || (effectiveMask == depthMask)) {
+	return drawableDepth;
+    }
+    while (effectiveMask != 0UL) {
+	if (effectiveMask & 1UL) {
+	    planeCount++;
+	}
+	effectiveMask >>= 1;
+    }
+    return planeCount;
+}
+
+static unsigned long
+BrowserXYPixmapPixelForPlaneMask(
+    unsigned long pixel,
+    unsigned int drawableDepth,
+    unsigned long planeMask)
+{
+    unsigned long depthMask = BrowserDepthPlaneMask(drawableDepth);
+    unsigned long effectiveMask = planeMask & depthMask;
+    unsigned long packedPixel = 0UL;
+    unsigned long targetBit = 1UL;
+    unsigned int plane;
+
+    if ((planeMask == AllPlanes) || (effectiveMask == depthMask)) {
+	return pixel & depthMask;
+    }
+    for (plane = 0; plane < drawableDepth; plane++) {
+	unsigned long sourceBit = 1UL << plane;
+
+	if ((effectiveMask & sourceBit) == 0UL) {
+	    continue;
+	}
+	if (pixel & sourceBit) {
+	    packedPixel |= targetBit;
+	}
+	targetBit <<= 1;
+    }
+    return packedPixel;
+}
+
 XImage *
 XGetImage(
     Display *display,
@@ -4420,7 +4470,8 @@ XGetImage(
 {
     X11WasmResource *resourcePtr;
     XImage *imagePtr;
-    unsigned int depth;
+    unsigned int drawableDepth;
+    unsigned int imageDepth;
     int dataLength;
 
     resourcePtr = BrowserDrawableResourceOrError(&display, drawable,
@@ -4443,10 +4494,12 @@ XGetImage(
 	    x, y, width, height)) {
 	return NULL;
     }
-    (void)planeMask;
-    depth = resourcePtr->depth;
+    drawableDepth = resourcePtr->depth;
+    imageDepth = (format == XYPixmap)
+	    ? BrowserXYPixmapDepthForPlaneMask(drawableDepth, planeMask)
+	    : drawableDepth;
     imagePtr = XCreateImage(display, DefaultVisual(display, DefaultScreen(display)),
-	    depth, format, 0, NULL, width, height, 32, 0);
+	    imageDepth, format, 0, NULL, width, height, 32, 0);
     if (imagePtr != NULL) {
 	dataLength = BrowserImageStorageLength(imagePtr);
 	if (dataLength <= 0) {
@@ -4456,45 +4509,52 @@ XGetImage(
 	imagePtr->data = (char *)ckalloc((unsigned int)dataLength);
 	memset(imagePtr->data, 0, (unsigned int)dataLength);
 	imagePtr->obdata = (XPointer)imagePtr;
-	if (!BrowserReadPixmapBacking(resourcePtr, imagePtr, x, y, width,
-		height)) {
-	    if (format == XYPixmap) {
-		XImage *zImagePtr = XCreateImage(display,
-			DefaultVisual(display, DefaultScreen(display)), depth,
-			ZPixmap, 0, NULL, width, height, 32, 0);
-		unsigned int ix, iy;
-		int zDataLength;
+	if (format == XYPixmap) {
+	    XImage *zImagePtr = XCreateImage(display,
+		    DefaultVisual(display, DefaultScreen(display)), drawableDepth,
+		    ZPixmap, 0, NULL, width, height, 32, 0);
+	    unsigned int ix, iy;
+	    int zDataLength;
 
-		if (zImagePtr == NULL) {
-		    (void)XDestroyImage(imagePtr);
-		    return NULL;
-		}
-		zDataLength = BrowserImageStorageLength(zImagePtr);
-		if (zDataLength <= 0) {
-		    (void)XDestroyImage(zImagePtr);
-		    (void)XDestroyImage(imagePtr);
-		    return NULL;
-		}
-		zImagePtr->data = (char *)ckalloc((unsigned int)zDataLength);
-		memset(zImagePtr->data, 0, (unsigned int)zDataLength);
-		zImagePtr->obdata = (XPointer)zImagePtr;
+	    if (zImagePtr == NULL) {
+		(void)XDestroyImage(imagePtr);
+		return NULL;
+	    }
+	    zDataLength = BrowserImageStorageLength(zImagePtr);
+	    if (zDataLength <= 0) {
+		(void)XDestroyImage(zImagePtr);
+		(void)XDestroyImage(imagePtr);
+		return NULL;
+	    }
+	    zImagePtr->data = (char *)ckalloc((unsigned int)zDataLength);
+	    memset(zImagePtr->data, 0, (unsigned int)zDataLength);
+	    zImagePtr->obdata = (XPointer)zImagePtr;
+	    if (!BrowserReadPixmapBacking(resourcePtr, zImagePtr, x, y, width,
+		    height)) {
 		(void)X11WasmJsGetImage(BrowserJsXId(drawable), x, y, width,
 			height, zImagePtr->data, zDataLength,
 			zImagePtr->bytes_per_line, zImagePtr->bits_per_pixel);
-		for (iy = 0; iy < height; iy++) {
-		    for (ix = 0; ix < width; ix++) {
-			(void)BrowserImagePutPixel(imagePtr, (int)ix, (int)iy,
-				BrowserImageGetPixel(zImagePtr, (int)ix, (int)iy));
-		    }
+	    }
+	    for (iy = 0; iy < height; iy++) {
+		for (ix = 0; ix < width; ix++) {
+		    unsigned long pixel = BrowserImageGetPixel(zImagePtr,
+			    (int)ix, (int)iy);
+
+		    (void)BrowserImagePutPixel(imagePtr, (int)ix, (int)iy,
+			    BrowserXYPixmapPixelForPlaneMask(pixel, drawableDepth,
+				    planeMask));
 		}
-		(void)XDestroyImage(zImagePtr);
-	    } else {
+	    }
+	    (void)XDestroyImage(zImagePtr);
+	} else {
+	    if (!BrowserReadPixmapBacking(resourcePtr, imagePtr, x, y, width,
+		    height)) {
 		(void)X11WasmJsGetImage(BrowserJsXId(drawable), x, y, width,
 			height, imagePtr->data, dataLength,
 			imagePtr->bytes_per_line, imagePtr->bits_per_pixel);
 	    }
+	    BrowserImageApplyPlaneMask(imagePtr, planeMask);
 	}
-	BrowserImageApplyPlaneMask(imagePtr, planeMask);
     }
     return imagePtr;
 }

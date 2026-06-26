@@ -4868,8 +4868,9 @@ X11WasmTestXlibApis(void)
     xyPixmapReadback = XGetImage(&browserDisplay.display, xyBitmapPixmap,
 	    0, 0, 2, 1, 0x00ff00UL, XYPixmap);
     if ((xyPixmapReadback == NULL)
-	    || (XGetPixel(xyPixmapReadback, 0, 0) != 0x00bb00UL)
-	    || (XGetPixel(xyPixmapReadback, 1, 0) != 0x005500UL)) {
+	    || (xyPixmapReadback->depth != 8)
+	    || (XGetPixel(xyPixmapReadback, 0, 0) != 0xbbUL)
+	    || (XGetPixel(xyPixmapReadback, 1, 0) != 0x55UL)) {
 	goto cleanup;
     }
     if ((XSetForeground(&browserDisplay.display, xyBitmapGC, 0xff0000UL)
@@ -4889,6 +4890,23 @@ X11WasmTestXlibApis(void)
     if ((xyBitmapReadback == NULL)
 	    || (XGetPixel(xyBitmapReadback, 0, 0) != 0xff0000UL)
 	    || (XGetPixel(xyBitmapReadback, 1, 0) != 0x0000ffUL)) {
+	goto cleanup;
+    }
+    (void)XDestroyImage(xyPixmapReadback);
+    xyPixmapReadback = NULL;
+    xyPixmapReadback = XGetImage(&browserDisplay.display, xyBitmapPixmap,
+	    0, 0, 2, 1, 1UL, XYPixmap);
+    if ((xyPixmapReadback == NULL)
+	    || (xyPixmapReadback->depth != 1)
+	    || (XGetPixel(xyPixmapReadback, 0, 0) != 0UL)
+	    || (XGetPixel(xyPixmapReadback, 1, 0) != 1UL)) {
+	goto cleanup;
+    }
+    (void)XDestroyImage(xyPixmapReadback);
+    xyPixmapReadback = NULL;
+    xyPixmapReadback = XGetImage(&browserDisplay.display, xyBitmapPixmap,
+	    0, 0, 2, 1, 0UL, XYPixmap);
+    if (xyPixmapReadback != NULL) {
 	goto cleanup;
     }
     xyBitmapSubImage = XCreateImage(&browserDisplay.display,
