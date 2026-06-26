@@ -281,6 +281,7 @@ XCloseDisplay(
     focusedInputContext = NULL;
     if (display == &browserDisplay.display) {
 	BrowserResetHostAccessControl();
+	BrowserClearFontPath();
 	BrowserClearPassiveGrabs();
 	browserDisplay.pointerGrabWindow = None;
 	browserDisplay.pointerGrabConfineWindow = None;

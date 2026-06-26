@@ -27,6 +27,12 @@ X11WasmHeaderXlibOnlyPrototypeTest(void)
     Status (*initImage)(XImage *) = XInitImage;
     XFontStruct *(*loadQueryFont)(Display *, _Xconst char *) =
 	    XLoadQueryFont;
+    char **(*listFontsWithInfo)(Display *, _Xconst char *, int, int *,
+	    XFontStruct **) = XListFontsWithInfo;
+    int (*freeFontInfo)(char **, XFontStruct *, int) = XFreeFontInfo;
+    char **(*getFontPath)(Display *, int *) = XGetFontPath;
+    int (*setFontPath)(Display *, char **, int) = XSetFontPath;
+    int (*freeFontPath)(char **) = XFreeFontPath;
     Region (*createRegion)(void) = XCreateRegion;
     int (*freeData)(void *) = XFree;
 
@@ -35,5 +41,8 @@ X11WasmHeaderXlibOnlyPrototypeTest(void)
 	    && (getMotionEvents != 0) && (readBitmapFile != 0)
 	    && (readBitmapFileData != 0) && (writeBitmapFile != 0)
 	    && (initImage != 0) && (loadQueryFont != 0)
+	    && (listFontsWithInfo != 0) && (freeFontInfo != 0)
+	    && (getFontPath != 0) && (setFontPath != 0)
+	    && (freeFontPath != 0)
 	    && (createRegion != 0) && (freeData != 0);
 }

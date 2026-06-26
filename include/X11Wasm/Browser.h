@@ -176,6 +176,9 @@ typedef struct X11WasmDisplayState {
     int hostAccessEnabled;
     int hostCount;
     X11WasmHostEntry *hosts;
+    int fontPathSet;
+    int fontPathCount;
+    char **fontPath;
     int pointerX;
     int pointerY;
     unsigned int pointerState;

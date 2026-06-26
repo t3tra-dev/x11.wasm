@@ -118,6 +118,10 @@
 #define X11_WASM_XREQ_CLOSE_FONT 46
 #define X11_WASM_XREQ_QUERY_FONT 47
 #define X11_WASM_XREQ_QUERY_TEXT_EXTENTS 48
+#define X11_WASM_XREQ_LIST_FONTS 49
+#define X11_WASM_XREQ_LIST_FONTS_WITH_INFO 50
+#define X11_WASM_XREQ_SET_FONT_PATH 51
+#define X11_WASM_XREQ_GET_FONT_PATH 52
 #define X11_WASM_XREQ_CREATE_PIXMAP 53
 #define X11_WASM_XREQ_FREE_PIXMAP 54
 #define X11_WASM_XREQ_CREATE_GC 55
@@ -554,6 +558,7 @@ short BrowserClampShort(
     int value);
 void BrowserClearEventQueue(void);
 void BrowserClearExternalClipboardText(void);
+void BrowserClearFontPath(void);
 void BrowserClearHostAccessList(void);
 void BrowserClearInputContext(
     void);

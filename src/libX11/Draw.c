@@ -1444,6 +1444,47 @@ BrowserAllocFontStruct(
     return fontPtr;
 }
 
+static const char *const browserDefaultFontPath[] = {
+    "/browser/fonts"
+};
+
+static char **
+BrowserCopyStringList(
+    const char *const *source,
+    int count)
+{
+    char **copy;
+    int i;
+
+    if (count <= 0) {
+	return NULL;
+    }
+    copy = (char **)ckalloc(sizeof(char *) * (size_t)(count + 1));
+    for (i = 0; i < count; i++) {
+	copy[i] = BrowserDupString((source[i] != NULL) ? source[i] : "");
+    }
+    copy[count] = NULL;
+    return copy;
+}
+
+void
+BrowserClearFontPath(void)
+{
+    int i;
+
+    if (browserDisplay.fontPath != NULL) {
+	for (i = 0; i < browserDisplay.fontPathCount; i++) {
+	    if (browserDisplay.fontPath[i] != NULL) {
+		ckfree(browserDisplay.fontPath[i]);
+	    }
+	}
+	ckfree(browserDisplay.fontPath);
+    }
+    browserDisplay.fontPathSet = 0;
+    browserDisplay.fontPathCount = 0;
+    browserDisplay.fontPath = NULL;
+}
+
 Font
 XLoadFont(
     Display *display,
@@ -1638,6 +1679,51 @@ XListFonts(
     return names;
 }
 
+char **
+XListFontsWithInfo(
+    Display *display,
+    _Xconst char *pattern,
+    int maxnames,
+    int *actualCountReturn,
+    XFontStruct **infoReturn)
+{
+    char **names;
+    XFontStruct *fontInfo;
+    int count = 0;
+    int i;
+
+    if (actualCountReturn != NULL) {
+	*actualCountReturn = 0;
+    }
+    if (infoReturn != NULL) {
+	*infoReturn = NULL;
+    }
+
+    names = XListFonts(display, pattern, maxnames, &count);
+    if (actualCountReturn != NULL) {
+	*actualCountReturn = count;
+    }
+    if ((names == NULL) || (count <= 0) || (infoReturn == NULL)) {
+	return names;
+    }
+
+    fontInfo = (XFontStruct *)ckalloc(sizeof(XFontStruct) * (size_t)count);
+    memset(fontInfo, 0, sizeof(XFontStruct) * (size_t)count);
+    for (i = 0; i < count; i++) {
+	char *familyName = BrowserFontFamilyFromName(names[i]);
+	int pixelSize = BrowserFontPixelSize(names[i]);
+	int pointSize = BrowserFontPointSize(names[i], pixelSize);
+	XFontStruct *fontPtr = BrowserAllocFontStruct(display, None, names[i],
+		familyName, pixelSize, pointSize);
+
+	fontInfo[i] = *fontPtr;
+	ckfree(fontPtr);
+	ckfree(familyName);
+    }
+    *infoReturn = fontInfo;
+    return names;
+}
+
 int
 XFreeFontNames(
     char **list)
@@ -1651,6 +1737,100 @@ XFreeFontNames(
 	ckfree(list);
     }
     return Success;
+}
+
+int
+XFreeFontInfo(
+    char **names,
+    XFontStruct *freeInfo,
+    int actualCount)
+{
+    int i;
+
+    if (names != NULL) {
+	XFreeFontNames(names);
+    }
+    if (freeInfo != NULL) {
+	if (actualCount > 0) {
+	    for (i = 0; i < actualCount; i++) {
+		if (freeInfo[i].properties != NULL) {
+		    ckfree(freeInfo[i].properties);
+		}
+		if (freeInfo[i].per_char != NULL) {
+		    ckfree(freeInfo[i].per_char);
+		}
+	    }
+	}
+	ckfree(freeInfo);
+    }
+    return Success;
+}
+
+char **
+XGetFontPath(
+    Display *display,
+    int *npathsReturn)
+{
+    char **path;
+    int count;
+
+    (void)display;
+    if (browserDisplay.fontPathSet) {
+	count = browserDisplay.fontPathCount;
+	path = BrowserCopyStringList((const char *const *)browserDisplay.fontPath,
+		count);
+    } else {
+	count = (int)(sizeof(browserDefaultFontPath)
+		/ sizeof(browserDefaultFontPath[0]));
+	path = BrowserCopyStringList(browserDefaultFontPath, count);
+    }
+    if (npathsReturn != NULL) {
+	*npathsReturn = count;
+    }
+    return path;
+}
+
+int
+XSetFontPath(
+    Display *display,
+    char **directories,
+    int ndirs)
+{
+    char **newPath = NULL;
+    int i;
+
+    if (!BrowserValueOrError(&display, ndirs, ndirs >= 0,
+	    X11_WASM_XREQ_SET_FONT_PATH)) {
+	return Success;
+    }
+    if ((ndirs > 0) && (directories == NULL)) {
+	(void)BrowserValueOrError(&display, 0, 0,
+		X11_WASM_XREQ_SET_FONT_PATH);
+	return Success;
+    }
+    for (i = 0; i < ndirs; i++) {
+	if (directories[i] == NULL) {
+	    (void)BrowserValueOrError(&display, i, 0,
+		    X11_WASM_XREQ_SET_FONT_PATH);
+	    return Success;
+	}
+    }
+    if (ndirs > 0) {
+	newPath = BrowserCopyStringList((const char *const *)directories,
+		ndirs);
+    }
+    BrowserClearFontPath();
+    browserDisplay.fontPathSet = 1;
+    browserDisplay.fontPathCount = ndirs;
+    browserDisplay.fontPath = newPath;
+    return Success;
+}
+
+int
+XFreeFontPath(
+    char **list)
+{
+    return XFreeFontNames(list);
 }
 
 Bool

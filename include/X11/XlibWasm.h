@@ -228,6 +228,9 @@ EXTERN int XFreeColors(Display *d, Colormap c, unsigned long *ulp, int i,
 EXTERN int XFreeCursor(Display *d, Cursor c);
 EXTERN int XRecolorCursor(Display *d, Cursor c, XColor *x1, XColor *x2);
 EXTERN int XFreeFont(Display *d, XFontStruct *font_struct);
+EXTERN int XFreeFontInfo(char **names, XFontStruct *free_info,
+	int actual_count);
+EXTERN int XFreeFontPath(char **list);
 	EXTERN int XFreeFontNames(char **list);
 	EXTERN void XFreeExtensionList(char **list);
 	EXTERN int XFreeModifiermap(XModifierKeymap *x);
@@ -662,6 +665,10 @@ EXTERN Font XLoadFont(Display *display, _Xconst char *name);
 EXTERN XFontStruct *XLoadQueryFont(Display *display, _Xconst char *name);
 EXTERN char **XListFonts(Display *display, _Xconst char *pattern,
 	int maxnames, int *actual_count_return);
+EXTERN char **XListFontsWithInfo(Display *display, _Xconst char *pattern,
+	int maxnames, int *actual_count_return, XFontStruct **info_return);
+EXTERN char **XGetFontPath(Display *display, int *npaths_return);
+EXTERN int XSetFontPath(Display *display, char **directories, int ndirs);
 EXTERN int XTextWidth(XFontStruct *font_struct, _Xconst char *string,
 	int count);
 	EXTERN int XTextWidth16(XFontStruct *font_struct, _Xconst XChar2b *string,

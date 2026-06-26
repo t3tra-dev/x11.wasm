@@ -1498,6 +1498,15 @@ X11WasmTestXlibApis(void)
     int stringCount = -1;
     char **listedFontNames = NULL;
     int listedFontCount = -1;
+    char **listedFontInfoNames = NULL;
+    XFontStruct *listedFontInfo = NULL;
+    int listedFontInfoCount = -1;
+    char **fontPathList = NULL;
+    int fontPathCount = -1;
+    char *customFontPath[2] = {
+	(char *)"/browser/fonts",
+	(char *)"/browser/custom"
+    };
     XFontSet fontSet = NULL;
     char **missingCharsets = NULL;
     int missingCharsetCount = -1;
@@ -4526,6 +4535,66 @@ X11WasmTestXlibApis(void)
     XFreeFontNames(listedFontNames);
     listedFontNames = NULL;
 
+    listedFontInfoNames = XListFontsWithInfo(&browserDisplay.display,
+	    "-*-Courier-*-*-*-*-*-*-*-*-*-*-*-*", 10,
+	    &listedFontInfoCount, &listedFontInfo);
+    if ((listedFontInfoNames == NULL) || (listedFontInfo == NULL)
+	    || (listedFontInfoCount < 1)
+	    || (strstr(listedFontInfoNames[0], "Courier") == NULL)
+	    || (listedFontInfo[0].ascent <= 0)
+	    || (listedFontInfo[0].descent <= 0)
+	    || (listedFontInfo[0].n_properties <= 0)
+	    || !XGetFontProperty(&listedFontInfo[0], XA_FONT,
+		    &fontPropertyValue)
+	    || (fontPropertyValue == None)) {
+	goto cleanup;
+    }
+    XFreeFontInfo(listedFontInfoNames, listedFontInfo,
+	    listedFontInfoCount);
+    listedFontInfoNames = NULL;
+    listedFontInfo = NULL;
+    listedFontInfoCount = -1;
+    listedFontInfoNames = XListFontsWithInfo(&browserDisplay.display,
+	    "-*-NoSuchFamily-*-*-*-*-*-*-*-*-*-*-*-*", 10,
+	    &listedFontInfoCount, &listedFontInfo);
+    if ((listedFontInfoNames != NULL) || (listedFontInfo != NULL)
+	    || (listedFontInfoCount != 0)) {
+	goto cleanup;
+    }
+    listedFontInfoCount = -1;
+
+    fontPathList = XGetFontPath(&browserDisplay.display, &fontPathCount);
+    if ((fontPathList == NULL) || (fontPathCount < 1)
+	    || (fontPathList[0] == NULL)) {
+	goto cleanup;
+    }
+    XFreeFontPath(fontPathList);
+    fontPathList = NULL;
+    fontPathCount = -1;
+    if (XSetFontPath(&browserDisplay.display, customFontPath, 2)
+	    != Success) {
+	goto cleanup;
+    }
+    fontPathList = XGetFontPath(&browserDisplay.display, &fontPathCount);
+    if ((fontPathList == NULL) || (fontPathCount != 2)
+	    || (strcmp(fontPathList[0], customFontPath[0]) != 0)
+	    || (strcmp(fontPathList[1], customFontPath[1]) != 0)
+	    || (fontPathList[2] != NULL)) {
+	goto cleanup;
+    }
+    XFreeFontPath(fontPathList);
+    fontPathList = NULL;
+    fontPathCount = -1;
+    if (XSetFontPath(&browserDisplay.display, NULL, 0) != Success) {
+	goto cleanup;
+    }
+    fontPathList = XGetFontPath(&browserDisplay.display, &fontPathCount);
+    if ((fontPathList != NULL) || (fontPathCount != 0)) {
+	goto cleanup;
+    }
+    fontPathCount = -1;
+    BrowserClearFontPath();
+
     fontSet = XCreateFontSet(&browserDisplay.display, "fixed, Courier",
 	    &missingCharsets, &missingCharsetCount, &defaultString);
     fontSetExtents = XExtentsOfFontSet(fontSet);
@@ -6230,6 +6299,14 @@ cleanup:
     if (listedFontNames != NULL) {
 	XFreeFontNames(listedFontNames);
     }
+    if ((listedFontInfoNames != NULL) || (listedFontInfo != NULL)) {
+	XFreeFontInfo(listedFontInfoNames, listedFontInfo,
+		listedFontInfoCount);
+    }
+    if (fontPathList != NULL) {
+	XFreeFontPath(fontPathList);
+    }
+    BrowserClearFontPath();
     if (hostList != NULL) {
 	XFree(hostList);
     }
@@ -7184,6 +7261,8 @@ X11WasmTestXErrorHandler(void)
     int sawChangeActivePointerGrabBadValue;
     int sawChangeActivePointerGrabBadCursor;
     int sawRecolorCursorBadCursor;
+    int invalidSetFontPathResult;
+    int sawSetFontPathBadValue;
     int invalidPointerMapLengthResult;
     int duplicatePointerMapResult;
     int sawPointerMapLengthBadValue;
@@ -7393,6 +7472,7 @@ X11WasmTestXErrorHandler(void)
     sawReconfigureBadValue = 0;
     sawIconifyBadValue = 0;
     sawWithdrawBadValue = 0;
+    sawSetFontPathBadValue = 0;
     sawPointerMapLengthBadValue = 0;
     sawPointerMapDuplicateBadValue = 0;
     duplicateModifierMapResult = MappingFailed;
@@ -7584,6 +7664,10 @@ X11WasmTestXErrorHandler(void)
 	    && (browserTestLastResourceId == (XID)invalidWindow);
     cursorResultSum += XUnloadFont(&browserDisplay.display,
 	    (Font)invalidWindow);
+    invalidSetFontPathResult = XSetFontPath(&browserDisplay.display, NULL,
+	    -1);
+    sawSetFontPathBadValue = (browserTestLastErrorCode == BadValue)
+	    && (browserTestLastRequestCode == X11_WASM_XREQ_SET_FONT_PATH);
     depthOnePixmap = XCreatePixmap(&browserDisplay.display,
 	    (Drawable)browserDisplay.rootWindow, 1, 1, 1);
     validColormap = XCreateColormap(&browserDisplay.display,
@@ -8409,6 +8493,8 @@ X11WasmTestXErrorHandler(void)
 	    || !sawChangeActivePointerGrabBadValue
 	    || !sawChangeActivePointerGrabBadCursor
 	    || !sawRecolorCursorBadCursor
+	    || (invalidSetFontPathResult != Success)
+	    || !sawSetFontPathBadValue
 	    || (invalidPointerMapLengthResult != MappingFailed)
 	    || (duplicatePointerMapResult != MappingFailed)
 	    || !sawPointerMapLengthBadValue
@@ -8523,6 +8609,7 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_FREE_CURSOR
 	    + X11_WASM_XREQ_RECOLOR_CURSOR
 	    + X11_WASM_XREQ_CLOSE_FONT
+	    + X11_WASM_XREQ_SET_FONT_PATH
 	    + X11_WASM_XREQ_CREATE_GC
 	    + X11_WASM_XREQ_CREATE_GC
 	    + X11_WASM_XREQ_CHANGE_GC
@@ -8714,6 +8801,7 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_SET_CLIP_RECTANGLES)
 	    | (1ULL << X11_WASM_XREQ_FREE_GC)
 	    | (1ULL << X11_WASM_XREQ_CLOSE_FONT)
+	    | (1ULL << X11_WASM_XREQ_SET_FONT_PATH)
 	    | (1ULL << X11_WASM_XREQ_GET_WINDOW_ATTRIBUTES)
 	    | (1ULL << X11_WASM_XREQ_GET_GEOMETRY)
 	    | (1ULL << X11_WASM_XREQ_TRANSLATE_COORDINATES)
@@ -8744,7 +8832,7 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 241)
+    if ((browserTestXErrorCount != 242)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)
