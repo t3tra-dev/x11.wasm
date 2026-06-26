@@ -296,33 +296,54 @@ int XCopyPlane(Display *d, Drawable s, Drawable t, GC g, int sx, int sy,
 	    w, h, dx, dy, X11_WASM_XREQ_COPY_PLANE);
     return XNoOp(d);
 }
-int XDrawArc(Display *d, Drawable dr, GC g, int x, int y, unsigned int w,
-	unsigned int h, int a1, int a2)
+static int
+BrowserDrawArc(
+    Display **displayPtr,
+    Drawable drawable,
+    GC gc,
+    int x,
+    int y,
+    unsigned int width,
+    unsigned int height,
+    int angle1,
+    int angle2,
+    unsigned char requestCode)
 {
-    X11WasmResource *resourcePtr = BrowserDrawableResourceOrError(&d, dr,
-	    X11_WASM_XREQ_POLY_ARC);
+    X11WasmResource *resourcePtr = BrowserDrawableResourceOrError(displayPtr,
+	    drawable, requestCode);
     unsigned int lineWidth;
     int pad;
 
     if (resourcePtr == NULL) {
-	return Success;
+	return 0;
     }
-    if (!BrowserOptionalGCOrError(&d, g, X11_WASM_XREQ_POLY_ARC)) {
-	return Success;
+    if (!BrowserOptionalGCOrError(displayPtr, gc, requestCode)) {
+	return 0;
     }
-    if (!BrowserValidateDrawableDimensions(&d, w, h,
+    if (!BrowserValidateDrawableDimensions(displayPtr, width, height,
+	    requestCode)) {
+	return 0;
+    }
+    lineWidth = BrowserGCLineWidth(gc);
+    pad = (int)((lineWidth + 1U) / 2U) + 1;
+    BrowserApplyGCStyle(gc);
+    BrowserApplyGCClip(gc);
+    (void)X11WasmJsDrawArc(BrowserJsXId(drawable), BrowserGCPixel(gc), x,
+	    y, width, height, angle1, angle2, 0, 0, lineWidth);
+    BrowserMarkResourceDamage(resourcePtr, x - pad, y - pad,
+	    width + (unsigned int)(pad * 2),
+	    height + (unsigned int)(pad * 2));
+    return 1;
+}
+
+int XDrawArc(Display *d, Drawable dr, GC g, int x, int y, unsigned int w,
+	unsigned int h, int a1, int a2)
+{
+    if (!BrowserDrawArc(&d, dr, g, x, y, w, h, a1, a2,
 	    X11_WASM_XREQ_POLY_ARC)) {
 	return Success;
     }
-    lineWidth = BrowserGCLineWidth(g);
-    pad = (int)((lineWidth + 1U) / 2U) + 1;
-    BrowserApplyGCStyle(g);
-    BrowserApplyGCClip(g);
-    (void)X11WasmJsDrawArc(BrowserJsXId(dr), BrowserGCPixel(g), x, y, w, h,
-	    a1, a2, 0, 0, lineWidth);
-    BrowserMarkResourceDamage(resourcePtr, x - pad, y - pad,
-	    w + (unsigned int)(pad * 2), h + (unsigned int)(pad * 2));
-    return Success;
+    return XNoOp(d);
 }
 int XDrawArcs(Display *d, Drawable dr, GC g, XArc *a, int n)
 {
@@ -339,32 +360,53 @@ int XDrawArcs(Display *d, Drawable dr, GC g, XArc *a, int n)
 	return Success;
     }
     for (i = 0; i < n; i++) {
-	(void)XDrawArc(d, dr, g, a[i].x, a[i].y, a[i].width, a[i].height,
-		a[i].angle1, a[i].angle2);
+	if (!BrowserDrawArc(&d, dr, g, a[i].x, a[i].y, a[i].width,
+		a[i].height, a[i].angle1, a[i].angle2,
+		X11_WASM_XREQ_POLY_ARC)) {
+	    return Success;
+	}
     }
-    return Success;
+    return XNoOp(d);
 }
-int XDrawLine(Display *d, Drawable dr, GC g, int x1, int y1, int x2, int y2)
+static int
+BrowserDrawLine(
+    Display **displayPtr,
+    Drawable drawable,
+    GC gc,
+    int x1,
+    int y1,
+    int x2,
+    int y2,
+    unsigned char requestCode)
 {
-    X11WasmResource *resourcePtr = BrowserDrawableResourceOrError(&d, dr,
-	    X11_WASM_XREQ_POLY_LINE);
+    X11WasmResource *resourcePtr = BrowserDrawableResourceOrError(displayPtr,
+	    drawable, requestCode);
     int x = (x1 < x2) ? x1 : x2;
     int y = (y1 < y2) ? y1 : y2;
     unsigned int width = (unsigned int)(((x1 > x2) ? x1 - x2 : x2 - x1) + 1);
     unsigned int height = (unsigned int)(((y1 > y2) ? y1 - y2 : y2 - y1) + 1);
 
     if (resourcePtr == NULL) {
-	return Success;
+	return 0;
     }
-    if (!BrowserOptionalGCOrError(&d, g, X11_WASM_XREQ_POLY_LINE)) {
-	return Success;
+    if (!BrowserOptionalGCOrError(displayPtr, gc, requestCode)) {
+	return 0;
     }
-    BrowserApplyGCStyle(g);
-    BrowserApplyGCClip(g);
-    (void)X11WasmJsDrawLine(BrowserJsXId(dr), BrowserGCPixel(g), x1, y1,
+    BrowserApplyGCStyle(gc);
+    BrowserApplyGCClip(gc);
+    (void)X11WasmJsDrawLine(BrowserJsXId(drawable), BrowserGCPixel(gc), x1, y1,
 	    x2, y2);
     BrowserMarkResourceDamage(resourcePtr, x, y, width, height);
-    return Success;
+    return 1;
+}
+
+int XDrawLine(Display *d, Drawable dr, GC g, int x1, int y1, int x2, int y2)
+{
+    if (!BrowserDrawLine(&d, dr, g, x1, y1, x2, y2,
+	    X11_WASM_XREQ_POLY_LINE)) {
+	return Success;
+    }
+    return XNoOp(d);
 }
 int XDrawLines(Display *d, Drawable dr, GC g, XPoint *p, int n, int m)
 {
@@ -395,29 +437,48 @@ int XDrawLines(Display *d, Drawable dr, GC g, XPoint *p, int n, int m)
 	    nextX += x;
 	    nextY += y;
 	}
-	(void)XDrawLine(d, dr, g, x, y, nextX, nextY);
+	if (!BrowserDrawLine(&d, dr, g, x, y, nextX, nextY,
+		X11_WASM_XREQ_POLY_LINE)) {
+	    return Success;
+	}
 	x = nextX;
 	y = nextY;
     }
-    return Success;
+    return XNoOp(d);
 }
-int XDrawPoint(Display *d, Drawable dr, GC g, int x, int y)
+
+static int
+BrowserDrawPoint(
+    Display **displayPtr,
+    Drawable drawable,
+    GC gc,
+    int x,
+    int y,
+    unsigned char requestCode)
 {
-    X11WasmResource *resourcePtr = BrowserDrawableResourceOrError(&d, dr,
-	    X11_WASM_XREQ_POLY_POINT);
+    X11WasmResource *resourcePtr = BrowserDrawableResourceOrError(displayPtr,
+	    drawable, requestCode);
 
     if (resourcePtr == NULL) {
-	return Success;
+	return 0;
     }
-    if (!BrowserOptionalGCOrError(&d, g, X11_WASM_XREQ_POLY_POINT)) {
-	return Success;
+    if (!BrowserOptionalGCOrError(displayPtr, gc, requestCode)) {
+	return 0;
     }
-    BrowserApplyGCStyle(g);
-    BrowserApplyGCClip(g);
-    (void)X11WasmJsDrawRectangle(BrowserJsXId(dr), BrowserGCPixel(g), x, y,
-	    1, 1, 1);
+    BrowserApplyGCStyle(gc);
+    BrowserApplyGCClip(gc);
+    (void)X11WasmJsDrawRectangle(BrowserJsXId(drawable), BrowserGCPixel(gc),
+	    x, y, 1, 1, 1);
     BrowserMarkResourceDamage(resourcePtr, x, y, 1, 1);
-    return Success;
+    return 1;
+}
+
+int XDrawPoint(Display *d, Drawable dr, GC g, int x, int y)
+{
+    if (!BrowserDrawPoint(&d, dr, g, x, y, X11_WASM_XREQ_POLY_POINT)) {
+	return Success;
+    }
+    return XNoOp(d);
 }
 int XDrawPoints(Display *d, Drawable dr, GC g, XPoint *p, int n, int m)
 {
@@ -446,32 +507,54 @@ int XDrawPoints(Display *d, Drawable dr, GC g, XPoint *p, int n, int m)
 	    x = p[i].x;
 	    y = p[i].y;
 	}
-	(void)XDrawPoint(d, dr, g, x, y);
+	if (!BrowserDrawPoint(&d, dr, g, x, y,
+		X11_WASM_XREQ_POLY_POINT)) {
+	    return Success;
+	}
     }
-    return Success;
+    return XNoOp(d);
 }
+
+static int
+BrowserDrawRectangle(
+    Display **displayPtr,
+    Drawable drawable,
+    GC gc,
+    int x,
+    int y,
+    unsigned int width,
+    unsigned int height,
+    unsigned char requestCode)
+{
+    X11WasmResource *resourcePtr = BrowserDrawableResourceOrError(displayPtr,
+	    drawable, requestCode);
+
+    if (resourcePtr == NULL) {
+	return 0;
+    }
+    if (!BrowserOptionalGCOrError(displayPtr, gc, requestCode)) {
+	return 0;
+    }
+    if (!BrowserValidateDrawableDimensions(displayPtr, width, height,
+	    requestCode)) {
+	return 0;
+    }
+    BrowserApplyGCStyle(gc);
+    BrowserApplyGCClip(gc);
+    (void)X11WasmJsDrawRectangle(BrowserJsXId(drawable), BrowserGCPixel(gc),
+	    x, y, width, height, 0);
+    BrowserMarkResourceDamage(resourcePtr, x, y, width + 1, height + 1);
+    return 1;
+}
+
 int XDrawRectangle(Display *d, Drawable dr, GC g, int x, int y,
 	unsigned int w, unsigned int h)
 {
-    X11WasmResource *resourcePtr = BrowserDrawableResourceOrError(&d, dr,
-	    X11_WASM_XREQ_POLY_RECTANGLE);
-
-    if (resourcePtr == NULL) {
-	return Success;
-    }
-    if (!BrowserOptionalGCOrError(&d, g, X11_WASM_XREQ_POLY_RECTANGLE)) {
-	return Success;
-    }
-    if (!BrowserValidateDrawableDimensions(&d, w, h,
+    if (!BrowserDrawRectangle(&d, dr, g, x, y, w, h,
 	    X11_WASM_XREQ_POLY_RECTANGLE)) {
 	return Success;
     }
-    BrowserApplyGCStyle(g);
-    BrowserApplyGCClip(g);
-    (void)X11WasmJsDrawRectangle(BrowserJsXId(dr), BrowserGCPixel(g), x, y,
-	    w, h, 0);
-    BrowserMarkResourceDamage(resourcePtr, x, y, w + 1, h + 1);
-    return Success;
+    return XNoOp(d);
 }
 int XDrawRectangles(Display *d, Drawable dr, GC g, XRectangle *r, int n)
 {
@@ -488,10 +571,12 @@ int XDrawRectangles(Display *d, Drawable dr, GC g, XRectangle *r, int n)
 	return Success;
     }
     for (i = 0; i < n; i++) {
-	(void)XDrawRectangle(d, dr, g, r[i].x, r[i].y, r[i].width,
-		r[i].height);
+	if (!BrowserDrawRectangle(&d, dr, g, r[i].x, r[i].y, r[i].width,
+		r[i].height, X11_WASM_XREQ_POLY_RECTANGLE)) {
+	    return Success;
+	}
     }
-    return Success;
+    return XNoOp(d);
 }
 int XDrawSegments(Display *d, Drawable dr, GC g, XSegment *s, int n)
 {
@@ -508,34 +593,58 @@ int XDrawSegments(Display *d, Drawable dr, GC g, XSegment *s, int n)
 	return Success;
     }
     for (i = 0; i < n; i++) {
-	(void)XDrawLine(d, dr, g, s[i].x1, s[i].y1, s[i].x2, s[i].y2);
+	if (!BrowserDrawLine(&d, dr, g, s[i].x1, s[i].y1, s[i].x2,
+		s[i].y2, X11_WASM_XREQ_POLY_SEGMENT)) {
+	    return Success;
+	}
     }
-    return Success;
+    return XNoOp(d);
 }
-int XFillArc(Display *d, Drawable dr, GC g, int x, int y, unsigned int w,
-	unsigned int h, int a1, int a2)
+static int
+BrowserFillArc(
+    Display **displayPtr,
+    Drawable drawable,
+    GC gc,
+    int x,
+    int y,
+    unsigned int width,
+    unsigned int height,
+    int angle1,
+    int angle2,
+    unsigned char requestCode)
 {
-    X11WasmResource *resourcePtr = BrowserDrawableResourceOrError(&d, dr,
-	    X11_WASM_XREQ_POLY_FILL_ARC);
+    X11WasmResource *resourcePtr = BrowserDrawableResourceOrError(displayPtr,
+	    drawable, requestCode);
     int pieSlice;
 
     if (resourcePtr == NULL) {
-	return Success;
+	return 0;
     }
-    if (!BrowserOptionalGCOrError(&d, g, X11_WASM_XREQ_POLY_FILL_ARC)) {
-	return Success;
+    if (!BrowserOptionalGCOrError(displayPtr, gc, requestCode)) {
+	return 0;
     }
-    if (!BrowserValidateDrawableDimensions(&d, w, h,
+    if (!BrowserValidateDrawableDimensions(displayPtr, width, height,
+	    requestCode)) {
+	return 0;
+    }
+    pieSlice = (gc == NULL) || (gc->arc_mode == ArcPieSlice);
+    BrowserApplyGCStyle(gc);
+    BrowserApplyGCClip(gc);
+    (void)X11WasmJsDrawArc(BrowserJsXId(drawable), BrowserGCPixel(gc), x,
+	    y, width, height, angle1, angle2, 1, pieSlice,
+	    BrowserGCLineWidth(gc));
+    BrowserMarkResourceDamage(resourcePtr, x, y, width, height);
+    return 1;
+}
+
+int XFillArc(Display *d, Drawable dr, GC g, int x, int y, unsigned int w,
+	unsigned int h, int a1, int a2)
+{
+    if (!BrowserFillArc(&d, dr, g, x, y, w, h, a1, a2,
 	    X11_WASM_XREQ_POLY_FILL_ARC)) {
 	return Success;
     }
-    pieSlice = (g == NULL) || (g->arc_mode == ArcPieSlice);
-    BrowserApplyGCStyle(g);
-    BrowserApplyGCClip(g);
-    (void)X11WasmJsDrawArc(BrowserJsXId(dr), BrowserGCPixel(g), x, y, w, h,
-	    a1, a2, 1, pieSlice, BrowserGCLineWidth(g));
-    BrowserMarkResourceDamage(resourcePtr, x, y, w, h);
-    return Success;
+    return XNoOp(d);
 }
 int XFillArcs(Display *d, Drawable dr, GC g, XArc *a, int n)
 {
@@ -552,13 +661,24 @@ int XFillArcs(Display *d, Drawable dr, GC g, XArc *a, int n)
 	return Success;
     }
     for (i = 0; i < n; i++) {
-	(void)XFillArc(d, dr, g, a[i].x, a[i].y, a[i].width, a[i].height,
-		a[i].angle1, a[i].angle2);
+	if (!BrowserFillArc(&d, dr, g, a[i].x, a[i].y, a[i].width,
+		a[i].height, a[i].angle1, a[i].angle2,
+		X11_WASM_XREQ_POLY_FILL_ARC)) {
+	    return Success;
+	}
     }
-    return Success;
+    return XNoOp(d);
 }
-int XFillPolygon(Display *d, Drawable dr, GC g, XPoint *p, int n, int shape,
-	int mode)
+static int
+BrowserFillPolygon(
+    Display **displayPtr,
+    Drawable drawable,
+    GC gc,
+    XPoint *points,
+    int count,
+    int shape,
+    int mode,
+    unsigned char requestCode)
 {
     X11WasmResource *resourcePtr;
     int *coords;
@@ -568,30 +688,30 @@ int XFillPolygon(Display *d, Drawable dr, GC g, XPoint *p, int n, int shape,
     int minX = 0, minY = 0, maxX = 0, maxY = 0;
     int fillRule;
 
-    if ((p == NULL) || (n < 3)) {
-	return Success;
+    if ((points == NULL) || (count < 3)) {
+	return 0;
     }
-    resourcePtr = BrowserDrawableResourceOrError(&d, dr,
-	    X11_WASM_XREQ_FILL_POLY);
+    resourcePtr = BrowserDrawableResourceOrError(displayPtr, drawable,
+	    requestCode);
     if (resourcePtr == NULL) {
-	return Success;
+	return 0;
     }
-    if (!BrowserValidatePolygonShape(&d, shape, X11_WASM_XREQ_FILL_POLY)
-	    || !BrowserValidateCoordMode(&d, mode, X11_WASM_XREQ_FILL_POLY)) {
-	return Success;
+    if (!BrowserValidatePolygonShape(displayPtr, shape, requestCode)
+	    || !BrowserValidateCoordMode(displayPtr, mode, requestCode)) {
+	return 0;
     }
-    if (!BrowserOptionalGCOrError(&d, g, X11_WASM_XREQ_FILL_POLY)) {
-	return Success;
+    if (!BrowserOptionalGCOrError(displayPtr, gc, requestCode)) {
+	return 0;
     }
-    fillRule = (g != NULL) ? g->fill_rule : EvenOddRule;
-    coords = (int *)ckalloc(sizeof(int) * (size_t)n * 2U);
-    for (i = 0; i < n; i++) {
+    fillRule = (gc != NULL) ? gc->fill_rule : EvenOddRule;
+    coords = (int *)ckalloc(sizeof(int) * (size_t)count * 2U);
+    for (i = 0; i < count; i++) {
 	if ((mode == CoordModePrevious) && (i > 0)) {
-	    x += p[i].x;
-	    y += p[i].y;
+	    x += points[i].x;
+	    y += points[i].y;
 	} else {
-	    x = p[i].x;
-	    y = p[i].y;
+	    x = points[i].x;
+	    y = points[i].y;
 	}
 	coords[i * 2] = x;
 	coords[i * 2 + 1] = y;
@@ -605,38 +725,66 @@ int XFillPolygon(Display *d, Drawable dr, GC g, XPoint *p, int n, int shape,
 	    if (y > maxY) maxY = y;
 	}
     }
-    BrowserApplyGCStyle(g);
-    BrowserApplyGCClip(g);
-    (void)X11WasmJsFillPolygon(BrowserJsXId(dr), BrowserGCPixel(g),
-	    coords, n, fillRule);
+    BrowserApplyGCStyle(gc);
+    BrowserApplyGCClip(gc);
+    (void)X11WasmJsFillPolygon(BrowserJsXId(drawable), BrowserGCPixel(gc),
+	    coords, count, fillRule);
     BrowserMarkResourceDamage(resourcePtr, minX, minY,
 	    (unsigned int)(maxX - minX + 1), (unsigned int)(maxY - minY + 1));
     ckfree(coords);
-    return Success;
+    return 1;
 }
+
+int XFillPolygon(Display *d, Drawable dr, GC g, XPoint *p, int n, int shape,
+	int mode)
+{
+    if (!BrowserFillPolygon(&d, dr, g, p, n, shape, mode,
+	    X11_WASM_XREQ_FILL_POLY)) {
+	return Success;
+    }
+    return XNoOp(d);
+}
+
+static int
+BrowserFillRectangle(
+    Display **displayPtr,
+    Drawable drawable,
+    GC gc,
+    int x,
+    int y,
+    unsigned int width,
+    unsigned int height,
+    unsigned char requestCode)
+{
+    X11WasmResource *resourcePtr = BrowserDrawableResourceOrError(displayPtr,
+	    drawable, requestCode);
+
+    if (resourcePtr == NULL) {
+	return 0;
+    }
+    if (!BrowserOptionalGCOrError(displayPtr, gc, requestCode)) {
+	return 0;
+    }
+    if (!BrowserValidateDrawableDimensions(displayPtr, width, height,
+	    requestCode)) {
+	return 0;
+    }
+    BrowserApplyGCStyle(gc);
+    BrowserApplyGCClip(gc);
+    (void)X11WasmJsDrawRectangle(BrowserJsXId(drawable), BrowserGCPixel(gc),
+	    x, y, width, height, 1);
+    BrowserMarkResourceDamage(resourcePtr, x, y, width, height);
+    return 1;
+}
+
 int XFillRectangle(Display *d, Drawable dr, GC g, int x, int y,
 	unsigned int w, unsigned int h)
 {
-    X11WasmResource *resourcePtr = BrowserDrawableResourceOrError(&d, dr,
-	    X11_WASM_XREQ_POLY_FILL_RECTANGLE);
-
-    if (resourcePtr == NULL) {
-	return Success;
-    }
-    if (!BrowserOptionalGCOrError(&d, g,
+    if (!BrowserFillRectangle(&d, dr, g, x, y, w, h,
 	    X11_WASM_XREQ_POLY_FILL_RECTANGLE)) {
 	return Success;
     }
-    if (!BrowserValidateDrawableDimensions(&d, w, h,
-	    X11_WASM_XREQ_POLY_FILL_RECTANGLE)) {
-	return Success;
-    }
-    BrowserApplyGCStyle(g);
-    BrowserApplyGCClip(g);
-    (void)X11WasmJsDrawRectangle(BrowserJsXId(dr), BrowserGCPixel(g), x, y,
-	    w, h, 1);
-    BrowserMarkResourceDamage(resourcePtr, x, y, w, h);
-    return Success;
+    return XNoOp(d);
 }
 int XFillRectangles(Display *d, Drawable dr, GC g, XRectangle *r, int n)
 {
@@ -654,10 +802,12 @@ int XFillRectangles(Display *d, Drawable dr, GC g, XRectangle *r, int n)
 	return Success;
     }
     for (i = 0; i < n; i++) {
-	(void)XFillRectangle(d, dr, g, r[i].x, r[i].y, r[i].width,
-		r[i].height);
+	if (!BrowserFillRectangle(&d, dr, g, r[i].x, r[i].y, r[i].width,
+		r[i].height, X11_WASM_XREQ_POLY_FILL_RECTANGLE)) {
+	    return Success;
+	}
     }
-    return Success;
+    return XNoOp(d);
 }
 
 Status

@@ -2154,6 +2154,85 @@ cleanup:
     return result;
 }
 
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestDrawRequestsComplete(void)
+{
+    Display *display;
+    Drawable drawable;
+    XPoint points[4];
+    XSegment segments[2];
+    XRectangle rectangles[2];
+    XArc arcs[2];
+    unsigned long before;
+    unsigned long expected;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    drawable = (Drawable)browserDisplay.rootWindow;
+    memset(points, 0, sizeof(points));
+    memset(segments, 0, sizeof(segments));
+    memset(rectangles, 0, sizeof(rectangles));
+    memset(arcs, 0, sizeof(arcs));
+    points[1].x = 2;
+    points[2].x = 4;
+    points[2].y = 2;
+    points[3].y = 4;
+    segments[0].x2 = 4;
+    segments[1].y1 = 1;
+    segments[1].x2 = 4;
+    segments[1].y2 = 1;
+    rectangles[0].width = 2;
+    rectangles[0].height = 3;
+    rectangles[1].x = 3;
+    rectangles[1].y = 1;
+    rectangles[1].width = 4;
+    rectangles[1].height = 2;
+    arcs[0].width = 4;
+    arcs[0].height = 4;
+    arcs[0].angle2 = 90 * 64;
+    arcs[1].x = 4;
+    arcs[1].width = 4;
+    arcs[1].height = 4;
+    arcs[1].angle2 = 180 * 64;
+
+    before = LastKnownRequestProcessed(display);
+    expected = before;
+#define CHECK_DRAW_REQUEST(call) do { \
+	if ((call) != Success) { \
+	    return 0; \
+	} \
+	expected++; \
+	if (LastKnownRequestProcessed(display) != expected) { \
+	    return 0; \
+	} \
+    } while (0)
+
+    CHECK_DRAW_REQUEST(XDrawPoint(display, drawable, NULL, 0, 0));
+    CHECK_DRAW_REQUEST(XDrawPoints(display, drawable, NULL, points, 4,
+	    CoordModeOrigin));
+    CHECK_DRAW_REQUEST(XDrawLine(display, drawable, NULL, 0, 0, 4, 4));
+    CHECK_DRAW_REQUEST(XDrawLines(display, drawable, NULL, points, 4,
+	    CoordModeOrigin));
+    CHECK_DRAW_REQUEST(XDrawSegments(display, drawable, NULL, segments, 2));
+    CHECK_DRAW_REQUEST(XDrawRectangle(display, drawable, NULL, 0, 0, 3, 2));
+    CHECK_DRAW_REQUEST(XDrawRectangles(display, drawable, NULL, rectangles,
+	    2));
+    CHECK_DRAW_REQUEST(XDrawArc(display, drawable, NULL, 0, 0, 4, 4, 0,
+	    90 * 64));
+    CHECK_DRAW_REQUEST(XDrawArcs(display, drawable, NULL, arcs, 2));
+    CHECK_DRAW_REQUEST(XFillPolygon(display, drawable, NULL, points, 4,
+	    Convex, CoordModeOrigin));
+    CHECK_DRAW_REQUEST(XFillRectangle(display, drawable, NULL, 0, 0, 3, 2));
+    CHECK_DRAW_REQUEST(XFillRectangles(display, drawable, NULL, rectangles,
+	    2));
+    CHECK_DRAW_REQUEST(XFillArc(display, drawable, NULL, 0, 0, 4, 4, 0,
+	    90 * 64));
+    CHECK_DRAW_REQUEST(XFillArcs(display, drawable, NULL, arcs, 2));
+
+#undef CHECK_DRAW_REQUEST
+    return 1;
+}
+
 static int
 BrowserTestPopCirculateEvent(
     Window eventWindow,

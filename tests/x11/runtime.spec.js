@@ -777,6 +777,26 @@ test("X copy requests update browser request metadata", async ({ page }) => {
   expect(result).toBe(1);
 });
 
+test("X drawing requests update browser request metadata", async ({ page }) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestDrawRequestsComplete?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestDrawRequestsComplete) {
+      throw new Error("missing drawing request completion test hook");
+    }
+    return module._X11WasmTestDrawRequestsComplete();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XSynchronize updates browser synchronize metadata", async ({ page }) => {
   await page.goto("/x11.html");
   await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
