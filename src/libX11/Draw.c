@@ -1444,6 +1444,22 @@ BrowserAllocFontStruct(
     return fontPtr;
 }
 
+static void
+BrowserFreeFontStruct(
+    XFontStruct *fontPtr)
+{
+    if (fontPtr == NULL) {
+	return;
+    }
+    if (fontPtr->properties != NULL) {
+	ckfree(fontPtr->properties);
+    }
+    if (fontPtr->per_char != NULL) {
+	ckfree(fontPtr->per_char);
+    }
+    ckfree(fontPtr);
+}
+
 static const char *const browserDefaultFontPath[] = {
     "/browser/fonts"
 };
@@ -1506,6 +1522,7 @@ XLoadQueryFont(
     _Xconst char *name)
 {
     Font font;
+    X11WasmResource *resourcePtr;
     char *fontName = BrowserFontXLFD(name, 0);
     char *familyName = BrowserFontFamilyFromName(fontName);
     int pixelSize = BrowserFontPixelSize(name);
@@ -1515,6 +1532,11 @@ XLoadQueryFont(
     font = XLoadFont(display, name);
     fontPtr = BrowserAllocFontStruct(display, font, fontName, familyName,
 	    pixelSize, pointSize);
+    resourcePtr = X11WasmFindResource(font);
+    if ((resourcePtr != NULL)
+	    && (resourcePtr->type == X11_WASM_RESOURCE_FONT)) {
+	resourcePtr->fontStruct = fontPtr;
+    }
     ckfree(familyName);
     ckfree(fontName);
     return fontPtr;
@@ -1529,6 +1551,7 @@ XQueryFont(
     X11WasmResource *resourcePtr = BrowserFontableResourceOrError(&display,
 	    fontId, X11_WASM_XREQ_QUERY_FONT, &validFontable);
     GC gc = (GC)(uintptr_t)fontId;
+    int fontableIsGC = BrowserIsKnownGC(gc);
     Font fid = None;
     const char *familyName = "fixed";
     int pixelSize = 14;
@@ -1539,8 +1562,12 @@ XQueryFont(
     if (!validFontable) {
 	return NULL;
     }
-    if (resourcePtr != NULL) {
+    if (fontableIsGC) {
+	fid = (Font)BrowserGCContext(gc);
+    } else if (resourcePtr != NULL) {
 	fid = (Font)resourcePtr->id;
+    }
+    if (resourcePtr != NULL) {
 	if (resourcePtr->fontFamily != NULL) {
 	    familyName = resourcePtr->fontFamily;
 	}
@@ -1550,8 +1577,6 @@ XQueryFont(
 	if (resourcePtr->fontPointSize > 0) {
 	    pointSize = resourcePtr->fontPointSize;
 	}
-    } else if (BrowserIsKnownGC(gc)) {
-	fid = gc->font;
     }
     fontName = BrowserFontXLFDForFamily(familyName, pixelSize);
     if (pointSize <= 0) {
@@ -1569,14 +1594,15 @@ XFreeFont(
     XFontStruct *font)
 {
     if (font != NULL) {
-	X11WasmDeleteResource(font->fid);
-	if (font->properties != NULL) {
-	    ckfree(font->properties);
+	X11WasmResource *resourcePtr = X11WasmFindResource(font->fid);
+
+	if ((resourcePtr != NULL)
+		&& (resourcePtr->type == X11_WASM_RESOURCE_FONT)
+		&& (resourcePtr->fontStruct == font)) {
+	    resourcePtr->fontStruct = NULL;
+	    X11WasmDeleteResource(font->fid);
 	}
-	if (font->per_char != NULL) {
-	    ckfree(font->per_char);
-	}
-	ckfree(font);
+	BrowserFreeFontStruct(font);
     }
     (void)display;
     return Success;

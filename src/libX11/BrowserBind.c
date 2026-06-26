@@ -694,6 +694,9 @@ X11WasmDeleteResource(
 	    if (resourcePtr->type == X11_WASM_RESOURCE_CURSOR) {
 		BrowserFreeCursorSnapshot(resourcePtr);
 	    }
+	    if (resourcePtr->type == X11_WASM_RESOURCE_FONT) {
+		resourcePtr->fontStruct = NULL;
+	    }
 	    if (resourcePtr->fontFamily != NULL) {
 		ckfree(resourcePtr->fontFamily);
 	    }

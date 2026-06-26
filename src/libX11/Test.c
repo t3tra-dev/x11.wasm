@@ -1640,6 +1640,7 @@ X11WasmTestXlibApis(void)
     GC inputOnlyGC = NULL;
     GC queryGC = NULL;
     GC textGC = NULL;
+    GContext queryGContext = None;
     Cursor testCursor = None;
     Cursor releasedCursor = None;
     XCharStruct textExtents;
@@ -5757,6 +5758,13 @@ X11WasmTestXlibApis(void)
 	    || (XTextWidth(queryFontInfo, latin1Text, 4) != latin1TextWidth)) {
 	goto cleanup;
     }
+    XFreeFontInfo(NULL, queryFontInfo, 1);
+    queryFontInfo = NULL;
+    if (XQueryTextExtents(&browserDisplay.display, queryFontStruct->fid,
+	    latin1Text, 4, &textDirection, &textAscent, &textDescent,
+	    &textExtents) != Success) {
+	goto cleanup;
+    }
     memset(longText, 'W', sizeof(longText));
     memset(&textExtents, 0, sizeof(textExtents));
     if ((XQueryTextExtents(&browserDisplay.display, queryFontStruct->fid,
@@ -5790,6 +5798,7 @@ X11WasmTestXlibApis(void)
 		    != Success)) {
 	goto cleanup;
     }
+    queryGContext = XGContextFromGC(queryGC);
     if (XDrawString(&browserDisplay.display, (Drawable)pixmap, queryGC, 0, 0,
 	    latin1Text, 4) != Success) {
 	goto cleanup;
@@ -5853,10 +5862,19 @@ X11WasmTestXlibApis(void)
     queryGCFontInfo = XQueryFont(&browserDisplay.display,
 	    (XID)(uintptr_t)queryGC);
     if ((queryGCFontInfo == NULL)
-	    || (queryGCFontInfo->fid != queryFont)
+	    || (queryGCFontInfo->fid != (Font)queryGContext)
 	    || (queryGCFontInfo->ascent != textAscent)
 	    || (queryGCFontInfo->descent != textDescent)
 	    || (XTextWidth(queryGCFontInfo, "gc", 2) != textExtents.width)) {
+	goto cleanup;
+    }
+    XFreeFontInfo(NULL, queryGCFontInfo, 1);
+    queryGCFontInfo = NULL;
+    if ((XQueryTextExtents(&browserDisplay.display, queryFont, "gc", 2,
+		    &textDirection, &textAscent, &textDescent, &textExtents)
+		    != Success)
+	    || (XDrawString(&browserDisplay.display, (Drawable)pixmap,
+		    queryGC, 0, textAscent * 5, "gc", 2) != Success)) {
 	goto cleanup;
     }
     if (XCopyArea(&browserDisplay.display, (Drawable)pixmap,
@@ -6497,10 +6515,10 @@ cleanup:
 	XFreeFont(&browserDisplay.display, queryFontStruct);
     }
     if (queryFontInfo != NULL) {
-	XFreeFont(&browserDisplay.display, queryFontInfo);
+	XFreeFontInfo(NULL, queryFontInfo, 1);
     }
     if (queryGCFontInfo != NULL) {
-	XFreeFont(&browserDisplay.display, queryGCFontInfo);
+	XFreeFontInfo(NULL, queryGCFontInfo, 1);
     }
     if (keyboardMapping != NULL) {
 	XFree(keyboardMapping);
