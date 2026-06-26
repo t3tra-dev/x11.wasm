@@ -3899,6 +3899,22 @@ X11WasmTestXlibApis(void)
 	    || (parsedWidth != 9) || (parsedHeight != 10)) {
 	goto cleanup;
     }
+    geometryX = 11;
+    geometryY = 12;
+    parsedWidth = 13;
+    parsedHeight = 14;
+    geometryMask = XParseGeometry("5x-10", &geometryX, &geometryY,
+	    &parsedWidth, &parsedHeight);
+    if ((geometryMask != NoValue) || (geometryX != 11) || (geometryY != 12)
+	    || (parsedWidth != 13) || (parsedHeight != 14)) {
+	goto cleanup;
+    }
+    geometryMask = XParseGeometry("5x+10", &geometryX, &geometryY,
+	    &parsedWidth, &parsedHeight);
+    if ((geometryMask != NoValue) || (geometryX != 11) || (geometryY != 12)
+	    || (parsedWidth != 13) || (parsedHeight != 14)) {
+	goto cleanup;
+    }
 
     memset(&geometryHints, 0, sizeof(geometryHints));
     geometryMask = XWMGeometry(&browserDisplay.display,

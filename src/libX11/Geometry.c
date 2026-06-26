@@ -1,21 +1,13 @@
 #include "XlibInt.h"
 
 static int
-BrowserReadGeometryInteger(
+BrowserReadGeometryUnsignedInteger(
     const char **cursorPtr,
     int *valuePtr)
 {
     const char *cursor = *cursorPtr;
-    int sign = 1;
     long value = 0;
     int sawDigit = 0;
-
-    if (*cursor == '+') {
-	cursor++;
-    } else if (*cursor == '-') {
-	sign = -1;
-	cursor++;
-    }
 
     while ((*cursor >= '0') && (*cursor <= '9')) {
 	if (value <= (LONG_MAX - 9L) / 10L) {
@@ -27,13 +19,8 @@ BrowserReadGeometryInteger(
     if (!sawDigit) {
 	return 0;
     }
-    if (sign < 0) {
-	value = -value;
-    }
     if (value > INT_MAX) {
 	value = INT_MAX;
-    } else if (value < INT_MIN) {
-	value = INT_MIN;
     }
 
     *cursorPtr = cursor;
@@ -67,7 +54,7 @@ XParseGeometry(
 
     if ((*cursor != '+') && (*cursor != '-') && (*cursor != 'x')
 	    && (*cursor != 'X')) {
-	if (!BrowserReadGeometryInteger(&cursor, &value)) {
+	if (!BrowserReadGeometryUnsignedInteger(&cursor, &value)) {
 	    return NoValue;
 	}
 	width = (unsigned int)value;
@@ -76,7 +63,7 @@ XParseGeometry(
 
     if ((*cursor == 'x') || (*cursor == 'X')) {
 	cursor++;
-	if (!BrowserReadGeometryInteger(&cursor, &value)) {
+	if (!BrowserReadGeometryUnsignedInteger(&cursor, &value)) {
 	    return NoValue;
 	}
 	height = (unsigned int)value;
@@ -86,14 +73,14 @@ XParseGeometry(
     if ((*cursor == '+') || (*cursor == '-')) {
 	if (*cursor == '-') {
 	    cursor++;
-	    if (!BrowserReadGeometryInteger(&cursor, &value)) {
+	    if (!BrowserReadGeometryUnsignedInteger(&cursor, &value)) {
 		return NoValue;
 	    }
 	    x = -value;
 	    mask |= XNegative;
 	} else {
 	    cursor++;
-	    if (!BrowserReadGeometryInteger(&cursor, &value)) {
+	    if (!BrowserReadGeometryUnsignedInteger(&cursor, &value)) {
 		return NoValue;
 	    }
 	    x = value;
@@ -103,14 +90,14 @@ XParseGeometry(
 	if ((*cursor == '+') || (*cursor == '-')) {
 	    if (*cursor == '-') {
 		cursor++;
-		if (!BrowserReadGeometryInteger(&cursor, &value)) {
+		if (!BrowserReadGeometryUnsignedInteger(&cursor, &value)) {
 		    return NoValue;
 		}
 		y = -value;
 		mask |= YNegative;
 	    } else {
 		cursor++;
-		if (!BrowserReadGeometryInteger(&cursor, &value)) {
+		if (!BrowserReadGeometryUnsignedInteger(&cursor, &value)) {
 		    return NoValue;
 		}
 		y = value;
