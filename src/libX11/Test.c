@@ -1131,6 +1131,66 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestConfigureDomPointerMapping(unsigned int window, int remapped)
+{
+    Display *display;
+    Window xid = (Window)window;
+    unsigned char pointerMap[5] = {
+	Button1, Button2, Button3, Button4, Button5
+    };
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    if (BrowserWindowResource(xid) == NULL) {
+	return 0;
+    }
+    if (remapped) {
+	pointerMap[0] = Button2;
+	pointerMap[1] = Button1;
+    }
+    if ((XSetPointerMapping(display, pointerMap, 5) != MappingSuccess)
+	    || (XSelectInput(display, xid, remapped
+		    ? (ButtonPressMask | ButtonReleaseMask) : NoEventMask)
+		    != Success)) {
+	return 0;
+    }
+    BrowserClearEventQueue();
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestReadDomPointerMappingEvents(unsigned int window)
+{
+    Display *display;
+    Window xid = (Window)window;
+    XEvent event;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    if (BrowserWindowResource(xid) == NULL) {
+	return 0;
+    }
+    if (!BrowserPopMatchingEvent(xid, ButtonPressMask, &event)) {
+	return 2;
+    }
+    if ((event.type != ButtonPress) || (event.xbutton.button != Button2)
+	    || (event.xbutton.state != 0)) {
+	return 3;
+    }
+    if (!BrowserPopMatchingEvent(xid, ButtonReleaseMask, &event)) {
+	return 4;
+    }
+    if ((event.type != ButtonRelease) || (event.xbutton.button != Button2)
+	    || (event.xbutton.state != Button2Mask)) {
+	return 5;
+    }
+    if (XEventsQueued(display, QueuedAlready) != 0) {
+	return 6;
+    }
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestCompositionEventPayload(void)
 {
     const char *payload = "compose \xe3\x81\x82";

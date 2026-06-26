@@ -485,6 +485,131 @@ test("X pointer events update browser pointer state metadata", async ({
   });
 });
 
+test("DOM pointer events honor X pointer button mapping", async ({ page }) => {
+  await waitForX11Runtime(page);
+  const windowId = await createMappedWindow(page);
+
+  const afterDown = await page.evaluate((windowId) => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestConfigureDomPointerMapping?: Function, x11WasmBackend?: X11WasmBackendSnapshot } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    const resource = backend?.resources.get(windowId);
+    const element = resource?.element;
+    const root = document.getElementById("x11-wasm-root");
+    if (
+      !module?._X11WasmTestConfigureDomPointerMapping ||
+      !backend ||
+      !resource ||
+      !root ||
+      !(element instanceof HTMLElement)
+    ) {
+      throw new Error("missing DOM pointer mapping test hooks");
+    }
+    const configureResult =
+      module._X11WasmTestConfigureDomPointerMapping(windowId, 1);
+    const rect = element.getBoundingClientRect();
+    const eventInit = {
+      bubbles: true,
+      button: 0,
+      buttons: 1,
+      cancelable: true,
+      clientX: Math.floor(rect.left + rect.width / 2),
+      clientY: Math.floor(rect.top + rect.height / 2),
+      isPrimary: true,
+      pointerId: 1,
+      pointerType: "mouse",
+    };
+    element.dispatchEvent(new PointerEvent("pointerdown", eventInit));
+    return {
+      backendCaptureWindow: backend.pointerCaptureWindow,
+      backendPointerState: backend.pointerState,
+      backendPointerWindow: backend.pointerWindow,
+      configureResult,
+      rootCaptureWindow: root.getAttribute(
+        "data-x11-wasm-pointer-capture-window",
+      ),
+      rootPointerState: root.getAttribute("data-x11-wasm-pointer-state"),
+      rootPointerWindow: root.getAttribute("data-x11-wasm-pointer-window"),
+    };
+  }, windowId);
+
+  const afterUp = await page.evaluate((windowId) => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestConfigureDomPointerMapping?: Function, _X11WasmTestReadDomPointerMappingEvents?: Function, x11WasmBackend?: X11WasmBackendSnapshot } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    const resource = backend?.resources.get(windowId);
+    const element = resource?.element;
+    const root = document.getElementById("x11-wasm-root");
+    if (
+      !module?._X11WasmTestConfigureDomPointerMapping ||
+      !module._X11WasmTestReadDomPointerMappingEvents ||
+      !backend ||
+      !resource ||
+      !(element instanceof HTMLElement) ||
+      !root
+    ) {
+      throw new Error("missing DOM pointer mapping read hooks");
+    }
+    const rect = element.getBoundingClientRect();
+    element.dispatchEvent(
+      new PointerEvent("pointerup", {
+        bubbles: true,
+        button: 0,
+        buttons: 0,
+        cancelable: true,
+        clientX: Math.floor(rect.left + rect.width / 2),
+        clientY: Math.floor(rect.top + rect.height / 2),
+        isPrimary: true,
+        pointerId: 1,
+        pointerType: "mouse",
+      }),
+    );
+    const eventResult =
+      module._X11WasmTestReadDomPointerMappingEvents(windowId);
+    const resetResult = module._X11WasmTestConfigureDomPointerMapping(
+      windowId,
+      0,
+    );
+    return {
+      backendCaptureWindow: backend.pointerCaptureWindow,
+      backendPointerState: backend.pointerState,
+      backendPointerWindow: backend.pointerWindow,
+      eventResult,
+      resetResult,
+      rootCaptureWindow: root.getAttribute(
+        "data-x11-wasm-pointer-capture-window",
+      ),
+      rootPointerState: root.getAttribute("data-x11-wasm-pointer-state"),
+      rootPointerWindow: root.getAttribute("data-x11-wasm-pointer-window"),
+    };
+  }, windowId);
+
+  expect(afterDown.configureResult).toBe(1);
+  expect(afterDown).toEqual({
+    backendCaptureWindow: windowId,
+    backendPointerState: 512,
+    backendPointerWindow: windowId,
+    configureResult: 1,
+    rootCaptureWindow: String(windowId),
+    rootPointerState: "512",
+    rootPointerWindow: String(windowId),
+  });
+  expect(afterUp).toEqual({
+    backendCaptureWindow: 0,
+    backendPointerState: 0,
+    backendPointerWindow: windowId,
+    eventResult: 1,
+    resetResult: 1,
+    rootCaptureWindow: "0",
+    rootPointerState: "0",
+    rootPointerWindow: String(windowId),
+  });
+});
+
 test("XGrabServer updates browser root metadata", async ({ page }) => {
   await waitForX11Runtime(page);
 

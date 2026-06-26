@@ -526,6 +526,11 @@ declare const Module: {
   _X11WasmTestWheelEventConstants?: () => number;
   _X11WasmTestCompositionEventPayload?: () => number;
   _X11WasmTestEventQueueAndKeycodeApis?: () => number;
+  _X11WasmTestConfigureDomPointerMapping?: (
+    window: number,
+    remapped: number,
+  ) => number;
+  _X11WasmTestReadDomPointerMappingEvents?: (window: number) => number;
   _X11WasmTestClearAreaApis?: () => number;
   _X11WasmTestConfigureStackingApis?: () => number;
   _X11WasmTestSubstructureNotifyApis?: () => number;
