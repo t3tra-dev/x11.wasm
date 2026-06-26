@@ -28,6 +28,31 @@ BrowserValidateColorFlags(
 	    (flags & ~(DoRed | DoGreen | DoBlue)) == 0, requestCode);
 }
 
+static int
+BrowserValidateCopyPlanePlane(
+    Display **displayPtr,
+    unsigned long plane,
+    unsigned int depth,
+    unsigned char requestCode)
+{
+    Display *display;
+    unsigned long depthMask = BrowserDepthPlaneMask(depth);
+
+    if ((plane != 0UL) && ((plane & (plane - 1UL)) == 0UL)
+	    && ((plane & ~depthMask) == 0UL)) {
+	return 1;
+    }
+    display = (displayPtr != NULL) ? *displayPtr : NULL;
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+	if (displayPtr != NULL) {
+	    *displayPtr = display;
+	}
+    }
+    (void)BrowserReportXError(display, BadValue, (XID)plane, requestCode, 0);
+    return 0;
+}
+
 static void
 BrowserColorFromPixel(
     unsigned long pixel,
@@ -280,6 +305,10 @@ int XCopyPlane(Display *d, Drawable s, Drawable t, GC g, int sx, int sy,
 	return Success;
     }
     if (!BrowserValidateDrawableDimensions(&d, w, h,
+	    X11_WASM_XREQ_COPY_PLANE)) {
+	return Success;
+    }
+    if (!BrowserValidateCopyPlanePlane(&d, p, sourcePtr->depth,
 	    X11_WASM_XREQ_COPY_PLANE)) {
 	return Success;
     }
