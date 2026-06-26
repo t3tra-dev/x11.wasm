@@ -610,6 +610,112 @@ test("DOM pointer events honor X pointer button mapping", async ({ page }) => {
   });
 });
 
+test("DOM pointermove queues coalesced motion events", async ({ page }) => {
+  await waitForX11Runtime(page);
+  const windowId = await createMappedWindow(page);
+
+  const result = await page.evaluate((windowId) => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmQueuePointerEvent?: Function, x11WasmBackend?: X11WasmBackendSnapshot } }} */ (
+        window
+      ).Module;
+    const backend =
+      /** @type {(X11WasmBackendSnapshot & { queuePointerEvent?: Function }) | undefined} */ (
+        module?.x11WasmBackend
+      );
+    const resource = backend?.resources.get(windowId);
+    const element = resource?.element;
+    const root = document.getElementById("x11-wasm-root");
+    const originalQueue = module?._X11WasmQueuePointerEvent;
+    if (
+      typeof originalQueue !== "function" ||
+      !backend ||
+      typeof backend.queuePointerEvent !== "function" ||
+      !resource ||
+      !(element instanceof HTMLElement) ||
+      !root
+    ) {
+      throw new Error("missing DOM pointermove coalescing test hooks");
+    }
+
+    const button1Mask = 1 << 8;
+    const motionNotify = 6;
+    const rootRect = root.getBoundingClientRect();
+    const calls = [];
+    const pointerMove = (x, y, timeStamp) => ({
+      button: 0,
+      buttons: 1,
+      clientX: rootRect.left + resource.x + x,
+      clientY: rootRect.top + resource.y + y,
+      shiftKey: false,
+      ctrlKey: false,
+      altKey: false,
+      metaKey: false,
+      timeStamp,
+    });
+    const expectedCall = (x, y, timeStamp) => [
+      motionNotify,
+      backend.rootWindow,
+      1,
+      button1Mask,
+      resource.x + x,
+      resource.y + y,
+      Math.floor(timeStamp),
+    ];
+
+    module._X11WasmQueuePointerEvent = (...args) => {
+      calls.push(args.slice(0, 7));
+      return originalQueue(...args);
+    };
+    try {
+      const first = pointerMove(2, 3, 100.1);
+      const second = pointerMove(5, 7, 101.9);
+      const coalescedMove = {
+        ...pointerMove(5, 7, 102.4),
+        getCoalescedEvents: () => [first, second],
+      };
+      backend.queuePointerEvent(motionNotify, coalescedMove);
+
+      const uncoalescedMove = {
+        ...pointerMove(11, 13, 103.8),
+        getCoalescedEvents: () => [],
+      };
+      backend.queuePointerEvent(motionNotify, uncoalescedMove);
+
+      const coalescedWithoutCurrent = {
+        ...pointerMove(23, 29, 105.1),
+        getCoalescedEvents: () => [pointerMove(17, 19, 104.2)],
+      };
+      backend.queuePointerEvent(motionNotify, coalescedWithoutCurrent);
+    } finally {
+      module._X11WasmQueuePointerEvent = originalQueue;
+    }
+
+    return {
+      backendPointerState: backend.pointerState,
+      calls,
+      expectedCalls: [
+        expectedCall(2, 3, 100.1),
+        expectedCall(5, 7, 101.9),
+        expectedCall(11, 13, 103.8),
+        expectedCall(17, 19, 104.2),
+        expectedCall(23, 29, 105.1),
+      ],
+      rootPointerState: root.getAttribute("data-x11-wasm-pointer-state"),
+      rootX: root.getAttribute("data-x11-wasm-pointer-x"),
+      rootY: root.getAttribute("data-x11-wasm-pointer-y"),
+      expectedRootX: String(resource.x + 23),
+      expectedRootY: String(resource.y + 29),
+    };
+  }, windowId);
+
+  expect(result.calls).toEqual(result.expectedCalls);
+  expect(result.backendPointerState).toBe(256);
+  expect(result.rootPointerState).toBe("256");
+  expect(result.rootX).toBe(result.expectedRootX);
+  expect(result.rootY).toBe(result.expectedRootY);
+});
+
 test("XGrabServer updates browser root metadata", async ({ page }) => {
   await waitForX11Runtime(page);
 

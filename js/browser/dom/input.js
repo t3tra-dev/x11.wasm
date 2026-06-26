@@ -638,19 +638,64 @@
      * @param {PointerEvent} event
      */
     queuePointerEvent(type, event) {
-      const { x, y } = this.eventRootCoordinates(event);
       const queue = this.module && this.module["_X11WasmQueuePointerEvent"];
       if (typeof queue === "function") {
-        queue(
-          type,
-          this.rootWindow,
-          xButtonFromPointerEvent(event),
-          pointerEventButtonState(type, event),
-          x,
-          y,
-          eventTime(event.timeStamp),
-        );
+        for (const pointerEvent of this.pointerEventsForQueue(type, event)) {
+          const { x, y } = this.eventRootCoordinates(pointerEvent);
+          queue(
+            type,
+            this.rootWindow,
+            xButtonFromPointerEvent(pointerEvent),
+            pointerEventButtonState(type, pointerEvent),
+            x,
+            y,
+            eventTime(pointerEvent.timeStamp),
+          );
+        }
       }
+    },
+
+    /**
+     * @param {number} type
+     * @param {PointerEvent} event
+     * @returns {PointerEvent[]}
+     */
+    pointerEventsForQueue(type, event) {
+      if (
+        type !== MOTION_NOTIFY ||
+        typeof event.getCoalescedEvents !== "function"
+      ) {
+        return [event];
+      }
+
+      const coalescedEvents = event.getCoalescedEvents();
+      if (coalescedEvents.length === 0) {
+        return [event];
+      }
+
+      const lastEvent = coalescedEvents[coalescedEvents.length - 1];
+      if (lastEvent && this.sameQueuedPointerEvent(lastEvent, event)) {
+        return coalescedEvents;
+      }
+      return [...coalescedEvents, event];
+    },
+
+    /**
+     * @param {PointerEvent} a
+     * @param {PointerEvent} b
+     * @returns {boolean}
+     */
+    sameQueuedPointerEvent(a, b) {
+      return (
+        a.clientX === b.clientX &&
+        a.clientY === b.clientY &&
+        a.button === b.button &&
+        a.buttons === b.buttons &&
+        a.shiftKey === b.shiftKey &&
+        a.ctrlKey === b.ctrlKey &&
+        a.altKey === b.altKey &&
+        a.metaKey === b.metaKey
+      );
     },
 
     /**
