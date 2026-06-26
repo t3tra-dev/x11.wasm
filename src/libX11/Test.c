@@ -9962,8 +9962,13 @@ X11WasmTestResourceManagerApis(void)
     const char replacementText[] =
 	    "wish.geometry: first\n"
 	    "wish.geometry: second\n";
+    const char databaseDefaultText[] =
+	    "wish.geometry: database-geometry\n"
+	    "*foreground: database-foreground\n";
     const char screenResourceText[] = "screen.option: screen-value\n";
     Atom screenResourcesAtom;
+    XrmDatabase defaultDatabase;
+    XrmDatabase manualDefaultDatabase = NULL;
     const char *resourceManagerString;
     char *screenResourceString = NULL;
     char *defaultValue;
@@ -10013,8 +10018,7 @@ X11WasmTestResourceManagerApis(void)
     if ((defaultValue == NULL) || (strcmp(defaultValue, "white") != 0)) {
 	return 0;
     }
-    defaultValue = XGetDefault(display, "other", "standalone");
-    if ((defaultValue == NULL) || (strcmp(defaultValue, "bare-value") != 0)) {
+    if (XGetDefault(display, "other", "standalone") != NULL) {
 	return 0;
     }
     defaultValue = XGetDefault(display, "wish", "empty");
@@ -10039,6 +10043,30 @@ X11WasmTestResourceManagerApis(void)
     XFree(screenResourceString);
     screenResourceString = NULL;
 
+    defaultDatabase = XrmGetDatabase(display);
+    XrmSetDatabase(display, NULL);
+    if (defaultDatabase != NULL) {
+	XrmDestroyDatabase(defaultDatabase);
+    }
+    manualDefaultDatabase = XrmGetStringDatabase(databaseDefaultText);
+    if (manualDefaultDatabase == NULL) {
+	return 0;
+    }
+    XrmSetDatabase(display, manualDefaultDatabase);
+    defaultValue = XGetDefault(display, "wish", "geometry");
+    if ((defaultValue == NULL)
+	    || (strcmp(defaultValue, "database-geometry") != 0)) {
+	return 0;
+    }
+    defaultValue = XGetDefault(display, "other", "foreground");
+    if ((defaultValue == NULL)
+	    || (strcmp(defaultValue, "database-foreground") != 0)) {
+	return 0;
+    }
+    XrmSetDatabase(display, NULL);
+    XrmDestroyDatabase(manualDefaultDatabase);
+    manualDefaultDatabase = NULL;
+
     if (XChangeProperty(display, browserDisplay.rootWindow,
 	    XA_RESOURCE_MANAGER, XA_STRING, 8, PropModeReplace,
 	    (const unsigned char *)replacementText,
@@ -10050,6 +10078,11 @@ X11WasmTestResourceManagerApis(void)
 	return 0;
     }
 
+    defaultDatabase = XrmGetDatabase(display);
+    XrmSetDatabase(display, NULL);
+    if (defaultDatabase != NULL) {
+	XrmDestroyDatabase(defaultDatabase);
+    }
     (void)XDeleteProperty(display, browserDisplay.rootWindow,
 	    XA_RESOURCE_MANAGER);
     (void)XDeleteProperty(display, browserDisplay.rootWindow,

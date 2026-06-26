@@ -1,8 +1,6 @@
 #include "XlibInt.h"
 #include <X11/Xresource.h>
 
-static char *browserDefaultValue = NULL;
-
 typedef struct BrowserXrmEntry {
     char *binding;
     char *value;
@@ -111,64 +109,6 @@ BrowserTrimDefaultSpaces(
 	end--;
     }
     return end;
-}
-
-static int
-BrowserResourceBindingScore(
-    const char *start,
-    const char *end,
-    const char *program,
-    const char *option)
-{
-    size_t optionLength = strlen(option);
-    size_t programLength = (program != NULL) ? strlen(program) : 0U;
-    size_t bindingLength = (size_t)(end - start);
-    const char *prefixEnd;
-    const char *prefixStart;
-    char separator;
-
-    if ((optionLength == 0U) || (bindingLength < optionLength)
-	    || (strncmp(end - optionLength, option, optionLength) != 0)) {
-	return 0;
-    }
-    if (bindingLength == optionLength) {
-	return 1;
-    }
-    separator = *(end - optionLength - 1U);
-    if ((separator != '.') && (separator != '*')) {
-	return 0;
-    }
-    prefixStart = start;
-    prefixEnd = end - optionLength - 1;
-    if ((prefixEnd == prefixStart)
-	    || ((prefixEnd == prefixStart + 1) && (*prefixStart == '*'))) {
-	return 2;
-    }
-    if ((programLength > 0U)
-	    && ((size_t)(prefixEnd - prefixStart) == programLength)
-	    && (strncmp(prefixStart, program, programLength) == 0)) {
-	return (separator == '.') ? 4 : 3;
-    }
-    return 0;
-}
-
-static char *
-BrowserRememberDefaultValue(
-    const char *start,
-    const char *end)
-{
-    size_t length = (size_t)(end - start);
-
-    if (browserDefaultValue != NULL) {
-	ckfree(browserDefaultValue);
-	browserDefaultValue = NULL;
-    }
-    browserDefaultValue = (char *)ckalloc(length + 1U);
-    if (length > 0U) {
-	memcpy(browserDefaultValue, start, length);
-    }
-    browserDefaultValue[length] = '\0';
-    return browserDefaultValue;
 }
 
 static char *
@@ -985,58 +925,60 @@ BrowserXrmParseLineIntoDatabase(
     return 1;
 }
 
+static XrmDatabase
+BrowserGetDefaultDatabase(
+    Display *display)
+{
+    const char *resources;
+
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+    }
+    if (display == NULL) {
+	return NULL;
+    }
+    if (display->db != NULL) {
+	return (XrmDatabase)display->db;
+    }
+    resources = BrowserResourceManagerString();
+    if (resources != NULL) {
+	display->db = (struct _XrmHashBucketRec *)XrmGetStringDatabase(
+		resources);
+    }
+    return (XrmDatabase)display->db;
+}
+
 char *
 XGetDefault(
     Display *display,
     _Xconst char *program,
     _Xconst char *option)
 {
-    const char *resources = XResourceManagerString(display);
+    XrmDatabase database;
+    XrmName names[3];
+    XrmClass classes[3];
+    XrmRepresentation type = NULLQUARK;
+    XrmValue value;
     const char *programName = BrowserDefaultProgramName(program);
-    const char *lineStart;
-    const char *bestStart = NULL;
-    const char *bestEnd = NULL;
-    int bestScore = 0;
 
-    if ((resources == NULL) || (option == NULL) || (option[0] == '\0')) {
+    value.size = 0U;
+    value.addr = NULL;
+    if ((programName == NULL) || (programName[0] == '\0')
+	    || (option == NULL) || (option[0] == '\0')) {
 	return NULL;
     }
-    for (lineStart = resources; *lineStart != '\0'; ) {
-	const char *lineEnd = lineStart;
-	const char *colon;
-	const char *bindingStart;
-	const char *bindingEnd;
-	const char *valueStart;
-	const char *valueEnd;
-	int score;
-
-	while ((*lineEnd != '\0') && (*lineEnd != '\n')) {
-	    lineEnd++;
-	}
-	bindingStart = BrowserSkipDefaultSpaces(lineStart, lineEnd);
-	if ((bindingStart == lineEnd) || (*bindingStart == '!')) {
-	    lineStart = (*lineEnd == '\n') ? lineEnd + 1 : lineEnd;
-	    continue;
-	}
-	colon = memchr(bindingStart, ':', (size_t)(lineEnd - bindingStart));
-	if (colon == NULL) {
-	    lineStart = (*lineEnd == '\n') ? lineEnd + 1 : lineEnd;
-	    continue;
-	}
-	bindingEnd = BrowserTrimDefaultSpaces(bindingStart, colon);
-	valueStart = BrowserSkipDefaultSpaces(colon + 1, lineEnd);
-	valueEnd = BrowserTrimDefaultSpaces(valueStart, lineEnd);
-	score = BrowserResourceBindingScore(bindingStart, bindingEnd,
-		programName, option);
-	if (score >= bestScore) {
-	    bestScore = score;
-	    bestStart = valueStart;
-	    bestEnd = valueEnd;
-	}
-	lineStart = (*lineEnd == '\n') ? lineEnd + 1 : lineEnd;
+    database = BrowserGetDefaultDatabase(display);
+    if (database == NULL) {
+	return NULL;
     }
-    return (bestScore > 0) ? BrowserRememberDefaultValue(bestStart, bestEnd)
-	    : NULL;
+    names[0] = XrmStringToName(programName);
+    names[1] = XrmStringToName(option);
+    names[2] = NULLQUARK;
+    classes[0] = XrmStringToClass("Program");
+    classes[1] = XrmStringToClass("Name");
+    classes[2] = NULLQUARK;
+    return XrmQGetResource(database, names, classes, &type, &value)
+	    ? (char *)value.addr : NULL;
 }
 
 char *
