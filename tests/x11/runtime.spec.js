@@ -655,6 +655,55 @@ test("external clipboard selection returns target-specific text properties", asy
   expect(result).toBe(1);
 });
 
+test("DOM paste queues text input events", async ({ page }) => {
+  await waitForX11Runtime(page);
+  const windowId = await createMappedWindow(page);
+
+  const text = "paste \u3042";
+  const state = await page.evaluate(({ pasteText, windowId }) => {
+    const input = document.querySelector(".x11-wasm-input");
+    const module =
+      /** @type {Window & { Module?: { _XEventsQueued?: Function, x11WasmBackend?: { externalClipboardAvailable?: boolean, externalClipboardText?: string, focusInput?: Function, focusedWindow?: number } } }} */ (
+        window
+      ).Module;
+    if (!(input instanceof HTMLTextAreaElement)) {
+      throw new Error("missing browser input textarea");
+    }
+    if (!module?._XEventsQueued || !module.x11WasmBackend?.focusInput) {
+      throw new Error("missing paste input test hooks");
+    }
+    module.x11WasmBackend.focusInput(true, windowId);
+    const before = module._XEventsQueued(0, 0);
+    const event = new Event("paste", {
+      bubbles: true,
+      cancelable: true,
+    });
+    Object.defineProperty(event, "clipboardData", {
+      value: {
+        /** @param {string} type */
+        getData(type) {
+          return type === "text/plain" ? pasteText : "";
+        },
+      },
+    });
+    input.dispatchEvent(event);
+    return {
+      after: module._XEventsQueued(0, 0),
+      available: module.x11WasmBackend.externalClipboardAvailable,
+      before,
+      defaultPrevented: event.defaultPrevented,
+      focusedWindow: module.x11WasmBackend.focusedWindow,
+      text: module.x11WasmBackend.externalClipboardText,
+    };
+  }, { pasteText: text, windowId });
+
+  expect(state.available).toBe(true);
+  expect(state.text).toBe(text);
+  expect(state.focusedWindow).toBe(windowId);
+  expect(state.defaultPrevented).toBe(true);
+  expect(state.after - state.before).toBe(Array.from(text).length);
+});
+
 test("XOpenDisplay rejects non-browser display names", async ({ page }) => {
   await page.goto("/x11.html");
   await expect(page.locator("#x11-wasm-status")).toHaveText("running", {

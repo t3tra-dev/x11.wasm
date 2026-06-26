@@ -1289,6 +1289,11 @@ X11WasmTestXSendEventTargets(
 	    || !BrowserWindowCanReceiveEvents(pointerWindow)) {
 	return 0;
     }
+    if ((XMoveWindow(display, focusWindow, 9, 10) != Success)
+	    || (XMoveWindow(display, pointerWindow, 72, 10) != Success)) {
+	return 0;
+    }
+    BrowserClearEventQueue();
     if ((XSelectInput(display, focusWindow,
 		    KeyPressMask | FocusChangeMask | EnterWindowMask
 		    | PointerMotionMask) != Success)

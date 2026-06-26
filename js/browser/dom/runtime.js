@@ -781,11 +781,17 @@ applyRootSelectionOwnerState() {
      */
     handlePaste(event) {
       const data = event.clipboardData;
+      let text;
 
       if (!data || typeof data.getData !== "function") {
         return;
       }
-      this.setExternalClipboardText(data.getData("text/plain") || "");
+      text = data.getData("text/plain") || "";
+      this.setExternalClipboardText(text);
+      if (text && this.focusedResourceAcceptsInput()) {
+        this.flushInputText(text);
+        event.preventDefault();
+      }
     },
 
     /**
