@@ -797,6 +797,26 @@ test("X drawing requests update browser request metadata", async ({ page }) => {
   expect(result).toBe(1);
 });
 
+test("X GC requests update browser request metadata", async ({ page }) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestGCRequestsComplete?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestGCRequestsComplete) {
+      throw new Error("missing GC request completion test hook");
+    }
+    return module._X11WasmTestGCRequestsComplete();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XSynchronize updates browser synchronize metadata", async ({ page }) => {
   await page.goto("/x11.html");
   await expect(page.locator("#x11-wasm-status")).toHaveText("running", {

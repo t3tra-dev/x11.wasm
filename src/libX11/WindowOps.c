@@ -1734,6 +1734,7 @@ XCreateGC(
     BrowserApplyGCValues(gc, valueMask, values);
     gcontext = (GContext)X11WasmAllocXId(display);
     BrowserRegisterGC(gc, gcontext, resourcePtr->depth);
+    (void)XNoOp(display);
     return gc;
 }
 
@@ -1750,7 +1751,7 @@ XFreeGC(
     BrowserDeleteGCClip(gc);
     BrowserDeleteGCDashes(gc);
     ckfree(gc);
-    return Success;
+    return XNoOp(display);
 }
 
 void
@@ -1785,7 +1786,7 @@ XChangeGC(
 	return Success;
     }
     BrowserApplyGCValues(gc, mask, values);
-    return Success;
+    return XNoOp(display);
 }
 
 int
@@ -1810,7 +1811,7 @@ XCopyGC(
 	return Success;
     }
     BrowserCopyGCComponents(src, dest, valuemask);
-    return Success;
+    return XNoOp(display);
 }
 
 int
@@ -1840,6 +1841,7 @@ XSetForeground(
 {
     if (BrowserGCOrError(&display, gc, X11_WASM_XREQ_CHANGE_GC) != NULL) {
 	gc->foreground = foreground;
+	return XNoOp(display);
     }
     return Success;
 }
@@ -1852,6 +1854,7 @@ XSetBackground(
 {
     if (BrowserGCOrError(&display, gc, X11_WASM_XREQ_CHANGE_GC) != NULL) {
 	gc->background = background;
+	return XNoOp(display);
     }
     return Success;
 }
@@ -1864,6 +1867,7 @@ XSetPlaneMask(
 {
     if (BrowserGCOrError(&display, gc, X11_WASM_XREQ_CHANGE_GC) != NULL) {
 	gc->plane_mask = planeMask;
+	return XNoOp(display);
     }
     return Success;
 }
@@ -1886,6 +1890,7 @@ XSetState(
 	gc->background = background;
 	gc->function = function;
 	gc->plane_mask = planeMask;
+	return XNoOp(display);
     }
     return Success;
 }
@@ -1904,7 +1909,7 @@ XSetFont(
 	return Success;
     }
     gc->font = font;
-    return Success;
+    return XNoOp(display);
 }
 
 int
@@ -1919,6 +1924,7 @@ XSetFunction(
     if (BrowserValidateGCFunction(&display, function,
 	    X11_WASM_XREQ_CHANGE_GC)) {
 	gc->function = function;
+	return XNoOp(display);
     }
     return Success;
 }
@@ -1935,6 +1941,7 @@ XSetGraphicsExposures(
     if (BrowserValidateGCBool(&display, graphicsExposures,
 	    X11_WASM_XREQ_CHANGE_GC)) {
 	gc->graphics_exposures = graphicsExposures;
+	return XNoOp(display);
     }
     return Success;
 }
@@ -1951,6 +1958,7 @@ XSetSubwindowMode(
     if (BrowserValidateGCSubwindowMode(&display, subwindowMode,
 	    X11_WASM_XREQ_CHANGE_GC)) {
 	gc->subwindow_mode = subwindowMode;
+	return XNoOp(display);
     }
     return Success;
 }
@@ -1967,6 +1975,7 @@ XSetFillStyle(
     if (BrowserValidateGCFillStyle(&display, fillStyle,
 	    X11_WASM_XREQ_CHANGE_GC)) {
 	gc->fill_style = fillStyle;
+	return XNoOp(display);
     }
     return Success;
 }
@@ -1983,6 +1992,7 @@ XSetFillRule(
     if (BrowserValidateGCFillRule(&display, fillRule,
 	    X11_WASM_XREQ_CHANGE_GC)) {
 	gc->fill_rule = fillRule;
+	return XNoOp(display);
     }
     return Success;
 }
@@ -1999,6 +2009,7 @@ XSetArcMode(
     if (BrowserValidateGCArcMode(&display, arcMode,
 	    X11_WASM_XREQ_CHANGE_GC)) {
 	gc->arc_mode = arcMode;
+	return XNoOp(display);
     }
     return Success;
 }
@@ -2017,7 +2028,7 @@ XSetTile(
 	return Success;
     }
     gc->tile = tile;
-    return Success;
+    return XNoOp(display);
 }
 
 int
@@ -2034,7 +2045,7 @@ XSetStipple(
 	return Success;
     }
     gc->stipple = stipple;
-    return Success;
+    return XNoOp(display);
 }
 
 int XSetClipMask(Display *display, GC gc, Pixmap pixmap)
@@ -2048,13 +2059,14 @@ int XSetClipMask(Display *display, GC gc, Pixmap pixmap)
     }
     gc->clip_mask = pixmap;
     BrowserSetGCClip(gc, 0, NULL);
-    return Success;
+    return XNoOp(display);
 }
 int XSetClipOrigin(Display *display, GC gc, int x, int y)
 {
     if (BrowserGCOrError(&display, gc, X11_WASM_XREQ_CHANGE_GC) != NULL) {
 	gc->clip_x_origin = x;
 	gc->clip_y_origin = y;
+	return XNoOp(display);
     }
     return Success;
 }
@@ -2063,6 +2075,7 @@ int XSetTSOrigin(Display *display, GC gc, int x, int y)
     if (BrowserGCOrError(&display, gc, X11_WASM_XREQ_CHANGE_GC) != NULL) {
 	gc->ts_x_origin = x;
 	gc->ts_y_origin = y;
+	return XNoOp(display);
     }
     return Success;
 }
@@ -2091,6 +2104,7 @@ XSetLineAttributes(
 	gc->line_style = lineStyle;
 	gc->cap_style = capStyle;
 	gc->join_style = joinStyle;
+	return XNoOp(display);
     }
     return Success;
 }
@@ -2111,6 +2125,7 @@ XSetDashes(
 	gc->dash_offset = dashOffset;
 	gc->dashes = dashList[0];
 	BrowserSetGCDashes(gc, dashList, n);
+	return XNoOp(display);
     }
     return Success;
 }
@@ -2137,7 +2152,7 @@ XSetClipRectangles(
     gc->clip_y_origin = clipYOrigin;
     gc->clip_mask = None;
     BrowserSetGCClipRects(gc, 1, rectangles, n);
-    return Success;
+    return XNoOp(display);
 }
 
 int
@@ -2157,10 +2172,10 @@ XSetRegion(
     gc->clip_mask = None;
     if ((regionPtr == NULL) || regionPtr->empty) {
 	BrowserSetGCClipRects(gc, 1, NULL, 0);
-	return Success;
+	return XNoOp(display);
     }
     BrowserSetGCClipRects(gc, 1, regionPtr->rects, regionPtr->rectCount);
-    return Success;
+    return XNoOp(display);
 }
 
 Region

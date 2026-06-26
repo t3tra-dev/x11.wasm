@@ -2233,6 +2233,123 @@ X11WasmTestDrawRequestsComplete(void)
     return 1;
 }
 
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestGCRequestsComplete(void)
+{
+    Display *display;
+    GC gc = NULL;
+    GC destGC = NULL;
+    Pixmap tile = None;
+    Pixmap stipple = None;
+    Font font = None;
+    XGCValues values;
+    XRectangle clipRect;
+    char dashes[2];
+    unsigned long before;
+    unsigned long expected;
+    int result = 0;
+    int screen;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+    memset(&values, 0, sizeof(values));
+    memset(&clipRect, 0, sizeof(clipRect));
+    dashes[0] = 1;
+    dashes[1] = 2;
+    clipRect.width = 1;
+    clipRect.height = 1;
+    tile = XCreatePixmap(display, (Drawable)browserDisplay.rootWindow, 1, 1,
+	    (unsigned int)DefaultDepth(display, screen));
+    stipple = XCreatePixmap(display, (Drawable)browserDisplay.rootWindow, 1,
+	    1, 1);
+    font = XLoadFont(display, "fixed");
+    if ((tile == None) || (stipple == None) || (font == None)) {
+	goto cleanup;
+    }
+
+    before = LastKnownRequestProcessed(display);
+    expected = before;
+#define CHECK_GC_REQUEST(call) do { \
+	if ((call) != Success) { \
+	    goto cleanup; \
+	} \
+	expected++; \
+	if (LastKnownRequestProcessed(display) != expected) { \
+	    goto cleanup; \
+	} \
+    } while (0)
+#define CHECK_GC_CREATE(target, call) do { \
+	target = (call); \
+	if ((target) == NULL) { \
+	    goto cleanup; \
+	} \
+	expected++; \
+	if (LastKnownRequestProcessed(display) != expected) { \
+	    goto cleanup; \
+	} \
+    } while (0)
+
+    CHECK_GC_CREATE(gc, XCreateGC(display,
+	    (Drawable)browserDisplay.rootWindow, 0, NULL));
+    CHECK_GC_CREATE(destGC, XCreateGC(display,
+	    (Drawable)browserDisplay.rootWindow, 0, NULL));
+    values.foreground = 0x010203UL;
+    CHECK_GC_REQUEST(XChangeGC(display, gc, GCForeground, &values));
+    CHECK_GC_REQUEST(XCopyGC(display, gc, GCForeground | GCBackground,
+	    destGC));
+    CHECK_GC_REQUEST(XSetForeground(display, gc, 0x112233UL));
+    CHECK_GC_REQUEST(XSetBackground(display, gc, 0x445566UL));
+    CHECK_GC_REQUEST(XSetPlaneMask(display, gc, AllPlanes));
+    CHECK_GC_REQUEST(XSetState(display, gc, 0x010203UL, 0x040506UL, GXcopy,
+	    AllPlanes));
+    CHECK_GC_REQUEST(XSetFont(display, gc, font));
+    CHECK_GC_REQUEST(XSetFunction(display, gc, GXxor));
+    CHECK_GC_REQUEST(XSetGraphicsExposures(display, gc, False));
+    CHECK_GC_REQUEST(XSetSubwindowMode(display, gc, IncludeInferiors));
+    CHECK_GC_REQUEST(XSetFillStyle(display, gc, FillSolid));
+    CHECK_GC_REQUEST(XSetFillRule(display, gc, WindingRule));
+    CHECK_GC_REQUEST(XSetArcMode(display, gc, ArcChord));
+    CHECK_GC_REQUEST(XSetTile(display, gc, tile));
+    CHECK_GC_REQUEST(XSetStipple(display, gc, stipple));
+    CHECK_GC_REQUEST(XSetClipMask(display, gc, None));
+    CHECK_GC_REQUEST(XSetClipOrigin(display, gc, 1, 2));
+    CHECK_GC_REQUEST(XSetTSOrigin(display, gc, 3, 4));
+    CHECK_GC_REQUEST(XSetLineAttributes(display, gc, 1, LineSolid, CapButt,
+	    JoinMiter));
+    CHECK_GC_REQUEST(XSetDashes(display, gc, 1, dashes, 2));
+    CHECK_GC_REQUEST(XSetClipRectangles(display, gc, 0, 0, &clipRect, 1,
+	    Unsorted));
+    CHECK_GC_REQUEST(XSetRegion(display, gc, NULL));
+    CHECK_GC_REQUEST(XFreeGC(display, destGC));
+    destGC = NULL;
+    CHECK_GC_REQUEST(XFreeGC(display, gc));
+    gc = NULL;
+    result = 1;
+
+#undef CHECK_GC_CREATE
+#undef CHECK_GC_REQUEST
+
+cleanup:
+    if (destGC != NULL) {
+	(void)XFreeGC(display, destGC);
+    }
+    if (gc != NULL) {
+	(void)XFreeGC(display, gc);
+    }
+    if (stipple != None) {
+	(void)XFreePixmap(display, stipple);
+    }
+    if (tile != None) {
+	(void)XFreePixmap(display, tile);
+    }
+    if (font != None) {
+	(void)XUnloadFont(display, font);
+    }
+    BrowserClearEventQueue();
+    return result;
+}
+
 static int
 BrowserTestPopCirculateEvent(
     Window eventWindow,
