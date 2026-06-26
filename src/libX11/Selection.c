@@ -1674,8 +1674,39 @@ BrowserUpdateKeymapState(
     }
 }
 
-int
-BrowserQueueKeyEventFields(
+static Window
+BrowserResolvePinnedKeyEventWindow(
+    Window window)
+{
+    Window target;
+    Window grabWindow;
+    int grabOwnerEvents = 1;
+
+    if (!BrowserWindowCanReceiveEvents(window)) {
+	return BrowserResolveKeyEventWindow(window);
+    }
+    target = window;
+
+    grabWindow = browserDisplay.keyboardGrabWindow;
+    if (BrowserWindowCanReceiveEvents(grabWindow)) {
+	grabOwnerEvents = browserDisplay.keyboardGrabOwnerEvents;
+    } else {
+	grabWindow = BrowserGetGrabWindow();
+	grabOwnerEvents = 1;
+    }
+    if (BrowserWindowCanReceiveEvents(grabWindow)) {
+	if (!grabOwnerEvents || !BrowserWindowInTree(target, grabWindow)) {
+	    target = grabWindow;
+	}
+    }
+    if (!BrowserWindowCanReceiveEvents(target)) {
+	target = BrowserResolveKeyEventWindow(window);
+    }
+    return target;
+}
+
+static int
+BrowserQueueKeyEventFieldsToTarget(
     int type,
     unsigned int window,
     unsigned int keycode,
@@ -1684,7 +1715,8 @@ BrowserQueueKeyEventFields(
     int x,
     int y,
     unsigned int time,
-    int imeControl)
+    int imeControl,
+    int forceWindow)
 {
     XEvent event;
     Window target;
@@ -1702,11 +1734,13 @@ BrowserQueueKeyEventFields(
     }
     BrowserResetScreenSaverForInput();
     resolvedKeycode = BrowserNormalizeKeycode(keycode, resolvedKeySym);
-    target = BrowserResolveKeyEventWindow((Window)window);
+    target = forceWindow ? BrowserResolvePinnedKeyEventWindow((Window)window)
+	    : BrowserResolveKeyEventWindow((Window)window);
     if (type == KeyPress) {
 	(void)BrowserActivatePassiveKeyGrab(target, resolvedKeycode, state,
 		(Time)time);
-	target = BrowserResolveKeyEventWindow((Window)window);
+	target = forceWindow ? BrowserResolvePinnedKeyEventWindow((Window)window)
+		: BrowserResolveKeyEventWindow((Window)window);
     }
     BrowserWindowCoordinatesFromRoot(target, rootX, rootY, &x, &y);
 
@@ -1721,6 +1755,9 @@ BrowserQueueKeyEventFields(
     event.xkey.state = state;
     if (imeControl) {
 	event.xkey.state |= X11_WASM_IME_CONTROL_STATE;
+    }
+    if (forceWindow) {
+	event.xkey.state |= X11_WASM_PINNED_KEY_EVENT_STATE;
     }
     event.xkey.keycode = resolvedKeycode;
     event.xkey.same_screen = True;
@@ -1747,4 +1784,36 @@ BrowserQueueKeyEventFields(
 	BrowserReleasePassiveKeyboardGrabIfIdle();
     }
     return queued;
+}
+
+int
+BrowserQueueKeyEventFields(
+    int type,
+    unsigned int window,
+    unsigned int keycode,
+    unsigned int keySym,
+    unsigned int state,
+    int x,
+    int y,
+    unsigned int time,
+    int imeControl)
+{
+    return BrowserQueueKeyEventFieldsToTarget(type, window, keycode, keySym,
+	    state, x, y, time, imeControl, 0);
+}
+
+int
+BrowserQueueKeyEventFieldsAtWindow(
+    int type,
+    unsigned int window,
+    unsigned int keycode,
+    unsigned int keySym,
+    unsigned int state,
+    int x,
+    int y,
+    unsigned int time,
+    int imeControl)
+{
+    return BrowserQueueKeyEventFieldsToTarget(type, window, keycode, keySym,
+	    state, x, y, time, imeControl, 1);
 }

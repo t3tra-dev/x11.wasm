@@ -17,4 +17,8 @@
 #define X11_WASM_BROWSER_WHEEL_MASK (1L << 28)
 #endif
 
+#ifndef X11_WASM_PINNED_KEY_EVENT_STATE
+#define X11_WASM_PINNED_KEY_EVENT_STATE ((unsigned int)0x40000000U)
+#endif
+
 #endif /* _X11WASM_EVENTS_H */

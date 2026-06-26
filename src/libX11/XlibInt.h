@@ -1379,6 +1379,16 @@ int BrowserQueueKeyEventFields(
     int y,
     unsigned int time,
     int imeControl);
+int BrowserQueueKeyEventFieldsAtWindow(
+    int type,
+    unsigned int window,
+    unsigned int keycode,
+    unsigned int keySym,
+    unsigned int state,
+    int x,
+    int y,
+    unsigned int time,
+    int imeControl);
 int BrowserQueueNoExposeEvent(
     Drawable drawable,
     unsigned char requestCode);

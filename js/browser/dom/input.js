@@ -749,8 +749,9 @@
      */
     startComposition(text) {
       this.composing = true;
+      this.compositionWindow = this.compositionTargetWindow();
       this.compositionText = text;
-      this.queueCompositionEvent(COMPOSITION_START, text);
+      this.queueCompositionEvent(COMPOSITION_START, text, this.compositionWindow);
     },
 
     /**
@@ -765,7 +766,7 @@
         return;
       }
       this.compositionText = text;
-      this.queueCompositionEvent(COMPOSITION_UPDATE, text);
+      this.queueCompositionEvent(COMPOSITION_UPDATE, text, this.compositionWindow);
     },
 
     /**
@@ -774,17 +775,27 @@
     endComposition(text) {
       const input = this.inputElement;
       const finalText = text || (input ? input.value : "");
+      const targetWindow = this.compositionWindow || this.compositionTargetWindow();
 
       this.composing = false;
+      this.compositionWindow = 0;
       this.compositionText = "";
-      this.queueCompositionEvent(COMPOSITION_END, finalText);
-      this.flushInputText(finalText || undefined);
+      this.queueCompositionEvent(COMPOSITION_END, finalText, targetWindow);
+      this.flushInputText(finalText || undefined, targetWindow);
+    },
+
+    /**
+     * @returns {number}
+     */
+    compositionTargetWindow() {
+      return this.inputContextWindow || this.focusedWindow || this.rootWindow;
     },
 
     /**
      * @param {string=} textOverride
+     * @param {number=} window
      */
-    flushInputText(textOverride) {
+    flushInputText(textOverride, window = 0) {
       const input = this.inputElement;
       if (!input) {
         return;
@@ -796,7 +807,7 @@
       }
       input.value = "";
       for (const char of text) {
-        this.queueTextEvent(KEY_PRESS, char, 0, 0);
+        this.queueTextEvent(KEY_PRESS, char, 0, 0, window);
       }
     },
 
@@ -805,9 +816,14 @@
      * @param {string} text
      * @param {number} state
      * @param {number} time
+     * @param {number=} window
      */
-    queueTextEvent(type, text, state, time) {
+    queueTextEvent(type, text, state, time, window = 0) {
       const codepoint = text.codePointAt(0);
+      const pinnedWindow = unsignedInt(window, 0);
+      const targetWindow = pinnedWindow || this.rootWindow;
+      const queueFieldsAtWindow =
+        this.module && this.module["_X11WasmQueueTextEventFieldsAtWindow"];
       const queueFields =
         this.module && this.module["_X11WasmQueueTextEventFields"];
       const queue = this.module && this.module["_X11WasmQueueTextEvent"];
@@ -815,10 +831,12 @@
       if (typeof codepoint !== "number") {
         return;
       }
-      if (typeof queueFields === "function") {
-        queueFields(type, this.rootWindow, codepoint, state, time);
+      if (pinnedWindow !== 0 && typeof queueFieldsAtWindow === "function") {
+        queueFieldsAtWindow(type, targetWindow, codepoint, state, time);
+      } else if (typeof queueFields === "function") {
+        queueFields(type, targetWindow, codepoint, state, time);
       } else if (type === KEY_PRESS && typeof queue === "function") {
-        queue(this.rootWindow, codepoint, state, time);
+        queue(targetWindow, codepoint, state, time);
       }
     },
 
@@ -854,16 +872,18 @@
     /**
      * @param {number} phase
      * @param {string} text
+     * @param {number=} window
      */
-    queueCompositionEvent(phase, text) {
+    queueCompositionEvent(phase, text, window = 0) {
       const queue =
         this.module && this.module["_X11WasmQueueCompositionEvent"];
+      const targetWindow = unsignedInt(window, 0) || this.rootWindow;
 
       if (typeof queue !== "function") {
         return;
       }
       this.withUtf8String(text, (pointer, byteLength) =>
-        queue(phase, this.rootWindow, pointer, byteLength),
+        queue(phase, targetWindow, pointer, byteLength),
       );
     },
 

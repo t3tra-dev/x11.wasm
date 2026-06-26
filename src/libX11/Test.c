@@ -1110,6 +1110,70 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestPinnedCompositionTargets(void)
+{
+    Display *display;
+    int screen;
+    Window first = None;
+    Window second = None;
+    XEvent event;
+    int result = 0;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+    first = XCreateWindow(display, browserDisplay.rootWindow, 10, 10, 60, 30,
+	    0, CopyFromParent, InputOutput, DefaultVisual(display, screen), 0,
+	    NULL);
+    second = XCreateWindow(display, browserDisplay.rootWindow, 90, 10, 60, 30,
+	    0, CopyFromParent, InputOutput, DefaultVisual(display, screen), 0,
+	    NULL);
+    if ((first == None) || (second == None)
+	    || (XMapWindow(display, first) != Success)
+	    || (XMapWindow(display, second) != Success)
+	    || (XSelectInput(display, first, KeyPressMask) != Success)
+	    || (XSelectInput(display, second, KeyPressMask) != Success)
+	    || (XSetInputFocus(display, second, RevertToParent, CurrentTime)
+		    != Success)) {
+	result = 10;
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    if (!X11WasmQueueCompositionEvent(X11_WASM_COMPOSITION_UPDATE,
+	    (unsigned int)first, "x", 1)
+	    || !BrowserPopEvent(&event, NULL)
+	    || (event.type != ClientMessage)
+	    || (event.xclient.window != first)) {
+	result = 11;
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    if (!BrowserQueueKeyEventFieldsAtWindow(KeyPress, first,
+	    BrowserKeycodeFromKeySym(XK_a), XK_a, 0, 12, 13, CurrentTime, 0)
+	    || !BrowserPopMatchingEvent(first, KeyPressMask, &event)
+	    || (event.type != KeyPress)
+	    || (event.xkey.window != first)
+	    || ((event.xkey.state & X11_WASM_PINNED_KEY_EVENT_STATE) == 0)) {
+	result = 12;
+	goto cleanup;
+    }
+
+    result = 1;
+
+cleanup:
+    if (first != None) {
+	(void)XDestroyWindow(display, first);
+    }
+    if (second != None) {
+	(void)XDestroyWindow(display, second);
+    }
+    BrowserClearEventQueue();
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestCrossingEventHierarchy(void)
 {
     Display *display;

@@ -73,6 +73,26 @@ X11WasmQueueTextEventFields(
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmQueueTextEventFieldsAtWindow(
+    int type,
+    unsigned int window,
+    unsigned int codepoint,
+    unsigned int state,
+    unsigned int time)
+{
+    KeySym keySym = BrowserKeySymFromCodepoint(codepoint);
+
+    BrowserInitDisplay();
+    if (((type != KeyPress) && (type != KeyRelease))
+	    || (keySym == NoSymbol)) {
+	return 0;
+    }
+    return BrowserQueueKeyEventFieldsAtWindow(type, window,
+	    BrowserKeycodeFromKeySym(keySym), (unsigned int)keySym, state,
+	    browserDisplay.pointerX, browserDisplay.pointerY, time, 0);
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmQueueTextEvent(
     unsigned int window,
     unsigned int codepoint,
@@ -104,7 +124,12 @@ X11WasmQueueCompositionEvent(
     } else if (utf8Length < 0) {
 	utf8Length = (int)strlen(utf8);
     }
-    target = BrowserResolveKeyEventWindow((Window)window);
+    if (((Window)window != browserDisplay.rootWindow)
+	    && BrowserWindowCanReceiveEvents((Window)window)) {
+	target = (Window)window;
+    } else {
+	target = BrowserResolveKeyEventWindow((Window)window);
+    }
     if (!BrowserWindowCanReceiveEvents(target)) {
 	return 0;
     }

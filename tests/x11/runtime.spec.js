@@ -126,6 +126,23 @@ test("composition ClientMessages preserve UTF-8 payloads", async ({ page }) => {
   expect(result).toBe(1);
 });
 
+test("composition events can pin explicit target windows", async ({ page }) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestPinnedCompositionTargets?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestPinnedCompositionTargets) {
+      throw new Error("missing pinned composition target test export");
+    }
+    return module._X11WasmTestPinnedCompositionTargets();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("X11 keyboard mapping APIs resolve ASCII key events", async ({ page }) => {
   await waitForX11Runtime(page);
 

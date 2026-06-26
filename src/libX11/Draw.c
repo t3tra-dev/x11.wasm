@@ -3457,6 +3457,10 @@ BrowserICAllowsLookup(
     if ((event->window == None) || (focusWindow == None)) {
 	return 0;
     }
+    if ((event->state & X11_WASM_PINNED_KEY_EVENT_STATE)
+	    && (event->window == focusWindow)) {
+	return 1;
+    }
     if (inputContext->focused && (focusedInputContext == inputContext)
 	    && (event->window == focusWindow)) {
 	return 1;

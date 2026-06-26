@@ -192,6 +192,8 @@
       /** @private */
       this.composing = false;
       /** @private */
+      this.compositionWindow = 0;
+      /** @private */
       this.compositionText = "";
       /** @private */
       this.listenersInstalled = false;

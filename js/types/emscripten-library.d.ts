@@ -378,6 +378,13 @@ declare const Module: {
     state: number,
     time: number,
   ) => number;
+  _X11WasmQueueTextEventFieldsAtWindow?: (
+    type: number,
+    window: number,
+    codepoint: number,
+    state: number,
+    time: number,
+  ) => number;
   _X11WasmQueueCompositionEvent?: (
     phase: number,
     window: number,
