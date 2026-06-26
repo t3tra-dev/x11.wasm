@@ -208,7 +208,8 @@
 	| ButtonMotionMask | KeymapStateMask | ExposureMask \
 	| VisibilityChangeMask | StructureNotifyMask | ResizeRedirectMask \
 	| SubstructureNotifyMask | SubstructureRedirectMask | FocusChangeMask \
-	| PropertyChangeMask | ColormapChangeMask | OwnerGrabButtonMask)
+	| PropertyChangeMask | ColormapChangeMask | OwnerGrabButtonMask \
+	| MouseWheelMask)
 #define X11_WASM_DO_NOT_PROPAGATE_EVENT_MASK \
 	(KeyPressMask | KeyReleaseMask | ButtonPressMask | ButtonReleaseMask \
 	| PointerMotionMask | Button1MotionMask | Button2MotionMask \

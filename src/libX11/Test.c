@@ -166,22 +166,33 @@ cleanup:
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestWheelEventConstants(void)
 {
+    Display *display;
+    XSetWindowAttributes attributes;
+    XWindowAttributes windowAttributes;
     XEvent event;
+    Window window = None;
     int internal = 0;
+    int result = 0;
+    int screen;
 
     BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
     BrowserClearEventQueue();
     if ((X11_WASM_BROWSER_WHEEL_EVENT != (MappingNotify + 1))
 	    || (MouseWheelEvent != X11_WASM_BROWSER_WHEEL_EVENT)
 	    || (MouseWheelMask != X11_WASM_BROWSER_WHEEL_MASK)) {
-	return 10;
+	result = 10;
+	goto cleanup;
     }
     if (!X11WasmQueueWheelEvent((unsigned int)browserDisplay.rootWindow, 120,
 	    0, 12, 14, CurrentTime)) {
-	return 11;
+	result = 11;
+	goto cleanup;
     }
     if (!BrowserPopEvent(&event, &internal)) {
-	return 12;
+	result = 12;
+	goto cleanup;
     }
     BrowserClearEventQueue();
     if ((event.type != X11_WASM_BROWSER_WHEEL_EVENT) || !internal
@@ -189,9 +200,45 @@ X11WasmTestWheelEventConstants(void)
 	    || (event.xbutton.button != 120U)
 	    || (event.xbutton.x_root != 12)
 	    || (event.xbutton.y_root != 14)) {
-	return 13;
+	result = 13;
+	goto cleanup;
     }
-    return 1;
+    memset(&attributes, 0, sizeof(attributes));
+    attributes.event_mask = MouseWheelMask;
+    window = XCreateWindow(display, browserDisplay.rootWindow, 0, 0, 8, 6, 0,
+	    CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    CWEventMask, &attributes);
+    if (window == None) {
+	result = 14;
+	goto cleanup;
+    }
+    memset(&windowAttributes, 0, sizeof(windowAttributes));
+    if ((XGetWindowAttributes(display, window, &windowAttributes) == 0)
+	    || ((windowAttributes.your_event_mask & MouseWheelMask) == 0)) {
+	result = 15;
+	goto cleanup;
+    }
+    if (XSelectInput(display, window, ExposureMask | MouseWheelMask)
+	    != Success) {
+	result = 16;
+	goto cleanup;
+    }
+    memset(&windowAttributes, 0, sizeof(windowAttributes));
+    if ((XGetWindowAttributes(display, window, &windowAttributes) == 0)
+	    || ((windowAttributes.your_event_mask
+		    & (ExposureMask | MouseWheelMask))
+		    != (ExposureMask | MouseWheelMask))) {
+	result = 17;
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    BrowserClearEventQueue();
+    if (window != None) {
+	(void)XDestroyWindow(display, window);
+    }
+    return result;
 }
 
 EMSCRIPTEN_KEEPALIVE int
