@@ -17,12 +17,4 @@
 #define X11_WASM_BROWSER_WHEEL_MASK (1L << 28)
 #endif
 
-#ifndef MouseWheelEvent
-#define MouseWheelEvent X11_WASM_BROWSER_WHEEL_EVENT
-#endif
-
-#ifndef MouseWheelMask
-#define MouseWheelMask X11_WASM_BROWSER_WHEEL_MASK
-#endif
-
 #endif /* _X11WASM_EVENTS_H */

@@ -209,7 +209,7 @@
 	| VisibilityChangeMask | StructureNotifyMask | ResizeRedirectMask \
 	| SubstructureNotifyMask | SubstructureRedirectMask | FocusChangeMask \
 	| PropertyChangeMask | ColormapChangeMask | OwnerGrabButtonMask \
-	| MouseWheelMask)
+	| X11_WASM_BROWSER_WHEEL_MASK)
 #define X11_WASM_DO_NOT_PROPAGATE_EVENT_MASK \
 	(KeyPressMask | KeyReleaseMask | ButtonPressMask | ButtonReleaseMask \
 	| PointerMotionMask | Button1MotionMask | Button2MotionMask \

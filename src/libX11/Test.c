@@ -180,11 +180,18 @@ X11WasmTestWheelEventConstants(void)
     screen = DefaultScreen(display);
     BrowserClearEventQueue();
     if ((X11_WASM_BROWSER_WHEEL_EVENT != (MappingNotify + 1))
-	    || (MouseWheelEvent != X11_WASM_BROWSER_WHEEL_EVENT)
-	    || (MouseWheelMask != X11_WASM_BROWSER_WHEEL_MASK)) {
+	    || (X11_WASM_BROWSER_WHEEL_MASK != (1L << 28))) {
 	result = 10;
 	goto cleanup;
     }
+#ifdef MouseWheelEvent
+    result = 18;
+    goto cleanup;
+#endif
+#ifdef MouseWheelMask
+    result = 19;
+    goto cleanup;
+#endif
     if (!X11WasmQueueWheelEvent((unsigned int)browserDisplay.rootWindow, 120,
 	    0, 12, 14, CurrentTime)) {
 	result = 11;
@@ -204,7 +211,7 @@ X11WasmTestWheelEventConstants(void)
 	goto cleanup;
     }
     memset(&attributes, 0, sizeof(attributes));
-    attributes.event_mask = MouseWheelMask;
+    attributes.event_mask = X11_WASM_BROWSER_WHEEL_MASK;
     window = XCreateWindow(display, browserDisplay.rootWindow, 0, 0, 8, 6, 0,
 	    CopyFromParent, InputOutput, DefaultVisual(display, screen),
 	    CWEventMask, &attributes);
@@ -214,11 +221,13 @@ X11WasmTestWheelEventConstants(void)
     }
     memset(&windowAttributes, 0, sizeof(windowAttributes));
     if ((XGetWindowAttributes(display, window, &windowAttributes) == 0)
-	    || ((windowAttributes.your_event_mask & MouseWheelMask) == 0)) {
+	    || ((windowAttributes.your_event_mask
+		    & X11_WASM_BROWSER_WHEEL_MASK) == 0)) {
 	result = 15;
 	goto cleanup;
     }
-    if (XSelectInput(display, window, ExposureMask | MouseWheelMask)
+    if (XSelectInput(display, window,
+	    ExposureMask | X11_WASM_BROWSER_WHEEL_MASK)
 	    != Success) {
 	result = 16;
 	goto cleanup;
@@ -226,8 +235,8 @@ X11WasmTestWheelEventConstants(void)
     memset(&windowAttributes, 0, sizeof(windowAttributes));
     if ((XGetWindowAttributes(display, window, &windowAttributes) == 0)
 	    || ((windowAttributes.your_event_mask
-		    & (ExposureMask | MouseWheelMask))
-		    != (ExposureMask | MouseWheelMask))) {
+		    & (ExposureMask | X11_WASM_BROWSER_WHEEL_MASK))
+		    != (ExposureMask | X11_WASM_BROWSER_WHEEL_MASK))) {
 	result = 17;
 	goto cleanup;
     }
