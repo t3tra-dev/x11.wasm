@@ -1021,11 +1021,11 @@ test("window style setters resync inherited child styles", async ({ page }) => {
     const pixmapChildId = module._X11WasmTestInheritedWindowStyleSync(1);
     backend.flush?.();
     const pixelChild =
-      /** @type {X11WasmResource & { backgroundColor?: string | null, backgroundPixmap?: number, borderColor?: string | null, borderPixmap?: number } | undefined} */ (
+      /** @type {X11WasmResource & { backgroundColor?: string | null, backgroundPixmap?: number, borderColor?: string | null, borderPixmap?: number, cursor?: string | null } | undefined} */ (
         backend.resources.get(pixelChildId)
       );
     const pixmapChild =
-      /** @type {X11WasmResource & { backgroundColor?: string | null, backgroundPixmap?: number, borderColor?: string | null, borderPixmap?: number } | undefined} */ (
+      /** @type {X11WasmResource & { backgroundColor?: string | null, backgroundPixmap?: number, borderColor?: string | null, borderPixmap?: number, cursor?: string | null } | undefined} */ (
         backend.resources.get(pixmapChildId)
       );
     return {
@@ -1037,6 +1037,7 @@ test("window style setters resync inherited child styles", async ({ page }) => {
             backgroundPixmap: pixelChild.backgroundPixmap,
             borderColor: pixelChild.borderColor,
             borderPixmap: pixelChild.borderPixmap,
+            cursor: pixelChild.cursor,
           }
         : null,
       pixmap: pixmapChild
@@ -1045,6 +1046,7 @@ test("window style setters resync inherited child styles", async ({ page }) => {
             backgroundPixmap: pixmapChild.backgroundPixmap,
             borderColor: pixmapChild.borderColor,
             borderPixmap: pixmapChild.borderPixmap,
+            cursor: pixmapChild.cursor,
           }
         : null,
     };
@@ -1057,11 +1059,48 @@ test("window style setters resync inherited child styles", async ({ page }) => {
     backgroundPixmap: 0,
     borderColor: "rgb(68 85 102)",
     borderPixmap: 0,
+    cursor: "text",
   });
   expect(state.pixmap?.backgroundColor).toBeNull();
   expect(state.pixmap?.borderColor).toBeNull();
   expect(state.pixmap?.backgroundPixmap).toBeGreaterThan(0);
   expect(state.pixmap?.borderPixmap).toBeGreaterThan(0);
+  expect(state.pixmap?.cursor).toBe("text");
+});
+
+test("XReparentWindow resyncs inherited child styles", async ({ page }) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const state = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestReparentInheritedWindowStyleSync?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    if (!module?._X11WasmTestReparentInheritedWindowStyleSync || !backend) {
+      throw new Error("missing reparent inherited style test hooks");
+    }
+    const childId = module._X11WasmTestReparentInheritedWindowStyleSync();
+    backend.flush?.();
+    const child =
+      /** @type {X11WasmResource & { backgroundColor?: string | null, borderColor?: string | null, cursor?: string | null } | undefined} */ (
+        backend.resources.get(childId)
+      );
+    return {
+      childId,
+      backgroundColor: child?.backgroundColor,
+      borderColor: child?.borderColor,
+      cursor: child?.cursor,
+    };
+  });
+
+  expect(state.childId).toBeGreaterThan(0);
+  expect(state.backgroundColor).toBe("rgb(119 136 153)");
+  expect(state.borderColor).toBe("rgb(170 187 204)");
+  expect(state.cursor).toBe("text");
 });
 
 test("Xlib colormap compatibility APIs are stable", async ({ page }) => {

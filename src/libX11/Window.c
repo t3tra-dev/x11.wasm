@@ -1037,7 +1037,8 @@ BrowserWindowInheritsStyle(
 			    == (Pixmap)ParentRelative))
 		    || (!resourcePtr->hasBorderPixel
 			    && (resourcePtr->atts.border_pixmap
-				    == (Pixmap)CopyFromParent)));
+				    == (Pixmap)CopyFromParent))
+		    || (resourcePtr->atts.cursor == None));
 }
 
 void
@@ -1076,6 +1077,20 @@ BrowserCursorShape(
 	return BrowserJsXId(cursorPtr->id);
     }
     return cursorPtr->cursorShape;
+}
+
+Cursor
+BrowserResolveWindowCursorStyle(
+    X11WasmResource *resourcePtr)
+{
+    while ((resourcePtr != NULL)
+	    && (resourcePtr->type == X11_WASM_RESOURCE_WINDOW)) {
+	if (resourcePtr->atts.cursor != None) {
+	    return resourcePtr->atts.cursor;
+	}
+	resourcePtr = resourcePtr->parentPtr;
+    }
+    return None;
 }
 
 void
@@ -1161,12 +1176,14 @@ BrowserSyncWindowStyle(
     unsigned long borderPixel;
     Pixmap backgroundPixmap;
     Pixmap borderPixmap;
+    Cursor cursor;
 
     if ((resourcePtr == NULL)
 	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)) {
 	return;
     }
-    hasCursor = resourcePtr->atts.cursor != None;
+    cursor = BrowserResolveWindowCursorStyle(resourcePtr);
+    hasCursor = cursor != None;
     BrowserResolveWindowBackgroundStyle(resourcePtr, &hasBackgroundPixel,
 	    &backgroundPixel, &backgroundPixmap);
     BrowserResolveWindowBorderStyle(resourcePtr, &hasBorderPixel,
@@ -1175,7 +1192,7 @@ BrowserSyncWindowStyle(
 	    hasBackgroundPixel, backgroundPixel,
 	    BrowserStylePixmap(backgroundPixmap),
 	    hasBorderPixel, borderPixel, BrowserStylePixmap(borderPixmap),
-	    hasCursor, BrowserCursorShape(resourcePtr->atts.cursor));
+	    hasCursor, BrowserCursorShape(cursor));
 }
 
 void
@@ -1221,6 +1238,7 @@ BrowserSyncCursorUsers(
 	if ((resourcePtr->type == X11_WASM_RESOURCE_WINDOW)
 		&& (resourcePtr->atts.cursor == cursor)) {
 	    BrowserSyncWindowStyle(resourcePtr);
+	    BrowserSyncInheritedChildStyles(resourcePtr);
 	}
     }
     if (browserDisplay.pointerGrabCursor == cursor) {

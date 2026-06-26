@@ -1240,6 +1240,10 @@ BrowserRetainSaveSetWindow(
 	BrowserLinkChildAtTop(resourcePtr, browserDisplay.rootWindow);
 	(void)X11WasmJsReparentWindow(BrowserJsXId(resourcePtr->id),
 		BrowserJsXId(browserDisplay.rootWindow), 0, 0);
+	if (BrowserWindowInheritsStyle(resourcePtr)) {
+	    BrowserSyncWindowStyle(resourcePtr);
+	    BrowserSyncInheritedChildStyles(resourcePtr);
+	}
 	BrowserSyncTransientStacking();
 	(void)BrowserQueueReparentNotify(resourcePtr, oldParent,
 		browserDisplay.rootWindow, 0, 0);

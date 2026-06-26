@@ -1522,6 +1522,8 @@ void BrowserResolveWindowBorderStyle(
     int *hasPixelPtr,
     unsigned long *pixelPtr,
     Pixmap *pixmapPtr);
+Cursor BrowserResolveWindowCursorStyle(
+    X11WasmResource *resourcePtr);
 int BrowserResourceIsVisible(
     X11WasmResource *resourcePtr);
 int BrowserResourceSupportsProtocol(

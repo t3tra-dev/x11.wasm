@@ -3236,7 +3236,8 @@ int XChangeWindowAttributes(Display *display, Window window, unsigned long mask,
 	BrowserSyncWindowAttributes(r);
     }
     BrowserSyncWindowStyle(r);
-    if (mask & (CWBackPixmap | CWBackPixel | CWBorderPixmap | CWBorderPixel)) {
+    if (mask & (CWBackPixmap | CWBackPixel | CWBorderPixmap | CWBorderPixel
+	    | CWCursor)) {
 	BrowserSyncInheritedChildStyles(r);
     }
     return Success;
@@ -3363,6 +3364,10 @@ XReparentWindow(
     BrowserLinkChildAtTop(resourcePtr, parent);
     (void)X11WasmJsReparentWindow(BrowserJsXId(window),
 	    BrowserJsXId(parent), x, y);
+    if (BrowserWindowInheritsStyle(resourcePtr)) {
+	BrowserSyncWindowStyle(resourcePtr);
+	BrowserSyncInheritedChildStyles(resourcePtr);
+    }
     BrowserSyncTransientStacking();
     (void)BrowserQueueReparentNotify(resourcePtr, oldParent, parent, x, y);
     if (wasMapped) {

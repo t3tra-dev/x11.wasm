@@ -3183,6 +3183,7 @@ int XDefineCursor(Display *display, Window window, Cursor cursor)
     }
     BrowserSetWindowCursor(resourcePtr, cursor);
     BrowserSyncWindowStyle(resourcePtr);
+    BrowserSyncInheritedChildStyles(resourcePtr);
     return Success;
 }
 

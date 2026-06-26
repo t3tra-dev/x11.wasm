@@ -8800,6 +8800,7 @@ X11WasmTestInheritedWindowStyleSync(int usePixmap)
     Window child = None;
     Pixmap backgroundPixmap = None;
     Pixmap borderPixmap = None;
+    Cursor cursor = None;
     int screen;
 
     BrowserInitDisplay();
@@ -8820,6 +8821,13 @@ X11WasmTestInheritedWindowStyleSync(int usePixmap)
 		    (Pixmap)CopyFromParent) != Success)) {
 	goto error;
     }
+    cursor = XCreateFontCursor(display, XC_xterm);
+    if ((cursor == None)
+	    || (XDefineCursor(display, parent, cursor) != Success)
+	    || (XFreeCursor(display, cursor) != Success)) {
+	goto error;
+    }
+    cursor = None;
 
     if (usePixmap) {
 	backgroundPixmap = XCreatePixmap(display, browserDisplay.rootWindow, 2,
@@ -8842,6 +8850,9 @@ X11WasmTestInheritedWindowStyleSync(int usePixmap)
     return BrowserJsXId(child);
 
 error:
+    if (cursor != None) {
+	(void)XFreeCursor(display, cursor);
+    }
     if (parent != None) {
 	(void)XDestroyWindow(display, parent);
     }
@@ -8850,6 +8861,58 @@ error:
     }
     if (borderPixmap != None) {
 	(void)XFreePixmap(display, borderPixmap);
+    }
+    return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE unsigned int
+X11WasmTestReparentInheritedWindowStyleSync(void)
+{
+    Display *display;
+    Window oldParent = None;
+    Window newParent = None;
+    Window child = None;
+    Cursor cursor = None;
+    int screen;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+    oldParent = XCreateSimpleWindow(display, browserDisplay.rootWindow, 4, 4,
+	    32, 24, 0, 0x445566UL, 0x112233UL);
+    newParent = XCreateSimpleWindow(display, browserDisplay.rootWindow, 40, 4,
+	    32, 24, 0, 0xaabbccUL, 0x778899UL);
+    child = XCreateWindow(display, oldParent, 2, 2, 16, 12, 0,
+	    CopyFromParent, InputOutput, DefaultVisual(display, screen), 0,
+	    NULL);
+    if ((oldParent == None) || (newParent == None) || (child == None)
+	    || (XSetWindowBackgroundPixmap(display, child,
+		    (Pixmap)ParentRelative) != Success)
+	    || (XSetWindowBorderPixmap(display, child,
+		    (Pixmap)CopyFromParent) != Success)) {
+	goto error;
+    }
+    cursor = XCreateFontCursor(display, XC_xterm);
+    if ((cursor == None)
+	    || (XDefineCursor(display, newParent, cursor) != Success)
+	    || (XFreeCursor(display, cursor) != Success)) {
+	goto error;
+    }
+    cursor = None;
+    if (XReparentWindow(display, child, newParent, 6, 8) != Success) {
+	goto error;
+    }
+    return BrowserJsXId(child);
+
+error:
+    if (cursor != None) {
+	(void)XFreeCursor(display, cursor);
+    }
+    if (oldParent != None) {
+	(void)XDestroyWindow(display, oldParent);
+    }
+    if (newParent != None) {
+	(void)XDestroyWindow(display, newParent);
     }
     return 0;
 }
