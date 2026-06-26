@@ -395,6 +395,25 @@ test("Xlib GC clip rectangles and empty regions constrain drawing", async ({
   expect(samples.windowId).toBeGreaterThan(0);
 });
 
+test("Xlib XPutImage keeps pixmap backing constrained by GC clip", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestPutImageClipBacking?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestPutImageClipBacking) {
+      throw new Error("missing XPutImage clip backing test export");
+    }
+    return module._X11WasmTestPutImageClipBacking();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("Xlib XCopyArea snapshots overlapping self copies", async ({ page }) => {
   await waitForX11Runtime(page);
 

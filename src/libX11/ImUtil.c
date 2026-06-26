@@ -867,7 +867,8 @@ BrowserStorePixmapImage(
 
 	    if ((targetX < 0) || (targetY < 0)
 		    || ((unsigned int)targetX >= resourcePtr->width)
-		    || ((unsigned int)targetY >= resourcePtr->height)) {
+		    || ((unsigned int)targetY >= resourcePtr->height)
+		    || !BrowserCopyTargetContains(gc, targetX, targetY)) {
 		continue;
 	    }
 	    source = BrowserImageGetPixel(image, srcX + (int)ix,

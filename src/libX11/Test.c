@@ -2198,6 +2198,90 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestPutImageClipBacking(void)
+{
+    Display *display;
+    GC gc = NULL;
+    Pixmap pixmap = None;
+    XImage image;
+    XImage *readback = NULL;
+    XRectangle clipRect;
+    unsigned char imageData[4 * 2 * 4];
+    int result = 0;
+    int x, y;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    memset(&image, 0, sizeof(image));
+    memset(imageData, 0, sizeof(imageData));
+    image.width = 4;
+    image.height = 2;
+    image.format = ZPixmap;
+    image.data = (char *)imageData;
+    image.byte_order = LSBFirst;
+    image.bitmap_unit = 32;
+    image.bitmap_bit_order = LSBFirst;
+    image.bitmap_pad = 32;
+    image.depth = DefaultDepth(display, DefaultScreen(display));
+    if (XInitImage(&image) == 0) {
+	goto cleanup;
+    }
+    pixmap = XCreatePixmap(display, (Drawable)browserDisplay.rootWindow,
+	    4, 2, (unsigned int)image.depth);
+    gc = (pixmap != None) ? XCreateGC(display, pixmap, 0, NULL) : NULL;
+    if ((pixmap == None) || (gc == NULL)) {
+	goto cleanup;
+    }
+
+    for (y = 0; y < 2; y++) {
+	for (x = 0; x < 4; x++) {
+	    (void)XPutPixel(&image, x, y, 0x0000ffUL);
+	}
+    }
+    if (XPutImage(display, pixmap, gc, &image, 0, 0, 0, 0, 4, 2)
+	    != Success) {
+	goto cleanup;
+    }
+
+    for (y = 0; y < 2; y++) {
+	for (x = 0; x < 4; x++) {
+	    (void)XPutPixel(&image, x, y, 0xff0000UL);
+	}
+    }
+    clipRect.x = 1;
+    clipRect.y = 0;
+    clipRect.width = 2;
+    clipRect.height = 2;
+    if ((XSetClipRectangles(display, gc, 0, 0, &clipRect, 1, Unsorted)
+		    != Success)
+	    || (XPutImage(display, pixmap, gc, &image, 0, 0, 0, 0, 4, 2)
+		    != Success)) {
+	goto cleanup;
+    }
+
+    readback = XGetImage(display, pixmap, 0, 0, 4, 2, AllPlanes, ZPixmap);
+    if ((readback != NULL)
+	    && (XGetPixel(readback, 0, 0) == 0x0000ffUL)
+	    && (XGetPixel(readback, 1, 0) == 0xff0000UL)
+	    && (XGetPixel(readback, 2, 1) == 0xff0000UL)
+	    && (XGetPixel(readback, 3, 1) == 0x0000ffUL)) {
+	result = 1;
+    }
+
+cleanup:
+    if (readback != NULL) {
+	(void)XDestroyImage(readback);
+    }
+    if (gc != NULL) {
+	(void)XFreeGC(display, gc);
+    }
+    if (pixmap != None) {
+	(void)XFreePixmap(display, pixmap);
+    }
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestCopyRequestsComplete(void)
 {
     Display *display;
