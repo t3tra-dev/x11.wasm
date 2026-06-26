@@ -720,6 +720,19 @@ int BrowserDrawableDepthsMatchOrError(
     X11WasmResource *targetPtr,
     Drawable target,
     unsigned char requestCode);
+int BrowserActivatePassiveButtonGrab(
+    Window eventWindow,
+    unsigned int button,
+    unsigned int state,
+    Time time);
+int BrowserActivatePassiveKeyGrab(
+    Window eventWindow,
+    unsigned int keycode,
+    unsigned int state,
+    Time time);
+void BrowserClearPassiveGrabs(void);
+void BrowserDeletePassiveGrabsForWindow(
+    Window window);
 X11WasmResource *BrowserDrawableResourceOrError(
     Display **displayPtr,
     Drawable drawable,
@@ -1185,6 +1198,8 @@ int BrowserPointerGrabAllowsEvent(
     const XEvent *eventPtr);
 int BrowserPointerGrabEventMaskIsValid(
     unsigned int eventMask);
+unsigned int BrowserPointerButtonMask(
+    unsigned int button);
 int BrowserPopEvent(
     XEvent *eventPtr,
     int *internalPtr);
@@ -1408,6 +1423,9 @@ Time BrowserRequestEffectiveTime(
 int BrowserRequestTimeIsValid(
     Time time,
     Time lastChangeTime);
+void BrowserReleasePassiveKeyboardGrabIfIdle(void);
+void BrowserReleasePassivePointerGrabIfIdle(
+    unsigned int state);
 void BrowserRecordPointerMotion(
     int rootX,
     int rootY,

@@ -281,6 +281,7 @@ XCloseDisplay(
     focusedInputContext = NULL;
     if (display == &browserDisplay.display) {
 	BrowserResetHostAccessControl();
+	BrowserClearPassiveGrabs();
 	browserDisplay.pointerGrabWindow = None;
 	browserDisplay.pointerGrabConfineWindow = None;
 	BrowserSetPointerGrabCursor(None);
@@ -288,12 +289,14 @@ XCloseDisplay(
 	browserDisplay.pointerGrabOwnerEvents = 0;
 	browserDisplay.pointerGrabPointerMode = GrabModeAsync;
 	browserDisplay.pointerGrabKeyboardMode = GrabModeAsync;
+	browserDisplay.pointerGrabPassive = 0;
 	browserDisplay.motionHistoryStart = 0;
 	browserDisplay.motionHistoryCount = 0;
 	browserDisplay.keyboardGrabWindow = None;
 	browserDisplay.keyboardGrabOwnerEvents = 0;
 	browserDisplay.keyboardGrabPointerMode = GrabModeAsync;
 	browserDisplay.keyboardGrabKeyboardMode = GrabModeAsync;
+	browserDisplay.keyboardGrabPassive = 0;
 	browserDisplay.serverGrabDepth = 0;
 	BrowserSyncServerGrabState();
 	browserDisplay.synchronize = 0;

@@ -1569,6 +1569,7 @@ X11WasmTestXlibApis(void)
     int focusAfterStaleRevert = 0;
     int focusAfterFutureRevert = 0;
     int focusAfterCurrentRevert = 0;
+    KeyCode passiveGrabKeycode = 0;
     int inheritedBackgroundHasPixel = 0;
     int inheritedBorderHasPixel = 0;
     unsigned long inheritedBackgroundPixel = 0;
@@ -5871,11 +5872,53 @@ X11WasmTestXlibApis(void)
 	    || (XGrabKey(&browserDisplay.display, AnyKey, AnyModifier,
 		    browserDisplay.rootWindow, False, GrabModeAsync,
 		    GrabModeAsync) != Success)
-	    || (XUngrabKey(&browserDisplay.display, AnyKey, AnyModifier,
-		    browserDisplay.rootWindow) != Success)) {
-	goto cleanup;
-    }
-    result = 72;
+		    || (XUngrabKey(&browserDisplay.display, AnyKey, AnyModifier,
+			    browserDisplay.rootWindow) != Success)) {
+		goto cleanup;
+	    }
+	    passiveGrabKeycode = XKeysymToKeycode(&browserDisplay.display, XK_a);
+	    if ((passiveGrabKeycode == 0)
+		    || (XGrabButton(&browserDisplay.display, Button1, ShiftMask,
+			    browserDisplay.rootWindow, False,
+			    ButtonPressMask | ButtonReleaseMask, GrabModeSync,
+			    GrabModeAsync, None, None) != Success)
+		    || !X11WasmQueuePointerEvent(ButtonPress,
+			    browserDisplay.rootWindow, Button1, ShiftMask, 7, 9,
+			    1200)
+		    || (browserDisplay.pointerGrabWindow
+			    != browserDisplay.rootWindow)
+		    || !browserDisplay.pointerGrabPassive
+		    || (browserDisplay.pointerGrabPointerMode != GrabModeSync)
+		    || (browserDisplay.pointerGrabKeyboardMode != GrabModeAsync)
+		    || !X11WasmQueuePointerEvent(ButtonRelease,
+			    browserDisplay.rootWindow, Button1,
+			    ShiftMask | Button1Mask, 7, 9, 1201)
+		    || (browserDisplay.pointerGrabWindow != None)
+		    || browserDisplay.pointerGrabPassive
+		    || (XUngrabButton(&browserDisplay.display, Button1,
+			    ShiftMask, browserDisplay.rootWindow) != Success)
+		    || (XGrabKey(&browserDisplay.display, passiveGrabKeycode,
+			    ShiftMask, browserDisplay.rootWindow, False,
+			    GrabModeAsync, GrabModeSync) != Success)
+		    || !BrowserQueueKeyEventFields(KeyPress,
+			    browserDisplay.rootWindow, passiveGrabKeycode, XK_a,
+			    ShiftMask, 7, 9, 1210, 0)
+		    || (browserDisplay.keyboardGrabWindow
+			    != browserDisplay.rootWindow)
+		    || !browserDisplay.keyboardGrabPassive
+		    || (browserDisplay.keyboardGrabPointerMode != GrabModeAsync)
+		    || (browserDisplay.keyboardGrabKeyboardMode != GrabModeSync)
+		    || !BrowserQueueKeyEventFields(KeyRelease,
+			    browserDisplay.rootWindow, passiveGrabKeycode, XK_a,
+			    ShiftMask, 7, 9, 1211, 0)
+		    || (browserDisplay.keyboardGrabWindow != None)
+		    || browserDisplay.keyboardGrabPassive
+		    || (XUngrabKey(&browserDisplay.display, passiveGrabKeycode,
+			    ShiftMask, browserDisplay.rootWindow) != Success)) {
+		goto cleanup;
+	    }
+	    BrowserClearEventQueue();
+	    result = 72;
     if ((XGrabPointer(&browserDisplay.display, browserDisplay.rootWindow,
 		    False, ButtonPressMask, GrabModeSync, GrabModeSync,
 		    None, None, CurrentTime) != GrabSuccess)

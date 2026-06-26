@@ -899,3 +899,193 @@ test("X grab APIs update browser root metadata", async ({ page }) => {
     },
   });
 });
+
+test("X passive grabs activate on queued input", async ({ page }) => {
+  await waitForX11Runtime(page);
+  const windowId = await createMappedWindow(page);
+
+  const metadata = await page.evaluate((grabWindowId) => {
+    const module =
+      /** @type {Window & { Module?: { _XGrabButton?: Function, _XUngrabButton?: Function, _XGrabKey?: Function, _XUngrabKey?: Function, _X11WasmQueuePointerEvent?: Function, _X11WasmQueueKeyEvent?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { rootWindow?: number } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    const root = document.getElementById("x11-wasm-root");
+    if (
+      !module?._XGrabButton ||
+      !module._XUngrabButton ||
+      !module._XGrabKey ||
+      !module._XUngrabKey ||
+      !module._X11WasmQueuePointerEvent ||
+      !module._X11WasmQueueKeyEvent ||
+      !backend ||
+      !root
+    ) {
+      throw new Error("missing passive grab test hooks");
+    }
+
+    const rootWindow = backend.rootWindow || 1;
+    const keyPress = 2;
+    const keyRelease = 3;
+    const buttonPress = 4;
+    const buttonRelease = 5;
+    const shiftMask = 1;
+    const button1Mask = 1 << 8;
+    const buttonPressMask = 1 << 2;
+    const buttonReleaseMask = 1 << 3;
+    const grabModeSync = 0;
+    const grabModeAsync = 1;
+    const button1 = 1;
+    const keycodeA = 65;
+    const keysymA = 0x61;
+
+    const pointerGrab = module._XGrabButton(
+      0,
+      button1,
+      shiftMask,
+      grabWindowId,
+      0,
+      buttonPressMask | buttonReleaseMask,
+      grabModeSync,
+      grabModeAsync,
+      0,
+      0,
+    );
+    const pointerPress = module._X11WasmQueuePointerEvent(
+      buttonPress,
+      rootWindow,
+      button1,
+      shiftMask,
+      10,
+      11,
+      300,
+    );
+    const afterPointerPress = {
+      active: root.getAttribute("data-x11-wasm-pointer-grab-active"),
+      eventMask: backend.pointerGrabEventMask,
+      keyboardMode: backend.pointerGrabKeyboardMode,
+      ownerEvents: backend.pointerGrabOwnerEvents,
+      pointerMode: backend.pointerGrabPointerMode,
+      rootWindow: root.getAttribute("data-x11-wasm-pointer-grab-window"),
+      window: backend.pointerGrabWindow,
+    };
+    const pointerRelease = module._X11WasmQueuePointerEvent(
+      buttonRelease,
+      rootWindow,
+      button1,
+      shiftMask | button1Mask,
+      10,
+      11,
+      301,
+    );
+    const afterPointerRelease = {
+      active: root.getAttribute("data-x11-wasm-pointer-grab-active"),
+      rootWindow: root.getAttribute("data-x11-wasm-pointer-grab-window"),
+      window: backend.pointerGrabWindow,
+    };
+    const pointerUngrab = module._XUngrabButton(
+      0,
+      button1,
+      shiftMask,
+      grabWindowId,
+    );
+
+    const keyboardGrab = module._XGrabKey(
+      0,
+      keycodeA,
+      shiftMask,
+      rootWindow,
+      0,
+      grabModeAsync,
+      grabModeSync,
+    );
+    const keyboardPress = module._X11WasmQueueKeyEvent(
+      keyPress,
+      rootWindow,
+      keysymA,
+      shiftMask,
+      310,
+    );
+    const afterKeyboardPress = {
+      active: root.getAttribute("data-x11-wasm-keyboard-grab-active"),
+      keyboardMode: backend.keyboardGrabKeyboardMode,
+      ownerEvents: backend.keyboardGrabOwnerEvents,
+      pointerMode: backend.keyboardGrabPointerMode,
+      rootWindow: root.getAttribute("data-x11-wasm-keyboard-grab-window"),
+      window: backend.keyboardGrabWindow,
+    };
+    const keyboardRelease = module._X11WasmQueueKeyEvent(
+      keyRelease,
+      rootWindow,
+      keysymA,
+      shiftMask,
+      311,
+    );
+    const afterKeyboardRelease = {
+      active: root.getAttribute("data-x11-wasm-keyboard-grab-active"),
+      rootWindow: root.getAttribute("data-x11-wasm-keyboard-grab-window"),
+      window: backend.keyboardGrabWindow,
+    };
+    const keyboardUngrab = module._XUngrabKey(
+      0,
+      keycodeA,
+      shiftMask,
+      rootWindow,
+    );
+
+    return {
+      afterKeyboardPress,
+      afterKeyboardRelease,
+      afterPointerPress,
+      afterPointerRelease,
+      keyboardGrab,
+      keyboardPress,
+      keyboardRelease,
+      keyboardUngrab,
+      pointerGrab,
+      pointerPress,
+      pointerRelease,
+      pointerUngrab,
+      rootWindow,
+    };
+  }, windowId);
+
+  expect(metadata).toEqual({
+    pointerGrab: 0,
+    pointerPress: 1,
+    pointerRelease: 1,
+    pointerUngrab: 0,
+    keyboardGrab: 0,
+    keyboardPress: 1,
+    keyboardRelease: 1,
+    keyboardUngrab: 0,
+    rootWindow: metadata.rootWindow,
+    afterPointerPress: {
+      active: "1",
+      eventMask: 12,
+      keyboardMode: 1,
+      ownerEvents: false,
+      pointerMode: 0,
+      rootWindow: String(windowId),
+      window: windowId,
+    },
+    afterPointerRelease: {
+      active: "0",
+      rootWindow: null,
+      window: 0,
+    },
+    afterKeyboardPress: {
+      active: "1",
+      keyboardMode: 0,
+      ownerEvents: false,
+      pointerMode: 1,
+      rootWindow: String(metadata.rootWindow),
+      window: metadata.rootWindow,
+    },
+    afterKeyboardRelease: {
+      active: "0",
+      rootWindow: null,
+      window: 0,
+    },
+  });
+});

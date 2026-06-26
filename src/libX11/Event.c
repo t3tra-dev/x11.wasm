@@ -11,6 +11,29 @@ typedef struct BrowserUserEventPredicate {
     XPointer arg;
 } BrowserUserEventPredicate;
 
+struct X11WasmPassiveButtonGrab {
+    Window window;
+    unsigned int button;
+    unsigned int modifiers;
+    int ownerEvents;
+    unsigned int eventMask;
+    int pointerMode;
+    int keyboardMode;
+    Window confineTo;
+    Cursor cursor;
+    X11WasmPassiveButtonGrab *nextPtr;
+};
+
+struct X11WasmPassiveKeyGrab {
+    Window window;
+    int keycode;
+    unsigned int modifiers;
+    int ownerEvents;
+    int pointerMode;
+    int keyboardMode;
+    X11WasmPassiveKeyGrab *nextPtr;
+};
+
 static int
 BrowserKeyboardPercentIsValid(
     int value)
@@ -45,6 +68,131 @@ BrowserSetKeyBit(
     } else {
 	bits[index] = (char)((unsigned char)bits[index] & ~mask);
     }
+}
+
+static unsigned int
+BrowserPassiveGrabModifierMask(void)
+{
+    return ShiftMask | LockMask | ControlMask | Mod1Mask | Mod2Mask
+	    | Mod3Mask | Mod4Mask | Mod5Mask;
+}
+
+static int
+BrowserPassiveGrabModifiersMatch(
+    unsigned int grabModifiers,
+    unsigned int state)
+{
+    if (grabModifiers == AnyModifier) {
+	return 1;
+    }
+    return (state & BrowserPassiveGrabModifierMask()) == grabModifiers;
+}
+
+static int
+BrowserPassiveGrabWindowMatches(
+    Window eventWindow,
+    Window grabWindow)
+{
+    return (eventWindow == grabWindow)
+	    || BrowserWindowInTree(eventWindow, grabWindow);
+}
+
+static void
+BrowserFreePassiveButtonGrab(
+    X11WasmPassiveButtonGrab *grabPtr)
+{
+    if (grabPtr == NULL) {
+	return;
+    }
+    BrowserReleaseCursor(grabPtr->cursor);
+    ckfree(grabPtr);
+}
+
+static void
+BrowserFreePassiveKeyGrab(
+    X11WasmPassiveKeyGrab *grabPtr)
+{
+    if (grabPtr != NULL) {
+	ckfree(grabPtr);
+    }
+}
+
+static void
+BrowserDeactivatePointerGrab(void)
+{
+    browserDisplay.pointerGrabWindow = None;
+    browserDisplay.pointerGrabConfineWindow = None;
+    browserDisplay.pointerGrabOwnerEvents = 0;
+    browserDisplay.pointerGrabEventMask = 0;
+    BrowserSetPointerGrabCursor(None);
+    browserDisplay.pointerGrabPointerMode = GrabModeAsync;
+    browserDisplay.pointerGrabKeyboardMode = GrabModeAsync;
+    browserDisplay.pointerGrabPassive = 0;
+    BrowserSyncPointerGrabCursor();
+    BrowserSyncPointerGrabState();
+}
+
+static void
+BrowserDeactivateKeyboardGrab(void)
+{
+    browserDisplay.keyboardGrabWindow = None;
+    browserDisplay.keyboardGrabOwnerEvents = 0;
+    browserDisplay.keyboardGrabPointerMode = GrabModeAsync;
+    browserDisplay.keyboardGrabKeyboardMode = GrabModeAsync;
+    browserDisplay.keyboardGrabPassive = 0;
+    BrowserSyncKeyboardGrabState();
+}
+
+static X11WasmPassiveButtonGrab *
+BrowserFindPassiveButtonGrab(
+    Window eventWindow,
+    unsigned int button,
+    unsigned int state)
+{
+    X11WasmPassiveButtonGrab *grabPtr;
+
+    if (!BrowserWindowCanReceiveEvents(eventWindow)) {
+	return NULL;
+    }
+    for (grabPtr = browserDisplay.passiveButtonGrabs; grabPtr != NULL;
+	    grabPtr = grabPtr->nextPtr) {
+	if (!BrowserWindowCanReceiveEvents(grabPtr->window)
+		|| ((grabPtr->button != AnyButton)
+		&& (grabPtr->button != button))
+		|| !BrowserPassiveGrabModifiersMatch(grabPtr->modifiers, state)
+		|| !BrowserPassiveGrabWindowMatches(eventWindow,
+			grabPtr->window)) {
+	    continue;
+	}
+	return grabPtr;
+    }
+    return NULL;
+}
+
+static X11WasmPassiveKeyGrab *
+BrowserFindPassiveKeyGrab(
+    Window eventWindow,
+    unsigned int keycode,
+    unsigned int state)
+{
+    X11WasmPassiveKeyGrab *grabPtr;
+
+    if (!BrowserWindowCanReceiveEvents(eventWindow)) {
+	return NULL;
+    }
+    for (grabPtr = browserDisplay.passiveKeyGrabs; grabPtr != NULL;
+	    grabPtr = grabPtr->nextPtr) {
+	if (!BrowserWindowCanReceiveEvents(grabPtr->window)
+		|| ((grabPtr->keycode != AnyKey)
+		&& ((unsigned int)grabPtr->keycode != keycode))
+		|| !BrowserPassiveGrabModifiersMatch(grabPtr->modifiers, state)
+		|| !BrowserPassiveGrabWindowMatches(eventWindow,
+			grabPtr->window)) {
+	    continue;
+	}
+	return grabPtr;
+    }
+    return NULL;
 }
 
 static int
@@ -565,6 +713,176 @@ BrowserAllowEventsTimeIsValid(
 	    || BrowserRequestTimeIsValid(time, browserDisplay.keyboardGrabTime));
 }
 
+static X11WasmPassiveButtonGrab *
+BrowserFindExactPassiveButtonGrab(
+    Window window,
+    unsigned int button,
+    unsigned int modifiers)
+{
+    X11WasmPassiveButtonGrab *grabPtr;
+
+    for (grabPtr = browserDisplay.passiveButtonGrabs; grabPtr != NULL;
+	    grabPtr = grabPtr->nextPtr) {
+	if ((grabPtr->window == window) && (grabPtr->button == button)
+		&& (grabPtr->modifiers == modifiers)) {
+	    return grabPtr;
+	}
+    }
+    return NULL;
+}
+
+static X11WasmPassiveKeyGrab *
+BrowserFindExactPassiveKeyGrab(
+    Window window,
+    int keycode,
+    unsigned int modifiers)
+{
+    X11WasmPassiveKeyGrab *grabPtr;
+
+    for (grabPtr = browserDisplay.passiveKeyGrabs; grabPtr != NULL;
+	    grabPtr = grabPtr->nextPtr) {
+	if ((grabPtr->window == window) && (grabPtr->keycode == keycode)
+		&& (grabPtr->modifiers == modifiers)) {
+	    return grabPtr;
+	}
+    }
+    return NULL;
+}
+
+static void
+BrowserInstallPassiveButtonGrab(
+    Window window,
+    unsigned int button,
+    unsigned int modifiers,
+    Bool ownerEvents,
+    unsigned int eventMask,
+    int pointerMode,
+    int keyboardMode,
+    Window confineTo,
+    Cursor cursor)
+{
+    X11WasmPassiveButtonGrab *grabPtr =
+	    BrowserFindExactPassiveButtonGrab(window, button, modifiers);
+
+    if (grabPtr == NULL) {
+	grabPtr = (X11WasmPassiveButtonGrab *)ckalloc(sizeof(*grabPtr));
+	memset(grabPtr, 0, sizeof(*grabPtr));
+	grabPtr->window = window;
+	grabPtr->button = button;
+	grabPtr->modifiers = modifiers;
+	grabPtr->nextPtr = browserDisplay.passiveButtonGrabs;
+	browserDisplay.passiveButtonGrabs = grabPtr;
+    }
+    grabPtr->ownerEvents = ownerEvents ? 1 : 0;
+    grabPtr->eventMask = eventMask;
+    grabPtr->pointerMode = pointerMode;
+    grabPtr->keyboardMode = keyboardMode;
+    grabPtr->confineTo = confineTo;
+    if (grabPtr->cursor != cursor) {
+	Cursor oldCursor = grabPtr->cursor;
+
+	BrowserRetainCursor(cursor);
+	grabPtr->cursor = cursor;
+	BrowserReleaseCursor(oldCursor);
+    }
+}
+
+static void
+BrowserInstallPassiveKeyGrab(
+    Window window,
+    int keycode,
+    unsigned int modifiers,
+    Bool ownerEvents,
+    int pointerMode,
+    int keyboardMode)
+{
+    X11WasmPassiveKeyGrab *grabPtr =
+	    BrowserFindExactPassiveKeyGrab(window, keycode, modifiers);
+
+    if (grabPtr == NULL) {
+	grabPtr = (X11WasmPassiveKeyGrab *)ckalloc(sizeof(*grabPtr));
+	memset(grabPtr, 0, sizeof(*grabPtr));
+	grabPtr->window = window;
+	grabPtr->keycode = keycode;
+	grabPtr->modifiers = modifiers;
+	grabPtr->nextPtr = browserDisplay.passiveKeyGrabs;
+	browserDisplay.passiveKeyGrabs = grabPtr;
+    }
+    grabPtr->ownerEvents = ownerEvents ? 1 : 0;
+    grabPtr->pointerMode = pointerMode;
+    grabPtr->keyboardMode = keyboardMode;
+}
+
+static int
+BrowserPassiveButtonGrabMatchesUngrab(
+    const X11WasmPassiveButtonGrab *grabPtr,
+    Window window,
+    unsigned int button,
+    unsigned int modifiers)
+{
+    return (grabPtr != NULL) && (grabPtr->window == window)
+	    && ((button == AnyButton) || (grabPtr->button == button)
+		    || (grabPtr->button == AnyButton))
+	    && ((modifiers == AnyModifier) || (grabPtr->modifiers == modifiers)
+		    || (grabPtr->modifiers == AnyModifier));
+}
+
+static int
+BrowserPassiveKeyGrabMatchesUngrab(
+    const X11WasmPassiveKeyGrab *grabPtr,
+    Window window,
+    int keycode,
+    unsigned int modifiers)
+{
+    return (grabPtr != NULL) && (grabPtr->window == window)
+	    && ((keycode == AnyKey) || (grabPtr->keycode == keycode)
+		    || (grabPtr->keycode == AnyKey))
+	    && ((modifiers == AnyModifier) || (grabPtr->modifiers == modifiers)
+		    || (grabPtr->modifiers == AnyModifier));
+}
+
+static void
+BrowserRemovePassiveButtonGrabs(
+    Window window,
+    unsigned int button,
+    unsigned int modifiers)
+{
+    X11WasmPassiveButtonGrab **linkPtr = &browserDisplay.passiveButtonGrabs;
+
+    while (*linkPtr != NULL) {
+	X11WasmPassiveButtonGrab *grabPtr = *linkPtr;
+
+	if (BrowserPassiveButtonGrabMatchesUngrab(grabPtr, window, button,
+		modifiers)) {
+	    *linkPtr = grabPtr->nextPtr;
+	    BrowserFreePassiveButtonGrab(grabPtr);
+	    continue;
+	}
+	linkPtr = &grabPtr->nextPtr;
+    }
+}
+
+static void
+BrowserRemovePassiveKeyGrabs(
+    Window window,
+    int keycode,
+    unsigned int modifiers)
+{
+    X11WasmPassiveKeyGrab **linkPtr = &browserDisplay.passiveKeyGrabs;
+
+    while (*linkPtr != NULL) {
+	X11WasmPassiveKeyGrab *grabPtr = *linkPtr;
+
+	if (BrowserPassiveKeyGrabMatchesUngrab(grabPtr, window, keycode,
+		modifiers)) {
+	    *linkPtr = grabPtr->nextPtr;
+	    BrowserFreePassiveKeyGrab(grabPtr);
+	    continue;
+	}
+	linkPtr = &grabPtr->nextPtr;
+    }
+}
+
 int
 BrowserRequestTimeIsValid(
     Time time,
@@ -595,6 +913,141 @@ BrowserRecordFocusChangeTime(
 {
     if (BrowserRequestTimeIsValid(time, browserDisplay.focusTime)) {
 	browserDisplay.focusTime = BrowserRequestEffectiveTime(time);
+    }
+}
+
+int
+BrowserActivatePassiveButtonGrab(
+    Window eventWindow,
+    unsigned int button,
+    unsigned int state,
+    Time time)
+{
+    X11WasmPassiveButtonGrab *grabPtr;
+
+    BrowserInitDisplay();
+    if (BrowserWindowCanReceiveEvents(browserDisplay.pointerGrabWindow)) {
+	return 0;
+    }
+    grabPtr = BrowserFindPassiveButtonGrab(eventWindow, button, state);
+    if (grabPtr == NULL) {
+	return 0;
+    }
+    browserDisplay.pointerGrabWindow = grabPtr->window;
+    browserDisplay.pointerGrabOwnerEvents = grabPtr->ownerEvents;
+    browserDisplay.pointerGrabEventMask = grabPtr->eventMask;
+    browserDisplay.pointerGrabConfineWindow = grabPtr->confineTo;
+    BrowserSetPointerGrabCursor(grabPtr->cursor);
+    browserDisplay.pointerGrabPointerMode = grabPtr->pointerMode;
+    browserDisplay.pointerGrabKeyboardMode = grabPtr->keyboardMode;
+    browserDisplay.pointerGrabTime = BrowserRequestEffectiveTime(time);
+    browserDisplay.pointerGrabPassive = 1;
+    BrowserSyncPointerGrabCursor();
+    BrowserSyncPointerGrabState();
+    return 1;
+}
+
+int
+BrowserActivatePassiveKeyGrab(
+    Window eventWindow,
+    unsigned int keycode,
+    unsigned int state,
+    Time time)
+{
+    X11WasmPassiveKeyGrab *grabPtr;
+
+    BrowserInitDisplay();
+    if (BrowserWindowCanReceiveEvents(browserDisplay.keyboardGrabWindow)) {
+	return 0;
+    }
+    grabPtr = BrowserFindPassiveKeyGrab(eventWindow, keycode, state);
+    if (grabPtr == NULL) {
+	return 0;
+    }
+    browserDisplay.keyboardGrabWindow = grabPtr->window;
+    browserDisplay.keyboardGrabOwnerEvents = grabPtr->ownerEvents;
+    browserDisplay.keyboardGrabPointerMode = grabPtr->pointerMode;
+    browserDisplay.keyboardGrabKeyboardMode = grabPtr->keyboardMode;
+    browserDisplay.keyboardGrabTime = BrowserRequestEffectiveTime(time);
+    browserDisplay.keyboardGrabPassive = 1;
+    BrowserSyncKeyboardGrabState();
+    return 1;
+}
+
+void
+BrowserReleasePassivePointerGrabIfIdle(
+    unsigned int state)
+{
+    const unsigned int buttonMask = Button1Mask | Button2Mask | Button3Mask
+	    | Button4Mask | Button5Mask;
+
+    if (browserDisplay.pointerGrabPassive && ((state & buttonMask) == 0)) {
+	BrowserDeactivatePointerGrab();
+    }
+}
+
+void
+BrowserReleasePassiveKeyboardGrabIfIdle(void)
+{
+    int i;
+
+    if (!browserDisplay.keyboardGrabPassive) {
+	return;
+    }
+    for (i = 0; i < 32; i++) {
+	if (browserDisplay.keymap[i] != 0) {
+	    return;
+	}
+    }
+    BrowserDeactivateKeyboardGrab();
+}
+
+void
+BrowserDeletePassiveGrabsForWindow(
+    Window window)
+{
+    X11WasmPassiveButtonGrab **buttonLinkPtr;
+    X11WasmPassiveKeyGrab **keyLinkPtr;
+
+    buttonLinkPtr = &browserDisplay.passiveButtonGrabs;
+    while (*buttonLinkPtr != NULL) {
+	X11WasmPassiveButtonGrab *grabPtr = *buttonLinkPtr;
+
+	if ((grabPtr->window == window) || (grabPtr->confineTo == window)) {
+	    *buttonLinkPtr = grabPtr->nextPtr;
+	    BrowserFreePassiveButtonGrab(grabPtr);
+	    continue;
+	}
+	buttonLinkPtr = &grabPtr->nextPtr;
+    }
+
+    keyLinkPtr = &browserDisplay.passiveKeyGrabs;
+    while (*keyLinkPtr != NULL) {
+	X11WasmPassiveKeyGrab *grabPtr = *keyLinkPtr;
+
+	if (grabPtr->window == window) {
+	    *keyLinkPtr = grabPtr->nextPtr;
+	    BrowserFreePassiveKeyGrab(grabPtr);
+	    continue;
+	}
+	keyLinkPtr = &grabPtr->nextPtr;
+    }
+}
+
+void
+BrowserClearPassiveGrabs(void)
+{
+    while (browserDisplay.passiveButtonGrabs != NULL) {
+	X11WasmPassiveButtonGrab *grabPtr = browserDisplay.passiveButtonGrabs;
+
+	browserDisplay.passiveButtonGrabs = grabPtr->nextPtr;
+	BrowserFreePassiveButtonGrab(grabPtr);
+    }
+    while (browserDisplay.passiveKeyGrabs != NULL) {
+	X11WasmPassiveKeyGrab *grabPtr = browserDisplay.passiveKeyGrabs;
+
+	browserDisplay.passiveKeyGrabs = grabPtr->nextPtr;
+	BrowserFreePassiveKeyGrab(grabPtr);
     }
 }
 
@@ -771,6 +1224,7 @@ XGrabKeyboard(
     browserDisplay.keyboardGrabPointerMode = pointerMode;
     browserDisplay.keyboardGrabKeyboardMode = keyboardMode;
     browserDisplay.keyboardGrabTime = BrowserRequestEffectiveTime(time);
+    browserDisplay.keyboardGrabPassive = 0;
     BrowserSyncKeyboardGrabState();
     return GrabSuccess;
 }
@@ -847,6 +1301,7 @@ XGrabPointer(
     browserDisplay.pointerGrabPointerMode = pointerMode;
     browserDisplay.pointerGrabKeyboardMode = keyboardMode;
     browserDisplay.pointerGrabTime = BrowserRequestEffectiveTime(time);
+    browserDisplay.pointerGrabPassive = 0;
     BrowserClampPointerToGrabConfine(&browserDisplay.pointerX,
 	    &browserDisplay.pointerY);
     browserDisplay.pointerWindow = BrowserHitTestRoot(browserDisplay.pointerX,
@@ -995,6 +1450,11 @@ XGrabButton(
 	    X11_WASM_XREQ_GRAB_BUTTON) == NULL)) {
 	return Success;
     }
+    if (display == &browserDisplay.display) {
+	BrowserInstallPassiveButtonGrab(grabWindow, button, modifiers,
+		ownerEvents, eventMask, pointerMode, keyboardMode, confineTo,
+		cursor);
+    }
     return XNoOp(display);
 }
 
@@ -1033,6 +1493,10 @@ XGrabKey(
 	    X11_WASM_XREQ_GRAB_KEY) == NULL) {
 	return Success;
     }
+    if (display == &browserDisplay.display) {
+	BrowserInstallPassiveKeyGrab(grabWindow, keycode, modifiers,
+		ownerEvents, pointerMode, keyboardMode);
+    }
     return XNoOp(display);
 }
 
@@ -1059,6 +1523,9 @@ XUngrabButton(
     if (BrowserWindowResourceOrError(&display, grabWindow,
 	    X11_WASM_XREQ_UNGRAB_BUTTON) == NULL) {
 	return Success;
+    }
+    if (display == &browserDisplay.display) {
+	BrowserRemovePassiveButtonGrabs(grabWindow, button, modifiers);
     }
     return XNoOp(display);
 }
@@ -1087,6 +1554,9 @@ XUngrabKey(
 	    X11_WASM_XREQ_UNGRAB_KEY) == NULL) {
 	return Success;
     }
+    if (display == &browserDisplay.display) {
+	BrowserRemovePassiveKeyGrabs(grabWindow, keycode, modifiers);
+    }
     return XNoOp(display);
 }
 
@@ -1105,12 +1575,8 @@ XUngrabKeyboard(
 	return Success;
     }
     effectiveTime = BrowserRequestEffectiveTime(time);
-    browserDisplay.keyboardGrabWindow = None;
-    browserDisplay.keyboardGrabOwnerEvents = 0;
-    browserDisplay.keyboardGrabPointerMode = GrabModeAsync;
-    browserDisplay.keyboardGrabKeyboardMode = GrabModeAsync;
+    BrowserDeactivateKeyboardGrab();
     browserDisplay.keyboardGrabTime = effectiveTime;
-    BrowserSyncKeyboardGrabState();
     return Success;
 }
 EMSCRIPTEN_KEEPALIVE int
@@ -1128,16 +1594,8 @@ XUngrabPointer(
 	return Success;
     }
     effectiveTime = BrowserRequestEffectiveTime(time);
-    browserDisplay.pointerGrabWindow = None;
-    browserDisplay.pointerGrabOwnerEvents = 0;
-    browserDisplay.pointerGrabEventMask = 0;
-    browserDisplay.pointerGrabConfineWindow = None;
-    BrowserSetPointerGrabCursor(None);
-    browserDisplay.pointerGrabPointerMode = GrabModeAsync;
-    browserDisplay.pointerGrabKeyboardMode = GrabModeAsync;
+    BrowserDeactivatePointerGrab();
     browserDisplay.pointerGrabTime = effectiveTime;
-    BrowserSyncPointerGrabCursor();
-    BrowserSyncPointerGrabState();
     return Success;
 }
 int
@@ -1544,9 +2002,9 @@ XGetPointerMapping(
     return count;
 }
 
-static unsigned int
+unsigned int
 BrowserPointerButtonMask(
-    unsigned char button)
+    unsigned int button)
 {
     switch (button) {
     case Button1:

@@ -24,6 +24,8 @@ typedef enum {
 
 typedef struct X11WasmProperty X11WasmProperty;
 typedef struct X11WasmColorEntry X11WasmColorEntry;
+typedef struct X11WasmPassiveButtonGrab X11WasmPassiveButtonGrab;
+typedef struct X11WasmPassiveKeyGrab X11WasmPassiveKeyGrab;
 
 typedef struct X11WasmResource {
     XID id;
@@ -111,11 +113,15 @@ typedef struct X11WasmDisplayState {
     int pointerGrabPointerMode;
     int pointerGrabKeyboardMode;
     Time pointerGrabTime;
+    int pointerGrabPassive;
     Window keyboardGrabWindow;
     int keyboardGrabOwnerEvents;
     int keyboardGrabPointerMode;
     int keyboardGrabKeyboardMode;
     Time keyboardGrabTime;
+    int keyboardGrabPassive;
+    X11WasmPassiveButtonGrab *passiveButtonGrabs;
+    X11WasmPassiveKeyGrab *passiveKeyGrabs;
     int serverGrabDepth;
     int synchronize;
     XAfterFunction afterFunction;

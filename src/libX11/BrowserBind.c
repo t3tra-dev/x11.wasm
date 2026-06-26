@@ -198,6 +198,7 @@ X11WasmQueuePointerEvent(
     Window target;
     int rootX = x;
     int rootY = y;
+    int queued;
 
     if ((type != ButtonPress) && (type != ButtonRelease)
 	    && (type != MotionNotify)) {
@@ -206,6 +207,12 @@ X11WasmQueuePointerEvent(
     BrowserClampPointerToGrabConfine(&rootX, &rootY);
     x = rootX;
     y = rootY;
+    if (type == ButtonPress) {
+	Window passiveWindow = BrowserHitTestRoot(rootX, rootY, NULL, NULL);
+
+	(void)BrowserActivatePassiveButtonGrab(passiveWindow, button, state,
+		(Time)time);
+    }
     target = BrowserResolvePointerEventWindow((Window)window, &x, &y);
     BrowserUpdatePointerState(target, rootX, rootY, state);
 
@@ -239,13 +246,22 @@ X11WasmQueuePointerEvent(
 	BrowserSyncPointerState();
     }
     if (!BrowserPointerGrabAllowsEvent(&event)) {
+	if (type == ButtonRelease) {
+	    BrowserReleasePassivePointerGrabIfIdle(
+		    state & ~BrowserPointerButtonMask(button));
+	}
 	return 0;
     }
     if (type == ButtonPress) {
 	browserDisplay.pointerCaptureWindow = target;
 	BrowserSyncPointerState();
     }
-    return BrowserQueueEvent(&event);
+    queued = BrowserQueueEvent(&event);
+    if (type == ButtonRelease) {
+	BrowserReleasePassivePointerGrabIfIdle(
+		state & ~BrowserPointerButtonMask(button));
+    }
+    return queued;
 }
 
 EMSCRIPTEN_KEEPALIVE int
@@ -575,35 +591,38 @@ X11WasmDeleteResource(
 		browserDisplay.pointerCaptureWindow = None;
 		pointerStateChanged = 1;
 	    }
-	    if (pointerStateChanged) {
-		BrowserSyncPointerState();
-	    }
-	    if (browserDisplay.pointerGrabWindow == (Window)id) {
-		browserDisplay.pointerGrabWindow = None;
-		browserDisplay.pointerGrabConfineWindow = None;
-		browserDisplay.pointerGrabOwnerEvents = 0;
-		browserDisplay.pointerGrabEventMask = 0;
-		pointerGrabCursorToRelease = browserDisplay.pointerGrabCursor;
-		browserDisplay.pointerGrabCursor = None;
-		browserDisplay.pointerGrabPointerMode = GrabModeAsync;
-		browserDisplay.pointerGrabKeyboardMode = GrabModeAsync;
-		BrowserSyncPointerGrabCursor();
-		BrowserSyncPointerGrabState();
-	    } else if (browserDisplay.pointerGrabConfineWindow == (Window)id) {
-		browserDisplay.pointerGrabConfineWindow = None;
-		BrowserSyncPointerGrabState();
-	    }
-	    if (browserDisplay.keyboardGrabWindow == (Window)id) {
-		browserDisplay.keyboardGrabWindow = None;
-		browserDisplay.keyboardGrabOwnerEvents = 0;
-		browserDisplay.keyboardGrabPointerMode = GrabModeAsync;
-		browserDisplay.keyboardGrabKeyboardMode = GrabModeAsync;
-		BrowserSyncKeyboardGrabState();
-	    }
-	    if (resourcePtr->type == X11_WASM_RESOURCE_WINDOW) {
-		windowCursorToRelease = resourcePtr->atts.cursor;
-		resourcePtr->atts.cursor = None;
-	    }
+		    if (pointerStateChanged) {
+			BrowserSyncPointerState();
+		    }
+		    if (browserDisplay.pointerGrabWindow == (Window)id) {
+			browserDisplay.pointerGrabWindow = None;
+			browserDisplay.pointerGrabConfineWindow = None;
+			browserDisplay.pointerGrabOwnerEvents = 0;
+			browserDisplay.pointerGrabEventMask = 0;
+			pointerGrabCursorToRelease = browserDisplay.pointerGrabCursor;
+			browserDisplay.pointerGrabCursor = None;
+			browserDisplay.pointerGrabPointerMode = GrabModeAsync;
+			browserDisplay.pointerGrabKeyboardMode = GrabModeAsync;
+			browserDisplay.pointerGrabPassive = 0;
+			BrowserSyncPointerGrabCursor();
+			BrowserSyncPointerGrabState();
+		    } else if (browserDisplay.pointerGrabConfineWindow == (Window)id) {
+			browserDisplay.pointerGrabConfineWindow = None;
+			BrowserSyncPointerGrabState();
+		    }
+		    if (browserDisplay.keyboardGrabWindow == (Window)id) {
+			browserDisplay.keyboardGrabWindow = None;
+			browserDisplay.keyboardGrabOwnerEvents = 0;
+			browserDisplay.keyboardGrabPointerMode = GrabModeAsync;
+			browserDisplay.keyboardGrabKeyboardMode = GrabModeAsync;
+			browserDisplay.keyboardGrabPassive = 0;
+			BrowserSyncKeyboardGrabState();
+		    }
+		    BrowserDeletePassiveGrabsForWindow((Window)id);
+		    if (resourcePtr->type == X11_WASM_RESOURCE_WINDOW) {
+			windowCursorToRelease = resourcePtr->atts.cursor;
+			resourcePtr->atts.cursor = None;
+		    }
 	    BrowserDeleteSelectionOwnersForWindow((Window)id);
 	    BrowserFreePixmapBacking(resourcePtr);
 	    if (resourcePtr->bitmapData != NULL) {

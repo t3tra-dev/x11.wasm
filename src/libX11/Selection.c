@@ -1504,6 +1504,7 @@ BrowserQueueKeyEventFields(
     int rootY = y;
     unsigned int resolvedKeycode;
     KeySym resolvedKeySym = (KeySym)keySym;
+    int queued;
 
     BrowserInitDisplay();
     if ((type != KeyPress) && (type != KeyRelease)) {
@@ -1511,6 +1512,11 @@ BrowserQueueKeyEventFields(
     }
     resolvedKeycode = BrowserNormalizeKeycode(keycode, resolvedKeySym);
     target = BrowserResolveKeyEventWindow((Window)window);
+    if (type == KeyPress) {
+	(void)BrowserActivatePassiveKeyGrab(target, resolvedKeycode, state,
+		(Time)time);
+	target = BrowserResolveKeyEventWindow((Window)window);
+    }
     BrowserWindowCoordinatesFromRoot(target, rootX, rootY, &x, &y);
 
     BrowserSetCommonEventFields(&event, type, target, (Time)time);
@@ -1528,5 +1534,9 @@ BrowserQueueKeyEventFields(
     event.xkey.keycode = resolvedKeycode;
     event.xkey.same_screen = True;
     BrowserUpdateKeymapState(resolvedKeycode, type == KeyPress);
-    return BrowserQueueEvent(&event);
+    queued = BrowserQueueEvent(&event);
+    if (type == KeyRelease) {
+	BrowserReleasePassiveKeyboardGrabIfIdle();
+    }
+    return queued;
 }
