@@ -9355,6 +9355,99 @@ BrowserTestXrmResourceEquals(
 	    && (value.size == ((unsigned int)strlen(expectedValue) + 1U));
 }
 
+typedef struct BrowserTestXrmEnumerateState {
+    int count;
+    int invalid;
+    int sawGlobalGeometry;
+    int sawWildcardGeometry;
+    int sawGeometry;
+    int sawForeground;
+    int sawBackground;
+    int sawEmpty;
+    int stopOnGeometry;
+    int stopped;
+} BrowserTestXrmEnumerateState;
+
+static int
+BrowserTestXrmValueEquals(
+    XrmRepresentation *type,
+    XrmValue *value,
+    const char *expectedValue)
+{
+    return (type != NULL) && (*type == XrmStringToRepresentation("String"))
+	    && (value != NULL) && (value->addr != NULL)
+	    && (strcmp((const char *)value->addr, expectedValue) == 0)
+	    && (value->size == ((unsigned int)strlen(expectedValue) + 1U));
+}
+
+static Bool
+BrowserTestXrmEnumerateProc(
+    XrmDatabase *databasePtr,
+    XrmBindingList bindings,
+    XrmQuarkList quarks,
+    XrmRepresentation *type,
+    XrmValue *value,
+    XPointer closure)
+{
+    BrowserTestXrmEnumerateState *statePtr =
+	    (BrowserTestXrmEnumerateState *)closure;
+    const char *first = (quarks != NULL) ? XrmQuarkToString(quarks[0]) : NULL;
+    const char *second = ((quarks != NULL) && (quarks[0] != NULLQUARK))
+	    ? XrmQuarkToString(quarks[1]) : NULL;
+
+    if ((statePtr == NULL) || (databasePtr == NULL) || (*databasePtr == NULL)
+	    || (bindings == NULL) || (quarks == NULL)
+	    || (first == NULL)) {
+	return False;
+    }
+    statePtr->count++;
+    if ((strcmp(first, "geometry") == 0) && (second == NULL)
+	    && (bindings[0] == XrmBindLoosely)
+	    && BrowserTestXrmValueEquals(type, value, "global-geometry")) {
+	statePtr->sawGlobalGeometry = 1;
+    } else if ((strcmp(first, "wish") == 0)
+	    && (second != NULL) && (strcmp(second, "geometry") == 0)
+	    && (quarks[2] == NULLQUARK)
+	    && (bindings[0] == XrmBindTightly)
+	    && (bindings[1] == XrmBindLoosely)
+	    && BrowserTestXrmValueEquals(type, value,
+		    "wildcard-geometry")) {
+	statePtr->sawWildcardGeometry = 1;
+    } else if ((strcmp(first, "wish") == 0)
+	    && (second != NULL) && (strcmp(second, "geometry") == 0)
+	    && (quarks[2] == NULLQUARK)
+	    && (bindings[0] == XrmBindTightly)
+	    && (bindings[1] == XrmBindTightly)
+	    && BrowserTestXrmValueEquals(type, value, "last-geometry")) {
+	statePtr->sawGeometry = 1;
+	if (statePtr->stopOnGeometry) {
+	    statePtr->stopped = 1;
+	    return True;
+	}
+    } else if ((strcmp(first, "wish") == 0)
+	    && (second != NULL) && (strcmp(second, "foreground") == 0)
+	    && (quarks[2] == NULLQUARK)
+	    && (bindings[0] == XrmBindTightly)
+	    && (bindings[1] == XrmBindLoosely)
+	    && BrowserTestXrmValueEquals(type, value,
+		    "wildcard-foreground")) {
+	statePtr->sawForeground = 1;
+    } else if ((strcmp(first, "Background") == 0) && (second == NULL)
+	    && (bindings[0] == XrmBindLoosely)
+	    && BrowserTestXrmValueEquals(type, value,
+		    "class-background")) {
+	statePtr->sawBackground = 1;
+    } else if ((strcmp(first, "wish") == 0)
+	    && (second != NULL) && (strcmp(second, "empty") == 0)
+	    && (quarks[2] == NULLQUARK)
+	    && BrowserTestXrmValueEquals(type, value, "")) {
+	statePtr->sawEmpty = 1;
+    } else {
+	statePtr->invalid = 1;
+    }
+    return False;
+}
+
 static int
 BrowserTestXrmDatabaseApis(void)
 {
@@ -9390,6 +9483,8 @@ BrowserTestXrmDatabaseApis(void)
     XrmQuark qQuarks[8];
     XrmName qNames[8];
     XrmClass qClasses[8];
+    XrmName emptyNames[1];
+    XrmClass emptyClasses[1];
     XrmHashTable searchList[8];
     XrmHashTable shortSearchList[1];
     XrmHashTable emptySearchList[2];
@@ -9412,9 +9507,15 @@ BrowserTestXrmDatabaseApis(void)
 	"-skip", "skip-value", "-skipn", "n1", "n2", "left",
 	"-skipline", "tail1", "tail2", NULL
     };
+    BrowserTestXrmEnumerateState enumAllState = { 0 };
+    BrowserTestXrmEnumerateState enumPrefixState = { 0 };
+    BrowserTestXrmEnumerateState enumOneLevelState = { 0 };
+    BrowserTestXrmEnumerateState enumStopState = { 0 };
     int parseArgc = 17;
     int result = 0;
 
+    emptyNames[0] = NULLQUARK;
+    emptyClasses[0] = NULLQUARK;
     (void)remove(xrmFilePath);
     (void)remove(xrmOutputPath);
     (void)remove(xrmMissingPath);
@@ -9526,6 +9627,56 @@ BrowserTestXrmDatabaseApis(void)
 	    &qType, &readValue) != False)
 	    || (qType != NULLQUARK) || (readValue.size != 0U)
 	    || (readValue.addr != NULL)) {
+	goto cleanup;
+    }
+    if ((XrmEnumerateDatabase(NULL, emptyNames, emptyClasses,
+	    XrmEnumAllLevels, BrowserTestXrmEnumerateProc,
+	    (XPointer)&enumAllState) != False)
+	    || (XrmEnumerateDatabase(database, emptyNames, emptyClasses,
+		    XrmEnumAllLevels, NULL, NULL) != False)) {
+	goto cleanup;
+    }
+    if ((XrmEnumerateDatabase(database, emptyNames, emptyClasses,
+	    XrmEnumAllLevels, BrowserTestXrmEnumerateProc,
+	    (XPointer)&enumAllState) != False)
+	    || (enumAllState.invalid != 0) || (enumAllState.count != 6)
+	    || !enumAllState.sawGlobalGeometry
+	    || !enumAllState.sawWildcardGeometry
+	    || !enumAllState.sawGeometry
+	    || !enumAllState.sawForeground
+	    || !enumAllState.sawBackground
+	    || !enumAllState.sawEmpty) {
+	goto cleanup;
+    }
+    XrmStringToNameList("wish", qNames);
+    XrmStringToClassList("Wish", qClasses);
+    if ((XrmEnumerateDatabase(database, qNames, qClasses,
+	    XrmEnumAllLevels, BrowserTestXrmEnumerateProc,
+	    (XPointer)&enumPrefixState) != False)
+	    || (enumPrefixState.invalid != 0)
+	    || !enumPrefixState.sawWildcardGeometry
+	    || !enumPrefixState.sawGeometry
+	    || !enumPrefixState.sawForeground
+	    || !enumPrefixState.sawEmpty) {
+	goto cleanup;
+    }
+    if ((XrmEnumerateDatabase(database, emptyNames, emptyClasses,
+	    XrmEnumOneLevel, BrowserTestXrmEnumerateProc,
+	    (XPointer)&enumOneLevelState) != False)
+	    || (enumOneLevelState.invalid != 0)
+	    || !enumOneLevelState.sawGlobalGeometry
+	    || !enumOneLevelState.sawBackground
+	    || enumOneLevelState.sawGeometry
+	    || enumOneLevelState.sawForeground
+	    || enumOneLevelState.sawEmpty) {
+	goto cleanup;
+    }
+    enumStopState.stopOnGeometry = 1;
+    if ((XrmEnumerateDatabase(database, emptyNames, emptyClasses,
+	    XrmEnumAllLevels, BrowserTestXrmEnumerateProc,
+	    (XPointer)&enumStopState) != True)
+	    || !enumStopState.stopped || !enumStopState.sawGeometry
+	    || (enumStopState.invalid != 0)) {
 	goto cleanup;
     }
     XrmPutStringResource(&putDatabase, "wish.geometry", "put-geometry");

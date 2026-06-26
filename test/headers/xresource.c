@@ -36,6 +36,10 @@ X11WasmHeaderXresourcePrototypeTest(void)
 	    XrmSearchList, int) = XrmQGetSearchList;
     Bool (*qGetSearchResource)(XrmSearchList, XrmName, XrmClass,
 	    XrmRepresentation *, XrmValue *) = XrmQGetSearchResource;
+    Bool (*enumerateDatabase)(XrmDatabase, XrmNameList, XrmClassList,
+	    int, Bool (*)(XrmDatabase *, XrmBindingList, XrmQuarkList,
+		    XrmRepresentation *, XrmValue *, XPointer), XPointer) =
+	    XrmEnumerateDatabase;
     void (*destroyDatabase)(XrmDatabase) = XrmDestroyDatabase;
     void (*mergeDatabases)(XrmDatabase, XrmDatabase *) = XrmMergeDatabases;
     void (*combineDatabase)(XrmDatabase, XrmDatabase *, Bool) =
@@ -68,6 +72,7 @@ X11WasmHeaderXresourcePrototypeTest(void)
 	    && (qPutResource != 0) && (qPutStringResource != 0)
 	    && (qGetResource != 0)
 	    && (qGetSearchList != 0) && (qGetSearchResource != 0)
+	    && (enumerateDatabase != 0)
 	    && (stringToQuarkList != 0) && (stringToBindingQuarkList != 0)
 	    && (parseCommand != 0)
 	    && (destroyDatabase != 0) && (database == NULL)
@@ -76,6 +81,7 @@ X11WasmHeaderXresourcePrototypeTest(void)
 	    && (XrmClassToString(class) != NULLSTRING)
 	    && (XrmRepresentationToString(representation) != NULLSTRING)
 	    && (bindings[0] = XrmBindTightly) == XrmBindTightly
+	    && (XrmEnumAllLevels == 0) && (XrmEnumOneLevel == 1)
 	    && (option.argKind = XrmoptionNoArg) == XrmoptionNoArg
 	    && (searchList[0] = NULL) == NULL
 	    && (quarks[0] = NULLQUARK) == NULLQUARK

@@ -67,6 +67,9 @@ typedef struct {
     XPointer value;
 } XrmOptionDescRec, *XrmOptionDescList;
 
+#define XrmEnumAllLevels 0
+#define XrmEnumOneLevel 1
+
 extern void XrmStringToQuarkList(
     _Xconst char *string,
     XrmQuarkList quarks_return);
@@ -139,6 +142,14 @@ extern Bool XrmQGetSearchResource(
     XrmClass class,
     XrmRepresentation *type_return,
     XrmValue *value_return);
+extern Bool XrmEnumerateDatabase(
+    XrmDatabase database,
+    XrmNameList name_prefix,
+    XrmClassList class_prefix,
+    int mode,
+    Bool (*proc)(XrmDatabase *, XrmBindingList, XrmQuarkList,
+	    XrmRepresentation *, XrmValue *, XPointer),
+    XPointer closure);
 extern void XrmDestroyDatabase(
     XrmDatabase database);
 extern void XrmMergeDatabases(

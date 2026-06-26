@@ -35,6 +35,14 @@ typedef struct BrowserXrmBindingPart {
     char separator;
 } BrowserXrmBindingPart;
 
+typedef Bool (*BrowserXrmEnumerator)(
+    XrmDatabase *database,
+    XrmBindingList bindings,
+    XrmQuarkList quarks,
+    XrmRepresentation *type,
+    XrmValue *value,
+    XPointer closure);
+
 Display *
 XOpenDisplay(
     _Xconst char *displayName)
@@ -626,6 +634,137 @@ BrowserXrmRangeEquals(
 
     return (firstLength == secondLength)
 	    && (strncmp(firstStart, secondStart, firstLength) == 0);
+}
+
+static int
+BrowserXrmQuarkListLength(
+    XrmQuarkList quarks)
+{
+    int count = 0;
+
+    if (quarks == NULL) {
+	return 0;
+    }
+    while (quarks[count] != NULLQUARK) {
+	count++;
+    }
+    return count;
+}
+
+static int
+BrowserXrmPartMatchesQuark(
+    const BrowserXrmBindingPart *partPtr,
+    XrmQuark quark)
+{
+    const char *string;
+
+    if ((partPtr == NULL) || (quark == NULLQUARK)) {
+	return 0;
+    }
+    string = XrmQuarkToString(quark);
+    return (string != NULL)
+	    && BrowserXrmRangeEquals(partPtr->start, partPtr->end,
+		    string, string + strlen(string));
+}
+
+static int
+BrowserXrmPartMatchesQuarkPair(
+    const BrowserXrmBindingPart *partPtr,
+    XrmNameList names,
+    int nameCount,
+    XrmClassList classes,
+    int classCount,
+    int index)
+{
+    return ((index < nameCount)
+	    && BrowserXrmPartMatchesQuark(partPtr, names[index]))
+	    || ((index < classCount)
+		    && BrowserXrmPartMatchesQuark(partPtr, classes[index]));
+}
+
+static int
+BrowserXrmEntryMatchesEnumerationPrefix(
+    const BrowserXrmBindingPart *parts,
+    int partCount,
+    XrmNameList names,
+    int nameCount,
+    XrmClassList classes,
+    int classCount,
+    int *matchedPartsPtr)
+{
+    int partIndex = 0;
+    int prefixIndex = 0;
+    int prefixCount = (nameCount > classCount) ? nameCount : classCount;
+
+    if (matchedPartsPtr != NULL) {
+	*matchedPartsPtr = 0;
+    }
+    if (prefixCount == 0) {
+	return 1;
+    }
+    while (prefixIndex < prefixCount) {
+	if (partIndex >= partCount) {
+	    return 0;
+	}
+	if (BrowserXrmPartMatchesQuarkPair(&parts[partIndex], names,
+		nameCount, classes, classCount, prefixIndex)) {
+	    partIndex++;
+	    prefixIndex++;
+	    continue;
+	}
+	if (parts[partIndex].separator == '*') {
+	    prefixIndex++;
+	    continue;
+	}
+	return 0;
+    }
+    if (matchedPartsPtr != NULL) {
+	*matchedPartsPtr = partIndex;
+    }
+    return 1;
+}
+
+static Bool
+BrowserXrmEnumerateEntry(
+    XrmDatabase database,
+    BrowserXrmEntry *entryPtr,
+    const BrowserXrmBindingPart *parts,
+    int partCount,
+    BrowserXrmEnumerator proc,
+    XPointer closure)
+{
+    XrmBinding *bindings;
+    XrmQuark *quarks;
+    XrmRepresentation type;
+    XrmValue value;
+    Bool result;
+    int index;
+
+    if ((parts == NULL) || (partCount <= 0)) {
+	return False;
+    }
+    bindings = (XrmBinding *)ckalloc(sizeof(*bindings)
+	    * (size_t)(partCount + 1));
+    quarks = (XrmQuark *)ckalloc(sizeof(*quarks)
+	    * (size_t)(partCount + 1));
+    for (index = 0; index < partCount; index++) {
+	char *part = BrowserDupRange(parts[index].start, parts[index].end);
+
+	bindings[index] = (parts[index].separator == '*')
+		? XrmBindLoosely : XrmBindTightly;
+	quarks[index] = XrmStringToQuark(part);
+	ckfree(part);
+    }
+    bindings[partCount] = XrmBindTightly;
+    quarks[partCount] = NULLQUARK;
+    type = (entryPtr->type != NULL)
+	    ? XrmStringToRepresentation(entryPtr->type) : NULLQUARK;
+    value.size = entryPtr->valueSize;
+    value.addr = entryPtr->value;
+    result = proc(&database, bindings, quarks, &type, &value, closure);
+    ckfree(quarks);
+    ckfree(bindings);
+    return result;
 }
 
 static int
@@ -1358,6 +1497,56 @@ cleanup:
 	ckfree(resourceClass);
     }
     return result;
+}
+
+Bool
+XrmEnumerateDatabase(
+    XrmDatabase database,
+    XrmNameList names,
+    XrmClassList classes,
+    int mode,
+    Bool (*proc)(XrmDatabase *, XrmBindingList, XrmQuarkList,
+	    XrmRepresentation *, XrmValue *, XPointer),
+    XPointer closure)
+{
+    BrowserXrmEntry *entryPtr;
+    int nameCount;
+    int classCount;
+
+    if ((database == NULL) || (proc == NULL)) {
+	return False;
+    }
+    nameCount = BrowserXrmQuarkListLength(names);
+    classCount = BrowserXrmQuarkListLength(classes);
+    for (entryPtr = database->firstEntryPtr; entryPtr != NULL;
+	    entryPtr = entryPtr->nextPtr) {
+	BrowserXrmBindingPart *parts;
+	int partCount = 0;
+	int matchedParts = 0;
+	int matches;
+
+	parts = BrowserXrmSplitBinding(entryPtr->binding, &partCount, NULL,
+		NULL);
+	matches = (parts != NULL)
+		&& BrowserXrmEntryMatchesEnumerationPrefix(parts, partCount,
+			names, nameCount, classes, classCount, &matchedParts)
+		&& ((mode == XrmEnumAllLevels)
+			|| ((partCount - matchedParts) <= 1));
+	if (matches) {
+	    Bool stop = BrowserXrmEnumerateEntry(database, entryPtr, parts,
+		    partCount, (BrowserXrmEnumerator)proc, closure);
+
+	    if (parts != NULL) {
+		ckfree(parts);
+	    }
+	    if (stop) {
+		return True;
+	    }
+	} else if (parts != NULL) {
+	    ckfree(parts);
+	}
+    }
+    return False;
 }
 
 void
