@@ -2654,23 +2654,35 @@ EMSCRIPTEN_KEEPALIVE int
 X11WasmTestPropertyNotifyEvents(void)
 {
     static const unsigned char value[] = {'p', 'r', 'o', 'p'};
+    static const unsigned char rotateValues[] = {'0', '1', '2'};
+    static const unsigned char rotatedValues[] = {'2', '0', '1'};
     Display *display;
     Window window = None;
     Atom property;
+    Atom rotateProperties[3];
     Atom actualType = None;
     int actualFormat = 0;
     unsigned long nitems = 0;
     unsigned long bytesAfter = 0;
     unsigned char *data = NULL;
     XEvent event;
+    int i;
     int result = 0;
 
     BrowserInitDisplay();
     display = &browserDisplay.display;
     property = XInternAtom(display, "_X11_WASM_PROPERTY_NOTIFY_TEST", False);
+    rotateProperties[0] = XInternAtom(display,
+	    "_X11_WASM_PROPERTY_NOTIFY_ROTATE_A", False);
+    rotateProperties[1] = XInternAtom(display,
+	    "_X11_WASM_PROPERTY_NOTIFY_ROTATE_B", False);
+    rotateProperties[2] = XInternAtom(display,
+	    "_X11_WASM_PROPERTY_NOTIFY_ROTATE_C", False);
     window = XCreateSimpleWindow(display, browserDisplay.rootWindow, 0, 0,
 	    4, 4, 0, 0, 0);
-    if ((property == None) || (window == None)) {
+    if ((property == None) || (rotateProperties[0] == None)
+	    || (rotateProperties[1] == None) || (rotateProperties[2] == None)
+	    || (window == None)) {
 	goto cleanup;
     }
     BrowserClearEventQueue();
@@ -2724,6 +2736,49 @@ X11WasmTestPropertyNotifyEvents(void)
 	    || (event.xproperty.atom != property)
 	    || (event.xproperty.state != PropertyDelete)
 	    || (XDeleteProperty(display, window, property) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+
+    for (i = 0; i < 3; i++) {
+	if (XChangeProperty(display, window, rotateProperties[i], XA_STRING,
+		8, PropModeReplace, rotateValues + i, 1) != Success) {
+	    goto cleanup;
+	}
+    }
+    BrowserClearEventQueue();
+    if ((XRotateWindowProperties(display, window, rotateProperties, 3, 1)
+		    != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 3)) {
+	goto cleanup;
+    }
+    for (i = 0; i < 3; i++) {
+	if ((XNextEvent(display, &event) != Success)
+		|| (event.type != PropertyNotify)
+		|| (event.xproperty.window != window)
+		|| (event.xproperty.atom != rotateProperties[i])
+		|| (event.xproperty.state != PropertyNewValue)) {
+	    goto cleanup;
+	}
+    }
+    if (XEventsQueued(display, QueuedAlready) != 0) {
+	goto cleanup;
+    }
+    for (i = 0; i < 3; i++) {
+	if ((XGetWindowProperty(display, window, rotateProperties[i], 0, 1,
+			False, AnyPropertyType, &actualType, &actualFormat,
+			&nitems, &bytesAfter, &data) != Success)
+		|| (actualType != XA_STRING) || (actualFormat != 8)
+		|| (nitems != 1) || (bytesAfter != 0)
+		|| (data == NULL) || (data[0] != rotatedValues[i])
+		|| (data[1] != '\0')) {
+	    goto cleanup;
+	}
+	XFree(data);
+	data = NULL;
+    }
+    if ((XRotateWindowProperties(display, window, rotateProperties, 3, 3)
+		    != Success)
 	    || (XEventsQueued(display, QueuedAlready) != 0)) {
 	goto cleanup;
     }
