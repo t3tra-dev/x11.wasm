@@ -604,6 +604,161 @@ test("_NET_WM_WINDOW_TYPE updates browser window type metadata", async ({
   });
 });
 
+test("_NET_WM_STATE client messages update browser window state metadata", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+  const windowId = await createMappedWindow(page);
+
+  const metadata = await page.evaluate((windowId) => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestSendNetWmStateMessage?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    const resource = backend?.resources.get(windowId);
+    const element = resource?.element;
+    if (
+      !module?._X11WasmTestSendNetWmStateMessage ||
+      !backend ||
+      !resource ||
+      !(element instanceof HTMLElement)
+    ) {
+      throw new Error("missing EWMH state metadata test hooks");
+    }
+
+    const states = {
+      above: 1,
+      maximizedVert: 2,
+      maximizedHorz: 3,
+      fullscreen: 4,
+    };
+    const actions = {
+      remove: 0,
+      add: 1,
+      toggle: 2,
+    };
+    const snapshot = () => ({
+      attrFullscreen: element.getAttribute("data-x11-wasm-fullscreen"),
+      attrTopmost: element.getAttribute("data-x11-wasm-topmost"),
+      attrZoomed: element.getAttribute("data-x11-wasm-zoomed"),
+      fullscreen: !!resource.fullscreen,
+      topmost: !!resource.topmost,
+      zoomed: !!resource.zoomed,
+    });
+
+    const initial = snapshot();
+    const addZoomResult = module._X11WasmTestSendNetWmStateMessage(
+      windowId,
+      actions.add,
+      states.maximizedVert,
+      states.maximizedHorz,
+    );
+    backend.flush?.();
+    const afterAddZoom = snapshot();
+    const addTopFullscreenResult = module._X11WasmTestSendNetWmStateMessage(
+      windowId,
+      actions.add,
+      states.above,
+      states.fullscreen,
+    );
+    backend.flush?.();
+    const afterAddTopFullscreen = snapshot();
+    const toggleTopResult = module._X11WasmTestSendNetWmStateMessage(
+      windowId,
+      actions.toggle,
+      states.above,
+      0,
+    );
+    backend.flush?.();
+    const afterToggleTop = snapshot();
+    const removeZoomResult = module._X11WasmTestSendNetWmStateMessage(
+      windowId,
+      actions.remove,
+      states.maximizedVert,
+      states.maximizedHorz,
+    );
+    backend.flush?.();
+    const afterRemoveZoom = snapshot();
+    const removeFullscreenResult = module._X11WasmTestSendNetWmStateMessage(
+      windowId,
+      actions.remove,
+      states.fullscreen,
+      0,
+    );
+    backend.flush?.();
+    const afterRemoveFullscreen = snapshot();
+
+    return {
+      addTopFullscreenResult,
+      addZoomResult,
+      afterAddTopFullscreen,
+      afterAddZoom,
+      afterRemoveFullscreen,
+      afterRemoveZoom,
+      afterToggleTop,
+      initial,
+      removeFullscreenResult,
+      removeZoomResult,
+      toggleTopResult,
+    };
+  }, windowId);
+
+  expect(metadata.addZoomResult).toBe(1);
+  expect(metadata.addTopFullscreenResult).toBe(1);
+  expect(metadata.toggleTopResult).toBe(1);
+  expect(metadata.removeZoomResult).toBe(1);
+  expect(metadata.removeFullscreenResult).toBe(1);
+  expect(metadata.initial).toEqual({
+    attrFullscreen: null,
+    attrTopmost: null,
+    attrZoomed: null,
+    fullscreen: false,
+    topmost: false,
+    zoomed: false,
+  });
+  expect(metadata.afterAddZoom).toEqual({
+    attrFullscreen: null,
+    attrTopmost: null,
+    attrZoomed: "1",
+    fullscreen: false,
+    topmost: false,
+    zoomed: true,
+  });
+  expect(metadata.afterAddTopFullscreen).toEqual({
+    attrFullscreen: "1",
+    attrTopmost: "1",
+    attrZoomed: "1",
+    fullscreen: true,
+    topmost: true,
+    zoomed: true,
+  });
+  expect(metadata.afterToggleTop).toEqual({
+    attrFullscreen: "1",
+    attrTopmost: null,
+    attrZoomed: "1",
+    fullscreen: true,
+    topmost: false,
+    zoomed: true,
+  });
+  expect(metadata.afterRemoveZoom).toEqual({
+    attrFullscreen: "1",
+    attrTopmost: null,
+    attrZoomed: null,
+    fullscreen: true,
+    topmost: false,
+    zoomed: false,
+  });
+  expect(metadata.afterRemoveFullscreen).toEqual({
+    attrFullscreen: null,
+    attrTopmost: null,
+    attrZoomed: null,
+    fullscreen: false,
+    topmost: false,
+    zoomed: false,
+  });
+});
+
 test("metadata target properties forward ICCCM metadata to another window", async ({
   page,
 }) => {

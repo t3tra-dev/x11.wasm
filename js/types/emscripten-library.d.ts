@@ -32,6 +32,7 @@ interface X11WasmResource {
   wmClassName?: string;
   wmClass?: string;
   fullscreen?: boolean;
+  topmost?: boolean;
   zoomed?: boolean;
   wmState?: "" | "normal" | "iconic" | "withdrawn";
   wmHints?: X11WasmWmHints | null;
@@ -464,6 +465,12 @@ declare const Module: {
     window: number,
     target: number,
     isRootToplevel: number,
+  ) => number;
+  _X11WasmTestSendNetWmStateMessage?: (
+    window: number,
+    action: number,
+    firstState: number,
+    secondState: number,
   ) => number;
   _X11WasmTestMapWindowWithInitialState?: (initialState: number) => number;
   _XGrabPointer?: (

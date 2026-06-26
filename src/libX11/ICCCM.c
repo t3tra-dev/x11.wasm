@@ -688,6 +688,65 @@ X11WasmTestSetWindowTypeProperties(unsigned int window, int mode)
     }
 }
 
+static Atom
+BrowserTestNetWmStateAtom(int state)
+{
+    const char *name = NULL;
+
+    switch (state) {
+    case 1:
+	name = "_NET_WM_STATE_ABOVE";
+	break;
+    case 2:
+	name = "_NET_WM_STATE_MAXIMIZED_VERT";
+	break;
+    case 3:
+	name = "_NET_WM_STATE_MAXIMIZED_HORZ";
+	break;
+    case 4:
+	name = "_NET_WM_STATE_FULLSCREEN";
+	break;
+    default:
+	return None;
+    }
+    return XInternAtom(&browserDisplay.display, name, False);
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestSendNetWmStateMessage(
+    unsigned int window,
+    int action,
+    int firstState,
+    int secondState)
+{
+    XEvent event;
+    Atom firstAtom;
+    Atom secondAtom;
+    Window xid = (Window)window;
+
+    BrowserInitDisplay();
+    if ((action < 0) || (action > 2) || (BrowserWindowResource(xid) == NULL)) {
+	return 0;
+    }
+    firstAtom = BrowserTestNetWmStateAtom(firstState);
+    secondAtom = BrowserTestNetWmStateAtom(secondState);
+    if ((firstAtom == None) && (secondAtom == None)) {
+	return 0;
+    }
+
+    memset(&event, 0, sizeof(event));
+    event.xclient.type = ClientMessage;
+    event.xclient.display = &browserDisplay.display;
+    event.xclient.window = xid;
+    event.xclient.message_type = BrowserNetWmStateAtom();
+    event.xclient.format = 32;
+    event.xclient.data.l[0] = action;
+    event.xclient.data.l[1] = (long)firstAtom;
+    event.xclient.data.l[2] = (long)secondAtom;
+    return XSendEvent(&browserDisplay.display, xid, False, NoEventMask,
+	    &event) == True;
+}
+
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestSetWindowMetadataTargetProperty(
     unsigned int window,
