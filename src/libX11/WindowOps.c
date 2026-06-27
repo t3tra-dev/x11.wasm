@@ -925,6 +925,49 @@ BrowserXrmParseLineIntoDatabase(
     return 1;
 }
 
+static void
+BrowserXrmParseStringIntoDatabase(
+    XrmDatabase database,
+    const char *data)
+{
+    size_t dataLength;
+    char *logicalLine;
+    char *logicalEnd;
+    const char *cursor;
+
+    if ((database == NULL) || (data == NULL)) {
+	return;
+    }
+    dataLength = strlen(data);
+    logicalLine = (char *)ckalloc(dataLength + 1U);
+    logicalEnd = logicalLine;
+    for (cursor = data; ; cursor++) {
+	char ch = *cursor;
+
+	if ((ch == '\n') || (ch == '\0')) {
+	    char *lineEnd = logicalEnd;
+
+	    if ((lineEnd > logicalLine) && (lineEnd[-1] == '\r')) {
+		lineEnd--;
+	    }
+	    if ((ch == '\n') && (lineEnd > logicalLine)
+		    && (lineEnd[-1] == '\\')) {
+		logicalEnd = lineEnd - 1;
+		continue;
+	    }
+	    (void)BrowserXrmParseLineIntoDatabase(database, logicalLine,
+		    lineEnd);
+	    logicalEnd = logicalLine;
+	    if (ch == '\0') {
+		break;
+	    }
+	    continue;
+	}
+	*logicalEnd++ = ch;
+    }
+    ckfree(logicalLine);
+}
+
 static XrmDatabase
 BrowserGetDefaultDatabase(
     Display *display)
@@ -1165,21 +1208,12 @@ XrmGetStringDatabase(
     _Xconst char *data)
 {
     XrmDatabase database;
-    const char *lineStart;
 
     if (data == NULL) {
 	return NULL;
     }
     database = BrowserXrmNewDatabase();
-    for (lineStart = data; *lineStart != '\0'; ) {
-	const char *lineEnd = lineStart;
-
-	while ((*lineEnd != '\0') && (*lineEnd != '\n')) {
-	    lineEnd++;
-	}
-	(void)BrowserXrmParseLineIntoDatabase(database, lineStart, lineEnd);
-	lineStart = (*lineEnd == '\n') ? lineEnd + 1 : lineEnd;
-    }
+    BrowserXrmParseStringIntoDatabase(database, data);
     return database;
 }
 

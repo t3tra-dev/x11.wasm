@@ -10870,6 +10870,11 @@ BrowserTestXrmDatabaseApis(void)
     const char xrmFileText[] =
 	    "wish.geometry: file-geometry\n"
 	    "wish.file: file-value\n"
+	    "wish.continued: first\\\n"
+	    " second\\\n"
+	    " third\n"
+	    "wish.crlfContinued: crlf\\\r\n"
+	    " value\r\n"
 	    "wish.escaped:\\ leading\\\\path\\nline\n";
     const char xrmFilePath[] = "x11wasm-xrm-input.txt";
     const char xrmOutputPath[] = "x11wasm-xrm-output.txt";
@@ -11235,6 +11240,10 @@ BrowserTestXrmDatabaseApis(void)
 		    "Wish.Geometry", "file-geometry")
 	    || !BrowserTestXrmResourceEquals(fileDatabase, "wish.file",
 		    "Wish.File", "file-value")
+	    || !BrowserTestXrmResourceEquals(fileDatabase, "wish.continued",
+		    "Wish.Continued", "first second third")
+	    || !BrowserTestXrmResourceEquals(fileDatabase,
+		    "wish.crlfContinued", "Wish.CrlfContinued", "crlf value")
 	    || !BrowserTestXrmResourceEquals(fileDatabase, "wish.escaped",
 		    "Wish.Escaped", " leading\\path\nline")) {
 	goto cleanup;
@@ -11323,6 +11332,8 @@ X11WasmTestResourceManagerApis(void)
 	    "wish.background: black\n"
 	    "*foreground: white\n"
 	    "standalone: bare-value\n"
+	    "wish.continued: root\\\n"
+	    " default\n"
 	    "wish.empty:\n";
     const char replacementText[] =
 	    "wish.geometry: first\n"
@@ -11388,6 +11399,10 @@ X11WasmTestResourceManagerApis(void)
     }
     defaultValue = XGetDefault(display, "wish", "empty");
     if ((defaultValue == NULL) || (strcmp(defaultValue, "") != 0)) {
+	return 0;
+    }
+    defaultValue = XGetDefault(display, "wish", "continued");
+    if ((defaultValue == NULL) || (strcmp(defaultValue, "root default") != 0)) {
 	return 0;
     }
     if ((XGetDefault(display, "other", "background") != NULL)
