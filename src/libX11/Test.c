@@ -10860,6 +10860,7 @@ BrowserTestXrmDatabaseApis(void)
     const char binaryData[] = { 'A', '\0', 'B', 'C' };
     const char resourceText[] =
 	    "! ignored comment\n"
+	    "# ignored: hash-comment\n"
 	    "*geometry: global-geometry\n"
 	    "wish*geometry: wildcard-geometry\n"
 	    "wish.geometry: exact-geometry\n"
@@ -10869,6 +10870,7 @@ BrowserTestXrmDatabaseApis(void)
 	    "wish.empty:\n";
     const char xrmFileText[] =
 	    "wish.geometry: file-geometry\n"
+	    "# file.comment: ignored\n"
 	    "wish.file: file-value\n"
 	    "wish.continued: first\\\n"
 	    " second\\\n"
@@ -10962,6 +10964,10 @@ BrowserTestXrmDatabaseApis(void)
     }
     if (XrmGetResource(database, "wish.missing", "Wish.Missing",
 	    NULL, NULL) != False) {
+	goto cleanup;
+    }
+    if (XrmGetResource(database, "# ignored", "# Ignored", NULL, NULL)
+	    != False) {
 	goto cleanup;
     }
     permanentAllocation = Xpermalloc(4);
@@ -11246,6 +11252,10 @@ BrowserTestXrmDatabaseApis(void)
 		    "wish.crlfContinued", "Wish.CrlfContinued", "crlf value")
 	    || !BrowserTestXrmResourceEquals(fileDatabase, "wish.escaped",
 		    "Wish.Escaped", " leading\\path\nline")) {
+	goto cleanup;
+    }
+    if (XrmGetResource(fileDatabase, "# file.comment", "# File.Comment",
+	    NULL, NULL) != False) {
 	goto cleanup;
     }
     if ((XrmCombineFileDatabase(xrmMissingPath, &putDatabase, True) != 0)

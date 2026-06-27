@@ -906,7 +906,8 @@ BrowserXrmParseLineIntoDatabase(
     const char *valueEnd;
 
     bindingStart = BrowserSkipDefaultSpaces(lineStart, lineEnd);
-    if ((bindingStart == lineEnd) || (*bindingStart == '!')) {
+    if ((bindingStart == lineEnd) || (*bindingStart == '!')
+	    || (*bindingStart == '#')) {
 	return 0;
     }
     colon = memchr(bindingStart, ':', (size_t)(lineEnd - bindingStart));
