@@ -463,6 +463,9 @@ declare const Module: {
   ) => number;
   _X11WasmTestRotateWindowNameProperties?: (window: number) => number;
   _X11WasmTestGetWindowNamePropertiesDeletes?: (window: number) => number;
+  _X11WasmTestGetWindowMetadataPropertiesDeletes?: (
+    window: number,
+  ) => number;
   _X11WasmTestGetWindowWMHintsDeletes?: (
     window: number,
     iconWindow: number,

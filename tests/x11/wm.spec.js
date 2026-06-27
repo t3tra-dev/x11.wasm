@@ -611,6 +611,62 @@ test("XGetWindowProperty delete clears browser name metadata", async ({
   });
 });
 
+test("XGetWindowProperty delete clears browser ICCCM metadata", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+  const windowId = await createMappedWindow(page);
+
+  const metadata = await page.evaluate((windowId) => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestGetWindowMetadataPropertiesDeletes?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    const resource = backend?.resources.get(windowId);
+    const element = resource?.element;
+    if (
+      !module?._X11WasmTestGetWindowMetadataPropertiesDeletes ||
+      !backend ||
+      !resource ||
+      !(element instanceof HTMLElement)
+    ) {
+      throw new Error("missing ICCCM metadata delete test hooks");
+    }
+
+    const deleteResult =
+      module._X11WasmTestGetWindowMetadataPropertiesDeletes(windowId);
+    backend.flush?.();
+    return {
+      className: element.getAttribute("data-x11-wasm-class-name"),
+      classValue: element.getAttribute("data-x11-wasm-class"),
+      clientMachine: element.getAttribute("data-x11-wasm-client-machine"),
+      command: element.getAttribute("data-x11-wasm-command"),
+      deleteResult,
+      resourceClassName: resource.wmClassName,
+      resourceClassValue: resource.wmClass,
+      resourceClientMachine: resource.clientMachine,
+      resourceCommand: resource.command,
+      resourceTransientFor: resource.transientFor,
+      transientFor: element.getAttribute("data-x11-wasm-transient-for"),
+    };
+  }, windowId);
+
+  expect(metadata).toEqual({
+    className: null,
+    classValue: null,
+    clientMachine: null,
+    command: null,
+    deleteResult: 1,
+    resourceClassName: "",
+    resourceClassValue: "",
+    resourceClientMachine: "",
+    resourceCommand: "",
+    resourceTransientFor: 0,
+    transientFor: null,
+  });
+});
+
 test("XGetWindowProperty delete clears browser WM_HINTS metadata", async ({
   page,
 }) => {

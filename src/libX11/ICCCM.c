@@ -708,6 +708,169 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestGetWindowMetadataPropertiesDeletes(unsigned int window)
+{
+    static char *commandArgv[] = {
+	(char *)"x11wasm-test", (char *)"--delete", NULL
+    };
+    static const unsigned char expectedCommand[] =
+	    "x11wasm-test\0--delete";
+    static const unsigned char expectedClass[] =
+	    "delete-class\0X11WasmDeleteClass";
+    static const char clientMachineValue[] = "delete-client";
+    Display *display;
+    Window xid = (Window)window;
+    XClassHint classHint;
+    XClassHint fetchedClassHint;
+    XTextProperty clientMachine;
+    XTextProperty fetchedClientMachine;
+    Window fetchedTransientFor = None;
+    char **fetchedCommandArgv = NULL;
+    int fetchedCommandArgc = -1;
+    Atom actualType = None;
+    int actualFormat = 0;
+    unsigned long nitems = 0;
+    unsigned long bytesAfter = 0;
+    unsigned char *commandData = NULL;
+    unsigned char *classData = NULL;
+    unsigned char *clientMachineData = NULL;
+    unsigned char *transientForData = NULL;
+    int result = 0;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    if (BrowserWindowResource(xid) == NULL) {
+	return 0;
+    }
+
+    classHint.res_name = (char *)"delete-class";
+    classHint.res_class = (char *)"X11WasmDeleteClass";
+    memset(&fetchedClassHint, 0, sizeof(fetchedClassHint));
+    memset(&clientMachine, 0, sizeof(clientMachine));
+    memset(&fetchedClientMachine, 0, sizeof(fetchedClientMachine));
+    clientMachine.value = (unsigned char *)clientMachineValue;
+    clientMachine.encoding = XA_STRING;
+    clientMachine.format = 8;
+    clientMachine.nitems = strlen(clientMachineValue);
+
+    if ((XSetCommand(display, xid, commandArgv, 2) != Success)
+	    || (XSetClassHint(display, xid, &classHint) != Success)
+	    || (XSetTransientForHint(display, xid, browserDisplay.rootWindow)
+		    != Success)) {
+	goto cleanup;
+    }
+    XSetWMClientMachine(display, xid, &clientMachine);
+
+    if ((XGetWindowProperty(display, xid, XA_WM_COMMAND, 0,
+		    (long)(LONG_MAX / 4L), True, XA_STRING, &actualType,
+		    &actualFormat, &nitems, &bytesAfter,
+		    &commandData) != Success)
+	    || (actualType != XA_STRING)
+	    || (actualFormat != 8)
+	    || (nitems != sizeof(expectedCommand))
+	    || (bytesAfter != 0)
+	    || (commandData == NULL)
+	    || (memcmp(commandData, expectedCommand,
+		    sizeof(expectedCommand)) != 0)) {
+	goto cleanup;
+    }
+
+    actualType = None;
+    actualFormat = 0;
+    nitems = 0;
+    bytesAfter = 0;
+    if ((XGetWindowProperty(display, xid, XA_WM_CLASS, 0,
+		    (long)(LONG_MAX / 4L), True, XA_STRING, &actualType,
+		    &actualFormat, &nitems, &bytesAfter, &classData)
+		    != Success)
+	    || (actualType != XA_STRING)
+	    || (actualFormat != 8)
+	    || (nitems != sizeof(expectedClass))
+	    || (bytesAfter != 0)
+	    || (classData == NULL)
+	    || (memcmp(classData, expectedClass, sizeof(expectedClass))
+		    != 0)) {
+	goto cleanup;
+    }
+
+    actualType = None;
+    actualFormat = 0;
+    nitems = 0;
+    bytesAfter = 0;
+    if ((XGetWindowProperty(display, xid, XA_WM_CLIENT_MACHINE, 0,
+		    (long)(LONG_MAX / 4L), True, XA_STRING, &actualType,
+		    &actualFormat, &nitems, &bytesAfter,
+		    &clientMachineData) != Success)
+	    || (actualType != XA_STRING)
+	    || (actualFormat != 8)
+	    || (nitems != strlen(clientMachineValue))
+	    || (bytesAfter != 0)
+	    || (clientMachineData == NULL)
+	    || (memcmp(clientMachineData, clientMachineValue,
+		    strlen(clientMachineValue)) != 0)) {
+	goto cleanup;
+    }
+
+    actualType = None;
+    actualFormat = 0;
+    nitems = 0;
+    bytesAfter = 0;
+    if ((XGetWindowProperty(display, xid, XA_WM_TRANSIENT_FOR, 0, 1, True,
+		    XA_WINDOW, &actualType, &actualFormat, &nitems,
+		    &bytesAfter, &transientForData) != Success)
+	    || (actualType != XA_WINDOW)
+	    || (actualFormat != 32)
+	    || (nitems != 1)
+	    || (bytesAfter != 0)
+	    || (transientForData == NULL)
+	    || ((Window)BrowserPropertyAtomAt(transientForData, 0)
+		    != browserDisplay.rootWindow)) {
+	goto cleanup;
+    }
+
+    if (XGetCommand(display, xid, &fetchedCommandArgv, &fetchedCommandArgc)
+	    || (fetchedCommandArgv != NULL)
+	    || (fetchedCommandArgc != 0)
+	    || XGetClassHint(display, xid, &fetchedClassHint)
+	    || (fetchedClassHint.res_name != NULL)
+	    || (fetchedClassHint.res_class != NULL)
+	    || XGetWMClientMachine(display, xid, &fetchedClientMachine)
+	    || (fetchedClientMachine.value != NULL)
+	    || XGetTransientForHint(display, xid, &fetchedTransientFor)
+	    || (fetchedTransientFor != None)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    if (commandData != NULL) {
+	XFree(commandData);
+    }
+    if (classData != NULL) {
+	XFree(classData);
+    }
+    if (clientMachineData != NULL) {
+	XFree(clientMachineData);
+    }
+    if (transientForData != NULL) {
+	XFree(transientForData);
+    }
+    if (fetchedCommandArgv != NULL) {
+	XFreeStringList(fetchedCommandArgv);
+    }
+    if (fetchedClassHint.res_name != NULL) {
+	XFree(fetchedClassHint.res_name);
+    }
+    if (fetchedClassHint.res_class != NULL) {
+	XFree(fetchedClassHint.res_class);
+    }
+    if (fetchedClientMachine.value != NULL) {
+	XFree(fetchedClientMachine.value);
+    }
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestGetWindowWMHintsDeletes(
     unsigned int window,
     unsigned int iconWindow,
