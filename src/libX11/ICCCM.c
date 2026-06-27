@@ -782,6 +782,100 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestGetWindowNormalHintsDeletes(unsigned int window)
+{
+    Display *display;
+    Window xid = (Window)window;
+    XSizeHints hints;
+    XSizeHints fetchedHints;
+    XSizeHints remainingHints;
+    long supplied = 0;
+    long remainingSupplied = -1;
+    Atom actualType = None;
+    int actualFormat = 0;
+    unsigned long nitems = 0;
+    unsigned long bytesAfter = 0;
+    unsigned char *data = NULL;
+    int result = 0;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    if (BrowserWindowResource(xid) == NULL) {
+	return 0;
+    }
+
+    memset(&hints, 0, sizeof(hints));
+    hints.flags = PPosition | PSize | PMinSize | PMaxSize | PResizeInc
+	    | PAspect | PBaseSize | PWinGravity;
+    hints.x = 19;
+    hints.y = 23;
+    hints.width = 180;
+    hints.height = 120;
+    hints.min_width = 90;
+    hints.min_height = 60;
+    hints.max_width = 360;
+    hints.max_height = 240;
+    hints.width_inc = 6;
+    hints.height_inc = 4;
+    hints.min_aspect.x = 3;
+    hints.min_aspect.y = 2;
+    hints.max_aspect.x = 3;
+    hints.max_aspect.y = 2;
+    hints.base_width = 30;
+    hints.base_height = 20;
+    hints.win_gravity = SouthEastGravity;
+
+    XSetWMNormalHints(display, xid, &hints);
+    if ((XGetWindowProperty(display, xid, XA_WM_NORMAL_HINTS, 0,
+		    (long)(LONG_MAX / 4L), True, XA_WM_SIZE_HINTS,
+		    &actualType, &actualFormat, &nitems, &bytesAfter,
+		    &data) != Success)
+	    || (actualType != XA_WM_SIZE_HINTS)
+	    || (actualFormat != 32)
+	    || (nitems != X11_WASM_SIZE_HINTS_ELEMENTS)
+	    || (bytesAfter != 0)
+	    || !BrowserDecodeSizeHintsProperty(data, nitems, &fetchedHints,
+		    &supplied)) {
+	goto cleanup;
+    }
+    if ((supplied != X11_WASM_SIZE_HINTS_SUPPLIED)
+	    || (fetchedHints.flags != hints.flags)
+	    || (fetchedHints.x != hints.x)
+	    || (fetchedHints.y != hints.y)
+	    || (fetchedHints.width != hints.width)
+	    || (fetchedHints.height != hints.height)
+	    || (fetchedHints.min_width != hints.min_width)
+	    || (fetchedHints.min_height != hints.min_height)
+	    || (fetchedHints.max_width != hints.max_width)
+	    || (fetchedHints.max_height != hints.max_height)
+	    || (fetchedHints.width_inc != hints.width_inc)
+	    || (fetchedHints.height_inc != hints.height_inc)
+	    || (fetchedHints.min_aspect.x != hints.min_aspect.x)
+	    || (fetchedHints.min_aspect.y != hints.min_aspect.y)
+	    || (fetchedHints.max_aspect.x != hints.max_aspect.x)
+	    || (fetchedHints.max_aspect.y != hints.max_aspect.y)
+	    || (fetchedHints.base_width != hints.base_width)
+	    || (fetchedHints.base_height != hints.base_height)
+	    || (fetchedHints.win_gravity != hints.win_gravity)) {
+	goto cleanup;
+    }
+
+    memset(&remainingHints, 0xff, sizeof(remainingHints));
+    if (XGetWMNormalHints(display, xid, &remainingHints, &remainingSupplied)
+	    || (remainingSupplied != 0)
+	    || (remainingHints.flags != 0)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    if (data != NULL) {
+	XFree(data);
+    }
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestSetWindowNetWmNameProperties(unsigned int window, int mode)
 {
     static const char netTitle[] = "Net " "\xe2\x98\x83" " Title";

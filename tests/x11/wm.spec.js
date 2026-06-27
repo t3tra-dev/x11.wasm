@@ -685,6 +685,65 @@ test("XGetWindowProperty delete clears browser WM_HINTS metadata", async ({
   });
 });
 
+test("XGetWindowProperty delete clears browser size hints metadata", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+  const windowId = await createMappedWindow(page);
+
+  const metadata = await page.evaluate((windowId) => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestGetWindowNormalHintsDeletes?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    const resource = backend?.resources.get(windowId);
+    const element = resource?.element;
+    if (
+      !module?._X11WasmTestGetWindowNormalHintsDeletes ||
+      !backend ||
+      !resource ||
+      !(element instanceof HTMLElement)
+    ) {
+      throw new Error("missing size hints delete metadata test hooks");
+    }
+
+    const deleteResult =
+      module._X11WasmTestGetWindowNormalHintsDeletes(windowId);
+    backend.flush?.();
+    const computed = getComputedStyle(element);
+    return {
+      deleteResult,
+      flags: element.getAttribute("data-x11-wasm-size-hints-flags"),
+      minWidth: element.getAttribute("data-x11-wasm-min-width"),
+      maxWidth: element.getAttribute("data-x11-wasm-max-width"),
+      widthInc: element.getAttribute("data-x11-wasm-width-inc"),
+      heightInc: element.getAttribute("data-x11-wasm-height-inc"),
+      baseWidth: element.getAttribute("data-x11-wasm-base-width"),
+      baseHeight: element.getAttribute("data-x11-wasm-base-height"),
+      resourceSizeHints: resource.sizeHints,
+      styleAspectRatio: element.style.aspectRatio,
+      styleMaxWidth: computed.maxWidth,
+      styleMinWidth: computed.minWidth,
+    };
+  }, windowId);
+
+  expect(metadata).toEqual({
+    deleteResult: 1,
+    flags: null,
+    minWidth: null,
+    maxWidth: null,
+    widthInc: null,
+    heightInc: null,
+    baseWidth: null,
+    baseHeight: null,
+    resourceSizeHints: null,
+    styleAspectRatio: "",
+    styleMaxWidth: "none",
+    styleMinWidth: "0px",
+  });
+});
+
 test("_NET_WM_WINDOW_TYPE updates browser window type metadata", async ({
   page,
 }) => {
