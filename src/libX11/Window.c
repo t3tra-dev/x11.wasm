@@ -1687,6 +1687,45 @@ BrowserQueueConfigureNotify(
 }
 
 int
+BrowserQueueConfigureRequest(
+    X11WasmResource *resourcePtr,
+    unsigned int valueMask,
+    XWindowChanges *changes)
+{
+    X11WasmResource *parentPtr;
+    XEvent event;
+
+    if ((resourcePtr == NULL)
+	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)) {
+	return 0;
+    }
+    parentPtr = BrowserWindowResource(resourcePtr->parent);
+    if (!BrowserResourceWantsEvent(parentPtr, SubstructureRedirectMask)) {
+	return 0;
+    }
+    BrowserSetCommonEventFields(&event, ConfigureRequest,
+	    (Window)parentPtr->id, CurrentTime);
+    event.xconfigurerequest.parent = (Window)parentPtr->id;
+    event.xconfigurerequest.window = (Window)resourcePtr->id;
+    event.xconfigurerequest.x = (valueMask & CWX)
+	    ? changes->x : resourcePtr->x;
+    event.xconfigurerequest.y = (valueMask & CWY)
+	    ? changes->y : resourcePtr->y;
+    event.xconfigurerequest.width = (valueMask & CWWidth)
+	    ? changes->width : (int)resourcePtr->width;
+    event.xconfigurerequest.height = (valueMask & CWHeight)
+	    ? changes->height : (int)resourcePtr->height;
+    event.xconfigurerequest.border_width = (valueMask & CWBorderWidth)
+	    ? changes->border_width : (int)resourcePtr->borderWidth;
+    event.xconfigurerequest.above = (valueMask & CWSibling)
+	    ? changes->sibling : None;
+    event.xconfigurerequest.detail = (valueMask & CWStackMode)
+	    ? changes->stack_mode : Above;
+    event.xconfigurerequest.value_mask = valueMask;
+    return BrowserQueueEvent(&event);
+}
+
+int
 BrowserQueueCirculateNotify(
     X11WasmResource *resourcePtr,
     int place)

@@ -81,6 +81,25 @@ test("XMapWindow redirects map requests to selecting parents", async ({
   expect(result).toBe(1);
 });
 
+test("XConfigureWindow redirects configure requests to selecting parents", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestConfigureRequestRedirectApis?: () => number } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestConfigureRequestRedirectApis) {
+      throw new Error("missing configure request redirect test export");
+    }
+    return module._X11WasmTestConfigureRequestRedirectApis();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XSetIconSizes updates browser WM_ICON_SIZE metadata", async ({ page }) => {
   await waitForX11Runtime(page);
   const windowId = await createMappedWindow(page);

@@ -2137,6 +2137,39 @@ BrowserTestPopConfigureGeometryEvent(
 }
 
 static int
+BrowserTestPopConfigureRequestEvent(
+    Window parent,
+    Window window,
+    int x,
+    int y,
+    int width,
+    int height,
+    int borderWidth,
+    Window above,
+    int detail,
+    unsigned long valueMask)
+{
+    XEvent event;
+
+    memset(&event, 0, sizeof(event));
+    if (!BrowserPopMatchingEvent(parent, SubstructureRedirectMask, &event)
+	    || (event.type != ConfigureRequest)
+	    || (event.xconfigurerequest.parent != parent)
+	    || (event.xconfigurerequest.window != window)
+	    || (event.xconfigurerequest.x != x)
+	    || (event.xconfigurerequest.y != y)
+	    || (event.xconfigurerequest.width != width)
+	    || (event.xconfigurerequest.height != height)
+	    || (event.xconfigurerequest.border_width != borderWidth)
+	    || (event.xconfigurerequest.above != above)
+	    || (event.xconfigurerequest.detail != detail)
+	    || (event.xconfigurerequest.value_mask != valueMask)) {
+	return 0;
+    }
+    return 1;
+}
+
+static int
 BrowserTestWindowGeometryAttributes(
     Display *display,
     Window window,
@@ -3548,6 +3581,151 @@ X11WasmTestMapViewableExposeApis(void)
 	    || (XEventsQueued(display, QueuedAlready) != 0)
 	    || !XGetWindowAttributes(display, child, &windowAttributes)
 	    || (windowAttributes.map_state != IsViewable)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    BrowserClearEventQueue();
+    if (parent != None) {
+	(void)XDestroyWindow(display, parent);
+    }
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestConfigureRequestRedirectApis(void)
+{
+    Display *display;
+    XSetWindowAttributes attributes;
+    XWindowChanges changes;
+    XEvent event;
+    Window parent = None;
+    Window bottom = None;
+    Window target = None;
+    Window top = None;
+    Window overrideChild = None;
+    Window expected[4];
+    unsigned int allMask = CWX | CWY | CWWidth | CWHeight | CWBorderWidth
+	    | CWSibling | CWStackMode;
+    int result = 0;
+    int screen;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+
+    parent = XCreateWindow(display, browserDisplay.rootWindow, 0, 0, 100, 80,
+	    0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL);
+    bottom = (parent != None) ? XCreateWindow(display, parent, 1, 2, 20, 21,
+	    1, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL) : None;
+    target = (parent != None) ? XCreateWindow(display, parent, 10, 11, 22,
+	    23, 1, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL) : None;
+    top = (parent != None) ? XCreateWindow(display, parent, 30, 31, 24, 25,
+	    1, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL) : None;
+    if ((parent == None) || (bottom == None) || (target == None)
+	    || (top == None)
+	    || (XSelectInput(display, parent, SubstructureRedirectMask)
+		    != Success)
+	    || (XSelectInput(display, target, StructureNotifyMask)
+		    != Success)) {
+	goto cleanup;
+    }
+    expected[0] = bottom;
+    expected[1] = target;
+    expected[2] = top;
+    if (!BrowserTestQueryTreeOrder(display, parent, expected, 3)) {
+	goto cleanup;
+    }
+
+    memset(&changes, 0, sizeof(changes));
+    changes.x = 41;
+    changes.y = 43;
+    changes.width = 45;
+    changes.height = 47;
+    changes.border_width = 3;
+    changes.sibling = bottom;
+    changes.stack_mode = Below;
+    BrowserClearEventQueue();
+    if ((XConfigureWindow(display, target, allMask, &changes) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserTestPopConfigureRequestEvent(parent, target, 41, 43,
+		    45, 47, 3, bottom, Below, allMask)
+	    || (XEventsQueued(display, QueuedAlready) != 0)
+	    || !BrowserTestWindowGeometryAttributes(display, target, 10, 11,
+		    22, 23, 1)
+	    || !BrowserTestQueryTreeOrder(display, parent, expected, 3)) {
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    if ((XRaiseWindow(display, target) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserTestPopConfigureRequestEvent(parent, target, 10, 11,
+		    22, 23, 1, None, Above, CWStackMode)
+	    || (XEventsQueued(display, QueuedAlready) != 0)
+	    || !BrowserTestQueryTreeOrder(display, parent, expected, 3)) {
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    expected[0] = bottom;
+    expected[1] = target;
+    expected[2] = top;
+    {
+	Window restack[2];
+
+	restack[0] = top;
+	restack[1] = target;
+	if ((XRestackWindows(display, restack, 2) != Success)
+		|| (XEventsQueued(display, QueuedAlready) != 1)
+		|| !BrowserTestPopConfigureRequestEvent(parent, target, 10,
+			11, 22, 23, 1, top, Below,
+			CWSibling | CWStackMode)
+		|| (XEventsQueued(display, QueuedAlready) != 0)
+		|| !BrowserTestQueryTreeOrder(display, parent, expected, 3)) {
+	    goto cleanup;
+	}
+    }
+
+    memset(&attributes, 0, sizeof(attributes));
+    attributes.override_redirect = True;
+    overrideChild = XCreateWindow(display, parent, 5, 6, 12, 13, 0,
+	    CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    CWOverrideRedirect, &attributes);
+    if ((overrideChild == None)
+	    || (XSelectInput(display, overrideChild, StructureNotifyMask)
+		    != Success)) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+    memset(&changes, 0, sizeof(changes));
+    changes.x = 15;
+    changes.y = 16;
+    changes.width = 17;
+    changes.height = 18;
+    if ((XConfigureWindow(display, overrideChild,
+	    CWX | CWY | CWWidth | CWHeight, &changes) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserPopMatchingEvent(overrideChild, StructureNotifyMask,
+		    &event)
+	    || (event.type != ConfigureNotify)
+	    || (event.xconfigure.event != overrideChild)
+	    || (event.xconfigure.window != overrideChild)
+	    || (event.xconfigure.x != 15)
+	    || (event.xconfigure.y != 16)
+	    || (event.xconfigure.width != 17)
+	    || (event.xconfigure.height != 18)
+	    || (event.xconfigure.border_width != 0)
+	    || (event.xconfigure.above != None)
+	    || (event.xconfigure.override_redirect != True)
+	    || (XEventsQueued(display, QueuedAlready) != 0)
+	    || !BrowserTestWindowGeometryAttributes(display, overrideChild,
+		    15, 16, 17, 18, 0)) {
 	goto cleanup;
     }
     result = 1;

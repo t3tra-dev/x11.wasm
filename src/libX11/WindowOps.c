@@ -1977,7 +1977,7 @@ BrowserDestroyWindowResource(
 }
 
 static int
-BrowserWindowMapIsRedirected(
+BrowserWindowSubstructureIsRedirected(
     X11WasmResource *resourcePtr)
 {
     X11WasmResource *parentPtr;
@@ -2011,7 +2011,7 @@ BrowserMapWindowResource(
 	}
 	return Success;
     }
-    if (BrowserWindowMapIsRedirected(resourcePtr)) {
+    if (BrowserWindowSubstructureIsRedirected(resourcePtr)) {
 	(void)BrowserQueueMapRequest(resourcePtr);
 	return Success;
     }
@@ -2207,6 +2207,10 @@ XConfigureWindow(
 	return Success;
     }
     if (changes == NULL) {
+	return Success;
+    }
+    if (BrowserWindowSubstructureIsRedirected(resourcePtr)) {
+	(void)BrowserQueueConfigureRequest(resourcePtr, valueMask, changes);
 	return Success;
     }
     oldWidth = resourcePtr->width;

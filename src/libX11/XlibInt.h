@@ -1354,6 +1354,10 @@ int BrowserQueueColormapNotify(
 int BrowserQueueConfigureNotify(
     X11WasmResource *resourcePtr,
     Window above);
+int BrowserQueueConfigureRequest(
+    X11WasmResource *resourcePtr,
+    unsigned int valueMask,
+    XWindowChanges *changes);
 int BrowserQueueCirculateNotify(
     X11WasmResource *resourcePtr,
     int place);
