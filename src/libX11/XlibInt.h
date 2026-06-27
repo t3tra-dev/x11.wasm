@@ -402,6 +402,8 @@ struct _XIC {
     X11WasmICAttributeSet preedit;
     X11WasmICAttributeSet status;
     int focused;
+    char *preeditText;
+    int preeditTextLength;
 };
 
 struct _XOC {
@@ -621,6 +623,8 @@ void BrowserClearHostAccessList(void);
 void BrowserClearCompositionPayloads(void);
 void BrowserClearInputContext(
     void);
+void BrowserClearICPreeditText(
+    XIC inputContext);
 void BrowserClearKeycodeRange(
     unsigned int firstKeycode,
     unsigned int count);
@@ -1085,6 +1089,11 @@ int BrowserHostFamilyIsValid(
 int BrowserICAllowsLookup(
     XIC inputContext,
     XKeyPressedEvent *event);
+void BrowserUpdateFocusedICPreedit(
+    Window target,
+    int phase,
+    const char *utf8,
+    int utf8Length);
 int BrowserIMInstantiateCallbackExists(
     Display *display,
     XIDProc callback,

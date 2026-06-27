@@ -250,28 +250,154 @@ cleanup:
     return result;
 }
 
+void
+BrowserClearICPreeditText(
+    XIC inputContext)
+{
+    if (inputContext == NULL) {
+	return;
+    }
+    if (inputContext->preeditText != NULL) {
+	ckfree(inputContext->preeditText);
+    }
+    inputContext->preeditText = NULL;
+    inputContext->preeditTextLength = 0;
+}
+
+static void
+BrowserSetICPreeditText(
+    XIC inputContext,
+    const char *utf8,
+    int utf8Length)
+{
+    BrowserClearICPreeditText(inputContext);
+    if ((inputContext == NULL) || (utf8 == NULL) || (utf8Length <= 0)) {
+	return;
+    }
+    inputContext->preeditText = (char *)ckalloc((size_t)utf8Length + 1U);
+    memcpy(inputContext->preeditText, utf8, (size_t)utf8Length);
+    inputContext->preeditText[utf8Length] = '\0';
+    inputContext->preeditTextLength = utf8Length;
+}
+
+static int
+BrowserCompositionQueuedEvent(
+    Display *display,
+    XEvent *eventPtr,
+    XPointer arg)
+{
+    Window target = (Window)(uintptr_t)arg;
+    int phase;
+    const char *eventName;
+
+    if ((eventPtr == NULL) || (eventPtr->type != ClientMessage)
+	    || (BrowserEventWindow(eventPtr) != target)) {
+	return 0;
+    }
+    phase = (int)eventPtr->xclient.data.l[0];
+    eventName = BrowserCompositionEventName(phase);
+    return (eventName != NULL)
+	    && (eventPtr->xclient.message_type == XInternAtom(display,
+		    eventName, False));
+}
+
+static void
+BrowserDiscardICCompositionEvents(
+    XIC inputContext)
+{
+    Window target = BrowserInputContextWindow(inputContext);
+    XEvent event;
+
+    if (target == None) {
+	return;
+    }
+    while (BrowserTakeQueuedEvent(&browserDisplay.display,
+	    BrowserCompositionQueuedEvent, (XPointer)(uintptr_t)target, 1,
+	    &event, NULL)) {
+	BrowserForgetCompositionPayload((unsigned long)event.xclient.data.l[2]);
+    }
+}
+
+void
+BrowserUpdateFocusedICPreedit(
+    Window target,
+    int phase,
+    const char *utf8,
+    int utf8Length)
+{
+    Window focusWindow;
+
+    if ((focusedInputContext == NULL) || !focusedInputContext->focused) {
+	return;
+    }
+    focusWindow = BrowserInputContextWindow(focusedInputContext);
+    if ((focusWindow == None) || (target != focusWindow)) {
+	return;
+    }
+    if (phase == X11_WASM_COMPOSITION_END) {
+	BrowserClearICPreeditText(focusedInputContext);
+    } else if ((phase == X11_WASM_COMPOSITION_START)
+	    || (phase == X11_WASM_COMPOSITION_UPDATE)) {
+	BrowserSetICPreeditText(focusedInputContext, utf8, utf8Length);
+    }
+}
+
+static char *
+BrowserResetICUtf8String(
+    XIC inputContext)
+{
+    char *result = NULL;
+
+    if (inputContext != NULL) {
+	BrowserDiscardICCompositionEvents(inputContext);
+	if ((inputContext->preeditText != NULL)
+		&& (inputContext->preeditTextLength > 0)) {
+	    result = (char *)ckalloc(
+		    (size_t)inputContext->preeditTextLength + 1U);
+	    memcpy(result, inputContext->preeditText,
+		    (size_t)inputContext->preeditTextLength);
+	    result[inputContext->preeditTextLength] = '\0';
+	}
+	BrowserClearICPreeditText(inputContext);
+    }
+    return result;
+}
+
 wchar_t *
 XwcResetIC(
     XIC inputContext)
 {
-    (void)inputContext;
-    return NULL;
+    wchar_t *result = NULL;
+
+    if (inputContext != NULL) {
+	BrowserDiscardICCompositionEvents(inputContext);
+	if ((inputContext->preeditText != NULL)
+		&& (inputContext->preeditTextLength > 0)) {
+	    int length = BrowserWideCharCountFromUtf8(inputContext->preeditText,
+		    inputContext->preeditTextLength);
+
+	    result = (wchar_t *)ckalloc(sizeof(wchar_t) * (size_t)(length + 1));
+	    (void)BrowserWideCharsFromUtf8(inputContext->preeditText,
+		    inputContext->preeditTextLength, result, length);
+	    result[length] = L'\0';
+	}
+	BrowserClearICPreeditText(inputContext);
+    }
+    return result;
 }
 
 char *
 XmbResetIC(
     XIC inputContext)
 {
-    (void)inputContext;
-    return NULL;
+    return BrowserResetICUtf8String(inputContext);
 }
 
 char *
 Xutf8ResetIC(
     XIC inputContext)
 {
-    (void)inputContext;
-    return NULL;
+    return BrowserResetICUtf8String(inputContext);
 }
 
 EMSCRIPTEN_KEEPALIVE int
@@ -285,6 +411,12 @@ X11WasmTestXICLookupFocus(void)
     KeySym lookupSym;
     Status lookupStatus;
     wchar_t wideBuffer[4];
+    char *resetMb = NULL;
+    char *resetUtf8 = NULL;
+    wchar_t *resetWide = NULL;
+    const char *utf8Preedit = "compose \xe3\x81\x82";
+    const char *mbPreedit = "compose mb";
+    const char *widePreedit = "wide \xe3\x81\x84";
     XIC inputContext = NULL;
     XIM inputMethod = NULL;
     XKeyPressedEvent lookupEvent;
@@ -347,6 +479,59 @@ X11WasmTestXICLookupFocus(void)
     }
 
     XSetICFocus(inputContext);
+    BrowserClearEventQueue();
+    if (!X11WasmQueueCompositionEvent(X11_WASM_COMPOSITION_UPDATE,
+	    (unsigned int)browserDisplay.rootWindow, utf8Preedit, -1)) {
+	goto cleanup;
+    }
+    resetUtf8 = Xutf8ResetIC(inputContext);
+    if ((resetUtf8 == NULL) || (strcmp(resetUtf8, utf8Preedit) != 0)
+	    || (XEventsQueued(&browserDisplay.display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    XFree(resetUtf8);
+    resetUtf8 = Xutf8ResetIC(inputContext);
+    if (resetUtf8 != NULL) {
+	goto cleanup;
+    }
+    if (!X11WasmQueueCompositionEvent(X11_WASM_COMPOSITION_UPDATE,
+	    (unsigned int)browserDisplay.rootWindow, mbPreedit, -1)) {
+	goto cleanup;
+    }
+    resetMb = XmbResetIC(inputContext);
+    if ((resetMb == NULL) || (strcmp(resetMb, mbPreedit) != 0)
+	    || (XEventsQueued(&browserDisplay.display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    XFree(resetMb);
+    resetMb = NULL;
+    if (!X11WasmQueueCompositionEvent(X11_WASM_COMPOSITION_UPDATE,
+	    (unsigned int)browserDisplay.rootWindow, widePreedit, -1)) {
+	goto cleanup;
+    }
+    resetWide = XwcResetIC(inputContext);
+    if ((resetWide == NULL) || (resetWide[0] != L'w')
+	    || (resetWide[1] != L'i') || (resetWide[2] != L'd')
+	    || (resetWide[3] != L'e') || (resetWide[4] != L' ')
+	    || (resetWide[5] != (wchar_t)0x3044)
+	    || (resetWide[6] != L'\0')
+	    || (XEventsQueued(&browserDisplay.display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    XFree(resetWide);
+    resetWide = NULL;
+    if (!X11WasmQueueCompositionEvent(X11_WASM_COMPOSITION_UPDATE,
+	    (unsigned int)browserDisplay.rootWindow, utf8Preedit, -1)
+	    || !X11WasmQueueCompositionEvent(X11_WASM_COMPOSITION_END,
+		    (unsigned int)browserDisplay.rootWindow, "final", -1)) {
+	goto cleanup;
+    }
+    resetUtf8 = Xutf8ResetIC(inputContext);
+    if ((resetUtf8 != NULL)
+	    || (XEventsQueued(&browserDisplay.display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+
     memset(buffer, 0, sizeof(buffer));
     lookupSym = NoSymbol;
     lookupStatus = 0;
@@ -419,6 +604,16 @@ X11WasmTestXICLookupFocus(void)
     result = 1;
 
 cleanup:
+    if (resetMb != NULL) {
+	XFree(resetMb);
+    }
+    if (resetUtf8 != NULL) {
+	XFree(resetUtf8);
+    }
+    if (resetWide != NULL) {
+	XFree(resetWide);
+    }
+    BrowserClearEventQueue();
     if (inputContext != NULL) {
 	XDestroyIC(inputContext);
     }
@@ -944,6 +1139,7 @@ XDestroyIC(
 	    BrowserClearInputContext();
 	    focusedInputContext = NULL;
 	}
+	BrowserClearICPreeditText(inputContext);
 	ckfree(inputContext);
     }
 }

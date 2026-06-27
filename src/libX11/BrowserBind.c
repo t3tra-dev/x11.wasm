@@ -145,6 +145,7 @@ X11WasmQueueCompositionEvent(
 	BrowserForgetCompositionPayload(payloadId);
 	return 0;
     }
+    BrowserUpdateFocusedICPreedit(target, phase, utf8, utf8Length);
     return 1;
 }
 
