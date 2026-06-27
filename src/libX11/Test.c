@@ -3054,8 +3054,26 @@ X11WasmTestConfigureStackingApis(void)
     if (XRestackWindows(display, restack, 3) != Success) {
 	goto cleanup;
     }
-    if (!BrowserTestPopConfigureEvent(top, far)
-	    || !BrowserTestPopConfigureEvent(far, None)
+    if (!BrowserTestPopConfigureEvent(middle, bottom)
+	    || !BrowserTestPopConfigureEvent(top, bottom)
+	    || !BrowserTestPopConfigureEvent(far, bottom)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    expected[0] = bottom;
+    expected[1] = far;
+    expected[2] = top;
+    expected[3] = middle;
+    if (!BrowserTestQueryTreeOrder(display, parent, expected, 4)) {
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    restack[0] = bottom;
+    if (XRestackWindows(display, restack, 1) != Success) {
+	goto cleanup;
+    }
+    if (!BrowserTestPopConfigureEvent(bottom, middle)
 	    || (XEventsQueued(display, QueuedAlready) != 0)) {
 	goto cleanup;
     }
@@ -4133,7 +4151,9 @@ X11WasmTestConfigureRequestRedirectApis(void)
 	restack[0] = top;
 	restack[1] = target;
 	if ((XRestackWindows(display, restack, 2) != Success)
-		|| (XEventsQueued(display, QueuedAlready) != 1)
+		|| (XEventsQueued(display, QueuedAlready) != 2)
+		|| !BrowserTestPopConfigureRequestEvent(parent, top, 30,
+			31, 24, 25, 1, None, Above, CWStackMode)
 		|| !BrowserTestPopConfigureRequestEvent(parent, target, 10,
 			11, 22, 23, 1, top, Below,
 			CWSibling | CWStackMode)

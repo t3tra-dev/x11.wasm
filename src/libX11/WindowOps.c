@@ -2330,6 +2330,8 @@ XRestackWindows(
 	return Success;
     }
     memset(&changes, 0, sizeof(changes));
+    changes.stack_mode = Above;
+    (void)XConfigureWindow(display, windows[0], CWStackMode, &changes);
     changes.stack_mode = Below;
     for (i = 1; i < nwindows; i++) {
 	changes.sibling = windows[i - 1];
