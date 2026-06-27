@@ -13,6 +13,22 @@ BrowserTestClientMessageDataPredicate(
 	    && (eventPtr->xclient.data.l[0] == value)) ? True : False;
 }
 
+static int
+BrowserTestMaskHasContiguousBits(
+    unsigned long mask)
+{
+    if (mask == 0UL) {
+	return 1;
+    }
+    while ((mask & 1UL) == 0UL) {
+	mask >>= 1;
+    }
+    while ((mask & 1UL) != 0UL) {
+	mask >>= 1;
+    }
+    return mask == 0UL;
+}
+
 static int browserTestAfterFunctionCount;
 
 static int
@@ -10357,12 +10373,21 @@ X11WasmTestColormapApis(void)
     unsigned long allocatedPlaneMask;
     unsigned long planeFreePixel;
     unsigned long planeMasks[2];
+    unsigned long contigPlaneMasks[3];
+    unsigned long contigPlaneMask;
+    unsigned long contigPixels[2];
     unsigned long colorPlanePixels[2];
     unsigned long colorPlaneMask;
     unsigned long colorPlaneCombination;
+    unsigned long contigColorPlanePixels[2];
+    unsigned long contigColorPlaneMask;
+    unsigned long contigColorPlaneCombination;
     unsigned long redMaskReturn = 0;
     unsigned long greenMaskReturn = 0;
     unsigned long blueMaskReturn = 0;
+    unsigned long contigRedMaskReturn = 0;
+    unsigned long contigGreenMaskReturn = 0;
+    unsigned long contigBlueMaskReturn = 0;
 
     BrowserInitDisplay();
     display = &browserDisplay.display;
@@ -10375,9 +10400,15 @@ X11WasmTestColormapApis(void)
     extraAllocatedPixel = 0;
     allocatedPlaneMask = 0;
     memset(planeMasks, 0, sizeof(planeMasks));
+    memset(contigPlaneMasks, 0, sizeof(contigPlaneMasks));
+    contigPlaneMask = 0;
+    memset(contigPixels, 0, sizeof(contigPixels));
     memset(colorPlanePixels, 0, sizeof(colorPlanePixels));
     colorPlaneMask = 0;
     colorPlaneCombination = 0;
+    memset(contigColorPlanePixels, 0, sizeof(contigColorPlanePixels));
+    contigColorPlaneMask = 0;
+    contigColorPlaneCombination = 0;
 
     colormap = XCreateColormap(display, browserDisplay.rootWindow,
 	    DefaultVisual(display, screen), AllocNone);
@@ -10487,6 +10518,24 @@ X11WasmTestColormapApis(void)
 	    || (storedColor.blue != 0)) {
 	goto cleanup;
     }
+    if (!XAllocColorCells(display, colormap, True, contigPlaneMasks, 3,
+	    contigPixels, 2)
+	    || (contigPixels[0] == contigPixels[1])
+	    || (contigPlaneMasks[0] == 0UL)
+	    || (contigPlaneMasks[1] == 0UL)
+	    || (contigPlaneMasks[2] == 0UL)
+	    || ((contigPlaneMasks[0] & contigPlaneMasks[1]) != 0UL)
+	    || ((contigPlaneMasks[0] & contigPlaneMasks[2]) != 0UL)
+	    || ((contigPlaneMasks[1] & contigPlaneMasks[2]) != 0UL)) {
+	goto cleanup;
+    }
+    contigPlaneMask = contigPlaneMasks[0] | contigPlaneMasks[1]
+	    | contigPlaneMasks[2];
+    if (!BrowserTestMaskHasContiguousBits(contigPlaneMask)
+	    || ((contigPixels[0] & contigPlaneMask) != 0UL)
+	    || ((contigPixels[1] & contigPlaneMask) != 0UL)) {
+	goto cleanup;
+    }
 
     if (!XAllocColorPlanes(display, colormap, False, colorPlanePixels, 2, 1,
 	    1, 1, &redMaskReturn, &greenMaskReturn, &blueMaskReturn)
@@ -10501,6 +10550,34 @@ X11WasmTestColormapApis(void)
     storedColor.pixel = colorPlaneCombination;
     if (((colorPlanePixels[0] & colorPlaneMask) != 0)
 	    || ((colorPlanePixels[1] & colorPlaneMask) != 0)
+	    || (XQueryColor(display, colormap, &storedColor) != Success)
+	    || (storedColor.red != 0)
+	    || (storedColor.green != 0)
+	    || (storedColor.blue != 0)) {
+	goto cleanup;
+    }
+    if (!XAllocColorPlanes(display, colormap, True, contigColorPlanePixels,
+	    2, 2, 2, 2, &contigRedMaskReturn, &contigGreenMaskReturn,
+	    &contigBlueMaskReturn)
+	    || (contigColorPlanePixels[0] == contigColorPlanePixels[1])
+	    || (contigRedMaskReturn == 0UL)
+	    || (contigGreenMaskReturn == 0UL)
+	    || (contigBlueMaskReturn == 0UL)
+	    || ((contigRedMaskReturn & contigGreenMaskReturn) != 0UL)
+	    || ((contigRedMaskReturn & contigBlueMaskReturn) != 0UL)
+	    || ((contigGreenMaskReturn & contigBlueMaskReturn) != 0UL)
+	    || !BrowserTestMaskHasContiguousBits(contigRedMaskReturn)
+	    || !BrowserTestMaskHasContiguousBits(contigGreenMaskReturn)
+	    || !BrowserTestMaskHasContiguousBits(contigBlueMaskReturn)) {
+	goto cleanup;
+    }
+    contigColorPlaneMask = contigRedMaskReturn | contigGreenMaskReturn
+	    | contigBlueMaskReturn;
+    contigColorPlaneCombination = contigColorPlanePixels[0]
+	    | contigColorPlaneMask;
+    storedColor.pixel = contigColorPlaneCombination;
+    if (((contigColorPlanePixels[0] & contigColorPlaneMask) != 0UL)
+	    || ((contigColorPlanePixels[1] & contigColorPlaneMask) != 0UL)
 	    || (XQueryColor(display, colormap, &storedColor) != Success)
 	    || (storedColor.red != 0)
 	    || (storedColor.green != 0)
@@ -11785,6 +11862,8 @@ X11WasmTestXErrorHandler(void)
     int invalidFreeColormapResult;
     int invalidAllocColorResult;
     int invalidAllocNamedColorResult;
+    int invalidAllocColorCellsResult;
+    int invalidAllocColorPlanesResult;
     int invalidLookupColorResult;
     int invalidQueryColorResult;
     int invalidQueryColorsResultSum;
@@ -11974,6 +12053,11 @@ X11WasmTestXErrorHandler(void)
     Atom rotateErrorAtoms[2];
     Atom atomPropertyValue = XA_WM_NAME;
     unsigned long colorPixel = 0;
+    unsigned long colorPlaneMasks[1];
+    unsigned long colorPlanePixels[1];
+    unsigned long colorPlaneRedMask = 0;
+    unsigned long colorPlaneGreenMask = 0;
+    unsigned long colorPlaneBlueMask = 0;
     unsigned long invalidGCMask = 1UL << 30;
     unsigned long invalidWindowAttributeMask = 1UL << 30;
     unsigned long invalidCopyPlaneOutOfRange = 0UL;
@@ -12007,6 +12091,8 @@ X11WasmTestXErrorHandler(void)
     memset(&invalidFormatPutImage, 0, sizeof(invalidFormatPutImage));
     memset(&depthMismatchPutImage, 0, sizeof(depthMismatchPutImage));
     memset(&depthMismatchSubImage, 0, sizeof(depthMismatchSubImage));
+    memset(colorPlaneMasks, 0, sizeof(colorPlaneMasks));
+    memset(colorPlanePixels, 0, sizeof(colorPlanePixels));
     memset(points, 0, sizeof(points));
     memset(&segment, 0, sizeof(segment));
     memset(text16, 0, sizeof(text16));
@@ -12465,6 +12551,11 @@ X11WasmTestXErrorHandler(void)
 	    (Colormap)invalidWindow, &color);
     invalidAllocNamedColorResult = XAllocNamedColor(&browserDisplay.display,
 	    (Colormap)invalidWindow, "red", &screenColor, &exactColor);
+    invalidAllocColorCellsResult = XAllocColorCells(&browserDisplay.display,
+	    validColormap, False, colorPlaneMasks, 0, colorPlanePixels, 0);
+    invalidAllocColorPlanesResult = XAllocColorPlanes(&browserDisplay.display,
+	    validColormap, False, colorPlanePixels, 0, 0, 0, 0,
+	    &colorPlaneRedMask, &colorPlaneGreenMask, &colorPlaneBlueMask);
     invalidLookupColorResult = XLookupColor(&browserDisplay.display,
 	    (Colormap)invalidWindow, "red", &exactColor, &screenColor);
     invalidQueryColorResult = XQueryColor(&browserDisplay.display,
@@ -13103,6 +13194,8 @@ X11WasmTestXErrorHandler(void)
 	    || (invalidFreeColormapResult != Success)
 	    || (invalidAllocColorResult != False)
 	    || (invalidAllocNamedColorResult != False)
+	    || (invalidAllocColorCellsResult != False)
+	    || (invalidAllocColorPlanesResult != False)
 	    || (invalidLookupColorResult != False)
 	    || (invalidQueryColorResult != Success)
 	    || (invalidQueryColorsResultSum != Success)
@@ -13319,6 +13412,8 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_FREE_COLORMAP
 	    + X11_WASM_XREQ_ALLOC_COLOR
 	    + X11_WASM_XREQ_ALLOC_NAMED_COLOR
+	    + X11_WASM_XREQ_ALLOC_COLOR_CELLS
+	    + X11_WASM_XREQ_ALLOC_COLOR_PLANES
 	    + X11_WASM_XREQ_LOOKUP_COLOR
 	    + X11_WASM_XREQ_QUERY_COLORS
 	    + X11_WASM_XREQ_QUERY_COLORS
@@ -13487,7 +13582,7 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 248)
+    if ((browserTestXErrorCount != 250)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)

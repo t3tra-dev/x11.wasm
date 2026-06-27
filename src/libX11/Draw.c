@@ -161,6 +161,22 @@ BrowserAppendColorPlaneMasks(
 }
 
 static int
+BrowserMaskHasContiguousBits(
+    unsigned long mask)
+{
+    if (mask == 0UL) {
+	return 1;
+    }
+    while ((mask & 1UL) == 0UL) {
+	mask >>= 1;
+    }
+    while ((mask & 1UL) != 0UL) {
+	mask >>= 1;
+    }
+    return mask == 0UL;
+}
+
+static int
 BrowserColorCellCombinationCount(
     unsigned int nplanes,
     size_t *combinationCountPtr)
@@ -908,7 +924,6 @@ XAllocColorCells(
     unsigned int i;
     unsigned long planeMaskUnion = 0;
 
-    (void)contig;
     if (!BrowserColormapOrError(&display, colormap,
 	    X11_WASM_XREQ_ALLOC_COLOR_CELLS, 0)) {
 	return False;
@@ -917,7 +932,7 @@ XAllocColorCells(
 	    nplanes <= (unsigned int)INT_MAX,
 	    X11_WASM_XREQ_ALLOC_COLOR_CELLS)
 	    || !BrowserValueOrError(&display, (long)npixels,
-		    npixels <= (unsigned int)INT_MAX,
+		    (npixels > 0U) && (npixels <= (unsigned int)INT_MAX),
 		    X11_WASM_XREQ_ALLOC_COLOR_CELLS)
 	    || !BrowserValidateCountedList(&display, planeMasksReturn,
 		    (int)nplanes, X11_WASM_XREQ_ALLOC_COLOR_CELLS)
@@ -932,6 +947,9 @@ XAllocColorCells(
 	planeMasksReturn[i] = (i < (unsigned int)(sizeof(unsigned long)
 		* CHAR_BIT)) ? (1UL << i) : 0UL;
 	planeMaskUnion |= planeMasksReturn[i];
+    }
+    if (contig && !BrowserMaskHasContiguousBits(planeMaskUnion)) {
+	return False;
     }
     for (i = 0; i < npixels; i++) {
 	if (!BrowserReserveColorCellBlock(colormap, planeMasksReturn, nplanes,
@@ -964,13 +982,14 @@ XAllocColorPlanes(
     unsigned long blueMask = 0;
     unsigned long planeMaskUnion;
 
-    (void)contig;
     if (!BrowserColormapOrError(&display, colormap,
 	    X11_WASM_XREQ_ALLOC_COLOR_PLANES, 0)) {
 	return False;
     }
     if (!BrowserValidateCountedList(&display, pixelsReturn, ncolors,
 	    X11_WASM_XREQ_ALLOC_COLOR_PLANES)
+	    || !BrowserValueOrError(&display, ncolors, ncolors > 0,
+		    X11_WASM_XREQ_ALLOC_COLOR_PLANES)
 	    || !BrowserValueOrError(&display, nreds,
 		    (nreds >= 0) && (nreds <= (int)BROWSER_COLOR_CHANNEL_BITS),
 		    X11_WASM_XREQ_ALLOC_COLOR_PLANES)
@@ -1000,6 +1019,11 @@ XAllocColorPlanes(
 		    nblues, BROWSER_COLOR_BLUE_SHIFT, &totalPlaneCount,
 		    &blueMask)
 	    || !BrowserColorCellCombinationCount(totalPlaneCount, NULL)) {
+	return False;
+    }
+    if (contig && (!BrowserMaskHasContiguousBits(redMask)
+	    || !BrowserMaskHasContiguousBits(greenMask)
+	    || !BrowserMaskHasContiguousBits(blueMask))) {
 	return False;
     }
     *rmaskReturn = redMask;
