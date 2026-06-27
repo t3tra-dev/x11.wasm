@@ -124,14 +124,24 @@ XrmStringToQuarkList(
     }
     segmentStart = string;
     for (p = string; *p != '\0'; p++) {
-	if ((*p == '.') || (*p == '*')) {
+	if (*p == '*') {
+	    if (p > segmentStart) {
+		*quarksReturn++ = BrowserQuarkFromRange(segmentStart, p);
+	    }
+	    if (p[1] == '\0') {
+		*quarksReturn++ = BrowserQuarkFromRange(p, p + 1);
+	    }
+	    segmentStart = p + 1;
+	} else if (*p == '.') {
 	    if (p > segmentStart) {
 		*quarksReturn++ = BrowserQuarkFromRange(segmentStart, p);
 	    }
 	    segmentStart = p + 1;
 	}
     }
-    *quarksReturn++ = BrowserQuarkFromRange(segmentStart, p);
+    if (p > segmentStart) {
+	*quarksReturn++ = BrowserQuarkFromRange(segmentStart, p);
+    }
     *quarksReturn = NULLQUARK;
 }
 
@@ -154,7 +164,10 @@ XrmStringToBindingQuarkList(
     }
     segmentStart = string;
     for (p = string; *p != '\0'; p++) {
-	if ((*p == '.') || (*p == '*')) {
+	if (*p == '*') {
+	    XrmBinding starBinding = (p > segmentStart)
+		    ? XrmBindLoosely : binding;
+
 	    if (p > segmentStart) {
 		if (bindingsReturn != NULL) {
 		    *bindingsReturn++ = binding;
@@ -163,14 +176,30 @@ XrmStringToBindingQuarkList(
 		binding = XrmBindTightly;
 	    }
 	    segmentStart = p + 1;
-	    if (*p == '*') {
+	    if (p[1] == '\0') {
+		if (bindingsReturn != NULL) {
+		    *bindingsReturn++ = starBinding;
+		}
+		*quarksReturn++ = BrowserQuarkFromRange(p, p + 1);
+	    } else {
 		binding = XrmBindLoosely;
 	    }
+	} else if (*p == '.') {
+	    if (p > segmentStart) {
+		if (bindingsReturn != NULL) {
+		    *bindingsReturn++ = binding;
+		}
+		*quarksReturn++ = BrowserQuarkFromRange(segmentStart, p);
+		binding = XrmBindTightly;
+	    }
+	    segmentStart = p + 1;
 	}
     }
-    if (bindingsReturn != NULL) {
-	*bindingsReturn = binding;
+    if (p > segmentStart) {
+	if (bindingsReturn != NULL) {
+	    *bindingsReturn++ = binding;
+	}
+	*quarksReturn++ = BrowserQuarkFromRange(segmentStart, p);
     }
-    *quarksReturn++ = BrowserQuarkFromRange(segmentStart, p);
     *quarksReturn = NULLQUARK;
 }

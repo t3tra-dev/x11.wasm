@@ -10919,6 +10919,8 @@ BrowserTestXrmDatabaseApis(void)
     XrmDatabase database = NULL;
     XrmDatabase precedenceDatabase = NULL;
     XrmDatabase finalQuestionDatabase = NULL;
+    XrmDatabase trailingStarDatabase = NULL;
+    XrmDatabase dotStarDatabase = NULL;
     XrmDatabase enumeratePrefixDatabase = NULL;
     XrmDatabase enumerateQuestionDatabase = NULL;
     XrmDatabase enumerateBacktrackDatabase = NULL;
@@ -11043,6 +11045,35 @@ BrowserTestXrmDatabaseApis(void)
 		    "wish.main.accent", "Wish.Main.Accent", "question-accent")) {
 	goto cleanup;
     }
+    trailingStarDatabase = XrmGetStringDatabase(
+	    "wish*: trailing-star\n"
+	    "wish*foreground: trailing-loose-foreground\n");
+    if ((trailingStarDatabase == NULL)
+	    || (XrmGetResource(trailingStarDatabase, "wish", "Wish",
+		    NULL, NULL) != False)
+	    || !BrowserTestXrmResourceEquals(trailingStarDatabase,
+		    "wish*", "WishStar", "trailing-star")
+	    || !BrowserTestXrmResourceEquals(trailingStarDatabase,
+		    "wish.main*", "Wish.MainStar", "trailing-star")
+	    || (XrmGetResource(trailingStarDatabase, "wish.main",
+		    "Wish.Main", NULL, NULL) != False)
+	    || !BrowserTestXrmResourceEquals(trailingStarDatabase,
+		    "wish.main.foreground", "Wish.Main.Foreground",
+		    "trailing-loose-foreground")) {
+	goto cleanup;
+    }
+    dotStarDatabase = XrmGetStringDatabase("wish.*: dot-star\n");
+    if ((dotStarDatabase == NULL)
+	    || (XrmGetResource(dotStarDatabase, "wish", "Wish",
+		    NULL, NULL) != False)
+	    || !BrowserTestXrmResourceEquals(dotStarDatabase,
+		    "wish*", "WishStar", "dot-star")
+	    || !BrowserTestXrmResourceEquals(dotStarDatabase,
+		    "wish.*", "Wish.Star", "dot-star")
+	    || (XrmGetResource(dotStarDatabase, "wish.main*",
+		    "Wish.MainStar", NULL, NULL) != False)) {
+	goto cleanup;
+    }
     permanentAllocation = Xpermalloc(4);
     if (permanentAllocation == NULL) {
 	goto cleanup;
@@ -11078,6 +11109,12 @@ BrowserTestXrmDatabaseApis(void)
 	    || (readValue.addr == NULL)
 	    || (strcmp((const char *)readValue.addr,
 		    "wildcard-foreground") != 0)) {
+	goto cleanup;
+    }
+    XrmStringToQuarkList("wish*", qNames);
+    if ((qNames[0] != XrmStringToName("wish"))
+	    || (qNames[1] != XrmStringToName("*"))
+	    || (qNames[2] != NULLQUARK)) {
 	goto cleanup;
     }
     XrmStringToNameList("wish.main", qNames);
@@ -11281,6 +11318,22 @@ BrowserTestXrmDatabaseApis(void)
 	    "q-background")) {
 	goto cleanup;
     }
+    XrmStringToBindingQuarkList("wish*", qBindings, qQuarks);
+    if ((qBindings[0] != XrmBindTightly)
+	    || (qBindings[1] != XrmBindLoosely)
+	    || (qQuarks[0] != XrmStringToQuark("wish"))
+	    || (qQuarks[1] != XrmStringToQuark("*"))
+	    || (qQuarks[2] != NULLQUARK)) {
+	goto cleanup;
+    }
+    XrmStringToBindingQuarkList("wish.*", qBindings, qQuarks);
+    if ((qBindings[0] != XrmBindTightly)
+	    || (qBindings[1] != XrmBindTightly)
+	    || (qQuarks[0] != XrmStringToQuark("wish"))
+	    || (qQuarks[1] != XrmStringToQuark("*"))
+	    || (qQuarks[2] != NULLQUARK)) {
+	goto cleanup;
+    }
     XrmStringToBindingQuarkList("wish*qbinary", qBindings, qQuarks);
     XrmQPutResource(&putDatabase, qBindings, qQuarks,
 	    XrmStringToRepresentation("QBinary"), &binaryValue);
@@ -11466,6 +11519,12 @@ cleanup:
     }
     if (finalQuestionDatabase != NULL) {
 	XrmDestroyDatabase(finalQuestionDatabase);
+    }
+    if (dotStarDatabase != NULL) {
+	XrmDestroyDatabase(dotStarDatabase);
+    }
+    if (trailingStarDatabase != NULL) {
+	XrmDestroyDatabase(trailingStarDatabase);
     }
     if (precedenceDatabase != NULL) {
 	XrmDestroyDatabase(precedenceDatabase);

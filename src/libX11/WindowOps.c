@@ -438,8 +438,13 @@ BrowserXrmComponentCount(
     for (p = text; *p != '\0'; ) {
 	const char *start;
 
-	while ((*p == '.') || (*p == '*')) {
+	while ((*p == '.') || ((*p == '*') && (p[1] != '\0'))) {
 	    p++;
+	}
+	if ((*p == '*') && (p[1] == '\0')) {
+	    count++;
+	    p++;
+	    continue;
 	}
 	start = p;
 	while ((*p != '\0') && (*p != '.') && (*p != '*')) {
@@ -473,8 +478,15 @@ BrowserXrmSplitComponents(
     for (p = text; *p != '\0'; ) {
 	const char *start;
 
-	while ((*p == '.') || (*p == '*')) {
+	while ((*p == '.') || ((*p == '*') && (p[1] != '\0'))) {
 	    p++;
+	}
+	if ((*p == '*') && (p[1] == '\0')) {
+	    parts[index].start = p;
+	    parts[index].end = p + 1;
+	    index++;
+	    p++;
+	    continue;
 	}
 	start = p;
 	while ((*p != '\0') && (*p != '.') && (*p != '*')) {
@@ -500,7 +512,12 @@ BrowserXrmBindingPartCount(
 	return 0;
     }
     for (p = binding; *p != '\0'; ) {
-	if ((*p == '.') || (*p == '*')) {
+	if ((*p == '.') || ((*p == '*') && (p[1] != '\0'))) {
+	    p++;
+	    continue;
+	}
+	if ((*p == '*') && (p[1] == '\0')) {
+	    count++;
 	    p++;
 	    continue;
 	}
@@ -542,13 +559,32 @@ BrowserXrmSplitBinding(
     for (p = binding; *p != '\0'; ) {
 	const char *start;
 
-	if ((*p == '.') || (*p == '*')) {
+	if (*p == '.') {
 	    separator = *p;
-	    if (separator == '.') {
-		if (dotCountPtr != NULL) {
-		    (*dotCountPtr)++;
+	    if (dotCountPtr != NULL) {
+		(*dotCountPtr)++;
+	    }
+	    p++;
+	    continue;
+	}
+	if (*p == '*') {
+	    if (p[1] == '\0') {
+		parts[index].start = p;
+		parts[index].end = p + 1;
+		if (separator == '\0') {
+		    separator = '*';
+		    if (starCountPtr != NULL) {
+			(*starCountPtr)++;
+		    }
 		}
-	    } else if (starCountPtr != NULL) {
+		parts[index].separator = separator;
+		index++;
+		separator = '\0';
+		p++;
+		continue;
+	    }
+	    separator = *p;
+	    if (starCountPtr != NULL) {
 		(*starCountPtr)++;
 	    }
 	    p++;
