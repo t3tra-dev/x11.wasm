@@ -611,6 +611,80 @@ test("XGetWindowProperty delete clears browser name metadata", async ({
   });
 });
 
+test("XGetWindowProperty delete clears browser WM_HINTS metadata", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+  const [ownerId, iconId, groupId] = await createMappedWindows(page, 3);
+
+  const metadata = await page.evaluate(
+    ({ ownerId, iconId, groupId }) => {
+      const module =
+        /** @type {Window & { Module?: { _X11WasmTestGetWindowWMHintsDeletes?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+          window
+        ).Module;
+      const backend = module?.x11WasmBackend;
+      const owner = backend?.resources.get(ownerId);
+      const icon = backend?.resources.get(iconId);
+      const group = backend?.resources.get(groupId);
+      const ownerElement = owner?.element;
+      const iconElement = icon?.element;
+      const groupElement = group?.element;
+      if (
+        !module?._X11WasmTestGetWindowWMHintsDeletes ||
+        !backend ||
+        !owner ||
+        !icon ||
+        !group ||
+        !(ownerElement instanceof HTMLElement) ||
+        !(iconElement instanceof HTMLElement) ||
+        !(groupElement instanceof HTMLElement)
+      ) {
+        throw new Error("missing WM_HINTS delete metadata test hooks");
+      }
+
+      const deleteResult = module._X11WasmTestGetWindowWMHintsDeletes(
+        ownerId,
+        iconId,
+        groupId,
+      );
+      backend.flush?.();
+      return {
+        deleteResult,
+        iconOwner: iconElement.getAttribute("data-x11-wasm-icon-owner"),
+        ownerFlags: ownerElement.getAttribute("data-x11-wasm-wm-hints-flags"),
+        ownerGroup: ownerElement.getAttribute("data-x11-wasm-window-group"),
+        ownerIconWindow: ownerElement.getAttribute(
+          "data-x11-wasm-icon-window",
+        ),
+        ownerInitialState: ownerElement.getAttribute(
+          "data-x11-wasm-initial-state-name",
+        ),
+        ownerInputEligible: ownerElement.getAttribute(
+          "data-x11-wasm-input-eligible",
+        ),
+        ownerWmHints: owner.wmHints,
+        groupMembers: groupElement.getAttribute(
+          "data-x11-wasm-window-group-members",
+        ),
+      };
+    },
+    { ownerId, iconId, groupId },
+  );
+
+  expect(metadata).toEqual({
+    deleteResult: 1,
+    iconOwner: null,
+    ownerFlags: null,
+    ownerGroup: null,
+    ownerIconWindow: null,
+    ownerInitialState: null,
+    ownerInputEligible: null,
+    ownerWmHints: null,
+    groupMembers: null,
+  });
+});
+
 test("_NET_WM_WINDOW_TYPE updates browser window type metadata", async ({
   page,
 }) => {

@@ -708,6 +708,80 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestGetWindowWMHintsDeletes(
+    unsigned int window,
+    unsigned int iconWindow,
+    unsigned int groupWindow)
+{
+    Display *display;
+    Window xid = (Window)window;
+    XWMHints hints;
+    XWMHints fetchedHints;
+    XWMHints *remainingHints = NULL;
+    Atom actualType = None;
+    int actualFormat = 0;
+    unsigned long nitems = 0;
+    unsigned long bytesAfter = 0;
+    unsigned char *data = NULL;
+    int result = 0;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    if ((BrowserWindowResource(xid) == NULL)
+	    || (BrowserWindowResource((Window)iconWindow) == NULL)
+	    || (BrowserWindowResource((Window)groupWindow) == NULL)) {
+	return 0;
+    }
+
+    memset(&hints, 0, sizeof(hints));
+    hints.flags = InputHint | StateHint | IconWindowHint | IconPositionHint
+	    | WindowGroupHint;
+    hints.input = False;
+    hints.initial_state = IconicState;
+    hints.icon_window = (Window)iconWindow;
+    hints.icon_x = 23;
+    hints.icon_y = 31;
+    hints.window_group = (Window)groupWindow;
+
+    if ((XSetWMHints(display, xid, &hints) != Success)
+	    || (XGetWindowProperty(display, xid, XA_WM_HINTS, 0,
+		    (long)(LONG_MAX / 4L), True, XA_WM_HINTS, &actualType,
+		    &actualFormat, &nitems, &bytesAfter, &data) != Success)
+	    || (actualType != XA_WM_HINTS)
+	    || (actualFormat != 32)
+	    || (nitems != (sizeof(XWMHints) / 4U))
+	    || (bytesAfter != 0)
+	    || (data == NULL)) {
+	goto cleanup;
+    }
+    memset(&fetchedHints, 0, sizeof(fetchedHints));
+    memcpy(&fetchedHints, data, sizeof(fetchedHints));
+    if ((fetchedHints.flags != hints.flags)
+	    || (fetchedHints.input != hints.input)
+	    || (fetchedHints.initial_state != hints.initial_state)
+	    || (fetchedHints.icon_window != hints.icon_window)
+	    || (fetchedHints.icon_x != hints.icon_x)
+	    || (fetchedHints.icon_y != hints.icon_y)
+	    || (fetchedHints.window_group != hints.window_group)) {
+	goto cleanup;
+    }
+    remainingHints = XGetWMHints(display, xid);
+    if (remainingHints != NULL) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    if (data != NULL) {
+	XFree(data);
+    }
+    if (remainingHints != NULL) {
+	XFree(remainingHints);
+    }
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestSetWindowNetWmNameProperties(unsigned int window, int mode)
 {
     static const char netTitle[] = "Net " "\xe2\x98\x83" " Title";
