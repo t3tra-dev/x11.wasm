@@ -307,24 +307,23 @@ BrowserXrmDupResourceValue(
 	    *out++ = '\n';
 	} else if (*p == '\\') {
 	    *out++ = '\\';
-	} else if ((p == start + 1) && ((*p == ' ') || (*p == '\t'))) {
+	} else if ((*p == ' ') || (*p == '\t')) {
 	    *out++ = *p;
 	} else if ((*p >= '0') && (*p <= '7')) {
-	    int count = 0;
 	    unsigned int value = 0U;
 
-	    do {
-		value = (value * 8U) + (unsigned int)(*p - '0');
-		count++;
-		if ((count == 3) || (p + 1 >= end)
-			|| (p[1] < '0') || (p[1] > '7')) {
-		    break;
-		}
-		p++;
-	    } while (1);
-	    *out++ = (char)value;
+	    if ((p + 2 < end)
+		    && (p[1] >= '0') && (p[1] <= '7')
+		    && (p[2] >= '0') && (p[2] <= '7')) {
+		value = ((unsigned int)(p[0] - '0') * 64U)
+			+ ((unsigned int)(p[1] - '0') * 8U)
+			+ (unsigned int)(p[2] - '0');
+		*out++ = (char)value;
+		p += 2;
+	    } else {
+		*out++ = *p;
+	    }
 	} else {
-	    *out++ = '\\';
 	    *out++ = *p;
 	}
     }

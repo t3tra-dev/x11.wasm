@@ -11020,6 +11020,10 @@ BrowserTestXrmDatabaseApis(void)
 	    " value\r\n"
 	    "wish.escaped:\\ leading\\\\path\\nline\n"
 	    "wish.unknownEscape: keep\\qslash\n"
+	    "wish.octalShort: a\\1b\n"
+	    "wish.octalPair: a\\12b\n"
+	    "wish.octalFull: a\\123b\n"
+	    "wish.embeddedSpace: a\\ b\n"
 	    "wish.trailing: value   \n";
     const char xrmIncludedFileText[] =
 	    "wish.included: include-value\n"
@@ -11496,6 +11500,9 @@ BrowserTestXrmDatabaseApis(void)
     XrmPutLineResource(&putDatabase, "! ignored");
     XrmPutLineResource(&putDatabase, "wish.empty:");
     XrmPutLineResource(&putDatabase, "wish.unknownEscape: put\\qslash");
+    XrmPutLineResource(&putDatabase, "wish.octalShort: put\\1value");
+    XrmPutLineResource(&putDatabase, "wish.octalFull: put\\123value");
+    XrmPutLineResource(&putDatabase, "wish.embeddedSpace: put\\ value");
     XrmPutLineResource(&putDatabase, "wish.trailing: put-value   ");
     binaryValue.addr = (XPointer)binaryData;
     binaryValue.size = (unsigned int)sizeof(binaryData);
@@ -11508,7 +11515,13 @@ BrowserTestXrmDatabaseApis(void)
 	    || !BrowserTestXrmResourceEquals(putDatabase, "wish.empty",
 		    "Wish.Empty", "")
 	    || !BrowserTestXrmResourceEquals(putDatabase,
-		    "wish.unknownEscape", "Wish.UnknownEscape", "put\\qslash")
+		    "wish.unknownEscape", "Wish.UnknownEscape", "putqslash")
+	    || !BrowserTestXrmResourceEquals(putDatabase,
+		    "wish.octalShort", "Wish.OctalShort", "put1value")
+	    || !BrowserTestXrmResourceEquals(putDatabase,
+		    "wish.octalFull", "Wish.OctalFull", "putSvalue")
+	    || !BrowserTestXrmResourceEquals(putDatabase,
+		    "wish.embeddedSpace", "Wish.EmbeddedSpace", "put value")
 	    || !BrowserTestXrmResourceEquals(putDatabase, "wish.trailing",
 		    "Wish.Trailing", "put-value   ")) {
 	goto cleanup;
@@ -11683,7 +11696,15 @@ BrowserTestXrmDatabaseApis(void)
 	    || !BrowserTestXrmResourceEquals(fileDatabase, "wish.escaped",
 		    "Wish.Escaped", " leading\\path\nline")
 	    || !BrowserTestXrmResourceEquals(fileDatabase,
-		    "wish.unknownEscape", "Wish.UnknownEscape", "keep\\qslash")
+		    "wish.unknownEscape", "Wish.UnknownEscape", "keepqslash")
+	    || !BrowserTestXrmResourceEquals(fileDatabase,
+		    "wish.octalShort", "Wish.OctalShort", "a1b")
+	    || !BrowserTestXrmResourceEquals(fileDatabase,
+		    "wish.octalPair", "Wish.OctalPair", "a12b")
+	    || !BrowserTestXrmResourceEquals(fileDatabase,
+		    "wish.octalFull", "Wish.OctalFull", "aSb")
+	    || !BrowserTestXrmResourceEquals(fileDatabase,
+		    "wish.embeddedSpace", "Wish.EmbeddedSpace", "a b")
 	    || !BrowserTestXrmResourceEquals(fileDatabase, "wish.trailing",
 		    "Wish.Trailing", "value   ")) {
 	goto cleanup;
