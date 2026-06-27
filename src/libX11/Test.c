@@ -10692,10 +10692,11 @@ X11WasmTestXErrorHandler(void)
     int sawRotateWindowBadMatch;
     int sawRotateWindowDuplicateBadMatch;
     int storeBufferValidationResult;
-    int sawStoreBufferBadValue;
+    int cutBufferErrorCount;
+    int sawStoreBufferNoError;
     int invalidFetchBufferLength = -1;
     char *invalidFetchBuffer = NULL;
-    int sawFetchBufferBadValue;
+    int sawFetchBufferNoError;
     int invalidAtomNamesResult;
     int sawGeometryBadDrawable;
     int sawGetSubImageBadMatch;
@@ -10895,7 +10896,8 @@ X11WasmTestXErrorHandler(void)
     sawPutImageGCDepthBadMatch = 0;
     sawQueryTextExtentsBadFont = 0;
     sawQueryTextExtents16BadFont = 0;
-    sawStoreBufferBadValue = 0;
+    sawStoreBufferNoError = 0;
+    sawFetchBufferNoError = 0;
     validRootPixmapResultSum = Success;
     rootPixmapErrorCount = 0;
     sawGetSubImageBadMatch = 0;
@@ -11761,18 +11763,15 @@ X11WasmTestXErrorHandler(void)
 	    && (browserTestLastRequestCode
 		    == X11_WASM_XREQ_ROTATE_PROPERTIES)
 	    && (browserTestLastResourceId == (XID)validProperty);
+    cutBufferErrorCount = browserTestXErrorCount;
     storeBufferValidationResult = XStoreBuffer(&browserDisplay.display,
 	    "invalid", 7, 8);
-    sawStoreBufferBadValue = (browserTestLastErrorCode == BadValue)
-	    && (browserTestLastRequestCode == X11_WASM_XREQ_CHANGE_PROPERTY)
-	    && (browserTestLastResourceId == (XID)8);
+    sawStoreBufferNoError = browserTestXErrorCount == cutBufferErrorCount;
     invalidFetchBuffer = XFetchBuffer(&browserDisplay.display,
 	    &invalidFetchBufferLength, 8);
-    sawFetchBufferBadValue = (invalidFetchBuffer == NULL)
+    sawFetchBufferNoError = (invalidFetchBuffer == NULL)
 	    && (invalidFetchBufferLength == 0)
-	    && (browserTestLastErrorCode == BadValue)
-	    && (browserTestLastRequestCode == X11_WASM_XREQ_GET_PROPERTY)
-	    && (browserTestLastResourceId == (XID)8);
+	    && (browserTestXErrorCount == cutBufferErrorCount);
     if (invalidFetchBuffer != NULL) {
 	XFree(invalidFetchBuffer);
 	invalidFetchBuffer = NULL;
@@ -12008,8 +12007,8 @@ X11WasmTestXErrorHandler(void)
 	    || !sawRotateWindowBadMatch
 	    || !sawRotateWindowDuplicateBadMatch
 	    || (storeBufferValidationResult != Success)
-	    || !sawStoreBufferBadValue
-	    || !sawFetchBufferBadValue
+	    || !sawStoreBufferNoError
+	    || !sawFetchBufferNoError
 	    || (invalidAtomName != NULL)
 	    || (invalidAtomNamesResult != False)
 	    || (invalidAtomNames[0] != NULL)
@@ -12260,8 +12259,6 @@ X11WasmTestXErrorHandler(void)
 	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_ROTATE_PROPERTIES
 	    + X11_WASM_XREQ_ROTATE_PROPERTIES
-	    + X11_WASM_XREQ_CHANGE_PROPERTY
-	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
 	    + X11_WASM_XREQ_GET_PROPERTY
@@ -12328,7 +12325,7 @@ X11WasmTestXErrorHandler(void)
 	    | (1ULL << X11_WASM_XREQ_REPARENT_WINDOW)
 	    | (1ULL << X11_WASM_XREQ_CLEAR_AREA)
 	    | (1ULL << X11_WASM_XREQ_DESTROY_WINDOW);
-    if ((browserTestXErrorCount != 250)
+    if ((browserTestXErrorCount != 248)
 	    || (browserTestLastErrorCode != BadWindow)
 	    || (browserTestLastRequestCode != X11_WASM_XREQ_DESTROY_WINDOW)
 	    || (browserTestLastResourceId != (XID)invalidWindow)

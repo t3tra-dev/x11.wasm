@@ -3135,8 +3135,6 @@ XStoreBuffer(
     }
     property = BrowserCutBufferAtom(buffer);
     if (property == None) {
-	(void)BrowserPropertyValueOrError(&display, (XID)buffer,
-		X11_WASM_XREQ_CHANGE_PROPERTY);
 	return Success;
     }
     return XChangeProperty(display,
@@ -3174,8 +3172,6 @@ XFetchBuffer(
 	display = X11WasmGetDisplay(NULL);
     }
     if (!BrowserCutBufferIndexIsValid(buffer)) {
-	(void)BrowserPropertyValueOrError(&display, (XID)buffer,
-		X11_WASM_XREQ_GET_PROPERTY);
 	return NULL;
     }
     result = XGetWindowProperty(display,
