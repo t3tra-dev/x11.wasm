@@ -1,5 +1,7 @@
 #include "XlibInt.h"
 
+#include <sys/stat.h>
+
 static Bool
 BrowserTestClientMessageDataPredicate(
     Display *display,
@@ -10967,6 +10969,30 @@ BrowserTestXrmEnumerateProc(
 }
 
 static int
+BrowserTestWriteTextFile(
+    const char *path,
+    const char *text)
+{
+    FILE *file;
+    size_t length;
+    int ok;
+
+    if ((path == NULL) || (text == NULL)) {
+	return 0;
+    }
+    file = fopen(path, "wb");
+    if (file == NULL) {
+	return 0;
+    }
+    length = strlen(text);
+    ok = (fwrite(text, 1U, length, file) == length);
+    if (fclose(file) != 0) {
+	ok = 0;
+    }
+    return ok;
+}
+
+static int
 BrowserTestXrmDatabaseApis(void)
 {
     Display *display;
@@ -10982,8 +11008,10 @@ BrowserTestXrmDatabaseApis(void)
 	    "wish.geometry: last-geometry\n"
 	    "wish.empty:\n";
     const char xrmFileText[] =
-	    "wish.geometry: file-geometry\n"
 	    "# file.comment: ignored\n"
+	    "# include x11wasm-xrm-include/included.txt\n"
+	    "# include x11wasm-xrm-include/missing.txt\n"
+	    "wish.geometry: file-geometry\n"
 	    "wish.file: file-value\n"
 	    "wish.continued: first\\\n"
 	    " second\\\n"
@@ -10993,7 +11021,19 @@ BrowserTestXrmDatabaseApis(void)
 	    "wish.escaped:\\ leading\\\\path\\nline\n"
 	    "wish.unknownEscape: keep\\qslash\n"
 	    "wish.trailing: value   \n";
+    const char xrmIncludedFileText[] =
+	    "wish.included: include-value\n"
+	    "# include nested.txt\n";
+    const char xrmNestedIncludedFileText[] =
+	    "wish.nested: nested-value\n"
+	    "wish.geometry: nested-geometry\n";
     const char xrmFilePath[] = "x11wasm-xrm-input.txt";
+    const char xrmIncludeDir[] = "x11wasm-xrm-include";
+    const char xrmIncludeFilePath[] = "x11wasm-xrm-include/included.txt";
+    const char xrmNestedIncludeFilePath[] =
+	    "x11wasm-xrm-include/nested.txt";
+    const char xrmMissingIncludeFilePath[] =
+	    "x11wasm-xrm-include/missing.txt";
     const char xrmOutputPath[] = "x11wasm-xrm-output.txt";
     const char xrmMissingPath[] = "x11wasm-xrm-missing.txt";
     XrmDatabase database = NULL;
@@ -11034,7 +11074,6 @@ BrowserTestXrmDatabaseApis(void)
     char *restoredLocaleName = NULL;
     const char *localeResult = NULL;
     const char *localeCandidates[] = { "C.UTF-8", "en_US.UTF-8", "C", NULL };
-    FILE *file = NULL;
     XrmOptionDescRec parseOptions[] = {
 	{ "-rv", ".reverse", XrmoptionNoArg, (XPointer)"on" },
 	{ "-title", ".title", XrmoptionSepArg, NULL },
@@ -11066,6 +11105,10 @@ BrowserTestXrmDatabaseApis(void)
     emptyNames[0] = NULLQUARK;
     emptyClasses[0] = NULLQUARK;
     (void)remove(xrmFilePath);
+    (void)remove(xrmNestedIncludeFilePath);
+    (void)remove(xrmIncludeFilePath);
+    (void)remove(xrmMissingIncludeFilePath);
+    (void)remove(xrmIncludeDir);
     (void)remove(xrmOutputPath);
     (void)remove(xrmMissingPath);
     BrowserInitDisplay();
@@ -11581,21 +11624,14 @@ BrowserTestXrmDatabaseApis(void)
 		    "Wish.Border", "merge-border")) {
 	goto cleanup;
     }
-    file = fopen(xrmFilePath, "wb");
-    if (file == NULL) {
+    if ((mkdir(xrmIncludeDir, 0777) != 0)
+	    || !BrowserTestWriteTextFile(xrmNestedIncludeFilePath,
+		    xrmNestedIncludedFileText)
+	    || !BrowserTestWriteTextFile(xrmIncludeFilePath,
+		    xrmIncludedFileText)
+	    || !BrowserTestWriteTextFile(xrmFilePath, xrmFileText)) {
 	goto cleanup;
     }
-    if (fwrite(xrmFileText, 1U, sizeof(xrmFileText) - 1U, file)
-	    != sizeof(xrmFileText) - 1U) {
-	(void)fclose(file);
-	file = NULL;
-	goto cleanup;
-    }
-    if (fclose(file) != 0) {
-	file = NULL;
-	goto cleanup;
-    }
-    file = NULL;
     if (XrmGetFileDatabase(xrmMissingPath) != NULL) {
 	goto cleanup;
     }
@@ -11605,6 +11641,10 @@ BrowserTestXrmDatabaseApis(void)
 	    || (strcmp(XrmLocaleOfDatabase(fileDatabase), "C") != 0)
 	    || !BrowserTestXrmResourceEquals(fileDatabase, "wish.geometry",
 		    "Wish.Geometry", "file-geometry")
+	    || !BrowserTestXrmResourceEquals(fileDatabase, "wish.included",
+		    "Wish.Included", "include-value")
+	    || !BrowserTestXrmResourceEquals(fileDatabase, "wish.nested",
+		    "Wish.Nested", "nested-value")
 	    || !BrowserTestXrmResourceEquals(fileDatabase, "wish.file",
 		    "Wish.File", "file-value")
 	    || !BrowserTestXrmResourceEquals(fileDatabase, "wish.continued",
@@ -11628,6 +11668,10 @@ BrowserTestXrmDatabaseApis(void)
 		    != 1)
 	    || !BrowserTestXrmResourceEquals(putDatabase, "wish.geometry",
 		    "Wish.Geometry", "merge-override")
+	    || !BrowserTestXrmResourceEquals(putDatabase, "wish.included",
+		    "Wish.Included", "include-value")
+	    || !BrowserTestXrmResourceEquals(putDatabase, "wish.nested",
+		    "Wish.Nested", "nested-value")
 	    || !BrowserTestXrmResourceEquals(putDatabase, "wish.file",
 		    "Wish.File", "file-value")
 	    || (XrmCombineFileDatabase(xrmFilePath, &putDatabase, True)
@@ -11662,9 +11706,6 @@ BrowserTestXrmDatabaseApis(void)
     result = 1;
 
 cleanup:
-    if (file != NULL) {
-	(void)fclose(file);
-    }
     if (permanentAllocation != NULL) {
 	XFree(permanentAllocation);
     }
@@ -11739,6 +11780,10 @@ cleanup:
 	XrmDestroyDatabase(database);
     }
     (void)remove(xrmFilePath);
+    (void)remove(xrmNestedIncludeFilePath);
+    (void)remove(xrmIncludeFilePath);
+    (void)remove(xrmMissingIncludeFilePath);
+    (void)remove(xrmIncludeDir);
     (void)remove(xrmOutputPath);
     (void)remove(xrmMissingPath);
     return result;

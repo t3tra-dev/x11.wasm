@@ -42,6 +42,8 @@ typedef Bool (*BrowserXrmEnumerator)(
     XrmValue *value,
     XPointer closure);
 
+#define BROWSER_XRM_INCLUDE_DEPTH_LIMIT 32
+
 Display *
 XOpenDisplay(
     _Xconst char *displayName)
@@ -209,6 +211,77 @@ BrowserXrmReadFileString(
     }
     buffer[length] = '\0';
     return buffer;
+}
+
+static int
+BrowserXrmPathIsAbsolute(
+    const char *path)
+{
+    if ((path == NULL) || (path[0] == '\0')) {
+	return 0;
+    }
+    if ((path[0] == '/') || (path[0] == '\\')) {
+	return 1;
+    }
+    return isalpha(UCHAR(path[0])) && (path[1] == ':')
+	    && ((path[2] == '/') || (path[2] == '\\'));
+}
+
+static char *
+BrowserXrmDirectoryName(
+    const char *filename)
+{
+    const char *slash;
+    const char *backslash;
+    const char *separator;
+
+    if (filename == NULL) {
+	return BrowserDupString("");
+    }
+    slash = strrchr(filename, '/');
+    backslash = strrchr(filename, '\\');
+    separator = slash;
+    if ((backslash != NULL) && ((separator == NULL)
+	    || (backslash > separator))) {
+	separator = backslash;
+    }
+    if (separator == NULL) {
+	return BrowserDupString("");
+    }
+    if (separator == filename) {
+	return BrowserDupRange(filename, filename + 1);
+    }
+    return BrowserDupRange(filename, separator);
+}
+
+static char *
+BrowserXrmJoinPath(
+    const char *baseDirectory,
+    const char *filename)
+{
+    size_t baseLength;
+    size_t filenameLength;
+    int needsSeparator;
+    char *path;
+
+    if ((filename == NULL) || (filename[0] == '\0')
+	    || BrowserXrmPathIsAbsolute(filename)
+	    || (baseDirectory == NULL) || (baseDirectory[0] == '\0')) {
+	return BrowserDupString((filename != NULL) ? filename : "");
+    }
+    baseLength = strlen(baseDirectory);
+    filenameLength = strlen(filename);
+    needsSeparator = (baseDirectory[baseLength - 1U] != '/')
+	    && (baseDirectory[baseLength - 1U] != '\\');
+    path = (char *)ckalloc(baseLength + (needsSeparator ? 1U : 0U)
+	    + filenameLength + 1U);
+    memcpy(path, baseDirectory, baseLength);
+    if (needsSeparator) {
+	path[baseLength++] = '/';
+    }
+    memcpy(path + baseLength, filename, filenameLength);
+    path[baseLength + filenameLength] = '\0';
+    return path;
 }
 
 static char *
@@ -1103,7 +1176,96 @@ BrowserXrmParseLineIntoDatabase(
 static void
 BrowserXrmParseStringIntoDatabase(
     XrmDatabase database,
-    const char *data)
+    const char *data,
+    const char *baseDirectory,
+    int includeDepth);
+
+static int
+BrowserXrmParseFileIntoDatabase(
+    XrmDatabase database,
+    const char *filename,
+    int includeDepth)
+{
+    char *data;
+    char *baseDirectory;
+
+    data = BrowserXrmReadFileString(filename);
+    if (data == NULL) {
+	return 0;
+    }
+    baseDirectory = BrowserXrmDirectoryName(filename);
+    BrowserXrmParseStringIntoDatabase(database, data, baseDirectory,
+	    includeDepth);
+    ckfree(baseDirectory);
+    ckfree(data);
+    return 1;
+}
+
+static char *
+BrowserXrmDupIncludeFilename(
+    const char *lineStart,
+    const char *lineEnd)
+{
+    static const char includeKeyword[] = "include";
+    const char *cursor = BrowserSkipDefaultSpaces(lineStart, lineEnd);
+    const char *filenameStart;
+    const char *filenameEnd;
+
+    if ((cursor == lineEnd) || (*cursor != '#')) {
+	return NULL;
+    }
+    cursor++;
+    if ((cursor == lineEnd) || !isspace(UCHAR(*cursor))) {
+	return NULL;
+    }
+    cursor = BrowserSkipDefaultSpaces(cursor, lineEnd);
+    if ((size_t)(lineEnd - cursor) < sizeof(includeKeyword) - 1U
+	    || memcmp(cursor, includeKeyword,
+		    sizeof(includeKeyword) - 1U) != 0) {
+	return NULL;
+    }
+    cursor += sizeof(includeKeyword) - 1U;
+    if ((cursor == lineEnd) || !isspace(UCHAR(*cursor))) {
+	return NULL;
+    }
+    filenameStart = BrowserSkipDefaultSpaces(cursor, lineEnd);
+    filenameEnd = BrowserTrimDefaultSpaces(filenameStart, lineEnd);
+    if (filenameStart == filenameEnd) {
+	return NULL;
+    }
+    return BrowserDupRange(filenameStart, filenameEnd);
+}
+
+static int
+BrowserXrmParseIncludeLine(
+    XrmDatabase database,
+    const char *lineStart,
+    const char *lineEnd,
+    const char *baseDirectory,
+    int includeDepth)
+{
+    char *filename = BrowserXrmDupIncludeFilename(lineStart, lineEnd);
+    char *path;
+
+    if (filename == NULL) {
+	return 0;
+    }
+    if (includeDepth < BROWSER_XRM_INCLUDE_DEPTH_LIMIT) {
+	path = BrowserXrmJoinPath(baseDirectory, filename);
+	(void)BrowserXrmParseFileIntoDatabase(database, path,
+		includeDepth + 1);
+	ckfree(path);
+    }
+    ckfree(filename);
+    return 1;
+}
+
+static void
+BrowserXrmParseStringIntoDatabase(
+    XrmDatabase database,
+    const char *data,
+    const char *baseDirectory,
+    int includeDepth)
 {
     size_t dataLength;
     char *logicalLine;
@@ -1130,8 +1292,11 @@ BrowserXrmParseStringIntoDatabase(
 		logicalEnd = lineEnd - 1;
 		continue;
 	    }
-	    (void)BrowserXrmParseLineIntoDatabase(database, logicalLine,
-		    lineEnd);
+	    if (!BrowserXrmParseIncludeLine(database, logicalLine, lineEnd,
+		    baseDirectory, includeDepth)) {
+		(void)BrowserXrmParseLineIntoDatabase(database, logicalLine,
+			lineEnd);
+	    }
 	    logicalEnd = logicalLine;
 	    if (ch == '\0') {
 		break;
@@ -1388,7 +1553,7 @@ XrmGetStringDatabase(
 	return NULL;
     }
     database = BrowserXrmNewDatabase();
-    BrowserXrmParseStringIntoDatabase(database, data);
+    BrowserXrmParseStringIntoDatabase(database, data, NULL, 0);
     return database;
 }
 
@@ -1396,15 +1561,13 @@ XrmDatabase
 XrmGetFileDatabase(
     _Xconst char *filename)
 {
-    char *data;
     XrmDatabase database;
 
-    data = BrowserXrmReadFileString(filename);
-    if (data == NULL) {
+    database = BrowserXrmNewDatabase();
+    if (!BrowserXrmParseFileIntoDatabase(database, filename, 0)) {
+	XrmDestroyDatabase(database);
 	return NULL;
     }
-    database = XrmGetStringDatabase(data);
-    ckfree(data);
     return database;
 }
 
