@@ -10769,6 +10769,10 @@ typedef struct BrowserTestXrmEnumerateState {
     int sawForeground;
     int sawBackground;
     int sawEmpty;
+    int sawPrefixRoot;
+    int sawOneLevel;
+    int sawQuestionAccent;
+    int sawLooseBacktrack;
     int stopOnGeometry;
     int stopped;
 } BrowserTestXrmEnumerateState;
@@ -10799,6 +10803,8 @@ BrowserTestXrmEnumerateProc(
     const char *first = (quarks != NULL) ? XrmQuarkToString(quarks[0]) : NULL;
     const char *second = ((quarks != NULL) && (quarks[0] != NULLQUARK))
 	    ? XrmQuarkToString(quarks[1]) : NULL;
+    const char *third = ((quarks != NULL) && (quarks[0] != NULLQUARK)
+	    && (quarks[1] != NULLQUARK)) ? XrmQuarkToString(quarks[2]) : NULL;
 
     if ((statePtr == NULL) || (databasePtr == NULL) || (*databasePtr == NULL)
 	    || (bindings == NULL) || (quarks == NULL)
@@ -10842,11 +10848,38 @@ BrowserTestXrmEnumerateProc(
 	    && BrowserTestXrmValueEquals(type, value,
 		    "class-background")) {
 	statePtr->sawBackground = 1;
+    } else if ((strcmp(first, "wish") == 0) && (second == NULL)
+	    && (bindings[0] == XrmBindTightly)
+	    && BrowserTestXrmValueEquals(type, value, "prefix-root")) {
+	statePtr->sawPrefixRoot = 1;
     } else if ((strcmp(first, "wish") == 0)
 	    && (second != NULL) && (strcmp(second, "empty") == 0)
 	    && (quarks[2] == NULLQUARK)
 	    && BrowserTestXrmValueEquals(type, value, "")) {
 	statePtr->sawEmpty = 1;
+    } else if ((strcmp(first, "wish") == 0)
+	    && (second != NULL) && (strcmp(second, "geometry") == 0)
+	    && (quarks[2] == NULLQUARK)
+	    && (bindings[0] == XrmBindTightly)
+	    && (bindings[1] == XrmBindTightly)
+	    && BrowserTestXrmValueEquals(type, value, "one-level")) {
+	statePtr->sawOneLevel = 1;
+    } else if ((strcmp(first, "wish") == 0)
+	    && (second != NULL) && (strcmp(second, "?") == 0)
+	    && (third != NULL) && (strcmp(third, "accent") == 0)
+	    && (quarks[3] == NULLQUARK)
+	    && (bindings[0] == XrmBindTightly)
+	    && (bindings[1] == XrmBindTightly)
+	    && (bindings[2] == XrmBindTightly)
+	    && BrowserTestXrmValueEquals(type, value, "question-accent")) {
+	statePtr->sawQuestionAccent = 1;
+    } else if ((strcmp(first, "a") == 0)
+	    && (second != NULL) && (strcmp(second, "b") == 0)
+	    && (quarks[2] == NULLQUARK)
+	    && (bindings[0] == XrmBindLoosely)
+	    && (bindings[1] == XrmBindTightly)
+	    && BrowserTestXrmValueEquals(type, value, "loose-backtrack")) {
+	statePtr->sawLooseBacktrack = 1;
     } else {
 	statePtr->invalid = 1;
     }
@@ -10885,6 +10918,9 @@ BrowserTestXrmDatabaseApis(void)
     const char xrmMissingPath[] = "x11wasm-xrm-missing.txt";
     XrmDatabase database = NULL;
     XrmDatabase precedenceDatabase = NULL;
+    XrmDatabase enumeratePrefixDatabase = NULL;
+    XrmDatabase enumerateQuestionDatabase = NULL;
+    XrmDatabase enumerateBacktrackDatabase = NULL;
     XrmDatabase emptyDatabase = NULL;
     XrmDatabase putDatabase = NULL;
     XrmDatabase mergeDatabase = NULL;
@@ -10927,6 +10963,10 @@ BrowserTestXrmDatabaseApis(void)
     BrowserTestXrmEnumerateState enumPrefixState = { 0 };
     BrowserTestXrmEnumerateState enumOneLevelState = { 0 };
     BrowserTestXrmEnumerateState enumStopState = { 0 };
+    BrowserTestXrmEnumerateState enumExactPrefixAllState = { 0 };
+    BrowserTestXrmEnumerateState enumExactPrefixOneState = { 0 };
+    BrowserTestXrmEnumerateState enumQuestionState = { 0 };
+    BrowserTestXrmEnumerateState enumBacktrackState = { 0 };
     int parseArgc = 17;
     int result = 0;
 
@@ -11127,6 +11167,53 @@ BrowserTestXrmDatabaseApis(void)
 	    (XPointer)&enumStopState) != True)
 	    || !enumStopState.stopped || !enumStopState.sawGeometry
 	    || (enumStopState.invalid != 0)) {
+	goto cleanup;
+    }
+    enumeratePrefixDatabase = XrmGetStringDatabase(
+	    "wish: prefix-root\n"
+	    "wish.geometry: one-level\n");
+    XrmStringToNameList("wish", qNames);
+    XrmStringToClassList("Wish", qClasses);
+    if ((enumeratePrefixDatabase == NULL)
+	    || (XrmEnumerateDatabase(enumeratePrefixDatabase, qNames, qClasses,
+		    XrmEnumAllLevels, BrowserTestXrmEnumerateProc,
+		    (XPointer)&enumExactPrefixAllState) != False)
+	    || (enumExactPrefixAllState.invalid != 0)
+	    || (enumExactPrefixAllState.count != 1)
+	    || enumExactPrefixAllState.sawPrefixRoot
+	    || !enumExactPrefixAllState.sawOneLevel
+	    || (XrmEnumerateDatabase(enumeratePrefixDatabase, qNames, qClasses,
+		    XrmEnumOneLevel, BrowserTestXrmEnumerateProc,
+		    (XPointer)&enumExactPrefixOneState) != False)
+	    || (enumExactPrefixOneState.invalid != 0)
+	    || (enumExactPrefixOneState.count != 1)
+	    || enumExactPrefixOneState.sawPrefixRoot
+	    || !enumExactPrefixOneState.sawOneLevel) {
+	goto cleanup;
+    }
+    enumerateQuestionDatabase = XrmGetStringDatabase(
+	    "wish.?.accent: question-accent\n");
+    XrmStringToNameList("wish.main", qNames);
+    XrmStringToClassList("Wish.Main", qClasses);
+    if ((enumerateQuestionDatabase == NULL)
+	    || (XrmEnumerateDatabase(enumerateQuestionDatabase, qNames,
+		    qClasses, XrmEnumOneLevel, BrowserTestXrmEnumerateProc,
+		    (XPointer)&enumQuestionState) != False)
+	    || (enumQuestionState.invalid != 0)
+	    || (enumQuestionState.count != 1)
+	    || !enumQuestionState.sawQuestionAccent) {
+	goto cleanup;
+    }
+    enumerateBacktrackDatabase = XrmGetStringDatabase("*a.b: loose-backtrack\n");
+    XrmStringToNameList("a.a", qNames);
+    XrmStringToClassList("A.A", qClasses);
+    if ((enumerateBacktrackDatabase == NULL)
+	    || (XrmEnumerateDatabase(enumerateBacktrackDatabase, qNames,
+		    qClasses, XrmEnumOneLevel, BrowserTestXrmEnumerateProc,
+		    (XPointer)&enumBacktrackState) != False)
+	    || (enumBacktrackState.invalid != 0)
+	    || (enumBacktrackState.count != 1)
+	    || !enumBacktrackState.sawLooseBacktrack) {
 	goto cleanup;
     }
     XrmPutStringResource(&putDatabase, "wish.geometry", "put-geometry");
@@ -11354,6 +11441,15 @@ cleanup:
     }
     if (emptyDatabase != NULL) {
 	XrmDestroyDatabase(emptyDatabase);
+    }
+    if (enumerateBacktrackDatabase != NULL) {
+	XrmDestroyDatabase(enumerateBacktrackDatabase);
+    }
+    if (enumerateQuestionDatabase != NULL) {
+	XrmDestroyDatabase(enumerateQuestionDatabase);
+    }
+    if (enumeratePrefixDatabase != NULL) {
+	XrmDestroyDatabase(enumeratePrefixDatabase);
     }
     if (precedenceDatabase != NULL) {
 	XrmDestroyDatabase(precedenceDatabase);
