@@ -713,7 +713,7 @@ BrowserXrmEnumerateEntry(
 }
 
 static int
-BrowserXrmPartMatchesComponent(
+BrowserXrmPartMatchType(
     const BrowserXrmBindingPart *partPtr,
     const BrowserXrmComponent *nameParts,
     int nameCount,
@@ -721,21 +721,76 @@ BrowserXrmPartMatchesComponent(
     int classCount,
     int componentIndex)
 {
-    if ((componentIndex < 0) || (componentIndex >= nameCount)) {
+    if ((partPtr == NULL) || (componentIndex < 0)
+	    || (componentIndex >= nameCount)) {
 	return 0;
     }
     if (BrowserXrmRangeEquals(partPtr->start, partPtr->end,
 	    nameParts[componentIndex].start, nameParts[componentIndex].end)) {
-	return 1;
+	return 3;
     }
-    return (componentIndex < classCount)
+    if ((componentIndex < classCount)
 	    && BrowserXrmRangeEquals(partPtr->start, partPtr->end,
 		    classParts[componentIndex].start,
-		    classParts[componentIndex].end);
+		    classParts[componentIndex].end)) {
+	return 2;
+    }
+    if (((partPtr->end - partPtr->start) == 1) && (*partPtr->start == '?')) {
+	return 1;
+    }
+    return 0;
+}
+
+static unsigned char
+BrowserXrmLevelScore(
+    const BrowserXrmBindingPart *partPtr,
+    int matchType)
+{
+    int bindingScore;
+
+    if (matchType <= 0) {
+	return 0U;
+    }
+    bindingScore = ((partPtr != NULL) && (partPtr->separator == '*')) ? 0 : 1;
+    return (unsigned char)((matchType * 2) + bindingScore);
 }
 
 static int
-BrowserXrmBindingMatchesAt(
+BrowserXrmMatchVectorCompare(
+    const unsigned char *firstLevels,
+    const unsigned char *secondLevels,
+    int levelCount)
+{
+    int index;
+
+    for (index = 0; index < levelCount; index++) {
+	if (firstLevels[index] > secondLevels[index]) {
+	    return 1;
+	}
+	if (firstLevels[index] < secondLevels[index]) {
+	    return -1;
+	}
+    }
+    return 0;
+}
+
+static void
+BrowserXrmSaveBestMatch(
+    const unsigned char *candidateLevels,
+    unsigned char *bestLevels,
+    int levelCount,
+    int *hasBestPtr)
+{
+    if ((*hasBestPtr == 0)
+	    || (BrowserXrmMatchVectorCompare(candidateLevels, bestLevels,
+		    levelCount) > 0)) {
+	memcpy(bestLevels, candidateLevels, (size_t)levelCount);
+	*hasBestPtr = 1;
+    }
+}
+
+static void
+BrowserXrmBindingBestMatchAt(
     const BrowserXrmBindingPart *parts,
     int partCount,
     int partIndex,
@@ -743,57 +798,85 @@ BrowserXrmBindingMatchesAt(
     int nameCount,
     const BrowserXrmComponent *classParts,
     int classCount,
-    int componentIndex)
+    int componentIndex,
+    unsigned char *candidateLevels,
+    unsigned char *bestLevels,
+    int *hasBestPtr)
 {
     if (partIndex >= partCount) {
-	return componentIndex == nameCount;
+	if (componentIndex == nameCount) {
+	    BrowserXrmSaveBestMatch(candidateLevels, bestLevels, nameCount,
+		    hasBestPtr);
+	}
+	return;
     }
     if (parts[partIndex].separator == '*') {
 	int index;
 
 	for (index = componentIndex; index < nameCount; index++) {
-	    if (BrowserXrmPartMatchesComponent(&parts[partIndex], nameParts,
-		    nameCount, classParts, classCount, index)
-		    && BrowserXrmBindingMatchesAt(parts, partCount,
-			    partIndex + 1, nameParts, nameCount, classParts,
-			    classCount, index + 1)) {
-		return 1;
+	    int matchType = BrowserXrmPartMatchType(&parts[partIndex],
+		    nameParts, nameCount, classParts, classCount, index);
+
+	    if (matchType > 0) {
+		unsigned char oldScore = candidateLevels[index];
+
+		candidateLevels[index] = BrowserXrmLevelScore(
+			&parts[partIndex], matchType);
+		BrowserXrmBindingBestMatchAt(parts, partCount, partIndex + 1,
+			nameParts, nameCount, classParts, classCount, index + 1,
+			candidateLevels, bestLevels, hasBestPtr);
+		candidateLevels[index] = oldScore;
 	    }
 	}
-	return 0;
+	return;
     }
-    return BrowserXrmPartMatchesComponent(&parts[partIndex], nameParts,
-	    nameCount, classParts, classCount, componentIndex)
-	    && BrowserXrmBindingMatchesAt(parts, partCount, partIndex + 1,
+    if (componentIndex < nameCount) {
+	int matchType = BrowserXrmPartMatchType(&parts[partIndex], nameParts,
+		nameCount, classParts, classCount, componentIndex);
+
+	if (matchType > 0) {
+	    unsigned char oldScore = candidateLevels[componentIndex];
+
+	    candidateLevels[componentIndex] = BrowserXrmLevelScore(
+		    &parts[partIndex], matchType);
+	    BrowserXrmBindingBestMatchAt(parts, partCount, partIndex + 1,
 		    nameParts, nameCount, classParts, classCount,
-		    componentIndex + 1);
+		    componentIndex + 1, candidateLevels, bestLevels,
+		    hasBestPtr);
+	    candidateLevels[componentIndex] = oldScore;
+	}
+    }
 }
 
 static int
-BrowserXrmEntryScore(
+BrowserXrmEntryMatch(
     BrowserXrmEntry *entryPtr,
     const BrowserXrmComponent *nameParts,
     int nameCount,
     const BrowserXrmComponent *classParts,
-    int classCount)
+    int classCount,
+    unsigned char *bestLevels)
 {
     BrowserXrmBindingPart *parts;
+    unsigned char *candidateLevels;
     int partCount = 0;
-    int dotCount = 0;
-    int starCount = 0;
-    int score = 0;
+    int hasBest = 0;
 
-    parts = BrowserXrmSplitBinding(entryPtr->binding, &partCount, &dotCount,
-	    &starCount);
-    if ((parts != NULL) && (nameCount > 0)
-	    && BrowserXrmBindingMatchesAt(parts, partCount, 0, nameParts,
-		    nameCount, classParts, classCount, 0)) {
-	score = (partCount * 20) + (dotCount * 5) - starCount;
+    if ((entryPtr == NULL) || (nameCount <= 0) || (bestLevels == NULL)) {
+	return 0;
     }
-    if (parts != NULL) {
-	ckfree(parts);
+    parts = BrowserXrmSplitBinding(entryPtr->binding, &partCount, NULL, NULL);
+    if (parts == NULL) {
+	return 0;
     }
-    return score;
+    candidateLevels = (unsigned char *)ckalloc((size_t)nameCount);
+    memset(candidateLevels, 0, (size_t)nameCount);
+    memset(bestLevels, 0, (size_t)nameCount);
+    BrowserXrmBindingBestMatchAt(parts, partCount, 0, nameParts, nameCount,
+	    classParts, classCount, 0, candidateLevels, bestLevels, &hasBest);
+    ckfree(candidateLevels);
+    ckfree(parts);
+    return hasBest;
 }
 
 static void
@@ -1308,9 +1391,10 @@ XrmGetResource(
     BrowserXrmEntry *bestEntryPtr = NULL;
     BrowserXrmComponent *nameParts;
     BrowserXrmComponent *classParts;
+    unsigned char *entryLevels = NULL;
+    unsigned char *bestLevels = NULL;
     int nameCount = 0;
     int classCount = 0;
-    int bestScore = 0;
 
     if ((database == NULL) || (resourceName == NULL)) {
 	return False;
@@ -1320,14 +1404,18 @@ XrmGetResource(
     if (nameCount == 0) {
 	goto cleanup;
     }
+    entryLevels = (unsigned char *)ckalloc((size_t)nameCount);
+    bestLevels = (unsigned char *)ckalloc((size_t)nameCount);
+    memset(bestLevels, 0, (size_t)nameCount);
     for (entryPtr = database->firstEntryPtr; entryPtr != NULL;
 	    entryPtr = entryPtr->nextPtr) {
-	int score = BrowserXrmEntryScore(entryPtr, nameParts, nameCount,
-		classParts, classCount);
-
-	if (score >= bestScore) {
-	    bestScore = score;
-	    bestEntryPtr = (score > 0) ? entryPtr : bestEntryPtr;
+	if (BrowserXrmEntryMatch(entryPtr, nameParts, nameCount, classParts,
+		classCount, entryLevels)
+		&& ((bestEntryPtr == NULL)
+			|| (BrowserXrmMatchVectorCompare(entryLevels, bestLevels,
+				nameCount) >= 0))) {
+	    memcpy(bestLevels, entryLevels, (size_t)nameCount);
+	    bestEntryPtr = entryPtr;
 	}
     }
     if (bestEntryPtr != NULL) {
@@ -1346,6 +1434,12 @@ cleanup:
     }
     if (classParts != NULL) {
 	ckfree(classParts);
+    }
+    if (entryLevels != NULL) {
+	ckfree(entryLevels);
+    }
+    if (bestLevels != NULL) {
+	ckfree(bestLevels);
     }
     return (bestEntryPtr != NULL) ? True : False;
 }

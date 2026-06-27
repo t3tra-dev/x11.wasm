@@ -10884,6 +10884,7 @@ BrowserTestXrmDatabaseApis(void)
     const char xrmOutputPath[] = "x11wasm-xrm-output.txt";
     const char xrmMissingPath[] = "x11wasm-xrm-missing.txt";
     XrmDatabase database = NULL;
+    XrmDatabase precedenceDatabase = NULL;
     XrmDatabase emptyDatabase = NULL;
     XrmDatabase putDatabase = NULL;
     XrmDatabase mergeDatabase = NULL;
@@ -10970,6 +10971,23 @@ BrowserTestXrmDatabaseApis(void)
     }
     if (XrmGetResource(database, "# ignored", "# Ignored", NULL, NULL)
 	    != False) {
+	goto cleanup;
+    }
+    precedenceDatabase = XrmGetStringDatabase(
+	    "*main.foreground: elided-foreground\n"
+	    "wish*foreground: component-foreground\n"
+	    "wish*color: name-color\n"
+	    "wish*Color: class-color\n"
+	    "wish*?.accent: question-accent\n");
+    if ((precedenceDatabase == NULL)
+	    || !BrowserTestXrmResourceEquals(precedenceDatabase,
+		    "wish.main.foreground", "Wish.Main.Foreground",
+		    "component-foreground")
+	    || !BrowserTestXrmResourceEquals(precedenceDatabase,
+		    "wish.main.color", "Wish.Main.Color", "name-color")
+	    || !BrowserTestXrmResourceEquals(precedenceDatabase,
+		    "wish.main.panel.accent", "Wish.Main.Panel.Accent",
+		    "question-accent")) {
 	goto cleanup;
     }
     permanentAllocation = Xpermalloc(4);
@@ -11336,6 +11354,9 @@ cleanup:
     }
     if (emptyDatabase != NULL) {
 	XrmDestroyDatabase(emptyDatabase);
+    }
+    if (precedenceDatabase != NULL) {
+	XrmDestroyDatabase(precedenceDatabase);
     }
     if (database != NULL) {
 	XrmDestroyDatabase(database);
