@@ -1083,6 +1083,7 @@ X11WasmCreateResource(
     resourcePtr->id = X11WasmAllocXId(display);
     resourcePtr->type = type;
     resourcePtr->display = display;
+    resourcePtr->clientSerial = browserDisplay.currentClientSerial;
     resourcePtr->width = 1;
     resourcePtr->height = 1;
     resourcePtr->depth = 24;
@@ -1204,6 +1205,14 @@ static void
 BrowserCloseDownWindowResource(
     X11WasmResource *resourcePtr);
 
+void
+BrowserStartNextClient(void)
+{
+    do {
+	browserDisplay.currentClientSerial = browserDisplay.nextClientSerial++;
+    } while (browserDisplay.currentClientSerial == 0);
+}
+
 static void
 BrowserRetainSaveSetWindow(
     X11WasmResource *resourcePtr)
@@ -1251,6 +1260,7 @@ BrowserRetainSaveSetWindow(
     resourcePtr->retained = 1;
     resourcePtr->temporary = 0;
     resourcePtr->inSaveSet = 0;
+    resourcePtr->clientSerial = 0;
     if (!resourcePtr->mapped) {
 	resourcePtr->mapped = 1;
 	(void)X11WasmJsMapWindow(BrowserJsXId(resourcePtr->id));
@@ -1312,8 +1322,18 @@ void
 BrowserDeleteTemporaryResources(void)
 {
     X11WasmResource *resourcePtr;
+    X11WasmTrackedGC *gcPtr;
 
     for (;;) {
+	for (gcPtr = gcList; gcPtr != NULL; gcPtr = gcPtr->nextPtr) {
+	    if (gcPtr->retained && gcPtr->temporary) {
+		break;
+	    }
+	}
+	if (gcPtr != NULL) {
+	    (void)BrowserDeleteRegisteredGC(gcPtr->gc);
+	    continue;
+	}
 	for (resourcePtr = browserDisplay.resourceList; resourcePtr != NULL;
 		resourcePtr = resourcePtr->nextPtr) {
 	    if ((resourcePtr != &browserDisplay.rootResource)
@@ -1334,38 +1354,70 @@ BrowserDeleteTemporaryResources(void)
 }
 
 void
+BrowserDeleteClientResources(
+    unsigned long clientSerial)
+{
+    X11WasmResource *resourcePtr;
+    X11WasmTrackedGC *gcPtr;
+
+    if (clientSerial == 0) {
+	return;
+    }
+    for (;;) {
+	for (gcPtr = gcList; gcPtr != NULL; gcPtr = gcPtr->nextPtr) {
+	    if (gcPtr->clientSerial == clientSerial) {
+		break;
+	    }
+	}
+	if (gcPtr != NULL) {
+	    (void)BrowserDeleteRegisteredGC(gcPtr->gc);
+	    continue;
+	}
+	for (resourcePtr = browserDisplay.resourceList; resourcePtr != NULL;
+		resourcePtr = resourcePtr->nextPtr) {
+	    if ((resourcePtr != &browserDisplay.rootResource)
+		    && (resourcePtr->clientSerial == clientSerial)) {
+		break;
+	    }
+	}
+	if (resourcePtr == NULL) {
+	    return;
+	}
+	if (resourcePtr->inSaveSet
+		&& (resourcePtr->type == X11_WASM_RESOURCE_WINDOW)) {
+	    BrowserRetainSaveSetWindow(resourcePtr);
+	} else {
+	    BrowserDeleteCloseDownResource(resourcePtr);
+	}
+    }
+}
+
+void
 BrowserApplyCloseDownMode(void)
 {
     X11WasmResource *resourcePtr;
+    X11WasmTrackedGC *gcPtr;
 
     if (browserDisplay.closeDownMode == DestroyAll) {
-	for (;;) {
-	    for (resourcePtr = browserDisplay.resourceList;
-		    resourcePtr != NULL; resourcePtr = resourcePtr->nextPtr) {
-		if ((resourcePtr != &browserDisplay.rootResource)
-			&& !resourcePtr->retained) {
-		    break;
-		}
-	    }
-	    if (resourcePtr == NULL) {
-		return;
-	    }
-	    if (resourcePtr->inSaveSet
-		    && (resourcePtr->type == X11_WASM_RESOURCE_WINDOW)) {
-		BrowserRetainSaveSetWindow(resourcePtr);
-	    } else {
-		BrowserDeleteCloseDownResource(resourcePtr);
-	    }
-	}
+	BrowserDeleteClientResources(browserDisplay.currentClientSerial);
+	return;
     }
 
     for (resourcePtr = browserDisplay.resourceList; resourcePtr != NULL;
 	    resourcePtr = resourcePtr->nextPtr) {
 	if ((resourcePtr != &browserDisplay.rootResource)
-		&& !resourcePtr->retained) {
+		&& !resourcePtr->retained
+		&& (resourcePtr->clientSerial == browserDisplay.currentClientSerial)) {
 	    resourcePtr->retained = 1;
 	    resourcePtr->temporary =
 		    browserDisplay.closeDownMode == RetainTemporary;
+	}
+    }
+    for (gcPtr = gcList; gcPtr != NULL; gcPtr = gcPtr->nextPtr) {
+	if (!gcPtr->retained
+		&& (gcPtr->clientSerial == browserDisplay.currentClientSerial)) {
+	    gcPtr->retained = 1;
+	    gcPtr->temporary = browserDisplay.closeDownMode == RetainTemporary;
 	}
     }
 }

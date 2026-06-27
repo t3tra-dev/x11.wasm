@@ -304,6 +304,9 @@ typedef struct X11WasmTrackedGC {
     GC gc;
     GContext gcontext;
     unsigned int depth;
+    unsigned long clientSerial;
+    int retained;
+    int temporary;
     struct X11WasmTrackedGC *nextPtr;
 } X11WasmTrackedGC;
 
@@ -1491,6 +1494,8 @@ void BrowserRegisterGC(
     GC gc,
     GContext gcontext,
     unsigned int depth);
+int BrowserDeleteRegisteredGC(
+    GC gc);
 void BrowserRememberColor(
     Colormap colormap,
     const XColor *colorPtr);
@@ -1883,6 +1888,8 @@ Status BrowserTextPropertyToUtf8StringList(
 Atom BrowserTimestampAtom(void);
 X11WasmTrackedGC *BrowserTrackedGC(
     GC gc);
+X11WasmTrackedGC *BrowserTrackedGCForGContext(
+    GContext gcontext);
 int BrowserTransientChainContains(
     X11WasmResource *resourcePtr,
     Window ancestor);

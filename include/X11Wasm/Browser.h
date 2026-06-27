@@ -87,6 +87,7 @@ typedef struct X11WasmResource {
     Window metadataTarget;
     int metadataRootToplevelSet;
     int metadataIsRootToplevel;
+    unsigned long clientSerial;
     int retained;
     int temporary;
     int inSaveSet;
@@ -151,6 +152,8 @@ typedef struct X11WasmDisplayState {
     unsigned long flushSerial;
     unsigned long syncSerial;
     unsigned long closeSerial;
+    unsigned long currentClientSerial;
+    unsigned long nextClientSerial;
     int closeDownMode;
     int screenSaverTimeout;
     int screenSaverInterval;
@@ -206,6 +209,8 @@ MODULE_SCOPE X11WasmResource *X11WasmFindResource(XID id);
 MODULE_SCOPE X11WasmResource *X11WasmCreateResource(
 	Display *display, X11WasmResourceType type);
 MODULE_SCOPE void X11WasmDeleteResource(XID id);
+MODULE_SCOPE void BrowserDeleteClientResources(unsigned long clientSerial);
+MODULE_SCOPE void BrowserStartNextClient(void);
 MODULE_SCOPE int X11WasmServiceEvents(void);
 
 #ifdef __EMSCRIPTEN__

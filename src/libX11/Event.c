@@ -2999,19 +2999,38 @@ XKillClient(
     Display *display,
     XID resource)
 {
+    X11WasmResource *resourcePtr;
+    X11WasmTrackedGC *gcPtr;
+    unsigned long clientSerial;
+
     if (display == NULL) {
 	display = X11WasmGetDisplay(NULL);
     } else {
 	BrowserInitDisplay();
     }
-    if ((resource != AllTemporary)
-	    && (X11WasmFindResource(resource) == NULL)) {
+    resourcePtr = (resource != AllTemporary) ? X11WasmFindResource(resource)
+	    : NULL;
+    gcPtr = ((resource != AllTemporary) && (resourcePtr == NULL))
+	    ? BrowserTrackedGCForGContext((GContext)resource) : NULL;
+    if ((resource != AllTemporary) && (resourcePtr == NULL)
+	    && (gcPtr == NULL)) {
 	(void)BrowserValueOrError(&display, (long)resource, 0,
 		X11_WASM_XREQ_KILL_CLIENT);
 	return Success;
     }
     if ((display == &browserDisplay.display) && (resource == AllTemporary)) {
 	BrowserDeleteTemporaryResources();
+    } else if ((display == &browserDisplay.display)
+	    && ((resourcePtr != NULL) || (gcPtr != NULL))) {
+	clientSerial = (resourcePtr != NULL) ? resourcePtr->clientSerial
+		: gcPtr->clientSerial;
+	if (clientSerial == browserDisplay.currentClientSerial) {
+	    BrowserApplyCloseDownMode();
+	    browserDisplay.closeDownMode = DestroyAll;
+	    BrowserStartNextClient();
+	} else {
+	    BrowserDeleteClientResources(clientSerial);
+	}
     }
     return XNoOp(display);
 }
@@ -3025,9 +3044,23 @@ X11WasmTestTemporaryResourceKill(void)
     Window permanentWindow = None;
     Window saveSetParent = None;
     Window saveSetWindow = None;
+    Window specificWindow = None;
+    Window activeWindow = None;
+    Window retainedKillWindow = None;
     Window temporaryWindow = None;
+    Pixmap specificPixmap = None;
+    Pixmap activePixmap = None;
     Pixmap temporaryPixmap = None;
     Colormap temporaryColormap = None;
+    GC specificGC = NULL;
+    GC activeGC = NULL;
+    GC retainedKillGC = NULL;
+    GC temporaryGC = NULL;
+    GContext specificGContext = None;
+    GContext activeGContext = None;
+    GContext retainedKillGContext = None;
+    GContext temporaryGContext = None;
+    Font specificFont = None;
     Font temporaryFont = None;
     X11WasmResource *resourcePtr;
     int result = 0;
@@ -3057,6 +3090,38 @@ X11WasmTestTemporaryResourceKill(void)
     if ((resourcePtr == NULL) || !resourcePtr->retained
 	    || resourcePtr->temporary
 	    || (XKillClient(display, AllTemporary) != Success)
+	    || (X11WasmFindResource((XID)permanentWindow) == NULL)) {
+	goto cleanup;
+    }
+    specificWindow = XCreateWindow(display, browserDisplay.rootWindow, 2, 2,
+	    13, 13, 0, CopyFromParent, InputOutput,
+	    DefaultVisual(display, screen), 0, NULL);
+    specificPixmap = XCreatePixmap(display, browserDisplay.rootWindow, 3, 3,
+	    DefaultDepth(display, screen));
+    specificFont = XLoadFont(display, "fixed");
+    specificGC = (specificWindow != None)
+	    ? XCreateGC(display, specificWindow, 0, NULL) : NULL;
+    specificGContext = XGContextFromGC(specificGC);
+    if ((specificWindow == None) || (specificPixmap == None)
+	    || (specificFont == None) || (specificGC == NULL)
+	    || (specificGContext == None)
+	    || (XSetCloseDownMode(display, RetainPermanent) != Success)
+	    || (XCloseDisplay(display) != Success)) {
+	goto cleanup;
+    }
+    resourcePtr = X11WasmFindResource((XID)specificWindow);
+    if ((resourcePtr == NULL) || !resourcePtr->retained
+	    || resourcePtr->temporary) {
+	goto cleanup;
+    }
+    if (XKillClient(display, (XID)specificGContext) != Success) {
+	goto cleanup;
+    }
+    specificGC = NULL;
+    if ((X11WasmFindResource((XID)specificWindow) != NULL)
+	    || (X11WasmFindResource((XID)specificPixmap) != NULL)
+	    || (X11WasmFindResource((XID)specificFont) != NULL)
+	    || (BrowserTrackedGCForGContext(specificGContext) != NULL)
 	    || (X11WasmFindResource((XID)permanentWindow) == NULL)) {
 	goto cleanup;
     }
@@ -3100,8 +3165,12 @@ X11WasmTestTemporaryResourceKill(void)
     temporaryColormap = XCreateColormap(display, browserDisplay.rootWindow,
 	    DefaultVisual(display, screen), AllocNone);
     temporaryFont = XLoadFont(display, "fixed");
+    temporaryGC = (temporaryWindow != None) ? XCreateGC(display,
+	    temporaryWindow, 0, NULL) : NULL;
+    temporaryGContext = XGContextFromGC(temporaryGC);
     if ((temporaryWindow == None) || (temporaryPixmap == None)
-	    || (temporaryColormap == None) || (temporaryFont == None)) {
+	    || (temporaryColormap == None) || (temporaryFont == None)
+	    || (temporaryGC == NULL) || (temporaryGContext == None)) {
 	goto cleanup;
     }
     if (XCloseDisplay(display) != Success) {
@@ -3127,14 +3196,74 @@ X11WasmTestTemporaryResourceKill(void)
 	    || !resourcePtr->temporary) {
 	goto cleanup;
     }
+    if ((BrowserTrackedGCForGContext(temporaryGContext) == NULL)
+	    || !BrowserTrackedGCForGContext(temporaryGContext)->retained
+	    || !BrowserTrackedGCForGContext(temporaryGContext)->temporary) {
+	goto cleanup;
+    }
     if (XKillClient(display, AllTemporary) != Success) {
 	goto cleanup;
     }
+    temporaryGC = NULL;
     if ((X11WasmFindResource((XID)temporaryWindow) != NULL)
 	    || (X11WasmFindResource((XID)temporaryPixmap) != NULL)
 	    || (X11WasmFindResource((XID)temporaryColormap) != NULL)
 	    || (X11WasmFindResource((XID)temporaryFont) != NULL)
+	    || (BrowserTrackedGCForGContext(temporaryGContext) != NULL)
 	    || (X11WasmFindResource((XID)permanentWindow) == NULL)) {
+	goto cleanup;
+    }
+    if (XSetCloseDownMode(display, RetainTemporary) != Success) {
+	goto cleanup;
+    }
+    retainedKillWindow = XCreateWindow(display, browserDisplay.rootWindow, 2, 2,
+	    10, 10, 0, CopyFromParent, InputOutput,
+	    DefaultVisual(display, screen), 0, NULL);
+    retainedKillGC = (retainedKillWindow != None) ? XCreateGC(display,
+	    retainedKillWindow, 0, NULL) : NULL;
+    retainedKillGContext = XGContextFromGC(retainedKillGC);
+    if ((retainedKillWindow == None) || (retainedKillGC == NULL)
+	    || (retainedKillGContext == None)
+	    || (XKillClient(display, (XID)retainedKillWindow) != Success)) {
+	goto cleanup;
+    }
+    resourcePtr = X11WasmFindResource((XID)retainedKillWindow);
+    if ((resourcePtr == NULL) || !resourcePtr->retained
+	    || !resourcePtr->temporary
+	    || (BrowserTrackedGCForGContext(retainedKillGContext) == NULL)
+	    || !BrowserTrackedGCForGContext(retainedKillGContext)->retained
+	    || !BrowserTrackedGCForGContext(retainedKillGContext)->temporary) {
+	goto cleanup;
+    }
+    if (XKillClient(display, AllTemporary) != Success) {
+	goto cleanup;
+    }
+    retainedKillGC = NULL;
+    if ((X11WasmFindResource((XID)retainedKillWindow) != NULL)
+	    || (BrowserTrackedGCForGContext(retainedKillGContext) != NULL)) {
+	goto cleanup;
+    }
+    activeWindow = XCreateWindow(display, browserDisplay.rootWindow, 3, 3,
+	    12, 12, 0, CopyFromParent, InputOutput,
+	    DefaultVisual(display, screen), 0, NULL);
+    activePixmap = XCreatePixmap(display, browserDisplay.rootWindow, 2, 2,
+	    DefaultDepth(display, screen));
+    activeGC = (activeWindow != None) ? XCreateGC(display, activeWindow, 0,
+	    NULL) : NULL;
+    activeGContext = XGContextFromGC(activeGC);
+    if ((activeWindow == None) || (activePixmap == None) || (activeGC == NULL)
+	    || (activeGContext == None)) {
+	goto cleanup;
+    }
+    if (XKillClient(display, (XID)activeWindow) != Success) {
+	goto cleanup;
+    }
+    activeGC = NULL;
+    if ((X11WasmFindResource((XID)activeWindow) != NULL)
+	    || (X11WasmFindResource((XID)activePixmap) != NULL)
+	    || (BrowserTrackedGCForGContext(activeGContext) != NULL)
+	    || (X11WasmFindResource((XID)permanentWindow) == NULL)
+	    || (X11WasmFindResource((XID)saveSetWindow) == NULL)) {
 	goto cleanup;
     }
     result = 1;
@@ -3149,6 +3278,36 @@ cleanup:
     }
     if (X11WasmFindResource((XID)saveSetParent) != NULL) {
 	(void)XDestroyWindow(display, saveSetParent);
+    }
+    if (specificGC != NULL) {
+	(void)XFreeGC(display, specificGC);
+    }
+    if (X11WasmFindResource((XID)specificFont) != NULL) {
+	(void)XUnloadFont(display, specificFont);
+    }
+    if (X11WasmFindResource((XID)specificPixmap) != NULL) {
+	(void)XFreePixmap(display, specificPixmap);
+    }
+    if (X11WasmFindResource((XID)specificWindow) != NULL) {
+	(void)XDestroyWindow(display, specificWindow);
+    }
+    if (activeGC != NULL) {
+	(void)XFreeGC(display, activeGC);
+    }
+    if (retainedKillGC != NULL) {
+	(void)XFreeGC(display, retainedKillGC);
+    }
+    if (temporaryGC != NULL) {
+	(void)XFreeGC(display, temporaryGC);
+    }
+    if (X11WasmFindResource((XID)activePixmap) != NULL) {
+	(void)XFreePixmap(display, activePixmap);
+    }
+    if (X11WasmFindResource((XID)activeWindow) != NULL) {
+	(void)XDestroyWindow(display, activeWindow);
+    }
+    if (X11WasmFindResource((XID)retainedKillWindow) != NULL) {
+	(void)XDestroyWindow(display, retainedKillWindow);
     }
     if (X11WasmFindResource((XID)temporaryFont) != NULL) {
 	(void)XUnloadFont(display, temporaryFont);

@@ -5542,6 +5542,12 @@ X11WasmTestXlibApis(void)
 		    (XPointer)&imCloseToken)) {
 	goto cleanup;
     }
+    stackImagePixmap = None;
+    xyBitmapPixmap = None;
+    bitmapDataPixmap = None;
+    xyPixmapWindow = None;
+    xyPixmapWindowGC = NULL;
+    xyBitmapGC = NULL;
     (void)XSetLocaleModifiers("@im=none");
     if (XOpenIM(&browserDisplay.display, NULL, NULL, NULL) != NULL) {
 	goto cleanup;
@@ -5653,6 +5659,15 @@ X11WasmTestXlibApis(void)
     }
 
     screen = DefaultScreen(&browserDisplay.display);
+    xyBitmapPixmap = XCreatePixmap(&browserDisplay.display,
+	    (Drawable)browserDisplay.rootWindow, 1, 1,
+	    (unsigned int)DefaultDepth(&browserDisplay.display, screen));
+    xyBitmapGC = (xyBitmapPixmap != None)
+	    ? XCreateGC(&browserDisplay.display, xyBitmapPixmap, 0, NULL)
+	    : NULL;
+    if ((xyBitmapPixmap == None) || (xyBitmapGC == NULL)) {
+	goto cleanup;
+    }
     allocatedIconSize = XAllocIconSize();
     allocatedStandardColormap = XAllocStandardColormap();
     if ((allocatedIconSize == NULL)

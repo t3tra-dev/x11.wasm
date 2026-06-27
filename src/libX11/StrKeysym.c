@@ -535,6 +535,23 @@ BrowserTrackedGC(
     return NULL;
 }
 
+X11WasmTrackedGC *
+BrowserTrackedGCForGContext(
+    GContext gcontext)
+{
+    X11WasmTrackedGC *gcPtr;
+
+    if (gcontext == None) {
+	return NULL;
+    }
+    for (gcPtr = gcList; gcPtr != NULL; gcPtr = gcPtr->nextPtr) {
+	if (gcPtr->gcontext == gcontext) {
+	    return gcPtr;
+	}
+    }
+    return NULL;
+}
+
 unsigned int
 BrowserGCDepth(
     GC gc)
@@ -579,6 +596,9 @@ BrowserRegisterGC(
     gcPtr->gc = gc;
     gcPtr->gcontext = gcontext;
     gcPtr->depth = depth;
+    gcPtr->clientSerial = browserDisplay.currentClientSerial;
+    gcPtr->retained = 0;
+    gcPtr->temporary = 0;
     gcPtr->nextPtr = gcList;
     gcList = gcPtr;
 }
@@ -600,6 +620,19 @@ BrowserUnregisterGC(
 	linkPtr = &gcPtr->nextPtr;
     }
     return 0;
+}
+
+int
+BrowserDeleteRegisteredGC(
+    GC gc)
+{
+    if (!BrowserUnregisterGC(gc)) {
+	return 0;
+    }
+    BrowserDeleteGCClip(gc);
+    BrowserDeleteGCDashes(gc);
+    ckfree(gc);
+    return 1;
 }
 
 int

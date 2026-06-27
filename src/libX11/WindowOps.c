@@ -1807,6 +1807,7 @@ XCloseDisplay(
 	BrowserApplyCloseDownMode();
 	browserDisplay.closeDownMode = DestroyAll;
 	browserDisplay.closeSerial++;
+	BrowserStartNextClient();
 	BrowserSyncPointerGrabCursor();
 	BrowserSyncPointerGrabState();
 	BrowserSyncKeyboardGrabState();
@@ -3242,14 +3243,11 @@ XFreeGC(
     Display *display,
     GC gc)
 {
-    if (!BrowserUnregisterGC(gc)) {
+    if (!BrowserDeleteRegisteredGC(gc)) {
 	(void)BrowserReportXError(display, BadGC, (XID)(uintptr_t)gc,
 		X11_WASM_XREQ_FREE_GC, 0);
 	return Success;
     }
-    BrowserDeleteGCClip(gc);
-    BrowserDeleteGCDashes(gc);
-    ckfree(gc);
     return XNoOp(display);
 }
 

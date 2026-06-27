@@ -67,6 +67,8 @@ BrowserInitDisplay(void)
     state->pointerWindow = state->rootWindow;
     state->defaultColormap = 2;
     state->nextXId = 100;
+    state->currentClientSerial = 1;
+    state->nextClientSerial = 2;
     state->closeDownMode = DestroyAll;
     state->screenSaverTimeout = X11_WASM_DEFAULT_SCREEN_SAVER_TIMEOUT;
     state->screenSaverInterval = X11_WASM_DEFAULT_SCREEN_SAVER_INTERVAL;
