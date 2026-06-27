@@ -1635,6 +1635,58 @@ X11WasmTestSetWindowMetadataTargetApi(
 	    (Window)target, isRootToplevel);
 }
 
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestGetWindowMetadataTargetDeletes(
+    unsigned int window,
+    unsigned int target)
+{
+    Display *display;
+    Window xid = (Window)window;
+    Window targetXid = (Window)target;
+    unsigned int targetValue = target;
+    Atom targetAtom;
+    Atom actualType = None;
+    int actualFormat = 0;
+    unsigned long nitems = 0;
+    unsigned long bytesAfter = 0;
+    unsigned char *targetData = NULL;
+    int result = 0;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    if ((BrowserWindowResource(xid) == NULL)
+	    || (BrowserWindowResource(targetXid) == NULL)) {
+	return 0;
+    }
+    targetAtom = XInternAtom(display, "_X11_WASM_METADATA_TARGET", False);
+    if (targetAtom == None) {
+	goto cleanup;
+    }
+    if ((XChangeProperty(display, xid, targetAtom, XA_WINDOW, 32,
+		    PropModeReplace, (const unsigned char *)&targetValue,
+		    1) != Success)
+	    || !X11WasmTestSetWindowMetadataProperties(window, 1)
+	    || (XGetWindowProperty(display, xid, targetAtom, 0, 1, True,
+		    XA_WINDOW, &actualType, &actualFormat, &nitems,
+		    &bytesAfter, &targetData) != Success)
+	    || (actualType != XA_WINDOW)
+	    || (actualFormat != 32)
+	    || (nitems != 1)
+	    || (bytesAfter != 0)
+	    || (targetData == NULL)
+	    || ((Window)BrowserPropertyAtomAt(targetData, 0) != targetXid)
+	    || !BrowserTestWindowPropertyIsMissing(display, xid, targetAtom)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    if (targetData != NULL) {
+	XFree(targetData);
+    }
+    return result;
+}
+
 void
 XSetWMSizeHints(
     Display *display,

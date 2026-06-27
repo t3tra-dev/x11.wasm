@@ -1272,7 +1272,7 @@ test("metadata target properties forward ICCCM metadata to another window", asyn
   expect(metadata).toEqual({
     documentTitle: "X11Wasm Metadata Title",
     metadataResult: 1,
-    nonRootDocumentTitle: "non-root metadata title sentinel",
+    nonRootDocumentTitle: "",
     nonRootTargetResult: 1,
     source: {
       command: "",
@@ -1286,6 +1286,126 @@ test("metadata target properties forward ICCCM metadata to another window", asyn
       titleAttr: "X11Wasm Metadata Title",
     },
     targetResult: 1,
+  });
+});
+
+test("metadata target delete clears old forwarded ICCCM metadata", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+  const [sourceId, targetId] = await createMappedWindows(page, 2);
+
+  const metadata = await page.evaluate(({ sourceId, targetId }) => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestGetWindowMetadataTargetDeletes?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    if (
+      !module?._X11WasmTestGetWindowMetadataTargetDeletes ||
+      !backend
+    ) {
+      throw new Error("missing metadata target delete test hooks");
+    }
+
+    const deleteResult = module._X11WasmTestGetWindowMetadataTargetDeletes(
+      sourceId,
+      targetId,
+    );
+    backend.flush?.();
+    const snapshot = (id) => {
+      const resource = backend.resources.get(id);
+      const element = resource?.element;
+      if (!(element instanceof HTMLElement) || !resource) {
+        throw new Error("missing metadata target delete test element");
+      }
+      return {
+        attrs: {
+          title: element.getAttribute("data-x11-wasm-title"),
+          iconName: element.getAttribute("data-x11-wasm-icon-name"),
+          command: element.getAttribute("data-x11-wasm-command"),
+          className: element.getAttribute("data-x11-wasm-class-name"),
+          classValue: element.getAttribute("data-x11-wasm-class"),
+          clientMachine: element.getAttribute("data-x11-wasm-client-machine"),
+          transientFor: element.getAttribute("data-x11-wasm-transient-for"),
+          wmHintsFlags: element.getAttribute("data-x11-wasm-wm-hints-flags"),
+          sizeFlags: element.getAttribute("data-x11-wasm-size-hints-flags"),
+        },
+        resource: {
+          title: resource.title,
+          iconName: resource.iconName,
+          command: resource.command,
+          className: resource.wmClassName,
+          classValue: resource.wmClass,
+          clientMachine: resource.clientMachine,
+          transientFor: resource.transientFor,
+          wmHintsFlags: resource.wmHints?.flags ?? null,
+          sizeFlags: resource.sizeHints?.flags ?? null,
+        },
+      };
+    };
+
+    return {
+      deleteResult,
+      documentTitle: document.title,
+      rootWindow: backend.rootWindow,
+      source: snapshot(sourceId),
+      target: snapshot(targetId),
+    };
+  }, { sourceId, targetId });
+
+  expect(metadata).toEqual({
+    deleteResult: 1,
+    documentTitle: "X11Wasm Metadata Title",
+    rootWindow: expect.any(Number),
+    source: {
+      attrs: {
+        title: "X11Wasm Metadata Title",
+        iconName: "X11Wasm Metadata Icon",
+        command: "x11wasm-test --metadata",
+        className: "metadata",
+        classValue: "X11WasmMetadata",
+        clientMachine: "x11wasm-client",
+        transientFor: String(metadata.rootWindow),
+        wmHintsFlags: "19",
+        sizeFlags: "1020",
+      },
+      resource: {
+        title: "X11Wasm Metadata Title",
+        iconName: "X11Wasm Metadata Icon",
+        command: "x11wasm-test --metadata",
+        className: "metadata",
+        classValue: "X11WasmMetadata",
+        clientMachine: "x11wasm-client",
+        transientFor: metadata.rootWindow,
+        wmHintsFlags: 19,
+        sizeFlags: 1020,
+      },
+    },
+    target: {
+      attrs: {
+        title: null,
+        iconName: null,
+        command: null,
+        className: null,
+        classValue: null,
+        clientMachine: null,
+        transientFor: null,
+        wmHintsFlags: "2",
+        sizeFlags: null,
+      },
+      resource: {
+        title: "",
+        iconName: "",
+        command: "",
+        className: "",
+        classValue: "",
+        clientMachine: "",
+        transientFor: 0,
+        wmHintsFlags: 2,
+        sizeFlags: null,
+      },
+    },
   });
 });
 

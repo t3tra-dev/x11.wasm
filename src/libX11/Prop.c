@@ -614,6 +614,41 @@ BrowserReapplyWindowMetadataProperties(
     }
 }
 
+static void
+BrowserClearWindowMetadataTarget(
+    Window target,
+    int updatesDocument)
+{
+    if ((target == None) || (BrowserWindowResource(target) == NULL)) {
+	return;
+    }
+    (void)X11WasmJsClearWindowMetadata(BrowserJsXId(target),
+	    updatesDocument);
+}
+
+static void
+BrowserRebuildWindowMetadataTarget(
+    Window target,
+    int updatesDocument)
+{
+    X11WasmResource *candidatePtr;
+
+    if ((target == None) || (BrowserWindowResource(target) == NULL)) {
+	return;
+    }
+    BrowserClearWindowMetadataTarget(target, updatesDocument);
+    for (candidatePtr = browserDisplay.resourceList; candidatePtr != NULL;
+	    candidatePtr = candidatePtr->nextPtr) {
+	if ((candidatePtr->type != X11_WASM_RESOURCE_WINDOW)
+		|| (BrowserWindowMetadataTarget((Window)candidatePtr->id)
+		    != target)) {
+	    continue;
+	}
+	BrowserReapplyWindowMetadataProperties((Window)candidatePtr->id,
+		candidatePtr);
+    }
+}
+
 static int
 BrowserApplyWindowMetadataRoutingProperty(
     Window window,
@@ -623,6 +658,10 @@ BrowserApplyWindowMetadataRoutingProperty(
     X11WasmResource *resourcePtr;
     Atom targetAtom = BrowserWindowMetadataTargetAtom();
     Atom rootToplevelAtom = BrowserWindowMetadataRootToplevelAtom();
+    Window oldTarget;
+    Window newTarget;
+    int oldUpdatesDocument;
+    int newUpdatesDocument;
 
     if ((property != targetAtom) && (property != rootToplevelAtom)) {
 	return 0;
@@ -631,6 +670,8 @@ BrowserApplyWindowMetadataRoutingProperty(
     if (resourcePtr == NULL) {
 	return 1;
     }
+    oldTarget = BrowserWindowMetadataTarget(window);
+    oldUpdatesDocument = BrowserWindowIsRootToplevel(window);
     if (property == targetAtom) {
 	Window target = None;
 
@@ -658,7 +699,17 @@ BrowserApplyWindowMetadataRoutingProperty(
 	resourcePtr->metadataRootToplevelSet = rootToplevelSet;
 	resourcePtr->metadataIsRootToplevel = isRootToplevel;
     }
-    BrowserReapplyWindowMetadataProperties(window, resourcePtr);
+    newTarget = BrowserWindowMetadataTarget(window);
+    newUpdatesDocument = BrowserWindowIsRootToplevel(window);
+    if ((oldTarget != None) && ((oldTarget != newTarget)
+	    || (oldUpdatesDocument != newUpdatesDocument))) {
+	BrowserRebuildWindowMetadataTarget(oldTarget, oldUpdatesDocument);
+	if (newTarget != oldTarget) {
+	    BrowserReapplyWindowMetadataProperties(window, resourcePtr);
+	}
+    } else {
+	BrowserReapplyWindowMetadataProperties(window, resourcePtr);
+    }
     return 1;
 }
 

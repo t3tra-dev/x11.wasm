@@ -32,6 +32,7 @@
       "bell",
       "clearWindow",
       "clearWindowArea",
+      "clearWindowMetadata",
       "configureWindow",
       "copyArea",
       "copyPlane",

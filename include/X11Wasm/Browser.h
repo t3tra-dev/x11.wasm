@@ -315,6 +315,8 @@ extern int X11WasmJsSetWindowTitle(unsigned int window, const char *utf8,
 	int utf8Length, int updatesDocument);
 extern int X11WasmJsSetWindowIconName(unsigned int window, const char *utf8,
 	int utf8Length);
+extern int X11WasmJsClearWindowMetadata(unsigned int window,
+	int updatesDocument);
 extern int X11WasmJsSetWindowTransientFor(unsigned int window,
 	unsigned int transientFor);
 extern int X11WasmJsSetWindowCommand(unsigned int window, const char *utf8,
@@ -647,6 +649,9 @@ static inline int
 X11WasmJsSetWindowIconName(unsigned int window, const char *utf8,
 	int utf8Length)
 { (void)window; (void)utf8; (void)utf8Length; return 0; }
+static inline int
+X11WasmJsClearWindowMetadata(unsigned int window, int updatesDocument)
+{ (void)window; (void)updatesDocument; return 0; }
 static inline int
 X11WasmJsSetWindowTransientFor(unsigned int window, unsigned int transientFor)
 { (void)window; (void)transientFor; return 0; }

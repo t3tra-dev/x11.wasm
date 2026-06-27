@@ -178,6 +178,88 @@
 
     /**
      * @param {number} id
+     * @param {boolean} updatesDocument
+     * @returns {number}
+     */
+    clearWindowMetadata(id, updatesDocument = false) {
+      const resource = this.resources.get(id);
+      if (!resource) {
+        return 0;
+      }
+
+      resource.title = "";
+      resource.iconName = "";
+      resource.alpha = 1;
+      if (resource.element) {
+        resource.element.removeAttribute("data-x11-wasm-title");
+        resource.element.removeAttribute("data-x11-wasm-icon-name");
+        resource.element.removeAttribute("data-x11-wasm-alpha");
+        resource.element.style.opacity = "";
+      }
+      if (this.document && updatesDocument) {
+        this.document.title = "";
+      }
+      this.setWindowTransientFor(id, 0);
+      this.setWindowCommand(id, "");
+      this.setWindowClientMachine(id, "");
+      this.setWindowClassHint(id, "", "");
+      this.setWindowSizeHints(
+        id,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+      );
+      this.setWindowZoomHints(
+        id,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+      );
+      this.setWindowWMHints(id, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      this.setWindowIconSizes(id, "", 0);
+      this.setWindowIconPhoto(id, 0, "", null, 0, 0);
+      this.setWindowProtocols(id, "");
+      this.setWindowTypes(id, "");
+      this.setWindowColormapWindows(id, "");
+      this.setWindowState(id, false, false, false);
+      resource.standardColormaps = Object.create(null);
+      this.applyStandardColormapAttributes(resource);
+      this.syncDocumentIconFromResources();
+      return 0;
+    },
+
+    /**
+     * @param {number} id
      * @param {number} transientFor
      * @returns {number}
      */

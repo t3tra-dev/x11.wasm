@@ -36,6 +36,16 @@
         return X11WasmBridge.call("setWindowIconName", [id, iconName]) | 0;
       },
 
+  X11WasmJsClearWindowMetadata__deps: ["$X11WasmBridge"],
+  X11WasmJsClearWindowMetadata: function(id, updatesDocument) {
+        return (
+          X11WasmBridge.call("clearWindowMetadata", [
+            id,
+            !!updatesDocument,
+          ]) | 0
+        );
+      },
+
   X11WasmJsSetWindowTransientFor__deps: ["$X11WasmBridge"],
   X11WasmJsSetWindowTransientFor: function(id, transientFor) {
         return (

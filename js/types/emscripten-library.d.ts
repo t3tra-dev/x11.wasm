@@ -287,6 +287,7 @@ interface X11WasmBackend {
     captureWindow: number,
   ): number;
   setSelectionOwner(selection: string, owner: number, time: number): number;
+  clearWindowMetadata(id: number, updatesDocument?: boolean): number;
   setWindowStandardColormaps(
     id: number,
     property: string,
@@ -487,6 +488,10 @@ declare const Module: {
     window: number,
     target: number,
     isRootToplevel: number,
+  ) => number;
+  _X11WasmTestGetWindowMetadataTargetDeletes?: (
+    window: number,
+    target: number,
   ) => number;
   _X11WasmTestSendNetWmStateMessage?: (
     window: number,
