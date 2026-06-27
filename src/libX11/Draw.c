@@ -2053,10 +2053,11 @@ XSetFontPath(
 	    return Success;
 	}
     }
-    if (ndirs > 0) {
-	newPath = BrowserCopyStringList((const char *const *)directories,
-		ndirs);
+    if (ndirs == 0) {
+	BrowserClearFontPath();
+	return Success;
     }
+    newPath = BrowserCopyStringList((const char *const *)directories, ndirs);
     BrowserClearFontPath();
     browserDisplay.fontPathSet = 1;
     browserDisplay.fontPathCount = ndirs;

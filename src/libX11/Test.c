@@ -7911,9 +7911,12 @@ X11WasmTestXlibApis(void)
 	goto cleanup;
     }
     fontPathList = XGetFontPath(&browserDisplay.display, &fontPathCount);
-    if ((fontPathList != NULL) || (fontPathCount != 0)) {
+    if ((fontPathList == NULL) || (fontPathCount < 1)
+	    || (fontPathList[0] == NULL)) {
 	goto cleanup;
     }
+    XFreeFontPath(fontPathList);
+    fontPathList = NULL;
     fontPathCount = -1;
     BrowserClearFontPath();
 
