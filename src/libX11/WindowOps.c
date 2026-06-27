@@ -1964,7 +1964,7 @@ BrowserDestroyWindowResource(
 	    || (resourcePtr == &browserDisplay.rootResource)) {
 	return Success;
     }
-    BrowserRevertInputFocusForUnviewableWindow(resourcePtr);
+    (void)BrowserUnmapWindowResource(resourcePtr, False);
     while (resourcePtr->firstChildPtr != NULL) {
 	(void)BrowserDestroyWindowResource(resourcePtr->firstChildPtr);
     }

@@ -3386,7 +3386,45 @@ X11WasmTestSubstructureNotifyApis(void)
 	    InputOutput, DefaultVisual(display, screen), 0, NULL);
     if ((child == None)
 	    || (XSelectInput(display, child, StructureNotifyMask)
-		    != Success)) {
+		    != Success)
+	    || (XMapWindow(display, child) != Success)) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+    destroyedChild = child;
+    if (XDestroyWindow(display, child) != Success) {
+	goto cleanup;
+    }
+    child = None;
+    if ((XEventsQueued(display, QueuedAlready) != 4)
+	    || (XNextEvent(display, &event) != Success)
+	    || (event.type != UnmapNotify)
+	    || (event.xunmap.event != destroyedChild)
+	    || (event.xunmap.window != destroyedChild)
+	    || (event.xunmap.from_configure != False)
+	    || (XNextEvent(display, &event) != Success)
+	    || (event.type != UnmapNotify)
+	    || (event.xunmap.event != parent)
+	    || (event.xunmap.window != destroyedChild)
+	    || (event.xunmap.from_configure != False)
+	    || (XNextEvent(display, &event) != Success)
+	    || (event.type != DestroyNotify)
+	    || (event.xdestroywindow.event != destroyedChild)
+	    || (event.xdestroywindow.window != destroyedChild)
+	    || (XNextEvent(display, &event) != Success)
+	    || (event.type != DestroyNotify)
+	    || (event.xdestroywindow.event != parent)
+	    || (event.xdestroywindow.window != destroyedChild)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+
+    child = XCreateWindow(display, parent, 7, 8, 9, 10, 0, CopyFromParent,
+	    InputOutput, DefaultVisual(display, screen), 0, NULL);
+    if ((child == None)
+	    || (XSelectInput(display, child, StructureNotifyMask)
+		    != Success)
+	    || (XMapWindow(display, child) != Success)) {
 	goto cleanup;
     }
     BrowserClearEventQueue();
@@ -3395,16 +3433,22 @@ X11WasmTestSubstructureNotifyApis(void)
 	goto cleanup;
     }
     child = None;
-    memset(&event, 0, sizeof(event));
-    if (!BrowserPopMatchingEvent(destroyedChild, StructureNotifyMask,
-	    &event)
+    if ((XEventsQueued(display, QueuedAlready) != 4)
+	    || (XNextEvent(display, &event) != Success)
+	    || (event.type != UnmapNotify)
+	    || (event.xunmap.event != destroyedChild)
+	    || (event.xunmap.window != destroyedChild)
+	    || (event.xunmap.from_configure != False)
+	    || (XNextEvent(display, &event) != Success)
+	    || (event.type != UnmapNotify)
+	    || (event.xunmap.event != parent)
+	    || (event.xunmap.window != destroyedChild)
+	    || (event.xunmap.from_configure != False)
+	    || (XNextEvent(display, &event) != Success)
 	    || (event.type != DestroyNotify)
 	    || (event.xdestroywindow.event != destroyedChild)
-	    || (event.xdestroywindow.window != destroyedChild)) {
-	goto cleanup;
-    }
-    memset(&event, 0, sizeof(event));
-    if (!BrowserPopMatchingEvent(parent, SubstructureNotifyMask, &event)
+	    || (event.xdestroywindow.window != destroyedChild)
+	    || (XNextEvent(display, &event) != Success)
 	    || (event.type != DestroyNotify)
 	    || (event.xdestroywindow.event != parent)
 	    || (event.xdestroywindow.window != destroyedChild)
