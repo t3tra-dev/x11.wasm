@@ -157,6 +157,25 @@ test("VisibilityNotify reports obscured sibling state changes", async ({
   expect(result).toBe(1);
 });
 
+test("Expose events report newly visible sibling and parent regions", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestExposeNewlyVisibleApis?: () => number } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestExposeNewlyVisibleApis) {
+      throw new Error("missing newly visible expose test export");
+    }
+    return module._X11WasmTestExposeNewlyVisibleApis();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XSetIconSizes updates browser WM_ICON_SIZE metadata", async ({ page }) => {
   await waitForX11Runtime(page);
   const windowId = await createMappedWindow(page);

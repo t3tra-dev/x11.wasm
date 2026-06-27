@@ -2111,6 +2111,8 @@ BrowserUnmapWindowResource(
     Bool fromConfigure)
 {
     X11WasmResource *parentPtr;
+    X11WasmResource *visibilityRootPtr;
+    BrowserVisibilitySnapshot visibilitySnapshot;
 
     if (resourcePtr == NULL) {
 	return Success;
@@ -2119,12 +2121,16 @@ BrowserUnmapWindowResource(
 	return Success;
     }
     parentPtr = BrowserWindowParentResource(resourcePtr);
+    visibilityRootPtr = (parentPtr != NULL) ? parentPtr : resourcePtr;
+    BrowserCaptureVisibilitySnapshot(visibilityRootPtr, &visibilitySnapshot);
     BrowserRevertInputFocusForUnviewableWindow(resourcePtr);
     resourcePtr->mapped = 0;
     (void)X11WasmJsUnmapWindow(BrowserJsXId(resourcePtr->id));
     (void)BrowserQueueUnmapNotify(resourcePtr, fromConfigure);
-    BrowserRefreshVisibilityTree((parentPtr != NULL) ? parentPtr
-	    : resourcePtr);
+    BrowserRefreshVisibilityTree(visibilityRootPtr);
+    BrowserQueueNewlyVisibleExposes(visibilityRootPtr, &visibilitySnapshot,
+	    (Window)resourcePtr->id);
+    BrowserFreeVisibilitySnapshot(&visibilitySnapshot);
     (void)BrowserQueuePointerCrossingEvents(browserDisplay.pointerState,
 	    browserDisplay.pointerX, browserDisplay.pointerY, CurrentTime);
     return Success;
@@ -2218,6 +2224,7 @@ XConfigureWindow(
     X11WasmResource *resourcePtr = BrowserWindowResourceOrError(&display,
 	    window, X11_WASM_XREQ_CONFIGURE_WINDOW);
     X11WasmResource *visibilityRootPtr;
+    BrowserVisibilitySnapshot visibilitySnapshot;
     int configureNotify = 1;
     int resizeRedirected = 0;
     int sizeChanged;
@@ -2247,6 +2254,7 @@ XConfigureWindow(
 	(void)BrowserQueueConfigureRequest(resourcePtr, valueMask, changes);
 	return Success;
     }
+    BrowserCaptureVisibilitySnapshot(visibilityRootPtr, &visibilitySnapshot);
     if (BrowserWindowResizeIsRedirected(resourcePtr, valueMask, changes)) {
 	effectiveChanges = *changes;
 	(void)BrowserQueueResizeRequest(resourcePtr, valueMask, changes);
@@ -2293,6 +2301,9 @@ XConfigureWindow(
 	BrowserApplyChildWinGravity(resourcePtr, oldWidth, oldHeight);
     }
     BrowserRefreshVisibilityTree(visibilityRootPtr);
+    BrowserQueueNewlyVisibleExposes(visibilityRootPtr, &visibilitySnapshot,
+	    (Window)resourcePtr->id);
+    BrowserFreeVisibilitySnapshot(&visibilitySnapshot);
     if (sizeChanged && (resourcePtr->c_class != InputOnly)) {
 	(void)BrowserQueueExpose(resourcePtr, 0, 0, resourcePtr->width,
 		resourcePtr->height);

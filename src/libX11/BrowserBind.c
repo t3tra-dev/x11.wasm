@@ -1218,6 +1218,8 @@ static void
 BrowserRetainSaveSetWindow(
     X11WasmResource *resourcePtr)
 {
+    X11WasmResource *oldParentPtr = NULL;
+    BrowserVisibilitySnapshot oldVisibilitySnapshot;
     Window oldParent;
     int wasMapped;
 
@@ -1238,9 +1240,15 @@ BrowserRetainSaveSetWindow(
     oldParent = resourcePtr->parent;
     wasMapped = resourcePtr->mapped;
     if (wasMapped) {
+	oldParentPtr = BrowserWindowResource(oldParent);
+	BrowserCaptureVisibilitySnapshot(oldParentPtr, &oldVisibilitySnapshot);
 	resourcePtr->mapped = 0;
 	(void)X11WasmJsUnmapWindow(BrowserJsXId(resourcePtr->id));
 	(void)BrowserQueueUnmapNotify(resourcePtr, False);
+	BrowserRefreshVisibilityTree(oldParentPtr);
+	BrowserQueueNewlyVisibleExposes(oldParentPtr, &oldVisibilitySnapshot,
+		(Window)resourcePtr->id);
+	BrowserFreeVisibilitySnapshot(&oldVisibilitySnapshot);
     }
     if (oldParent != browserDisplay.rootWindow) {
 	BrowserUnlinkChild(resourcePtr);

@@ -4518,6 +4518,7 @@ XCirculateSubwindows(
     X11WasmResource *parentPtr = BrowserWindowResourceOrError(&display,
 	    window, X11_WASM_XREQ_CIRCULATE_WINDOW);
     X11WasmResource *resourcePtr;
+    BrowserVisibilitySnapshot visibilitySnapshot;
     int place = PlaceOnTop;
 
     if (parentPtr == NULL) {
@@ -4535,11 +4536,15 @@ XCirculateSubwindows(
 	}
 	return Success;
     }
+    BrowserCaptureVisibilitySnapshot(parentPtr, &visibilitySnapshot);
     resourcePtr = BrowserCirculateSubwindow(parentPtr, direction, &place);
     if (resourcePtr != NULL) {
 	(void)BrowserQueueCirculateNotify(resourcePtr, place);
 	BrowserRefreshVisibilityTree(parentPtr);
+	BrowserQueueNewlyVisibleExposes(parentPtr, &visibilitySnapshot,
+		(Window)resourcePtr->id);
     }
+    BrowserFreeVisibilitySnapshot(&visibilitySnapshot);
     return Success;
 }
 
@@ -4570,6 +4575,7 @@ XReparentWindow(
     X11WasmResource *resourcePtr = BrowserWindowResourceOrError(&display,
 	    window, X11_WASM_XREQ_REPARENT_WINDOW);
     X11WasmResource *parentPtr;
+    BrowserVisibilitySnapshot oldVisibilitySnapshot;
     Window oldParent;
     int wasMapped;
 
@@ -4596,10 +4602,15 @@ XReparentWindow(
     oldParent = resourcePtr->parent;
     wasMapped = resourcePtr->mapped;
     if (wasMapped) {
+	BrowserCaptureVisibilitySnapshot(BrowserWindowResource(oldParent),
+		&oldVisibilitySnapshot);
 	resourcePtr->mapped = 0;
 	(void)X11WasmJsUnmapWindow(BrowserJsXId(window));
 	(void)BrowserQueueUnmapNotify(resourcePtr, False);
 	BrowserRefreshVisibilityTree(BrowserWindowResource(oldParent));
+	BrowserQueueNewlyVisibleExposes(BrowserWindowResource(oldParent),
+		&oldVisibilitySnapshot, window);
+	BrowserFreeVisibilitySnapshot(&oldVisibilitySnapshot);
     }
     BrowserUnlinkChild(resourcePtr);
     resourcePtr->parent = parent;

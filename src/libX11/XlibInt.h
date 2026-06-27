@@ -327,6 +327,24 @@ typedef int (*X11WasmQueuedEventPredicate)(
     XEvent *eventPtr,
     XPointer arg);
 
+typedef struct BrowserVisibilityRect {
+    int x1;
+    int y1;
+    int x2;
+    int y2;
+} BrowserVisibilityRect;
+
+typedef struct BrowserVisibilitySnapshotEntry {
+    Window window;
+    int rectCount;
+    BrowserVisibilityRect *rects;
+    struct BrowserVisibilitySnapshotEntry *nextPtr;
+} BrowserVisibilitySnapshotEntry;
+
+typedef struct BrowserVisibilitySnapshot {
+    BrowserVisibilitySnapshotEntry *firstEntryPtr;
+} BrowserVisibilitySnapshot;
+
 typedef struct X11WasmIMInstantiateCallback {
     Display *display;
     XIDProc callback;
@@ -1241,6 +1259,15 @@ void BrowserNotifyProperty(
     X11WasmResource *resourcePtr,
     Atom atom,
     int state);
+void BrowserCaptureVisibilitySnapshot(
+    X11WasmResource *resourcePtr,
+    BrowserVisibilitySnapshot *snapshotPtr);
+void BrowserFreeVisibilitySnapshot(
+    BrowserVisibilitySnapshot *snapshotPtr);
+void BrowserQueueNewlyVisibleExposes(
+    X11WasmResource *resourcePtr,
+    BrowserVisibilitySnapshot *snapshotPtr,
+    Window excludeSubtree);
 void BrowserRefreshVisibilityTree(
     X11WasmResource *resourcePtr);
 void BrowserNotifyWindowColormap(

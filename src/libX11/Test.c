@@ -2251,6 +2251,30 @@ BrowserTestPopExposeEvent(
     return 1;
 }
 
+static int
+BrowserTestPopExposeGeometryEvent(
+    Window window,
+    int x,
+    int y,
+    int width,
+    int height)
+{
+    XEvent event;
+
+    memset(&event, 0, sizeof(event));
+    if (!BrowserPopMatchingEvent(window, ExposureMask, &event)
+	    || (event.type != Expose)
+	    || (event.xexpose.window != window)
+	    || (event.xexpose.x != x)
+	    || (event.xexpose.y != y)
+	    || (event.xexpose.width != width)
+	    || (event.xexpose.height != height)
+	    || (event.xexpose.count != 0)) {
+	return 0;
+    }
+    return 1;
+}
+
 EMSCRIPTEN_KEEPALIVE unsigned int
 X11WasmTestGCClipRendering(void)
 {
@@ -3832,6 +3856,92 @@ X11WasmTestVisibilityObscuredApis(void)
     if ((XUnmapWindow(display, cover) != Success)
 	    || (XEventsQueued(display, QueuedAlready) != 1)
 	    || !BrowserTestPopVisibilityEvent(bottom, VisibilityUnobscured)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    BrowserClearEventQueue();
+    if (parent != None) {
+	(void)XDestroyWindow(display, parent);
+    }
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestExposeNewlyVisibleApis(void)
+{
+    Display *display;
+    XSetWindowAttributes exposureAttributes;
+    Window parent = None;
+    Window bottom = None;
+    Window cover = None;
+    Window parentCover = None;
+    int result = 0;
+    int screen;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+    memset(&exposureAttributes, 0, sizeof(exposureAttributes));
+    exposureAttributes.event_mask = ExposureMask;
+
+    parent = XCreateWindow(display, browserDisplay.rootWindow, 0, 0, 120, 90,
+	    0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    CWEventMask, &exposureAttributes);
+    bottom = (parent != None) ? XCreateWindow(display, parent, 0, 0, 40, 40,
+	    0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    CWEventMask, &exposureAttributes) : None;
+    cover = (parent != None) ? XCreateWindow(display, parent, 10, 10, 20, 20,
+	    0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL) : None;
+    parentCover = (parent != None) ? XCreateWindow(display, parent, 80, 10,
+	    20, 20, 0, CopyFromParent, InputOutput,
+	    DefaultVisual(display, screen), 0, NULL) : None;
+    if ((parent == None) || (bottom == None) || (cover == None)
+	    || (parentCover == None)
+	    || (XMapWindow(display, parent) != Success)
+	    || (XMapWindow(display, bottom) != Success)
+	    || (XMapWindow(display, cover) != Success)
+	    || (XMapWindow(display, parentCover) != Success)) {
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    if ((XUnmapWindow(display, cover) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserTestPopExposeGeometryEvent(bottom, 10, 10, 20, 20)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+
+    if (XMapWindow(display, cover) != Success) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+    if ((XLowerWindow(display, cover) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserTestPopExposeGeometryEvent(bottom, 10, 10, 20, 20)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+
+    if (XRaiseWindow(display, cover) != Success) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+    if ((XMoveWindow(display, cover, 50, 50) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserTestPopExposeGeometryEvent(bottom, 10, 10, 20, 20)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    if ((XUnmapWindow(display, parentCover) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserTestPopExposeGeometryEvent(parent, 80, 10, 20, 20)
 	    || (XEventsQueued(display, QueuedAlready) != 0)) {
 	goto cleanup;
     }
