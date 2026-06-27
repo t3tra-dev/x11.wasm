@@ -1409,6 +1409,116 @@ test("metadata target delete clears old forwarded ICCCM metadata", async ({
   });
 });
 
+test("metadata target source destroy clears old forwarded ICCCM metadata", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+  const [sourceId, targetId] = await createMappedWindows(page, 2);
+
+  const metadata = await page.evaluate(({ sourceId, targetId }) => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestDestroyWindowMetadataTargetSource?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    if (
+      !module?._X11WasmTestDestroyWindowMetadataTargetSource ||
+      !backend
+    ) {
+      throw new Error("missing metadata target destroy test hooks");
+    }
+
+    const destroyResult = module._X11WasmTestDestroyWindowMetadataTargetSource(
+      sourceId,
+      targetId,
+    );
+    backend.flush?.();
+    const target = backend.resources.get(targetId);
+    const targetElement = target?.element;
+    if (!(targetElement instanceof HTMLElement) || !target) {
+      throw new Error("missing metadata target destroy test element");
+    }
+    return {
+      destroyResult,
+      sourcePresent: backend.resources.has(sourceId),
+      target: {
+        command: target.command,
+        commandAttr: targetElement.getAttribute("data-x11-wasm-command"),
+        iconName: target.iconName,
+        iconNameAttr: targetElement.getAttribute("data-x11-wasm-icon-name"),
+        title: target.title,
+        titleAttr: targetElement.getAttribute("data-x11-wasm-title"),
+      },
+    };
+  }, { sourceId, targetId });
+
+  expect(metadata).toEqual({
+    destroyResult: 1,
+    sourcePresent: false,
+    target: {
+      command: "",
+      commandAttr: null,
+      iconName: "",
+      iconNameAttr: null,
+      title: "",
+      titleAttr: null,
+    },
+  });
+});
+
+test("metadata fallback source destroy clears old forwarded ICCCM metadata", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+  const targetId = await createMappedWindow(page);
+
+  const metadata = await page.evaluate((targetId) => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestDestroyWindowMetadataFallbackSource?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    if (
+      !module?._X11WasmTestDestroyWindowMetadataFallbackSource ||
+      !backend
+    ) {
+      throw new Error("missing metadata fallback destroy test hooks");
+    }
+
+    const destroyResult =
+      module._X11WasmTestDestroyWindowMetadataFallbackSource(targetId);
+    backend.flush?.();
+    const target = backend.resources.get(targetId);
+    const targetElement = target?.element;
+    if (!(targetElement instanceof HTMLElement) || !target) {
+      throw new Error("missing metadata fallback destroy test element");
+    }
+    return {
+      destroyResult,
+      target: {
+        command: target.command,
+        commandAttr: targetElement.getAttribute("data-x11-wasm-command"),
+        iconName: target.iconName,
+        iconNameAttr: targetElement.getAttribute("data-x11-wasm-icon-name"),
+        title: target.title,
+        titleAttr: targetElement.getAttribute("data-x11-wasm-title"),
+      },
+    };
+  }, targetId);
+
+  expect(metadata).toEqual({
+    destroyResult: 1,
+    target: {
+      command: "",
+      commandAttr: null,
+      iconName: "",
+      iconNameAttr: null,
+      title: "",
+      titleAttr: null,
+    },
+  });
+});
+
 test("metadata target API reapplies existing ICCCM metadata", async ({
   page,
 }) => {

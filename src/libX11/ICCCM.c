@@ -1636,6 +1636,58 @@ X11WasmTestSetWindowMetadataTargetApi(
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestDestroyWindowMetadataTargetSource(
+    unsigned int window,
+    unsigned int target)
+{
+    Window xid = (Window)window;
+    Window targetXid = (Window)target;
+
+    BrowserInitDisplay();
+    if ((BrowserWindowResource(xid) == NULL)
+	    || (BrowserWindowResource(targetXid) == NULL)) {
+	return 0;
+    }
+    if (!X11WasmTestSetWindowMetadataTargetProperty(window, target, 0)
+	    || !X11WasmTestSetWindowMetadataProperties(window, 1)
+	    || (XDestroyWindow(&browserDisplay.display, xid) != Success)
+	    || (BrowserWindowResource(xid) != NULL)
+	    || (BrowserWindowResource(targetXid) == NULL)) {
+	return 0;
+    }
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestDestroyWindowMetadataFallbackSource(
+    unsigned int target)
+{
+    Window targetXid = (Window)target;
+    Window source = None;
+
+    BrowserInitDisplay();
+    if (BrowserWindowResource(targetXid) == NULL) {
+	return 0;
+    }
+    source = XCreateSimpleWindow(&browserDisplay.display, targetXid, 0, 0,
+	    64, 48, 0, 0, 0);
+    if ((source == None) || (BrowserWindowResource(source) == NULL)) {
+	return 0;
+    }
+    if ((XMapWindow(&browserDisplay.display, source) != Success)
+	    || !X11WasmTestSetWindowMetadataProperties((unsigned int)source, 1)
+	    || (XDestroyWindow(&browserDisplay.display, source) != Success)
+	    || (BrowserWindowResource(source) != NULL)
+	    || (BrowserWindowResource(targetXid) == NULL)) {
+	if (BrowserWindowResource(source) != NULL) {
+	    (void)XDestroyWindow(&browserDisplay.display, source);
+	}
+	return 0;
+    }
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestGetWindowMetadataTargetDeletes(
     unsigned int window,
     unsigned int target)

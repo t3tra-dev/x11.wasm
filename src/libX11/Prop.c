@@ -649,6 +649,29 @@ BrowserRebuildWindowMetadataTarget(
     }
 }
 
+void
+BrowserForgetWindowMetadataSource(
+    Window window)
+{
+    X11WasmResource *resourcePtr = BrowserWindowResource(window);
+    Window target;
+    int updatesDocument;
+
+    if (resourcePtr == NULL) {
+	return;
+    }
+    target = BrowserWindowMetadataTarget(window);
+    if ((target == None) || (target == window)
+	    || (BrowserWindowResource(target) == NULL)) {
+	return;
+    }
+    updatesDocument = BrowserWindowIsRootToplevel(window);
+    resourcePtr->metadataTarget = window;
+    resourcePtr->metadataRootToplevelSet = 1;
+    resourcePtr->metadataIsRootToplevel = 0;
+    BrowserRebuildWindowMetadataTarget(target, updatesDocument);
+}
+
 static int
 BrowserApplyWindowMetadataRoutingProperty(
     Window window,

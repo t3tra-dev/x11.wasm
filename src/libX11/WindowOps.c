@@ -1968,6 +1968,7 @@ BrowserDestroyWindowResource(
 	(void)BrowserDestroyWindowResource(resourcePtr->firstChildPtr);
     }
     window = (Window)resourcePtr->id;
+    BrowserForgetWindowMetadataSource(window);
     (void)BrowserQueueDestroyNotify(resourcePtr);
     (void)X11WasmJsDestroyResource(BrowserJsXId(window));
     X11WasmDeleteResource(window);

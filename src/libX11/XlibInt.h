@@ -2133,6 +2133,8 @@ int BrowserWindowInheritsStyle(
     X11WasmResource *resourcePtr);
 int BrowserWindowIsRootToplevel(
     Window window);
+void BrowserForgetWindowMetadataSource(
+    Window window);
 Window BrowserWindowMetadataTarget(
     Window window);
 Atom BrowserWindowOpacityAtom(void);
