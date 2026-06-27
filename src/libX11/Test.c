@@ -10877,7 +10877,9 @@ BrowserTestXrmDatabaseApis(void)
 	    " third\n"
 	    "wish.crlfContinued: crlf\\\r\n"
 	    " value\r\n"
-	    "wish.escaped:\\ leading\\\\path\\nline\n";
+	    "wish.escaped:\\ leading\\\\path\\nline\n"
+	    "wish.unknownEscape: keep\\qslash\n"
+	    "wish.trailing: value   \n";
     const char xrmFilePath[] = "x11wasm-xrm-input.txt";
     const char xrmOutputPath[] = "x11wasm-xrm-output.txt";
     const char xrmMissingPath[] = "x11wasm-xrm-missing.txt";
@@ -11115,6 +11117,8 @@ BrowserTestXrmDatabaseApis(void)
     XrmPutLineResource(&putDatabase, "wish*foreground: put-foreground");
     XrmPutLineResource(&putDatabase, "! ignored");
     XrmPutLineResource(&putDatabase, "wish.empty:");
+    XrmPutLineResource(&putDatabase, "wish.unknownEscape: put\\qslash");
+    XrmPutLineResource(&putDatabase, "wish.trailing: put-value   ");
     binaryValue.addr = (XPointer)binaryData;
     binaryValue.size = (unsigned int)sizeof(binaryData);
     XrmPutResource(&putDatabase, "wish.binary", "Binary", &binaryValue);
@@ -11124,7 +11128,11 @@ BrowserTestXrmDatabaseApis(void)
 		    "wish.main.foreground", "Wish.Main.Foreground",
 		    "put-foreground")
 	    || !BrowserTestXrmResourceEquals(putDatabase, "wish.empty",
-		    "Wish.Empty", "")) {
+		    "Wish.Empty", "")
+	    || !BrowserTestXrmResourceEquals(putDatabase,
+		    "wish.unknownEscape", "Wish.UnknownEscape", "put\\qslash")
+	    || !BrowserTestXrmResourceEquals(putDatabase, "wish.trailing",
+		    "Wish.Trailing", "put-value   ")) {
 	goto cleanup;
     }
     readValue.size = 0U;
@@ -11251,7 +11259,11 @@ BrowserTestXrmDatabaseApis(void)
 	    || !BrowserTestXrmResourceEquals(fileDatabase,
 		    "wish.crlfContinued", "Wish.CrlfContinued", "crlf value")
 	    || !BrowserTestXrmResourceEquals(fileDatabase, "wish.escaped",
-		    "Wish.Escaped", " leading\\path\nline")) {
+		    "Wish.Escaped", " leading\\path\nline")
+	    || !BrowserTestXrmResourceEquals(fileDatabase,
+		    "wish.unknownEscape", "Wish.UnknownEscape", "keep\\qslash")
+	    || !BrowserTestXrmResourceEquals(fileDatabase, "wish.trailing",
+		    "Wish.Trailing", "value   ")) {
 	goto cleanup;
     }
     if (XrmGetResource(fileDatabase, "# file.comment", "# File.Comment",
@@ -11273,6 +11285,8 @@ BrowserTestXrmDatabaseApis(void)
     }
     XrmPutStringResource(&outputDatabase, "wish.output",
 	    " leading\\path\nline");
+    XrmPutStringResource(&outputDatabase, "wish.outputTrailing",
+	    "tail   ");
     XrmPutResource(&outputDatabase, "wish.outputBinary", "Binary",
 	    &binaryValue);
     XrmPutFileDatabase(outputDatabase, xrmOutputPath);
@@ -11280,6 +11294,8 @@ BrowserTestXrmDatabaseApis(void)
     if ((roundTripDatabase == NULL)
 	    || !BrowserTestXrmResourceEquals(roundTripDatabase, "wish.output",
 		    "Wish.Output", " leading\\path\nline")
+	    || !BrowserTestXrmResourceEquals(roundTripDatabase,
+		    "wish.outputTrailing", "Wish.OutputTrailing", "tail   ")
 	    || (XrmGetResource(roundTripDatabase, "wish.outputBinary",
 		    "Wish.OutputBinary", NULL, NULL) != False)) {
 	goto cleanup;

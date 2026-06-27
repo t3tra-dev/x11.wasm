@@ -231,6 +231,10 @@ BrowserXrmDupResourceValue(
 	}
 	if (*p == 'n') {
 	    *out++ = '\n';
+	} else if (*p == '\\') {
+	    *out++ = '\\';
+	} else if ((p == start + 1) && ((*p == ' ') || (*p == '\t'))) {
+	    *out++ = *p;
 	} else if ((*p >= '0') && (*p <= '7')) {
 	    int count = 0;
 	    unsigned int value = 0U;
@@ -246,6 +250,7 @@ BrowserXrmDupResourceValue(
 	    } while (1);
 	    *out++ = (char)value;
 	} else {
+	    *out++ = '\\';
 	    *out++ = *p;
 	}
     }
@@ -919,7 +924,7 @@ BrowserXrmParseLineIntoDatabase(
 	return 0;
     }
     valueStart = BrowserSkipDefaultSpaces(colon + 1, lineEnd);
-    valueEnd = BrowserTrimDefaultSpaces(valueStart, lineEnd);
+    valueEnd = lineEnd;
     BrowserXrmStoreStringEntry(database,
 	    BrowserDupRange(bindingStart, bindingEnd),
 	    BrowserXrmDupResourceValue(valueStart, valueEnd));
