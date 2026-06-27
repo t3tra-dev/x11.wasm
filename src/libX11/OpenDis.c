@@ -163,6 +163,7 @@ BrowserInitDisplay(void)
     state->rootResource.depth = (unsigned int)state->screen.root_depth;
     state->rootResource.c_class = InputOutput;
     state->rootResource.mapped = 1;
+    state->rootResource.visibilityState = VisibilityUnobscured;
     state->rootResource.atts.colormap = state->defaultColormap;
     state->rootResource.atts.bit_gravity = NorthWestGravity;
     state->rootResource.atts.win_gravity = NorthWestGravity;

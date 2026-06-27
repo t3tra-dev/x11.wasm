@@ -2015,6 +2015,7 @@ BrowserMapWindowResource(
     X11WasmResource *resourcePtr,
     int *mappedReturn)
 {
+    X11WasmResource *parentPtr;
     Window window;
 
     if (mappedReturn != NULL) {
@@ -2041,7 +2042,9 @@ BrowserMapWindowResource(
 		BrowserInitialWmStateForMap(display, window));
     }
     (void)BrowserQueueMapNotify(resourcePtr);
-    BrowserNotifyVisibilityTree(resourcePtr, VisibilityUnobscured);
+    parentPtr = BrowserWindowParentResource(resourcePtr);
+    BrowserRefreshVisibilityTree((parentPtr != NULL) ? parentPtr
+	    : resourcePtr);
     BrowserQueueViewableExposeTree(resourcePtr);
     (void)BrowserQueuePointerCrossingEvents(browserDisplay.pointerState,
 	    browserDisplay.pointerX, browserDisplay.pointerY, CurrentTime);
@@ -2107,16 +2110,21 @@ BrowserUnmapWindowResource(
     X11WasmResource *resourcePtr,
     Bool fromConfigure)
 {
+    X11WasmResource *parentPtr;
+
     if (resourcePtr == NULL) {
 	return Success;
     }
     if (!resourcePtr->mapped) {
 	return Success;
     }
+    parentPtr = BrowserWindowParentResource(resourcePtr);
     BrowserRevertInputFocusForUnviewableWindow(resourcePtr);
     resourcePtr->mapped = 0;
     (void)X11WasmJsUnmapWindow(BrowserJsXId(resourcePtr->id));
     (void)BrowserQueueUnmapNotify(resourcePtr, fromConfigure);
+    BrowserRefreshVisibilityTree((parentPtr != NULL) ? parentPtr
+	    : resourcePtr);
     (void)BrowserQueuePointerCrossingEvents(browserDisplay.pointerState,
 	    browserDisplay.pointerX, browserDisplay.pointerY, CurrentTime);
     return Success;
@@ -2209,6 +2217,7 @@ XConfigureWindow(
 {
     X11WasmResource *resourcePtr = BrowserWindowResourceOrError(&display,
 	    window, X11_WASM_XREQ_CONFIGURE_WINDOW);
+    X11WasmResource *visibilityRootPtr;
     int configureNotify = 1;
     int resizeRedirected = 0;
     int sizeChanged;
@@ -2229,6 +2238,10 @@ XConfigureWindow(
     }
     if (changes == NULL) {
 	return Success;
+    }
+    visibilityRootPtr = BrowserWindowParentResource(resourcePtr);
+    if (visibilityRootPtr == NULL) {
+	visibilityRootPtr = resourcePtr;
     }
     if (BrowserWindowSubstructureIsRedirected(resourcePtr)) {
 	(void)BrowserQueueConfigureRequest(resourcePtr, valueMask, changes);
@@ -2279,6 +2292,7 @@ XConfigureWindow(
     if (sizeChanged) {
 	BrowserApplyChildWinGravity(resourcePtr, oldWidth, oldHeight);
     }
+    BrowserRefreshVisibilityTree(visibilityRootPtr);
     if (sizeChanged && (resourcePtr->c_class != InputOnly)) {
 	(void)BrowserQueueExpose(resourcePtr, 0, 0, resourcePtr->width,
 		resourcePtr->height);

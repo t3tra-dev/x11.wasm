@@ -138,6 +138,25 @@ test("XResizeWindow redirects resize requests to selecting windows", async ({
   expect(result).toBe(1);
 });
 
+test("VisibilityNotify reports obscured sibling state changes", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestVisibilityObscuredApis?: () => number } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestVisibilityObscuredApis) {
+      throw new Error("missing visibility obscured test export");
+    }
+    return module._X11WasmTestVisibilityObscuredApis();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XSetIconSizes updates browser WM_ICON_SIZE metadata", async ({ page }) => {
   await waitForX11Runtime(page);
   const windowId = await createMappedWindow(page);

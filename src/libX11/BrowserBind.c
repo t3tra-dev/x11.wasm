@@ -1086,6 +1086,7 @@ X11WasmCreateResource(
     resourcePtr->clientSerial = browserDisplay.currentClientSerial;
     resourcePtr->width = 1;
     resourcePtr->height = 1;
+    resourcePtr->visibilityState = X11_WASM_VISIBILITY_NOT_VIEWABLE;
     resourcePtr->depth = 24;
     resourcePtr->c_class = InputOutput;
     resourcePtr->atts.colormap = browserDisplay.defaultColormap;
@@ -1265,7 +1266,7 @@ BrowserRetainSaveSetWindow(
 	resourcePtr->mapped = 1;
 	(void)X11WasmJsMapWindow(BrowserJsXId(resourcePtr->id));
 	(void)BrowserQueueMapNotify(resourcePtr);
-	BrowserNotifyVisibilityTree(resourcePtr, VisibilityUnobscured);
+	BrowserRefreshVisibilityTree(BrowserWindowResource(resourcePtr->parent));
 	BrowserQueueViewableExposeTree(resourcePtr);
     }
 }

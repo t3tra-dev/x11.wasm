@@ -1826,6 +1826,236 @@ BrowserQueueGravityNotify(
     return BrowserQueueEvent(&event);
 }
 
+typedef struct BrowserVisibilityRect {
+    int x1;
+    int y1;
+    int x2;
+    int y2;
+} BrowserVisibilityRect;
+
+#define BROWSER_VISIBILITY_RECT_LIMIT 256
+
+static int
+BrowserVisibilityRectIsEmpty(
+    const BrowserVisibilityRect *rectPtr)
+{
+    return (rectPtr == NULL) || (rectPtr->x1 >= rectPtr->x2)
+	    || (rectPtr->y1 >= rectPtr->y2);
+}
+
+static int
+BrowserVisibilityRectEquals(
+    const BrowserVisibilityRect *firstPtr,
+    const BrowserVisibilityRect *secondPtr)
+{
+    return (firstPtr != NULL) && (secondPtr != NULL)
+	    && (firstPtr->x1 == secondPtr->x1)
+	    && (firstPtr->y1 == secondPtr->y1)
+	    && (firstPtr->x2 == secondPtr->x2)
+	    && (firstPtr->y2 == secondPtr->y2);
+}
+
+static int
+BrowserVisibilityRectIntersect(
+    BrowserVisibilityRect *rectPtr,
+    const BrowserVisibilityRect *clipPtr)
+{
+    if ((rectPtr == NULL) || (clipPtr == NULL)) {
+	return 0;
+    }
+    if (rectPtr->x1 < clipPtr->x1) rectPtr->x1 = clipPtr->x1;
+    if (rectPtr->y1 < clipPtr->y1) rectPtr->y1 = clipPtr->y1;
+    if (rectPtr->x2 > clipPtr->x2) rectPtr->x2 = clipPtr->x2;
+    if (rectPtr->y2 > clipPtr->y2) rectPtr->y2 = clipPtr->y2;
+    return !BrowserVisibilityRectIsEmpty(rectPtr);
+}
+
+static int
+BrowserVisibilityRectsOverlap(
+    const BrowserVisibilityRect *firstPtr,
+    const BrowserVisibilityRect *secondPtr)
+{
+    return (firstPtr != NULL) && (secondPtr != NULL)
+	    && (firstPtr->x1 < secondPtr->x2)
+	    && (firstPtr->x2 > secondPtr->x1)
+	    && (firstPtr->y1 < secondPtr->y2)
+	    && (firstPtr->y2 > secondPtr->y1);
+}
+
+static int
+BrowserVisibilityResourceRect(
+    X11WasmResource *resourcePtr,
+    BrowserVisibilityRect *rectPtr)
+{
+    int rootX = 0;
+    int rootY = 0;
+
+    if ((resourcePtr == NULL)
+	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)
+	    || (rectPtr == NULL)
+	    || (resourcePtr->width == 0)
+	    || (resourcePtr->height == 0)) {
+	return 0;
+    }
+    BrowserWindowRootOffset((Window)resourcePtr->id, &rootX, &rootY);
+    rectPtr->x1 = rootX;
+    rectPtr->y1 = rootY;
+    rectPtr->x2 = rootX + (int)resourcePtr->width;
+    rectPtr->y2 = rootY + (int)resourcePtr->height;
+    return !BrowserVisibilityRectIsEmpty(rectPtr);
+}
+
+static int
+BrowserVisibilityVisibleRect(
+    X11WasmResource *resourcePtr,
+    BrowserVisibilityRect *rectPtr)
+{
+    X11WasmResource *ancestorPtr;
+    BrowserVisibilityRect clip;
+
+    if (!BrowserVisibilityResourceRect(resourcePtr, rectPtr)) {
+	return 0;
+    }
+    for (ancestorPtr = BrowserWindowParentResource(resourcePtr);
+	    ancestorPtr != NULL;
+	    ancestorPtr = BrowserWindowParentResource(ancestorPtr)) {
+	if (!BrowserVisibilityResourceRect(ancestorPtr, &clip)
+		|| !BrowserVisibilityRectIntersect(rectPtr, &clip)) {
+	    return 0;
+	}
+    }
+    return 1;
+}
+
+static int
+BrowserVisibilityAppendRect(
+    BrowserVisibilityRect *rects,
+    int *countPtr,
+    const BrowserVisibilityRect *rectPtr)
+{
+    if (BrowserVisibilityRectIsEmpty(rectPtr)) {
+	return 1;
+    }
+    if (*countPtr >= BROWSER_VISIBILITY_RECT_LIMIT) {
+	return 0;
+    }
+    rects[(*countPtr)++] = *rectPtr;
+    return 1;
+}
+
+static int
+BrowserVisibilitySubtractRect(
+    BrowserVisibilityRect *rects,
+    int *countPtr,
+    const BrowserVisibilityRect *coverPtr)
+{
+    BrowserVisibilityRect result[BROWSER_VISIBILITY_RECT_LIMIT];
+    int resultCount = 0;
+    int i;
+
+    for (i = 0; i < *countPtr; i++) {
+	BrowserVisibilityRect rect = rects[i];
+	BrowserVisibilityRect overlap = rect;
+	BrowserVisibilityRect piece;
+
+	if (!BrowserVisibilityRectIntersect(&overlap, coverPtr)) {
+	    if (!BrowserVisibilityAppendRect(result, &resultCount, &rect)) {
+		return 0;
+	    }
+	    continue;
+	}
+
+	piece = rect;
+	piece.x2 = overlap.x1;
+	if (!BrowserVisibilityAppendRect(result, &resultCount, &piece)) {
+	    return 0;
+	}
+	piece = rect;
+	piece.x1 = overlap.x2;
+	if (!BrowserVisibilityAppendRect(result, &resultCount, &piece)) {
+	    return 0;
+	}
+	piece = rect;
+	piece.x1 = overlap.x1;
+	piece.x2 = overlap.x2;
+	piece.y2 = overlap.y1;
+	if (!BrowserVisibilityAppendRect(result, &resultCount, &piece)) {
+	    return 0;
+	}
+	piece = rect;
+	piece.x1 = overlap.x1;
+	piece.x2 = overlap.x2;
+	piece.y1 = overlap.y2;
+	if (!BrowserVisibilityAppendRect(result, &resultCount, &piece)) {
+	    return 0;
+	}
+    }
+    memcpy(rects, result, sizeof(BrowserVisibilityRect) * (size_t)resultCount);
+    *countPtr = resultCount;
+    return 1;
+}
+
+static int
+BrowserWindowVisibilityState(
+    X11WasmResource *resourcePtr)
+{
+    BrowserVisibilityRect fullRect;
+    BrowserVisibilityRect visibleRect;
+    BrowserVisibilityRect uncovered[BROWSER_VISIBILITY_RECT_LIMIT];
+    X11WasmResource *nodePtr;
+    int uncoveredCount = 1;
+    int obscured = 0;
+
+    if ((resourcePtr == NULL)
+	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)
+	    || (resourcePtr->c_class == InputOnly)
+	    || !BrowserResourceIsVisible(resourcePtr)) {
+	return X11_WASM_VISIBILITY_NOT_VIEWABLE;
+    }
+    if (!BrowserVisibilityResourceRect(resourcePtr, &fullRect)) {
+	return VisibilityFullyObscured;
+    }
+    if (!BrowserVisibilityVisibleRect(resourcePtr, &visibleRect)) {
+	return VisibilityFullyObscured;
+    }
+    if (!BrowserVisibilityRectEquals(&fullRect, &visibleRect)) {
+	obscured = 1;
+    }
+    uncovered[0] = visibleRect;
+    for (nodePtr = resourcePtr; nodePtr != NULL
+	    && nodePtr->id != browserDisplay.rootWindow;
+	    nodePtr = BrowserWindowParentResource(nodePtr)) {
+	X11WasmResource *parentPtr = BrowserWindowParentResource(nodePtr);
+	X11WasmResource *siblingPtr;
+
+	if (parentPtr == NULL) {
+	    break;
+	}
+	for (siblingPtr = nodePtr->nextSiblingPtr; siblingPtr != NULL;
+		siblingPtr = siblingPtr->nextSiblingPtr) {
+	    BrowserVisibilityRect coverRect;
+
+	    if ((siblingPtr->type != X11_WASM_RESOURCE_WINDOW)
+		    || (siblingPtr->c_class == InputOnly)
+		    || !BrowserResourceIsVisible(siblingPtr)
+		    || !BrowserVisibilityVisibleRect(siblingPtr, &coverRect)
+		    || !BrowserVisibilityRectsOverlap(&visibleRect,
+			    &coverRect)) {
+		continue;
+	    }
+	    obscured = 1;
+	    if (!BrowserVisibilitySubtractRect(uncovered, &uncoveredCount,
+		    &coverRect)) {
+		return VisibilityPartiallyObscured;
+	    }
+	    if (uncoveredCount == 0) {
+		return VisibilityFullyObscured;
+	    }
+	}
+    }
+    return obscured ? VisibilityPartiallyObscured : VisibilityUnobscured;
+}
+
 int
 BrowserQueueVisibilityNotify(
     X11WasmResource *resourcePtr,
@@ -1835,6 +2065,7 @@ BrowserQueueVisibilityNotify(
 
     if ((resourcePtr == NULL)
 	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)
+	    || (resourcePtr->c_class == InputOnly)
 	    || !BrowserResourceWantsEvent(resourcePtr, VisibilityChangeMask)) {
 	return 0;
     }
@@ -1846,22 +2077,27 @@ BrowserQueueVisibilityNotify(
 }
 
 void
-BrowserNotifyVisibilityTree(
-    X11WasmResource *resourcePtr,
-    int state)
+BrowserRefreshVisibilityTree(
+    X11WasmResource *resourcePtr)
 {
     X11WasmResource *childPtr;
+    int state;
 
     if ((resourcePtr == NULL)
-	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)
-	    || !BrowserResourceIsVisible(resourcePtr)) {
+	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)) {
 	return;
     }
-    (void)BrowserQueueVisibilityNotify(resourcePtr, state);
+    state = BrowserWindowVisibilityState(resourcePtr);
+    if (state == X11_WASM_VISIBILITY_NOT_VIEWABLE) {
+	resourcePtr->visibilityState = X11_WASM_VISIBILITY_NOT_VIEWABLE;
+    } else if (resourcePtr->visibilityState != state) {
+	(void)BrowserQueueVisibilityNotify(resourcePtr, state);
+	resourcePtr->visibilityState = state;
+    }
     for (childPtr = resourcePtr->firstChildPtr; childPtr != NULL;
 	    childPtr = childPtr->nextSiblingPtr) {
-	if (childPtr->mapped) {
-	    BrowserNotifyVisibilityTree(childPtr, state);
+	if (childPtr->type == X11_WASM_RESOURCE_WINDOW) {
+	    BrowserRefreshVisibilityTree(childPtr);
 	}
     }
 }

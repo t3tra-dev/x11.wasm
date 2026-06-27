@@ -218,6 +218,7 @@
 	| PointerMotionMask | Button1MotionMask | Button2MotionMask \
 	| Button3MotionMask | Button4MotionMask | Button5MotionMask \
 	| ButtonMotionMask)
+#define X11_WASM_VISIBILITY_NOT_VIEWABLE -1
 
 typedef struct X11WasmQueuedEvent {
     XEvent event;
@@ -1240,9 +1241,8 @@ void BrowserNotifyProperty(
     X11WasmResource *resourcePtr,
     Atom atom,
     int state);
-void BrowserNotifyVisibilityTree(
-    X11WasmResource *resourcePtr,
-    int state);
+void BrowserRefreshVisibilityTree(
+    X11WasmResource *resourcePtr);
 void BrowserNotifyWindowColormap(
     X11WasmResource *resourcePtr,
     Colormap oldColormap);

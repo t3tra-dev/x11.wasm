@@ -55,6 +55,7 @@ typedef struct X11WasmResource {
     unsigned char *bitmapData;
     int bitmapBytesPerLine;
     int mapped;
+    int visibilityState;
     int damaged;
     XRectangle damage;
     unsigned long damageSerial;

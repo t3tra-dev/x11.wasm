@@ -2189,6 +2189,23 @@ BrowserTestPopResizeRequestEvent(
 }
 
 static int
+BrowserTestPopVisibilityEvent(
+    Window window,
+    int state)
+{
+    XEvent event;
+
+    memset(&event, 0, sizeof(event));
+    if (!BrowserPopMatchingEvent(window, VisibilityChangeMask, &event)
+	    || (event.type != VisibilityNotify)
+	    || (event.xvisibility.window != window)
+	    || (event.xvisibility.state != state)) {
+	return 0;
+    }
+    return 1;
+}
+
+static int
 BrowserTestWindowGeometryAttributes(
     Display *display,
     Window window,
@@ -3722,6 +3739,100 @@ X11WasmTestResizeRequestRedirectApis(void)
 	    || (XEventsQueued(display, QueuedAlready) != 0)
 	    || !BrowserTestWindowGeometryAttributes(display, target, 12, 13,
 		    20, 21, 3)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    BrowserClearEventQueue();
+    if (parent != None) {
+	(void)XDestroyWindow(display, parent);
+    }
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestVisibilityObscuredApis(void)
+{
+    Display *display;
+    Window parent = None;
+    Window bottom = None;
+    Window cover = None;
+    int result = 0;
+    int screen;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+
+    parent = XCreateWindow(display, browserDisplay.rootWindow, 0, 0, 120, 90,
+	    0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL);
+    bottom = (parent != None) ? XCreateWindow(display, parent, 0, 0, 40, 40,
+	    0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL) : None;
+    cover = (parent != None) ? XCreateWindow(display, parent, 10, 10, 20, 20,
+	    0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL) : None;
+    if ((parent == None) || (bottom == None) || (cover == None)
+	    || (XMapWindow(display, parent) != Success)
+	    || (XSelectInput(display, bottom, VisibilityChangeMask)
+		    != Success)) {
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    if ((XMapWindow(display, bottom) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserTestPopVisibilityEvent(bottom, VisibilityUnobscured)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    if ((XMapWindow(display, cover) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserTestPopVisibilityEvent(bottom,
+		    VisibilityPartiallyObscured)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    if ((XMoveResizeWindow(display, cover, 0, 0, 40, 40) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserTestPopVisibilityEvent(bottom, VisibilityFullyObscured)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    if ((XMoveResizeWindow(display, cover, 0, 0, 40, 40) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    if ((XLowerWindow(display, cover) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserTestPopVisibilityEvent(bottom, VisibilityUnobscured)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    if ((XRaiseWindow(display, cover) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserTestPopVisibilityEvent(bottom, VisibilityFullyObscured)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    if ((XUnmapWindow(display, cover) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserTestPopVisibilityEvent(bottom, VisibilityUnobscured)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
 	goto cleanup;
     }
     result = 1;

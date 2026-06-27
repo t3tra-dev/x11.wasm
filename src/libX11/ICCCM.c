@@ -4538,6 +4538,7 @@ XCirculateSubwindows(
     resourcePtr = BrowserCirculateSubwindow(parentPtr, direction, &place);
     if (resourcePtr != NULL) {
 	(void)BrowserQueueCirculateNotify(resourcePtr, place);
+	BrowserRefreshVisibilityTree(parentPtr);
     }
     return Success;
 }
@@ -4598,6 +4599,7 @@ XReparentWindow(
 	resourcePtr->mapped = 0;
 	(void)X11WasmJsUnmapWindow(BrowserJsXId(window));
 	(void)BrowserQueueUnmapNotify(resourcePtr, False);
+	BrowserRefreshVisibilityTree(BrowserWindowResource(oldParent));
     }
     BrowserUnlinkChild(resourcePtr);
     resourcePtr->parent = parent;
@@ -4616,7 +4618,7 @@ XReparentWindow(
 	resourcePtr->mapped = 1;
 	(void)X11WasmJsMapWindow(BrowserJsXId(window));
 	(void)BrowserQueueMapNotify(resourcePtr);
-	BrowserNotifyVisibilityTree(resourcePtr, VisibilityUnobscured);
+	BrowserRefreshVisibilityTree(BrowserWindowResource(parent));
 	BrowserQueueViewableExposeTree(resourcePtr);
     }
     return Success;
