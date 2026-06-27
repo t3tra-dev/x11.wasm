@@ -405,6 +405,46 @@ test("Xlib GC clip rectangles and empty regions constrain drawing", async ({
   expect(samples.windowId).toBeGreaterThan(0);
 });
 
+test("Xlib GC subwindow_mode clips visible child windows", async ({ page }) => {
+  await waitForX11Runtime(page);
+
+  const samples = await page.evaluate(async () => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestSubwindowModeRendering?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    if (!module?._X11WasmTestSubwindowModeRendering || !backend) {
+      throw new Error("missing Xlib GC subwindow_mode rendering test hooks");
+    }
+    const windowId = module._X11WasmTestSubwindowModeRendering() >>> 0;
+    backend.flush?.();
+    const resource = backend.resources.get(windowId);
+    const canvas = resource?.canvas;
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      throw new Error("missing Xlib GC subwindow_mode rendering canvas");
+    }
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("missing Xlib GC subwindow_mode rendering context");
+    }
+    const pixel = (x, y) => Array.from(context.getImageData(x, y, 1, 1).data);
+    return {
+      clippedParent: pixel(4, 4),
+      clippedInferior: pixel(20, 10),
+      includedInferior: pixel(28, 10),
+      includedParent: pixel(40, 4),
+      windowId,
+    };
+  });
+
+  expect(samples.clippedParent).toEqual([255, 0, 0, 255]);
+  expect(samples.clippedInferior).toEqual([0, 0, 255, 255]);
+  expect(samples.includedInferior).toEqual([0, 255, 0, 255]);
+  expect(samples.includedParent).toEqual([0, 255, 0, 255]);
+  expect(samples.windowId).toBeGreaterThan(0);
+});
+
 test("Xlib XPutImage keeps pixmap backing constrained by GC clip", async ({
   page,
 }) => {

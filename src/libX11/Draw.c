@@ -293,7 +293,7 @@ int XCopyArea(Display *d, Drawable s, Drawable t, GC g, int sx, int sy,
 	return Success;
     }
     BrowserApplyGCStyle(g);
-    BrowserApplyGCClip(g);
+    BrowserApplyGCClip(g, t);
     BrowserStorePixmapCopy(d, s, sourcePtr, targetPtr, g, sx, sy, w, h, dx,
 	    dy, 0, AllPlanes, 0);
     (void)X11WasmJsCopyArea(BrowserJsXId(s), BrowserJsXId(t), sx, sy, w, h,
@@ -331,7 +331,7 @@ int XCopyPlane(Display *d, Drawable s, Drawable t, GC g, int sx, int sy,
 	return Success;
     }
     BrowserApplyGCStyle(g);
-    BrowserApplyGCClip(g);
+    BrowserApplyGCClip(g, t);
     BrowserStorePixmapCopy(d, s, sourcePtr, targetPtr, g, sx, sy, w, h, dx,
 	    dy, 1, p, (g != NULL) && (g->clip_mask == s));
     (void)X11WasmJsCopyPlane(BrowserJsXId(s), BrowserJsXId(t), sx, sy,
@@ -375,7 +375,7 @@ BrowserDrawArc(
     lineWidth = BrowserGCLineWidth(gc);
     pad = (int)((lineWidth + 1U) / 2U) + 1;
     BrowserApplyGCStyle(gc);
-    BrowserApplyGCClip(gc);
+    BrowserApplyGCClip(gc, drawable);
     (void)X11WasmJsDrawArc(BrowserJsXId(drawable), BrowserGCPixel(gc), x,
 	    y, width, height, angle1, angle2, 0, 0, lineWidth);
     BrowserMarkResourceDamage(resourcePtr, x - pad, y - pad,
@@ -442,7 +442,7 @@ BrowserDrawLine(
 	return 0;
     }
     BrowserApplyGCStyle(gc);
-    BrowserApplyGCClip(gc);
+    BrowserApplyGCClip(gc, drawable);
     (void)X11WasmJsDrawLine(BrowserJsXId(drawable), BrowserGCPixel(gc), x1, y1,
 	    x2, y2);
     BrowserMarkResourceDamage(resourcePtr, x, y, width, height);
@@ -516,7 +516,7 @@ BrowserDrawPoint(
 	return 0;
     }
     BrowserApplyGCStyle(gc);
-    BrowserApplyGCClip(gc);
+    BrowserApplyGCClip(gc, drawable);
     (void)X11WasmJsDrawRectangle(BrowserJsXId(drawable), BrowserGCPixel(gc),
 	    x, y, 1, 1, 1);
     BrowserMarkResourceDamage(resourcePtr, x, y, 1, 1);
@@ -591,7 +591,7 @@ BrowserDrawRectangle(
 	return 0;
     }
     BrowserApplyGCStyle(gc);
-    BrowserApplyGCClip(gc);
+    BrowserApplyGCClip(gc, drawable);
     (void)X11WasmJsDrawRectangle(BrowserJsXId(drawable), BrowserGCPixel(gc),
 	    x, y, width, height, 0);
     BrowserMarkResourceDamage(resourcePtr, x, y, width + 1, height + 1);
@@ -681,7 +681,7 @@ BrowserFillArc(
     }
     pieSlice = (gc == NULL) || (gc->arc_mode == ArcPieSlice);
     BrowserApplyGCStyle(gc);
-    BrowserApplyGCClip(gc);
+    BrowserApplyGCClip(gc, drawable);
     (void)X11WasmJsDrawArc(BrowserJsXId(drawable), BrowserGCPixel(gc), x,
 	    y, width, height, angle1, angle2, 1, pieSlice,
 	    BrowserGCLineWidth(gc));
@@ -779,7 +779,7 @@ BrowserFillPolygon(
 	}
     }
     BrowserApplyGCStyle(gc);
-    BrowserApplyGCClip(gc);
+    BrowserApplyGCClip(gc, drawable);
     (void)X11WasmJsFillPolygon(BrowserJsXId(drawable), BrowserGCPixel(gc),
 	    coords, count, fillRule);
     BrowserMarkResourceDamage(resourcePtr, minX, minY,
@@ -824,7 +824,7 @@ BrowserFillRectangle(
 	return 0;
     }
     BrowserApplyGCStyle(gc);
-    BrowserApplyGCClip(gc);
+    BrowserApplyGCClip(gc, drawable);
     (void)X11WasmJsDrawRectangle(BrowserJsXId(drawable), BrowserGCPixel(gc),
 	    x, y, width, height, 1);
     BrowserMarkResourceDamage(resourcePtr, x, y, width, height);
@@ -2325,7 +2325,7 @@ BrowserDrawUtf8Text(
 	    (gc != NULL) ? X11WasmFindResource(gc->font) : NULL, 8,
 	    utf8, length);
     BrowserApplyGCStyle(gc);
-    BrowserApplyGCClip(gc);
+    BrowserApplyGCClip(gc, drawable);
     (void)X11WasmJsDrawText(BrowserJsXId(drawable), BrowserGCPixel(gc), x,
 	    y, utf8, length);
     BrowserMarkResourceDamage(resourcePtr, x, y - 12,
@@ -2372,7 +2372,7 @@ BrowserDrawUtf8ImageString(
     }
     width = BrowserFontResourceTextWidth(fontPtr, charWidth, utf8, length);
     BrowserApplyGCStyle(gc);
-    BrowserApplyGCClip(gc);
+    BrowserApplyGCClip(gc, drawable);
     (void)X11WasmJsDrawRectangle(BrowserJsXId(drawable),
 	    (gc != NULL) ? gc->background : 0, x, y - ascent,
 	    (unsigned int)width, (unsigned int)(ascent + descent), 1);

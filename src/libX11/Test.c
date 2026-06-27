@@ -2381,6 +2381,68 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE unsigned int
+X11WasmTestSubwindowModeRendering(void)
+{
+    Display *display;
+    GC gc = NULL;
+    Window parent = None;
+    Window child = None;
+    unsigned int result = 0;
+    int screen;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+    parent = XCreateWindow(display, browserDisplay.rootWindow, 0, 0, 48,
+	    32, 0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL);
+    child = (parent != None) ? XCreateWindow(display, parent, 18, 8, 12,
+	    12, 0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL) : None;
+    gc = (parent != None) ? XCreateGC(display, parent, 0, NULL) : NULL;
+    if ((parent == None) || (child == None) || (gc == NULL)
+	    || (XMapWindow(display, parent) != Success)) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+
+    if ((XSetForeground(display, gc, 0x0000ffUL) != Success)
+	    || (XFillRectangle(display, parent, gc, 0, 0, 48, 32)
+		    != Success)
+	    || (XMapWindow(display, child) != Success)) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+    if ((XSetSubwindowMode(display, gc, ClipByChildren) != Success)
+	    || (XSetForeground(display, gc, 0xff0000UL) != Success)
+	    || (XFillRectangle(display, parent, gc, 0, 0, 24, 32)
+		    != Success)
+	    || (XSetSubwindowMode(display, gc, IncludeInferiors) != Success)
+	    || (XSetForeground(display, gc, 0x00ff00UL) != Success)
+	    || (XFillRectangle(display, parent, gc, 24, 0, 24, 32)
+		    != Success)) {
+	goto cleanup;
+    }
+    result = (unsigned int)BrowserJsXId(parent);
+    parent = None;
+    child = None;
+
+cleanup:
+    BrowserClearEventQueue();
+    if (gc != NULL) {
+	(void)XFreeGC(display, gc);
+    }
+    if (child != None) {
+	(void)XDestroyWindow(display, child);
+    }
+    if (parent != None) {
+	(void)XDestroyWindow(display, parent);
+    }
+    BrowserClearEventQueue();
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE unsigned int
 X11WasmTestCopyAreaSelfOverlapRendering(void)
 {
     static const unsigned long colors[] = {

@@ -5305,7 +5305,7 @@ XPutImage(
 	return Success;
     }
     BrowserApplyGCStyle(gc);
-    BrowserApplyGCClip(gc);
+    BrowserApplyGCClip(gc, drawable);
     putImage = BrowserConvertImageForPut(resourcePtr, gc, image,
 	    srcX, srcY, width, height);
     if (putImage == NULL) {

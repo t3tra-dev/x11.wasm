@@ -209,13 +209,142 @@ BrowserSetGCClipRects(
     }
 }
 
+static int
+BrowserDrawableHasVisibleInferiors(
+    X11WasmResource *resourcePtr)
+{
+    X11WasmResource *childPtr;
+
+    if ((resourcePtr == NULL)
+	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)
+	    || (resourcePtr->c_class == InputOnly)) {
+	return 0;
+    }
+    for (childPtr = resourcePtr->firstChildPtr; childPtr != NULL;
+	    childPtr = childPtr->nextSiblingPtr) {
+	if ((childPtr->type == X11_WASM_RESOURCE_WINDOW)
+		&& (childPtr->c_class != InputOnly)
+		&& BrowserResourceIsVisible(childPtr)) {
+	    return 1;
+	}
+    }
+    return 0;
+}
+
+static int
+BrowserDrawableClipsInferiors(
+    GC gc,
+    X11WasmResource *resourcePtr)
+{
+    if ((gc != NULL) && !BrowserIsKnownGC(gc)) {
+	return 0;
+    }
+    if ((gc != NULL) && (gc->subwindow_mode != ClipByChildren)) {
+	return 0;
+    }
+    return BrowserDrawableHasVisibleInferiors(resourcePtr);
+}
+
+static void
+BrowserAppendOffsetGCClipRects(
+    GC gc,
+    X11WasmGCClip *clipPtr,
+    XRectangle **rectsPtr,
+    int *countPtr)
+{
+    int i;
+    int xOrigin = (gc != NULL) ? gc->clip_x_origin : 0;
+    int yOrigin = (gc != NULL) ? gc->clip_y_origin : 0;
+
+    if ((clipPtr == NULL) || !clipPtr->enabled) {
+	return;
+    }
+    for (i = 0; i < clipPtr->rectCount; i++) {
+	XRectangle rect;
+	const XRectangle *sourcePtr = &clipPtr->rects[i];
+
+	BrowserSetRectangleBounds(&rect,
+		(int)sourcePtr->x + xOrigin,
+		(int)sourcePtr->y + yOrigin,
+		(int)sourcePtr->x + xOrigin + (int)sourcePtr->width,
+		(int)sourcePtr->y + yOrigin + (int)sourcePtr->height);
+	BrowserAppendRectangle(rectsPtr, countPtr, &rect);
+    }
+}
+
+static void
+BrowserSubtractInferiorClipRects(
+    X11WasmResource *resourcePtr,
+    XRectangle **rectsPtr,
+    int *countPtr)
+{
+    X11WasmResource *childPtr;
+
+    if ((resourcePtr == NULL) || (rectsPtr == NULL) || (countPtr == NULL)) {
+	return;
+    }
+    for (childPtr = resourcePtr->firstChildPtr; childPtr != NULL;
+	    childPtr = childPtr->nextSiblingPtr) {
+	XRectangle childRect;
+	XRectangle *remainingRects = NULL;
+	int remainingCount = 0;
+	int i;
+
+	if ((childPtr->type != X11_WASM_RESOURCE_WINDOW)
+		|| (childPtr->c_class == InputOnly)
+		|| !BrowserResourceIsVisible(childPtr)) {
+	    continue;
+	}
+	BrowserSetRectangleBounds(&childRect, childPtr->x, childPtr->y,
+		childPtr->x + (int)childPtr->width,
+		childPtr->y + (int)childPtr->height);
+	if (BrowserRectangleIsEmpty(&childRect)) {
+	    continue;
+	}
+	for (i = 0; i < *countPtr; i++) {
+	    BrowserSubtractRectangle(&(*rectsPtr)[i], &childRect,
+		    &remainingRects, &remainingCount);
+	}
+	if (*rectsPtr != NULL) {
+	    ckfree(*rectsPtr);
+	}
+	*rectsPtr = remainingRects;
+	*countPtr = remainingCount;
+	if (remainingCount == 0) {
+	    return;
+	}
+    }
+}
+
 void
 BrowserApplyGCClip(
-    GC gc)
+    GC gc,
+    Drawable drawable)
 {
     X11WasmGCClip *clipPtr = BrowserFindGCClip(gc, 0);
+    X11WasmResource *resourcePtr = X11WasmFindResource(drawable);
 
-    if ((clipPtr != NULL) && clipPtr->enabled) {
+    if (BrowserDrawableClipsInferiors(gc, resourcePtr)) {
+	XRectangle *clipRects = NULL;
+	int clipRectCount = 0;
+
+	if ((clipPtr != NULL) && clipPtr->enabled) {
+	    BrowserAppendOffsetGCClipRects(gc, clipPtr, &clipRects,
+		    &clipRectCount);
+	} else {
+	    XRectangle drawableRect;
+
+	    BrowserSetRectangleBounds(&drawableRect, 0, 0,
+		    (int)resourcePtr->width, (int)resourcePtr->height);
+	    BrowserAppendRectangle(&clipRects, &clipRectCount, &drawableRect);
+	}
+	BrowserSubtractInferiorClipRects(resourcePtr, &clipRects,
+		&clipRectCount);
+	(void)X11WasmJsSetClipRects(1, clipRects, clipRectCount, 0, 0);
+	if (clipRects != NULL) {
+	    ckfree(clipRects);
+	}
+    } else if ((clipPtr != NULL) && clipPtr->enabled) {
 	(void)X11WasmJsSetClipRects(1, clipPtr->rects, clipPtr->rectCount,
 		(gc != NULL) ? gc->clip_x_origin : 0,
 		(gc != NULL) ? gc->clip_y_origin : 0);

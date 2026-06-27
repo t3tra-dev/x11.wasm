@@ -1982,7 +1982,7 @@ BrowserDrawUtf8ImageText(
     width = BrowserFontSetTextEscapement(fontSet, utf8, length);
     BrowserFontSetMetrics(fontSet, &ascent, &descent);
     BrowserApplyGCStyle(gc);
-    BrowserApplyGCClip(gc);
+    BrowserApplyGCClip(gc, drawable);
     (void)X11WasmJsDrawRectangle(BrowserJsXId(drawable),
 	    (gc != NULL) ? gc->background : 0, x, y - ascent,
 	    (unsigned int)width, (unsigned int)(ascent + descent), 1);

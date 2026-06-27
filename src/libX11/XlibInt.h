@@ -521,7 +521,8 @@ void BrowserApplyChildWinGravity(
     unsigned int oldWidth,
     unsigned int oldHeight);
 void BrowserApplyGCClip(
-    GC gc);
+    GC gc,
+    Drawable drawable);
 void BrowserApplyGCStyle(
     GC gc);
 void BrowserApplyGCValues(
