@@ -11006,6 +11006,9 @@ BrowserTestXrmDatabaseApis(void)
     XrmDatabase enumerateQuestionDatabase = NULL;
     XrmDatabase enumerateBacktrackDatabase = NULL;
     XrmDatabase emptyDatabase = NULL;
+    XrmDatabase localeDatabase = NULL;
+    XrmDatabase alternateLocaleDatabase = NULL;
+    XrmDatabase restoredLocaleDatabase = NULL;
     XrmDatabase putDatabase = NULL;
     XrmDatabase mergeDatabase = NULL;
     XrmDatabase fileDatabase = NULL;
@@ -11026,6 +11029,11 @@ BrowserTestXrmDatabaseApis(void)
     XrmHashTable emptySearchList[2];
     XrmRepresentation qType = NULLQUARK;
     char *resourceType = NULL;
+    char *savedLocaleName = NULL;
+    char *alternateLocaleName = NULL;
+    char *restoredLocaleName = NULL;
+    const char *localeResult = NULL;
+    const char *localeCandidates[] = { "C.UTF-8", "en_US.UTF-8", "C", NULL };
     FILE *file = NULL;
     XrmOptionDescRec parseOptions[] = {
 	{ "-rv", ".reverse", XrmoptionNoArg, (XPointer)"on" },
@@ -11051,6 +11059,7 @@ BrowserTestXrmDatabaseApis(void)
     BrowserTestXrmEnumerateState enumExactPrefixOneState = { 0 };
     BrowserTestXrmEnumerateState enumQuestionState = { 0 };
     BrowserTestXrmEnumerateState enumBacktrackState = { 0 };
+    int localeIndex = 0;
     int parseArgc = 17;
     int result = 0;
 
@@ -11189,6 +11198,57 @@ BrowserTestXrmDatabaseApis(void)
 	    || (XrmGetResource(emptyDatabase, "wish.geometry",
 		    "Wish.Geometry", NULL, NULL) != False)
 	    || (XrmGetStringDatabase(NULL) != NULL)) {
+	goto cleanup;
+    }
+    localeResult = setlocale(LC_CTYPE, NULL);
+    savedLocaleName = BrowserDupString(
+	    (localeResult != NULL) ? localeResult : "C");
+    localeDatabase = XrmGetStringDatabase("wish.locale: current\n");
+    if ((localeDatabase == NULL)
+	    || (XrmLocaleOfDatabase(localeDatabase) == NULL)
+	    || (strcmp(XrmLocaleOfDatabase(localeDatabase),
+		    savedLocaleName) != 0)) {
+	goto cleanup;
+    }
+    for (localeIndex = 0; localeCandidates[localeIndex] != NULL;
+	    localeIndex++) {
+	if (strcmp(localeCandidates[localeIndex], savedLocaleName) == 0) {
+	    continue;
+	}
+	localeResult = setlocale(LC_CTYPE, localeCandidates[localeIndex]);
+	if ((localeResult != NULL)
+		&& (strcmp(localeResult, savedLocaleName) != 0)) {
+	    alternateLocaleName = BrowserDupString(localeResult);
+	    break;
+	}
+    }
+    if (alternateLocaleName != NULL) {
+	alternateLocaleDatabase =
+		XrmGetStringDatabase("wish.locale: alternate\n");
+	if ((alternateLocaleDatabase == NULL)
+		|| (XrmLocaleOfDatabase(alternateLocaleDatabase) == NULL)
+		|| (strcmp(XrmLocaleOfDatabase(alternateLocaleDatabase),
+			alternateLocaleName) != 0)) {
+	    goto cleanup;
+	}
+	localeResult = setlocale(LC_CTYPE, savedLocaleName);
+	if (localeResult == NULL) {
+	    goto cleanup;
+	}
+	restoredLocaleName = BrowserDupString(localeResult);
+	if ((strcmp(XrmLocaleOfDatabase(alternateLocaleDatabase),
+		alternateLocaleName) != 0)) {
+	    goto cleanup;
+	}
+	restoredLocaleDatabase =
+		XrmGetStringDatabase("wish.locale: restored\n");
+	if ((restoredLocaleDatabase == NULL)
+		|| (XrmLocaleOfDatabase(restoredLocaleDatabase) == NULL)
+		|| (strcmp(XrmLocaleOfDatabase(restoredLocaleDatabase),
+			restoredLocaleName) != 0)) {
+	    goto cleanup;
+	}
+    } else if (setlocale(LC_CTYPE, savedLocaleName) == NULL) {
 	goto cleanup;
     }
     XrmStringToQuarkList("wish.main.foreground", qNames);
@@ -11608,6 +11668,18 @@ cleanup:
     if (permanentAllocation != NULL) {
 	XFree(permanentAllocation);
     }
+    if (savedLocaleName != NULL) {
+	(void)setlocale(LC_CTYPE, savedLocaleName);
+    }
+    if (restoredLocaleName != NULL) {
+	ckfree(restoredLocaleName);
+    }
+    if (alternateLocaleName != NULL) {
+	ckfree(alternateLocaleName);
+    }
+    if (savedLocaleName != NULL) {
+	ckfree(savedLocaleName);
+    }
     XrmSetDatabase(display, NULL);
     if (roundTripDatabase != NULL) {
 	XrmDestroyDatabase(roundTripDatabase);
@@ -11629,6 +11701,15 @@ cleanup:
     }
     if (emptyDatabase != NULL) {
 	XrmDestroyDatabase(emptyDatabase);
+    }
+    if (restoredLocaleDatabase != NULL) {
+	XrmDestroyDatabase(restoredLocaleDatabase);
+    }
+    if (alternateLocaleDatabase != NULL) {
+	XrmDestroyDatabase(alternateLocaleDatabase);
+    }
+    if (localeDatabase != NULL) {
+	XrmDestroyDatabase(localeDatabase);
     }
     if (enumerateBacktrackDatabase != NULL) {
 	XrmDestroyDatabase(enumerateBacktrackDatabase);

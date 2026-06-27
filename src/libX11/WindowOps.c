@@ -20,6 +20,7 @@ struct _XrmHashBucketRec {
     BrowserXrmEntry *firstEntryPtr;
     BrowserXrmEntry *lastEntryPtr;
     BrowserXrmSearchContext *firstSearchPtr;
+    char *localeName;
 };
 
 typedef struct BrowserXrmComponent {
@@ -330,10 +331,13 @@ static XrmDatabase
 BrowserXrmNewDatabase(void)
 {
     XrmDatabase database = (XrmDatabase)ckalloc(sizeof(*database));
+    const char *localeName = setlocale(LC_CTYPE, NULL);
 
     database->firstEntryPtr = NULL;
     database->lastEntryPtr = NULL;
     database->firstSearchPtr = NULL;
+    database->localeName = BrowserDupString(
+	    (localeName != NULL) ? localeName : "C");
     return database;
 }
 
@@ -1458,7 +1462,7 @@ const char *
 XrmLocaleOfDatabase(
     XrmDatabase database)
 {
-    return (database != NULL) ? "C" : NULL;
+    return (database != NULL) ? database->localeName : NULL;
 }
 
 Bool
@@ -1720,6 +1724,9 @@ XrmDestroyDatabase(
 	entryPtr = nextPtr;
     }
     BrowserXrmDestroySearchContexts(database);
+    if (database->localeName != NULL) {
+	ckfree(database->localeName);
+    }
     ckfree(database);
 }
 
@@ -1760,6 +1767,9 @@ XrmCombineDatabase(
 	entryPtr = nextPtr;
     }
     BrowserXrmDestroySearchContexts(sourceDatabase);
+    if (sourceDatabase->localeName != NULL) {
+	ckfree(sourceDatabase->localeName);
+    }
     ckfree(sourceDatabase);
 }
 
