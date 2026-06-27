@@ -4733,6 +4733,39 @@ XCreatePixmapFromBitmapData(
 }
 
 static Status
+BrowserQueryBestDrawableResourceOrError(
+    Display **displayPtr,
+    Drawable drawable,
+    int shape,
+    unsigned char requestCode)
+{
+    Display *display = (displayPtr != NULL) ? *displayPtr : NULL;
+    X11WasmResource *resourcePtr;
+
+    if (display == NULL) {
+	display = X11WasmGetDisplay(NULL);
+	if (displayPtr != NULL) {
+	    *displayPtr = display;
+	}
+    }
+    resourcePtr = X11WasmFindResource(drawable);
+    if ((resourcePtr == NULL)
+	    || ((resourcePtr->type != X11_WASM_RESOURCE_WINDOW)
+		    && (resourcePtr->type != X11_WASM_RESOURCE_PIXMAP))) {
+	(void)BrowserReportXError(display, BadDrawable, (XID)drawable,
+		requestCode, 0);
+	return False;
+    }
+    if ((resourcePtr->type == X11_WASM_RESOURCE_WINDOW)
+	    && (resourcePtr->c_class == InputOnly)
+	    && ((shape == TileShape) || (shape == StippleShape))) {
+	(void)BrowserBadMatchOrError(displayPtr, (XID)drawable, requestCode);
+	return False;
+    }
+    return True;
+}
+
+static Status
 BrowserQueryBestSize(
     Display *display,
     int shape,
@@ -4742,8 +4775,8 @@ BrowserQueryBestSize(
     unsigned int *widthReturn,
     unsigned int *heightReturn)
 {
-    if (BrowserDrawableResourceOrError(&display, drawable,
-	    X11_WASM_XREQ_QUERY_BEST_SIZE) == NULL) {
+    if (!BrowserQueryBestDrawableResourceOrError(&display, drawable, shape,
+	    X11_WASM_XREQ_QUERY_BEST_SIZE)) {
 	return False;
     }
     if (!BrowserValueOrError(&display, shape,
@@ -4756,6 +4789,19 @@ BrowserQueryBestSize(
 	    || !BrowserValidateCard16(&display, (long)height, 1,
 		    X11_WASM_XREQ_QUERY_BEST_SIZE)) {
 	return False;
+    }
+    if (shape == CursorShape) {
+	unsigned int maxWidth =
+		(unsigned int)DisplayWidth(display, DefaultScreen(display));
+	unsigned int maxHeight =
+		(unsigned int)DisplayHeight(display, DefaultScreen(display));
+
+	if ((maxWidth > 0U) && (width > maxWidth)) {
+	    width = maxWidth;
+	}
+	if ((maxHeight > 0U) && (height > maxHeight)) {
+	    height = maxHeight;
+	}
     }
     if (widthReturn != NULL) {
 	*widthReturn = width;
