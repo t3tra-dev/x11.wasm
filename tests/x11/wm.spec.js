@@ -876,6 +876,87 @@ test("XGetWindowProperty delete clears browser collection metadata", async ({
   });
 });
 
+test("XGetWindowProperty delete clears browser EWMH metadata", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+  const windowId = await createMappedWindow(page);
+
+  const metadata = await page.evaluate((windowId) => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestGetWindowEwmhPropertiesDeletes?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    const resource = backend?.resources.get(windowId);
+    const element = resource?.element;
+    if (
+      !module?._X11WasmTestGetWindowEwmhPropertiesDeletes ||
+      !backend ||
+      !resource ||
+      !(element instanceof HTMLElement)
+    ) {
+      throw new Error("missing EWMH delete metadata test hooks");
+    }
+
+    const deleteResult =
+      module._X11WasmTestGetWindowEwmhPropertiesDeletes(windowId);
+    backend.flush?.();
+    const documentIcon = document.querySelector("link[data-x11-wasm-icon]");
+    return {
+      alpha: element.getAttribute("data-x11-wasm-alpha"),
+      deleteResult,
+      documentIconHref: documentIcon?.getAttribute("href") ?? null,
+      fullscreen: element.getAttribute("data-x11-wasm-fullscreen"),
+      iconPhotoCount: element.getAttribute("data-x11-wasm-icon-photo-count"),
+      iconPhotoHeight: element.getAttribute("data-x11-wasm-icon-photo-height"),
+      iconPhotoHref: element.getAttribute("data-x11-wasm-icon-photo-href"),
+      iconPhotoSizes: element.getAttribute("data-x11-wasm-icon-photo-sizes"),
+      iconPhotoWidth: element.getAttribute("data-x11-wasm-icon-photo-width"),
+      opacity: element.style.opacity,
+      resourceAlpha: resource.alpha,
+      resourceFullscreen: !!resource.fullscreen,
+      resourceIconPhotoCount: resource.iconPhotoCount,
+      resourceIconPhotoHeight: resource.iconPhotoHeight,
+      resourceIconPhotoHref: resource.iconPhotoHref,
+      resourceIconPhotoSizes: resource.iconPhotoSizes,
+      resourceIconPhotoWidth: resource.iconPhotoWidth,
+      resourceTopmost: !!resource.topmost,
+      resourceWindowTypes: [...(resource.windowTypes ?? [])],
+      resourceZoomed: !!resource.zoomed,
+      topmost: element.getAttribute("data-x11-wasm-topmost"),
+      windowTypes: element.getAttribute("data-x11-wasm-window-types"),
+      zoomed: element.getAttribute("data-x11-wasm-zoomed"),
+    };
+  }, windowId);
+
+  expect(metadata).toEqual({
+    alpha: "1",
+    deleteResult: 1,
+    documentIconHref: null,
+    fullscreen: null,
+    iconPhotoCount: null,
+    iconPhotoHeight: null,
+    iconPhotoHref: null,
+    iconPhotoSizes: null,
+    iconPhotoWidth: null,
+    opacity: "",
+    resourceAlpha: 1,
+    resourceFullscreen: false,
+    resourceIconPhotoCount: 0,
+    resourceIconPhotoHeight: 0,
+    resourceIconPhotoHref: "",
+    resourceIconPhotoSizes: "",
+    resourceIconPhotoWidth: 0,
+    resourceTopmost: false,
+    resourceWindowTypes: [],
+    resourceZoomed: false,
+    topmost: null,
+    windowTypes: null,
+    zoomed: null,
+  });
+});
+
 test("_NET_WM_WINDOW_TYPE updates browser window type metadata", async ({
   page,
 }) => {

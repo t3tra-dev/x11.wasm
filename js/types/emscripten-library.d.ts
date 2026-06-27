@@ -31,11 +31,17 @@ interface X11WasmResource {
   clientMachine?: string;
   wmClassName?: string;
   wmClass?: string;
+  alpha?: number;
   fullscreen?: boolean;
   topmost?: boolean;
   zoomed?: boolean;
   wmState?: "" | "normal" | "iconic" | "withdrawn";
   wmHints?: X11WasmWmHints | null;
+  iconPhotoCount?: number;
+  iconPhotoSizes?: string;
+  iconPhotoHref?: string;
+  iconPhotoWidth?: number;
+  iconPhotoHeight?: number;
   iconSizeCount?: number;
   iconSizes?: string;
   protocols?: string[];
@@ -476,6 +482,7 @@ declare const Module: {
     window: number,
     colormapWindow: number,
   ) => number;
+  _X11WasmTestGetWindowEwmhPropertiesDeletes?: (window: number) => number;
   _X11WasmTestSetWindowMetadataTargetProperty?: (
     window: number,
     target: number,

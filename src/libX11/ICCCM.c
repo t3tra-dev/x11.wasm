@@ -1239,6 +1239,192 @@ cleanup:
     return result;
 }
 
+static int
+BrowserTestWindowPropertyIsMissing(
+    Display *display,
+    Window window,
+    Atom property)
+{
+    Atom actualType = None;
+    int actualFormat = -1;
+    unsigned long nitems = 1;
+    unsigned long bytesAfter = 1;
+    unsigned char *data = NULL;
+    int status;
+
+    status = XGetWindowProperty(display, window, property, 0, 0, False,
+	    AnyPropertyType, &actualType, &actualFormat, &nitems,
+	    &bytesAfter, &data);
+    if (data != NULL) {
+	XFree(data);
+    }
+    return (status == Success) && (actualType == None)
+	    && (actualFormat == 0) && (nitems == 0)
+	    && (bytesAfter == 0);
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestGetWindowEwmhPropertiesDeletes(unsigned int window)
+{
+    static const unsigned int iconData[] = {
+	2, 2,
+	0xffff0000U, 0xff00ff00U,
+	0xff0000ffU, 0xffffffffU
+    };
+    Display *display;
+    Window xid = (Window)window;
+    Atom windowTypeAtom;
+    Atom windowTypes[2];
+    Atom netWmStateAtom;
+    Atom states[4];
+    Atom opacityAtom;
+    Atom iconAtom;
+    unsigned int opacity = 0x80000000U;
+    Atom actualType = None;
+    int actualFormat = 0;
+    unsigned long nitems = 0;
+    unsigned long bytesAfter = 0;
+    unsigned char *typeData = NULL;
+    unsigned char *stateData = NULL;
+    unsigned char *opacityData = NULL;
+    unsigned char *iconPropertyData = NULL;
+    int result = 0;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    if (BrowserWindowResource(xid) == NULL) {
+	return 0;
+    }
+
+    windowTypeAtom = XInternAtom(display, "_NET_WM_WINDOW_TYPE", False);
+    windowTypes[0] = XInternAtom(display, "_NET_WM_WINDOW_TYPE_DIALOG",
+	    False);
+    windowTypes[1] = XInternAtom(display, "_NET_WM_WINDOW_TYPE_UTILITY",
+	    False);
+    netWmStateAtom = BrowserNetWmStateAtom();
+    states[0] = XInternAtom(display, "_NET_WM_STATE_ABOVE", False);
+    states[1] = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_VERT", False);
+    states[2] = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_HORZ", False);
+    states[3] = XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", False);
+    opacityAtom = XInternAtom(display, "_NET_WM_WINDOW_OPACITY", False);
+    iconAtom = XInternAtom(display, "_NET_WM_ICON", False);
+    if ((windowTypeAtom == None) || (windowTypes[0] == None)
+	    || (windowTypes[1] == None) || (netWmStateAtom == None)
+	    || (states[0] == None) || (states[1] == None)
+	    || (states[2] == None) || (states[3] == None)
+	    || (opacityAtom == None) || (iconAtom == None)) {
+	goto cleanup;
+    }
+
+    if ((XChangeProperty(display, xid, windowTypeAtom, XA_ATOM, 32,
+		    PropModeReplace, (const unsigned char *)windowTypes,
+		    2) != Success)
+	    || (XChangeProperty(display, xid, netWmStateAtom, XA_ATOM, 32,
+		    PropModeReplace, (const unsigned char *)states,
+		    4) != Success)
+	    || (XChangeProperty(display, xid, opacityAtom, XA_CARDINAL, 32,
+		    PropModeReplace, (const unsigned char *)&opacity,
+		    1) != Success)
+	    || (XChangeProperty(display, xid, iconAtom, XA_CARDINAL, 32,
+		    PropModeReplace, (const unsigned char *)iconData,
+		    (int)(sizeof(iconData) / sizeof(iconData[0])))
+		    != Success)) {
+	goto cleanup;
+    }
+
+    if ((XGetWindowProperty(display, xid, windowTypeAtom, 0,
+		    (long)(LONG_MAX / 4L), True, XA_ATOM, &actualType,
+		    &actualFormat, &nitems, &bytesAfter,
+		    &typeData) != Success)
+	    || (actualType != XA_ATOM)
+	    || (actualFormat != 32)
+	    || (nitems != 2)
+	    || (bytesAfter != 0)
+	    || (typeData == NULL)
+	    || (BrowserPropertyAtomAt(typeData, 0) != windowTypes[0])
+	    || (BrowserPropertyAtomAt(typeData, 1) != windowTypes[1])) {
+	goto cleanup;
+    }
+
+    actualType = None;
+    actualFormat = 0;
+    nitems = 0;
+    bytesAfter = 0;
+    if ((XGetWindowProperty(display, xid, netWmStateAtom, 0,
+		    (long)(LONG_MAX / 4L), True, XA_ATOM, &actualType,
+		    &actualFormat, &nitems, &bytesAfter,
+		    &stateData) != Success)
+	    || (actualType != XA_ATOM)
+	    || (actualFormat != 32)
+	    || (nitems != 4)
+	    || (bytesAfter != 0)
+	    || (stateData == NULL)
+	    || (BrowserPropertyAtomAt(stateData, 0) != states[0])
+	    || (BrowserPropertyAtomAt(stateData, 1) != states[1])
+	    || (BrowserPropertyAtomAt(stateData, 2) != states[2])
+	    || (BrowserPropertyAtomAt(stateData, 3) != states[3])) {
+	goto cleanup;
+    }
+
+    actualType = None;
+    actualFormat = 0;
+    nitems = 0;
+    bytesAfter = 0;
+    if ((XGetWindowProperty(display, xid, opacityAtom, 0, 1, True,
+		    XA_CARDINAL, &actualType, &actualFormat, &nitems,
+		    &bytesAfter, &opacityData) != Success)
+	    || (actualType != XA_CARDINAL)
+	    || (actualFormat != 32)
+	    || (nitems != 1)
+	    || (bytesAfter != 0)
+	    || (opacityData == NULL)
+	    || (BrowserPropertyAtomAt(opacityData, 0) != (Atom)opacity)) {
+	goto cleanup;
+    }
+
+    actualType = None;
+    actualFormat = 0;
+    nitems = 0;
+    bytesAfter = 0;
+    if ((XGetWindowProperty(display, xid, iconAtom, 0,
+		    (long)(LONG_MAX / 4L), True, XA_CARDINAL, &actualType,
+		    &actualFormat, &nitems, &bytesAfter,
+		    &iconPropertyData) != Success)
+	    || (actualType != XA_CARDINAL)
+	    || (actualFormat != 32)
+	    || (nitems != (sizeof(iconData) / sizeof(iconData[0])))
+	    || (bytesAfter != 0)
+	    || (iconPropertyData == NULL)
+	    || (memcmp(iconPropertyData, iconData, sizeof(iconData)) != 0)) {
+	goto cleanup;
+    }
+
+    if (!BrowserTestWindowPropertyIsMissing(display, xid, windowTypeAtom)
+	    || !BrowserTestWindowPropertyIsMissing(display, xid,
+		    netWmStateAtom)
+	    || !BrowserTestWindowPropertyIsMissing(display, xid,
+		    opacityAtom)
+	    || !BrowserTestWindowPropertyIsMissing(display, xid, iconAtom)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    if (typeData != NULL) {
+	XFree(typeData);
+    }
+    if (stateData != NULL) {
+	XFree(stateData);
+    }
+    if (opacityData != NULL) {
+	XFree(opacityData);
+    }
+    if (iconPropertyData != NULL) {
+	XFree(iconPropertyData);
+    }
+    return result;
+}
+
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestSetWindowNetWmNameProperties(unsigned int window, int mode)
 {
