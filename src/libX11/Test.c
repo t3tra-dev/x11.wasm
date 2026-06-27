@@ -11060,6 +11060,7 @@ BrowserTestXrmDatabaseApis(void)
     XrmDatabase outputDatabase = NULL;
     XrmDatabase roundTripDatabase = NULL;
     XrmDatabase parseDatabase = NULL;
+    XrmDatabase dottedNameDatabase = NULL;
     XrmValue binaryValue;
     XrmValue readValue;
     char *permanentAllocation = NULL;
@@ -11095,6 +11096,9 @@ BrowserTestXrmDatabaseApis(void)
 	"-skip", "skip-value", "-skipn", "n1", "n2", "left",
 	"-skipline", "tail1", "tail2", NULL
     };
+    char *dottedNameArgv[] = {
+	"app.name", "-title", "Dotted Title", NULL
+    };
     BrowserTestXrmEnumerateState enumAllState = { 0 };
     BrowserTestXrmEnumerateState enumPrefixState = { 0 };
     BrowserTestXrmEnumerateState enumOneLevelState = { 0 };
@@ -11105,6 +11109,7 @@ BrowserTestXrmDatabaseApis(void)
     BrowserTestXrmEnumerateState enumBacktrackState = { 0 };
     int localeIndex = 0;
     int parseArgc = 17;
+    int dottedNameArgc = 3;
     int result = 0;
 
     emptyNames[0] = NULLQUARK;
@@ -11554,6 +11559,48 @@ BrowserTestXrmDatabaseApis(void)
 	    "q-background")) {
 	goto cleanup;
     }
+    qBindings[0] = XrmBindTightly;
+    qBindings[1] = XrmBindTightly;
+    qQuarks[0] = XrmStringToName("wish.main");
+    qQuarks[1] = XrmStringToName("literal");
+    qQuarks[2] = NULLQUARK;
+    XrmQPutStringResource(&putDatabase, qBindings, qQuarks,
+	    "literal-dot-component");
+    qNames[0] = XrmStringToName("wish.main");
+    qNames[1] = XrmStringToName("literal");
+    qNames[2] = NULLQUARK;
+    qClasses[0] = XrmStringToClass("Wish.Main");
+    qClasses[1] = XrmStringToClass("Literal");
+    qClasses[2] = NULLQUARK;
+    readValue.size = 0U;
+    readValue.addr = NULL;
+    qType = NULLQUARK;
+    if (!XrmQGetResource(putDatabase, qNames, qClasses, &qType, &readValue)
+	    || (qType != XrmStringToRepresentation("String"))
+	    || (readValue.addr == NULL)
+	    || (strcmp((const char *)readValue.addr,
+		    "literal-dot-component") != 0)
+	    || (XrmGetResource(putDatabase, "wish.main.literal",
+		    "Wish.Main.Literal", NULL, NULL) != False)) {
+	goto cleanup;
+    }
+    qNames[0] = XrmStringToName("wish.main");
+    qNames[1] = NULLQUARK;
+    qClasses[0] = XrmStringToClass("Wish.Main");
+    qClasses[1] = NULLQUARK;
+    readValue.size = 0U;
+    readValue.addr = NULL;
+    qType = NULLQUARK;
+    if (!XrmQGetSearchList(putDatabase, qNames, qClasses, searchList,
+	    (int)(sizeof(searchList) / sizeof(searchList[0])))
+	    || !XrmQGetSearchResource(searchList, XrmStringToName("literal"),
+		    XrmStringToClass("Literal"), &qType, &readValue)
+	    || (qType != XrmStringToRepresentation("String"))
+	    || (readValue.addr == NULL)
+	    || (strcmp((const char *)readValue.addr,
+		    "literal-dot-component") != 0)) {
+	goto cleanup;
+    }
     XrmStringToBindingQuarkList("wish..panel.*accent", qBindings,
 	    qQuarks);
     if ((qBindings[0] != XrmBindTightly)
@@ -11642,6 +11689,29 @@ BrowserTestXrmDatabaseApis(void)
 		    "Wish.Self", "-selfValue")
 	    || !BrowserTestXrmResourceEquals(parseDatabase, "wish.extra",
 		    "Wish.Extra", "extra-value")) {
+	goto cleanup;
+    }
+    XrmParseCommand(&dottedNameDatabase, parseOptions,
+	    (int)(sizeof(parseOptions) / sizeof(parseOptions[0])), "app.name",
+	    &dottedNameArgc, dottedNameArgv);
+    qNames[0] = XrmStringToName("app.name");
+    qNames[1] = XrmStringToName("title");
+    qNames[2] = NULLQUARK;
+    qClasses[0] = XrmStringToClass("App.Name");
+    qClasses[1] = XrmStringToClass("Title");
+    qClasses[2] = NULLQUARK;
+    readValue.size = 0U;
+    readValue.addr = NULL;
+    qType = NULLQUARK;
+    if ((dottedNameArgc != 1)
+	    || (strcmp(dottedNameArgv[0], "app.name") != 0)
+	    || !XrmQGetResource(dottedNameDatabase, qNames, qClasses, &qType,
+		    &readValue)
+	    || (qType != XrmStringToRepresentation("String"))
+	    || (readValue.addr == NULL)
+	    || (strcmp((const char *)readValue.addr, "Dotted Title") != 0)
+	    || (XrmGetResource(dottedNameDatabase, "app.name.title",
+		    "App.Name.Title", NULL, NULL) != False)) {
 	goto cleanup;
     }
     mergeDatabase = XrmGetStringDatabase(
@@ -11783,6 +11853,9 @@ cleanup:
     }
     if (parseDatabase != NULL) {
 	XrmDestroyDatabase(parseDatabase);
+    }
+    if (dottedNameDatabase != NULL) {
+	XrmDestroyDatabase(dottedNameDatabase);
     }
     if (mergeDatabase != NULL) {
 	XrmDestroyDatabase(mergeDatabase);

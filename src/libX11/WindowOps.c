@@ -3,6 +3,9 @@
 
 typedef struct BrowserXrmEntry {
     char *binding;
+    XrmBinding *bindings;
+    XrmQuark *quarks;
+    int quarkCount;
     char *value;
     char *type;
     unsigned int valueSize;
@@ -11,8 +14,10 @@ typedef struct BrowserXrmEntry {
 
 typedef struct BrowserXrmSearchContext {
     XrmDatabase database;
-    char *resourcePrefix;
-    char *classPrefix;
+    XrmQuark *names;
+    XrmQuark *classes;
+    int nameCount;
+    int classCount;
     struct BrowserXrmSearchContext *nextPtr;
 } BrowserXrmSearchContext;
 
@@ -23,15 +28,11 @@ struct _XrmHashBucketRec {
     char *localeName;
 };
 
-typedef struct BrowserXrmComponent {
-    const char *start;
-    const char *end;
-} BrowserXrmComponent;
-
 typedef struct BrowserXrmBindingPart {
     const char *start;
     const char *end;
     char separator;
+    XrmQuark quark;
 } BrowserXrmBindingPart;
 
 typedef Bool (*BrowserXrmEnumerator)(
@@ -433,11 +434,11 @@ BrowserXrmDestroySearchContexts(
     for (contextPtr = database->firstSearchPtr; contextPtr != NULL; ) {
 	BrowserXrmSearchContext *nextPtr = contextPtr->nextPtr;
 
-	if (contextPtr->resourcePrefix != NULL) {
-	    ckfree(contextPtr->resourcePrefix);
+	if (contextPtr->names != NULL) {
+	    ckfree(contextPtr->names);
 	}
-	if (contextPtr->classPrefix != NULL) {
-	    ckfree(contextPtr->classPrefix);
+	if (contextPtr->classes != NULL) {
+	    ckfree(contextPtr->classes);
 	}
 	ckfree(contextPtr);
 	contextPtr = nextPtr;
@@ -445,44 +446,43 @@ BrowserXrmDestroySearchContexts(
     database->firstSearchPtr = NULL;
 }
 
-static char *
-BrowserXrmQuarkListToSearchString(
-    XrmQuarkList quarks)
+static void
+BrowserXrmJoinQuarkPrefix(
+    XrmQuarkList prefix,
+    int prefixCount,
+    XrmQuark leaf,
+    XrmQuark **quarksPtr,
+    int *countPtr)
 {
-    char *string = BrowserXrmQuarkListToBindingString(NULL, quarks);
+    int count = prefixCount + ((leaf != NULLQUARK) ? 1 : 0);
+    XrmQuark *quarks = NULL;
+    int index;
 
-    return (string != NULL) ? string : BrowserDupString("");
-}
-
-static char *
-BrowserXrmJoinSearchPart(
-    const char *prefix,
-    const char *leaf)
-{
-    size_t prefixLength;
-    size_t leafLength;
-    char *string;
-    char *p;
-
-    if ((leaf == NULL) || (leaf[0] == '\0')) {
-	return NULL;
+    if (quarksPtr != NULL) {
+	*quarksPtr = NULL;
     }
-    if (prefix == NULL) {
-	prefix = "";
+    if (countPtr != NULL) {
+	*countPtr = 0;
     }
-    prefixLength = strlen(prefix);
-    leafLength = strlen(leaf);
-    string = (char *)ckalloc(prefixLength + leafLength
-	    + ((prefixLength > 0U) ? 2U : 1U));
-    p = string;
-    if (prefixLength > 0U) {
-	memcpy(p, prefix, prefixLength);
-	p += prefixLength;
-	*p++ = '.';
+    if (count <= 0) {
+	return;
     }
-    memcpy(p, leaf, leafLength);
-    p[leafLength] = '\0';
-    return string;
+    quarks = (XrmQuark *)ckalloc(sizeof(*quarks) * (size_t)(count + 1));
+    for (index = 0; index < prefixCount; index++) {
+	quarks[index] = prefix[index];
+    }
+    if (leaf != NULLQUARK) {
+	quarks[index++] = leaf;
+    }
+    quarks[index] = NULLQUARK;
+    if (quarksPtr != NULL) {
+	*quarksPtr = quarks;
+    } else {
+	ckfree(quarks);
+    }
+    if (countPtr != NULL) {
+	*countPtr = count;
+    }
 }
 
 static char *
@@ -543,54 +543,6 @@ BrowserXrmComponentCount(
     return count;
 }
 
-static BrowserXrmComponent *
-BrowserXrmSplitComponents(
-    const char *text,
-    int *countPtr)
-{
-    BrowserXrmComponent *parts;
-    int count;
-    int index = 0;
-    int emitted = 0;
-    int endedWithSeparator = 0;
-    const char *p;
-    const char *segmentStart;
-
-    count = BrowserXrmComponentCount(text);
-    if (countPtr != NULL) {
-	*countPtr = count;
-    }
-    if (count == 0) {
-	return NULL;
-    }
-    parts = (BrowserXrmComponent *)ckalloc(sizeof(*parts) * (size_t)count);
-    segmentStart = text;
-    for (p = text; *p != '\0'; p++) {
-	if ((*p == '.') || (*p == '*')) {
-	    if (p > segmentStart) {
-		parts[index].start = segmentStart;
-		parts[index].end = p;
-		index++;
-		emitted = 1;
-	    }
-	    segmentStart = p + 1;
-	    endedWithSeparator = 1;
-	} else {
-	    endedWithSeparator = 0;
-	}
-    }
-    if (p > segmentStart) {
-	parts[index].start = segmentStart;
-	parts[index].end = p;
-	index++;
-    } else if (!emitted || endedWithSeparator) {
-	parts[index].start = p;
-	parts[index].end = p;
-	index++;
-    }
-    return parts;
-}
-
 static int
 BrowserXrmBindingPartCount(
     const char *binding)
@@ -625,77 +577,6 @@ BrowserXrmBindingPartCount(
     return count;
 }
 
-static BrowserXrmBindingPart *
-BrowserXrmSplitBinding(
-    const char *binding,
-    int *countPtr,
-    int *dotCountPtr,
-    int *starCountPtr)
-{
-    BrowserXrmBindingPart *parts;
-    int count;
-    int index = 0;
-    char separator = '\0';
-    int emitted = 0;
-    int endedWithSeparator = 0;
-    const char *p;
-    const char *segmentStart;
-
-    if (dotCountPtr != NULL) {
-	*dotCountPtr = 0;
-    }
-    if (starCountPtr != NULL) {
-	*starCountPtr = 0;
-    }
-    count = BrowserXrmBindingPartCount(binding);
-    if (countPtr != NULL) {
-	*countPtr = count;
-    }
-    if (count == 0) {
-	return NULL;
-    }
-    parts = (BrowserXrmBindingPart *)ckalloc(sizeof(*parts) * (size_t)count);
-    segmentStart = binding;
-    for (p = binding; *p != '\0'; p++) {
-	if ((*p == '.') || (*p == '*')) {
-	    if (p > segmentStart) {
-		parts[index].start = segmentStart;
-		parts[index].end = p;
-		parts[index].separator = separator;
-		index++;
-		emitted = 1;
-		separator = '\0';
-	    }
-	    if (*p == '.') {
-		if (dotCountPtr != NULL) {
-		    (*dotCountPtr)++;
-		}
-	    } else {
-		separator = '*';
-		if (starCountPtr != NULL) {
-		    (*starCountPtr)++;
-		}
-	    }
-	    segmentStart = p + 1;
-	    endedWithSeparator = 1;
-	} else {
-	    endedWithSeparator = 0;
-	}
-    }
-    if (p > segmentStart) {
-	parts[index].start = segmentStart;
-	parts[index].end = p;
-	parts[index].separator = separator;
-	index++;
-    } else if (!emitted || endedWithSeparator) {
-	parts[index].start = p;
-	parts[index].end = p;
-	parts[index].separator = separator;
-	index++;
-    }
-    return parts;
-}
-
 static int
 BrowserXrmRangeEquals(
     const char *firstStart,
@@ -725,6 +606,181 @@ BrowserXrmQuarkListLength(
     return count;
 }
 
+static void
+BrowserXrmCopyQuarkList(
+    XrmBindingList sourceBindings,
+    XrmQuarkList sourceQuarks,
+    XrmBinding **bindingsPtr,
+    XrmQuark **quarksPtr,
+    int *countPtr)
+{
+    int count = BrowserXrmQuarkListLength(sourceQuarks);
+    XrmBinding *bindings = NULL;
+    XrmQuark *quarks = NULL;
+    int index;
+
+    if (bindingsPtr != NULL) {
+	*bindingsPtr = NULL;
+    }
+    if (quarksPtr != NULL) {
+	*quarksPtr = NULL;
+    }
+    if (countPtr != NULL) {
+	*countPtr = 0;
+    }
+    if (count <= 0) {
+	return;
+    }
+    bindings = (XrmBinding *)ckalloc(sizeof(*bindings) * (size_t)count);
+    quarks = (XrmQuark *)ckalloc(sizeof(*quarks) * (size_t)(count + 1));
+    for (index = 0; index < count; index++) {
+	bindings[index] = ((sourceBindings != NULL)
+		&& (sourceBindings[index] == XrmBindLoosely))
+		? XrmBindLoosely : XrmBindTightly;
+	quarks[index] = sourceQuarks[index];
+    }
+    quarks[count] = NULLQUARK;
+    if (bindingsPtr != NULL) {
+	*bindingsPtr = bindings;
+    } else {
+	ckfree(bindings);
+    }
+    if (quarksPtr != NULL) {
+	*quarksPtr = quarks;
+    } else {
+	ckfree(quarks);
+    }
+    if (countPtr != NULL) {
+	*countPtr = count;
+    }
+}
+
+static void
+BrowserXrmBindingToQuarkList(
+    const char *binding,
+    XrmBinding **bindingsPtr,
+    XrmQuark **quarksPtr,
+    int *countPtr)
+{
+    int count = BrowserXrmBindingPartCount(binding);
+    XrmBinding *bindings = NULL;
+    XrmQuark *quarks = NULL;
+
+    if (bindingsPtr != NULL) {
+	*bindingsPtr = NULL;
+    }
+    if (quarksPtr != NULL) {
+	*quarksPtr = NULL;
+    }
+    if (countPtr != NULL) {
+	*countPtr = 0;
+    }
+    if (count <= 0) {
+	return;
+    }
+    bindings = (XrmBinding *)ckalloc(sizeof(*bindings) * (size_t)count);
+    quarks = (XrmQuark *)ckalloc(sizeof(*quarks) * (size_t)(count + 1));
+    XrmStringToBindingQuarkList(binding, bindings, quarks);
+    if (bindingsPtr != NULL) {
+	*bindingsPtr = bindings;
+    } else {
+	ckfree(bindings);
+    }
+    if (quarksPtr != NULL) {
+	*quarksPtr = quarks;
+    } else {
+	ckfree(quarks);
+    }
+    if (countPtr != NULL) {
+	*countPtr = count;
+    }
+}
+
+static void
+BrowserXrmStringToQuarkArray(
+    const char *string,
+    XrmQuark **quarksPtr,
+    int *countPtr)
+{
+    int count = BrowserXrmComponentCount(string);
+    XrmQuark *quarks = NULL;
+
+    if (quarksPtr != NULL) {
+	*quarksPtr = NULL;
+    }
+    if (countPtr != NULL) {
+	*countPtr = 0;
+    }
+    if (count <= 0) {
+	return;
+    }
+    quarks = (XrmQuark *)ckalloc(sizeof(*quarks) * (size_t)(count + 1));
+    XrmStringToQuarkList(string, quarks);
+    if (quarksPtr != NULL) {
+	*quarksPtr = quarks;
+    } else {
+	ckfree(quarks);
+    }
+    if (countPtr != NULL) {
+	*countPtr = count;
+    }
+}
+
+static BrowserXrmBindingPart *
+BrowserXrmEntryParts(
+    const BrowserXrmEntry *entryPtr,
+    int *countPtr,
+    int *dotCountPtr,
+    int *starCountPtr)
+{
+    BrowserXrmBindingPart *parts;
+    int index;
+
+    if (countPtr != NULL) {
+	*countPtr = 0;
+    }
+    if (dotCountPtr != NULL) {
+	*dotCountPtr = 0;
+    }
+    if (starCountPtr != NULL) {
+	*starCountPtr = 0;
+    }
+    if ((entryPtr == NULL) || (entryPtr->quarks == NULL)
+	    || (entryPtr->quarkCount <= 0)) {
+	return NULL;
+    }
+    parts = (BrowserXrmBindingPart *)ckalloc(sizeof(*parts)
+	    * (size_t)entryPtr->quarkCount);
+    for (index = 0; index < entryPtr->quarkCount; index++) {
+	const char *string = XrmQuarkToString(entryPtr->quarks[index]);
+
+	if (string == NULL) {
+	    string = "";
+	}
+	parts[index].start = string;
+	parts[index].end = string + strlen(string);
+	parts[index].separator = ((entryPtr->bindings != NULL)
+		&& (entryPtr->bindings[index] == XrmBindLoosely)) ? '*' : '\0';
+	parts[index].quark = entryPtr->quarks[index];
+	if (index > 0 && parts[index].separator != '*') {
+	    parts[index].separator = '.';
+	}
+	if (parts[index].separator == '*') {
+	    if (starCountPtr != NULL) {
+		(*starCountPtr)++;
+	    }
+	} else if (index > 0) {
+	    if (dotCountPtr != NULL) {
+		(*dotCountPtr)++;
+	    }
+	}
+    }
+    if (countPtr != NULL) {
+	*countPtr = entryPtr->quarkCount;
+    }
+    return parts;
+}
+
 static int
 BrowserXrmPartIsQuestion(
     const BrowserXrmBindingPart *partPtr)
@@ -742,6 +798,9 @@ BrowserXrmPartMatchesQuark(
 
     if ((partPtr == NULL) || (quark == NULLQUARK)) {
 	return 0;
+    }
+    if (partPtr->quark != NULLQUARK) {
+	return partPtr->quark == quark;
     }
     string = XrmQuarkToString(quark);
     return (string != NULL)
@@ -876,11 +935,11 @@ BrowserXrmEnumerateEntry(
 }
 
 static int
-BrowserXrmPartMatchType(
+BrowserXrmPartMatchQuarkType(
     const BrowserXrmBindingPart *partPtr,
-    const BrowserXrmComponent *nameParts,
+    XrmNameList names,
     int nameCount,
-    const BrowserXrmComponent *classParts,
+    XrmClassList classes,
     int classCount,
     int componentIndex,
     int allowQuestionWildcard)
@@ -889,14 +948,11 @@ BrowserXrmPartMatchType(
 	    || (componentIndex >= nameCount)) {
 	return 0;
     }
-    if (BrowserXrmRangeEquals(partPtr->start, partPtr->end,
-	    nameParts[componentIndex].start, nameParts[componentIndex].end)) {
+    if (BrowserXrmPartMatchesQuark(partPtr, names[componentIndex])) {
 	return 3;
     }
-    if ((componentIndex < classCount)
-	    && BrowserXrmRangeEquals(partPtr->start, partPtr->end,
-		    classParts[componentIndex].start,
-		    classParts[componentIndex].end)) {
+    if ((componentIndex < classCount) && BrowserXrmPartMatchesQuark(partPtr,
+	    classes[componentIndex])) {
 	return 2;
     }
     if (allowQuestionWildcard && BrowserXrmPartIsQuestion(partPtr)) {
@@ -958,9 +1014,9 @@ BrowserXrmBindingBestMatchAt(
     const BrowserXrmBindingPart *parts,
     int partCount,
     int partIndex,
-    const BrowserXrmComponent *nameParts,
+    XrmNameList names,
     int nameCount,
-    const BrowserXrmComponent *classParts,
+    XrmClassList classes,
     int classCount,
     int componentIndex,
     unsigned char *candidateLevels,
@@ -978,8 +1034,8 @@ BrowserXrmBindingBestMatchAt(
 	int index;
 
 	for (index = componentIndex; index < nameCount; index++) {
-	    int matchType = BrowserXrmPartMatchType(&parts[partIndex],
-		    nameParts, nameCount, classParts, classCount, index,
+	    int matchType = BrowserXrmPartMatchQuarkType(&parts[partIndex],
+		    names, nameCount, classes, classCount, index,
 		    (partIndex + 1) < partCount);
 
 	    if (matchType > 0) {
@@ -988,7 +1044,7 @@ BrowserXrmBindingBestMatchAt(
 		candidateLevels[index] = BrowserXrmLevelScore(
 			&parts[partIndex], matchType);
 		BrowserXrmBindingBestMatchAt(parts, partCount, partIndex + 1,
-			nameParts, nameCount, classParts, classCount, index + 1,
+			names, nameCount, classes, classCount, index + 1,
 			candidateLevels, bestLevels, hasBestPtr);
 		candidateLevels[index] = oldScore;
 	    }
@@ -996,8 +1052,8 @@ BrowserXrmBindingBestMatchAt(
 	return;
     }
     if (componentIndex < nameCount) {
-	int matchType = BrowserXrmPartMatchType(&parts[partIndex], nameParts,
-		nameCount, classParts, classCount, componentIndex,
+	int matchType = BrowserXrmPartMatchQuarkType(&parts[partIndex], names,
+		nameCount, classes, classCount, componentIndex,
 		(partIndex + 1) < partCount);
 
 	if (matchType > 0) {
@@ -1006,7 +1062,7 @@ BrowserXrmBindingBestMatchAt(
 	    candidateLevels[componentIndex] = BrowserXrmLevelScore(
 		    &parts[partIndex], matchType);
 	    BrowserXrmBindingBestMatchAt(parts, partCount, partIndex + 1,
-		    nameParts, nameCount, classParts, classCount,
+		    names, nameCount, classes, classCount,
 		    componentIndex + 1, candidateLevels, bestLevels,
 		    hasBestPtr);
 	    candidateLevels[componentIndex] = oldScore;
@@ -1017,9 +1073,9 @@ BrowserXrmBindingBestMatchAt(
 static int
 BrowserXrmEntryMatch(
     BrowserXrmEntry *entryPtr,
-    const BrowserXrmComponent *nameParts,
+    XrmNameList names,
     int nameCount,
-    const BrowserXrmComponent *classParts,
+    XrmClassList classes,
     int classCount,
     unsigned char *bestLevels)
 {
@@ -1031,15 +1087,15 @@ BrowserXrmEntryMatch(
     if ((entryPtr == NULL) || (nameCount <= 0) || (bestLevels == NULL)) {
 	return 0;
     }
-    parts = BrowserXrmSplitBinding(entryPtr->binding, &partCount, NULL, NULL);
+    parts = BrowserXrmEntryParts(entryPtr, &partCount, NULL, NULL);
     if (parts == NULL) {
 	return 0;
     }
     candidateLevels = (unsigned char *)ckalloc((size_t)nameCount);
     memset(candidateLevels, 0, (size_t)nameCount);
     memset(bestLevels, 0, (size_t)nameCount);
-    BrowserXrmBindingBestMatchAt(parts, partCount, 0, nameParts, nameCount,
-	    classParts, classCount, 0, candidateLevels, bestLevels, &hasBest);
+    BrowserXrmBindingBestMatchAt(parts, partCount, 0, names, nameCount,
+	    classes, classCount, 0, candidateLevels, bestLevels, &hasBest);
     ckfree(candidateLevels);
     ckfree(parts);
     return hasBest;
@@ -1051,6 +1107,12 @@ BrowserXrmFreeEntryFields(
 {
     if (entryPtr->binding != NULL) {
 	ckfree(entryPtr->binding);
+    }
+    if (entryPtr->bindings != NULL) {
+	ckfree(entryPtr->bindings);
+    }
+    if (entryPtr->quarks != NULL) {
+	ckfree(entryPtr->quarks);
     }
     if (entryPtr->value != NULL) {
 	ckfree(entryPtr->value);
@@ -1072,18 +1134,35 @@ BrowserXrmDestroyEntry(
 }
 
 static BrowserXrmEntry *
-BrowserXrmFindExactEntry(
+BrowserXrmFindExactQuarkEntry(
     XrmDatabase database,
-    const char *binding)
+    XrmBindingList bindings,
+    XrmQuarkList quarks)
 {
     BrowserXrmEntry *entryPtr;
+    int quarkCount = BrowserXrmQuarkListLength(quarks);
 
-    if ((database == NULL) || (binding == NULL)) {
+    if ((database == NULL) || (quarkCount <= 0)) {
 	return NULL;
     }
     for (entryPtr = database->firstEntryPtr; entryPtr != NULL;
 	    entryPtr = entryPtr->nextPtr) {
-	if (strcmp(entryPtr->binding, binding) == 0) {
+	int index;
+
+	if (entryPtr->quarkCount != quarkCount) {
+	    continue;
+	}
+	for (index = 0; index < quarkCount; index++) {
+	    XrmBinding binding = ((bindings != NULL)
+		    && (bindings[index] == XrmBindLoosely))
+		    ? XrmBindLoosely : XrmBindTightly;
+
+	    if ((entryPtr->quarks[index] != quarks[index])
+		    || (entryPtr->bindings[index] != binding)) {
+		break;
+	    }
+	}
+	if (index == quarkCount) {
 	    return entryPtr;
 	}
     }
@@ -1138,16 +1217,29 @@ static void
 BrowserXrmStoreEntry(
     XrmDatabase database,
     char *binding,
+    XrmBinding *bindings,
+    XrmQuark *quarks,
+    int quarkCount,
     char *type,
     char *value,
     unsigned int valueSize)
 {
     BrowserXrmEntry *entryPtr;
+    int hasExplicitQuarks = (quarks != NULL) && (quarkCount > 0);
 
-    BrowserXrmNormalizeBinding(binding);
-    entryPtr = BrowserXrmFindExactEntry(database, binding);
+    if (!hasExplicitQuarks) {
+	BrowserXrmNormalizeBinding(binding);
+	BrowserXrmBindingToQuarkList(binding, &bindings, &quarks, &quarkCount);
+    }
+    entryPtr = BrowserXrmFindExactQuarkEntry(database, bindings, quarks);
     if (entryPtr != NULL) {
 	ckfree(entryPtr->binding);
+	if (entryPtr->bindings != NULL) {
+	    ckfree(entryPtr->bindings);
+	}
+	if (entryPtr->quarks != NULL) {
+	    ckfree(entryPtr->quarks);
+	}
 	if (entryPtr->type != NULL) {
 	    ckfree(entryPtr->type);
 	}
@@ -1155,6 +1247,9 @@ BrowserXrmStoreEntry(
 	    ckfree(entryPtr->value);
 	}
 	entryPtr->binding = binding;
+	entryPtr->bindings = bindings;
+	entryPtr->quarks = quarks;
+	entryPtr->quarkCount = quarkCount;
 	entryPtr->type = type;
 	entryPtr->value = value;
 	entryPtr->valueSize = valueSize;
@@ -1162,6 +1257,9 @@ BrowserXrmStoreEntry(
     }
     entryPtr = (BrowserXrmEntry *)ckalloc(sizeof(*entryPtr));
     entryPtr->binding = binding;
+    entryPtr->bindings = bindings;
+    entryPtr->quarks = quarks;
+    entryPtr->quarkCount = quarkCount;
     entryPtr->value = value;
     entryPtr->type = type;
     entryPtr->valueSize = valueSize;
@@ -1174,8 +1272,8 @@ BrowserXrmStoreStringEntry(
     char *binding,
     char *value)
 {
-    BrowserXrmStoreEntry(database, binding, BrowserDupString("String"), value,
-	    (unsigned int)strlen(value) + 1U);
+    BrowserXrmStoreEntry(database, binding, NULL, NULL, 0,
+	    BrowserDupString("String"), value, (unsigned int)strlen(value) + 1U);
 }
 
 static int
@@ -1507,6 +1605,7 @@ XrmPutResource(
     }
     valueCopy = BrowserDupValue(value, &valueSize);
     BrowserXrmStoreEntry(*databasePtr, BrowserDupString(specifier),
+	    NULL, NULL, 0,
 	    (type != NULL) ? BrowserDupString(type) : NULL,
 	    valueCopy, valueSize);
 }
@@ -1521,12 +1620,28 @@ XrmQPutResource(
 {
     char *specifier = BrowserXrmQuarkListToBindingString(bindings, quarks);
     const char *typeString = XrmRepresentationToString(type);
+    XrmBinding *bindingCopy = NULL;
+    XrmQuark *quarkCopy = NULL;
+    int quarkCount = 0;
+    char *valueCopy;
+    unsigned int valueSize = 0U;
 
     if (specifier == NULL) {
 	return;
     }
-    XrmPutResource(databasePtr, specifier, typeString, value);
-    ckfree(specifier);
+    if (databasePtr == NULL) {
+	ckfree(specifier);
+	return;
+    }
+    if (*databasePtr == NULL) {
+	*databasePtr = BrowserXrmNewDatabase();
+    }
+    BrowserXrmCopyQuarkList(bindings, quarks, &bindingCopy, &quarkCopy,
+	    &quarkCount);
+    valueCopy = BrowserDupValue(value, &valueSize);
+    BrowserXrmStoreEntry(*databasePtr, specifier, bindingCopy, quarkCopy,
+	    quarkCount, (typeString != NULL) ? BrowserDupString(typeString) : NULL,
+	    valueCopy, valueSize);
 }
 
 void
@@ -1552,13 +1667,12 @@ XrmQPutStringResource(
     XrmQuarkList quarks,
     _Xconst char *value)
 {
-    char *specifier = BrowserXrmQuarkListToBindingString(bindings, quarks);
+    XrmValue xrmValue;
 
-    if (specifier == NULL) {
-	return;
-    }
-    XrmPutStringResource(databasePtr, specifier, value);
-    ckfree(specifier);
+    xrmValue.size = (unsigned int)(((value != NULL) ? strlen(value) : 0U) + 1U);
+    xrmValue.addr = (XPointer)((value != NULL) ? value : "");
+    XrmQPutResource(databasePtr, bindings, quarks,
+	    XrmStringToRepresentation("String"), &xrmValue);
 }
 
 void
@@ -1666,37 +1780,30 @@ XrmLocaleOfDatabase(
     return (database != NULL) ? database->localeName : NULL;
 }
 
-Bool
-XrmGetResource(
+static Bool
+BrowserXrmGetResourceByQuarks(
     XrmDatabase database,
-    _Xconst char *resourceName,
-    _Xconst char *resourceClass,
+    XrmNameList names,
+    int nameCount,
+    XrmClassList classes,
+    int classCount,
     char **resourceTypeReturn,
     XrmValue *valueReturn)
 {
     BrowserXrmEntry *entryPtr;
     BrowserXrmEntry *bestEntryPtr = NULL;
-    BrowserXrmComponent *nameParts;
-    BrowserXrmComponent *classParts;
     unsigned char *entryLevels = NULL;
     unsigned char *bestLevels = NULL;
-    int nameCount = 0;
-    int classCount = 0;
 
-    if ((database == NULL) || (resourceName == NULL)) {
+    if ((database == NULL) || (names == NULL) || (nameCount <= 0)) {
 	return False;
-    }
-    nameParts = BrowserXrmSplitComponents(resourceName, &nameCount);
-    classParts = BrowserXrmSplitComponents(resourceClass, &classCount);
-    if (nameCount == 0) {
-	goto cleanup;
     }
     entryLevels = (unsigned char *)ckalloc((size_t)nameCount);
     bestLevels = (unsigned char *)ckalloc((size_t)nameCount);
     memset(bestLevels, 0, (size_t)nameCount);
     for (entryPtr = database->firstEntryPtr; entryPtr != NULL;
 	    entryPtr = entryPtr->nextPtr) {
-	if (BrowserXrmEntryMatch(entryPtr, nameParts, nameCount, classParts,
+	if (BrowserXrmEntryMatch(entryPtr, names, nameCount, classes,
 		classCount, entryLevels)
 		&& ((bestEntryPtr == NULL)
 			|| (BrowserXrmMatchVectorCompare(entryLevels, bestLevels,
@@ -1716,12 +1823,6 @@ XrmGetResource(
     }
 
 cleanup:
-    if (nameParts != NULL) {
-	ckfree(nameParts);
-    }
-    if (classParts != NULL) {
-	ckfree(classParts);
-    }
     if (entryLevels != NULL) {
 	ckfree(entryLevels);
     }
@@ -1732,6 +1833,37 @@ cleanup:
 }
 
 Bool
+XrmGetResource(
+    XrmDatabase database,
+    _Xconst char *resourceName,
+    _Xconst char *resourceClass,
+    char **resourceTypeReturn,
+    XrmValue *valueReturn)
+{
+    XrmQuark *names = NULL;
+    XrmQuark *classes = NULL;
+    int nameCount = 0;
+    int classCount = 0;
+    Bool result;
+
+    BrowserXrmStringToQuarkArray(resourceName, &names, &nameCount);
+    BrowserXrmStringToQuarkArray(resourceClass, &classes, &classCount);
+    result = BrowserXrmGetResourceByQuarks(database, names, nameCount,
+	    classes, classCount, resourceTypeReturn, valueReturn);
+    if (!result && (valueReturn != NULL)) {
+	valueReturn->size = 0U;
+	valueReturn->addr = NULL;
+    }
+    if (names != NULL) {
+	ckfree(names);
+    }
+    if (classes != NULL) {
+	ckfree(classes);
+    }
+    return result;
+}
+
+Bool
 XrmQGetResource(
     XrmDatabase database,
     XrmNameList quarkName,
@@ -1739,16 +1871,13 @@ XrmQGetResource(
     XrmRepresentation *quarkTypeReturn,
     XrmValue *valueReturn)
 {
-    char *resourceName = BrowserXrmQuarkListToBindingString(NULL, quarkName);
-    char *resourceClass = BrowserXrmQuarkListToBindingString(NULL, quarkClass);
     char *resourceType = NULL;
-    Bool result = False;
+    int nameCount = BrowserXrmQuarkListLength(quarkName);
+    int classCount = BrowserXrmQuarkListLength(quarkClass);
+    Bool result;
 
-    if (resourceName == NULL) {
-	goto cleanup;
-    }
-    result = XrmGetResource(database, resourceName, resourceClass,
-	    &resourceType, valueReturn);
+    result = BrowserXrmGetResourceByQuarks(database, quarkName, nameCount,
+	    quarkClass, classCount, &resourceType, valueReturn);
     if (quarkTypeReturn != NULL) {
 	*quarkTypeReturn = (result && (resourceType != NULL))
 		? XrmStringToRepresentation(resourceType) : NULLQUARK;
@@ -1757,16 +1886,8 @@ XrmQGetResource(
 	valueReturn->size = 0U;
 	valueReturn->addr = NULL;
     }
-
-cleanup:
     if (!result && (quarkTypeReturn != NULL)) {
 	*quarkTypeReturn = NULLQUARK;
-    }
-    if (resourceName != NULL) {
-	ckfree(resourceName);
-    }
-    if (resourceClass != NULL) {
-	ckfree(resourceClass);
     }
     return result;
 }
@@ -1793,8 +1914,14 @@ XrmQGetSearchList(
     }
     contextPtr = (BrowserXrmSearchContext *)ckalloc(sizeof(*contextPtr));
     contextPtr->database = database;
-    contextPtr->resourcePrefix = BrowserXrmQuarkListToSearchString(names);
-    contextPtr->classPrefix = BrowserXrmQuarkListToSearchString(classes);
+    contextPtr->names = NULL;
+    contextPtr->classes = NULL;
+    contextPtr->nameCount = 0;
+    contextPtr->classCount = 0;
+    BrowserXrmCopyQuarkList(NULL, names, NULL, &contextPtr->names,
+	    &contextPtr->nameCount);
+    BrowserXrmCopyQuarkList(NULL, classes, NULL, &contextPtr->classes,
+	    &contextPtr->classCount);
     contextPtr->nextPtr = database->firstSearchPtr;
     database->firstSearchPtr = contextPtr;
     listReturn[0] = (XrmHashTable)(void *)contextPtr;
@@ -1811,10 +1938,11 @@ XrmQGetSearchResource(
     XrmValue *valueReturn)
 {
     BrowserXrmSearchContext *contextPtr;
-    const char *leafName = XrmNameToString(name);
-    const char *leafClass = XrmClassToString(class);
-    char *resourceName = NULL;
-    char *resourceClass = NULL;
+    XrmQuark resourceLeaf;
+    XrmQuark *resourceNames = NULL;
+    XrmQuark *resourceClasses = NULL;
+    int resourceNameCount = 0;
+    int resourceClassCount = 0;
     char *resourceType = NULL;
     Bool result = False;
 
@@ -1822,22 +1950,17 @@ XrmQGetSearchResource(
 	goto cleanup;
     }
     contextPtr = (BrowserXrmSearchContext *)(void *)list[0];
-    if (leafName != NULL) {
-	resourceName = BrowserXrmJoinSearchPart(contextPtr->resourcePrefix,
-		leafName);
-    } else if (leafClass != NULL) {
-	resourceName = BrowserXrmJoinSearchPart(contextPtr->resourcePrefix,
-		leafClass);
-    }
-    if (leafClass != NULL) {
-	resourceClass = BrowserXrmJoinSearchPart(contextPtr->classPrefix,
-		leafClass);
-    }
-    if (resourceName == NULL) {
+    resourceLeaf = (name != NULLQUARK) ? name : class;
+    if (resourceLeaf == NULLQUARK) {
 	goto cleanup;
     }
-    result = XrmGetResource(contextPtr->database, resourceName,
-	    resourceClass, &resourceType, valueReturn);
+    BrowserXrmJoinQuarkPrefix(contextPtr->names, contextPtr->nameCount,
+	    resourceLeaf, &resourceNames, &resourceNameCount);
+    BrowserXrmJoinQuarkPrefix(contextPtr->classes, contextPtr->classCount,
+	    class, &resourceClasses, &resourceClassCount);
+    result = BrowserXrmGetResourceByQuarks(contextPtr->database,
+	    resourceNames, resourceNameCount, resourceClasses, resourceClassCount,
+	    &resourceType, valueReturn);
     if (typeReturn != NULL) {
 	*typeReturn = (result && (resourceType != NULL))
 		? XrmStringToRepresentation(resourceType) : NULLQUARK;
@@ -1853,11 +1976,11 @@ cleanup:
 	    valueReturn->addr = NULL;
 	}
     }
-    if (resourceName != NULL) {
-	ckfree(resourceName);
+    if (resourceNames != NULL) {
+	ckfree(resourceNames);
     }
-    if (resourceClass != NULL) {
-	ckfree(resourceClass);
+    if (resourceClasses != NULL) {
+	ckfree(resourceClasses);
     }
     return result;
 }
@@ -1887,8 +2010,7 @@ XrmEnumerateDatabase(
 	int partCount = 0;
 	int matches;
 
-	parts = BrowserXrmSplitBinding(entryPtr->binding, &partCount, NULL,
-		NULL);
+	parts = BrowserXrmEntryParts(entryPtr, &partCount, NULL, NULL);
 	matches = (parts != NULL)
 		&& BrowserXrmEntryMatchesEnumerationPrefix(parts, partCount,
 			names, nameCount, classes, classCount, mode);
@@ -1954,12 +2076,13 @@ XrmCombineDatabase(
 	BrowserXrmEntry *targetEntryPtr;
 
 	entryPtr->nextPtr = NULL;
-	targetEntryPtr = BrowserXrmFindExactEntry(*targetDatabasePtr,
-		entryPtr->binding);
+	targetEntryPtr = BrowserXrmFindExactQuarkEntry(*targetDatabasePtr,
+		entryPtr->bindings, entryPtr->quarks);
 	if (targetEntryPtr == NULL) {
 	    BrowserXrmAppendEntryObject(*targetDatabasePtr, entryPtr);
 	} else if (override) {
 	    BrowserXrmStoreEntry(*targetDatabasePtr, entryPtr->binding,
+		    entryPtr->bindings, entryPtr->quarks, entryPtr->quarkCount,
 		    entryPtr->type, entryPtr->value, entryPtr->valueSize);
 	    ckfree(entryPtr);
 	} else {
