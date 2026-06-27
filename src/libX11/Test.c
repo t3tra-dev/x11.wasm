@@ -3486,6 +3486,81 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestMapViewableExposeApis(void)
+{
+    Display *display;
+    XSetWindowAttributes attributes;
+    XWindowAttributes windowAttributes;
+    XEvent event;
+    Window parent = None;
+    Window child = None;
+    int result = 0;
+    int screen;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+    memset(&attributes, 0, sizeof(attributes));
+    attributes.event_mask = ExposureMask;
+    parent = XCreateWindow(display, browserDisplay.rootWindow, 0, 0, 32, 24,
+	    0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    CWEventMask, &attributes);
+    child = (parent != None) ? XCreateWindow(display, parent, 2, 3, 11, 7,
+	    0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    CWEventMask, &attributes) : None;
+    if ((parent == None) || (child == None)) {
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    memset(&windowAttributes, 0, sizeof(windowAttributes));
+    if ((XMapWindow(display, child) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 0)
+	    || !XGetWindowAttributes(display, child, &windowAttributes)
+	    || (windowAttributes.map_state != IsUnviewable)) {
+	goto cleanup;
+    }
+    if ((XMapWindow(display, parent) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 2)) {
+	goto cleanup;
+    }
+    memset(&event, 0, sizeof(event));
+    if (!BrowserPopMatchingEvent(parent, ExposureMask, &event)
+	    || (event.type != Expose)
+	    || (event.xexpose.window != parent)
+	    || (event.xexpose.x != 0)
+	    || (event.xexpose.y != 0)
+	    || (event.xexpose.width != 32)
+	    || (event.xexpose.height != 24)
+	    || (event.xexpose.count != 0)) {
+	goto cleanup;
+    }
+    memset(&event, 0, sizeof(event));
+    memset(&windowAttributes, 0, sizeof(windowAttributes));
+    if (!BrowserPopMatchingEvent(child, ExposureMask, &event)
+	    || (event.type != Expose)
+	    || (event.xexpose.window != child)
+	    || (event.xexpose.x != 0)
+	    || (event.xexpose.y != 0)
+	    || (event.xexpose.width != 11)
+	    || (event.xexpose.height != 7)
+	    || (event.xexpose.count != 0)
+	    || (XEventsQueued(display, QueuedAlready) != 0)
+	    || !XGetWindowAttributes(display, child, &windowAttributes)
+	    || (windowAttributes.map_state != IsViewable)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    BrowserClearEventQueue();
+    if (parent != None) {
+	(void)XDestroyWindow(display, parent);
+    }
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestXlibApis(void)
 {
     char buffer[64];

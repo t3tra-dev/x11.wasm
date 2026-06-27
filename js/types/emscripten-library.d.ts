@@ -561,6 +561,7 @@ declare const Module: {
   _X11WasmTestClearAreaApis?: () => number;
   _X11WasmTestConfigureStackingApis?: () => number;
   _X11WasmTestSubstructureNotifyApis?: () => number;
+  _X11WasmTestMapViewableExposeApis?: () => number;
   _X11WasmTestXlibApis?: () => number;
   _X11WasmTestColormapApis?: () => number;
   _X11WasmTestBitmapFileApis?: () => number;

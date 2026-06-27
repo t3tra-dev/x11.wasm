@@ -1398,7 +1398,7 @@ BrowserQueueExpose(
     if ((resourcePtr == NULL)
 	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)
 	    || (resourcePtr->c_class == InputOnly)
-	    || !resourcePtr->mapped
+	    || !BrowserResourceIsVisible(resourcePtr)
 	    || !BrowserResourceWantsEvent(resourcePtr, ExposureMask)) {
 	return 0;
     }
@@ -1412,6 +1412,27 @@ BrowserQueueExpose(
     event.xexpose.height = (int)height;
     event.xexpose.count = 0;
     return BrowserQueueEvent(&event);
+}
+
+void
+BrowserQueueViewableExposeTree(
+    X11WasmResource *resourcePtr)
+{
+    X11WasmResource *childPtr;
+
+    if ((resourcePtr == NULL)
+	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)
+	    || !BrowserResourceIsVisible(resourcePtr)) {
+	return;
+    }
+    (void)BrowserQueueExpose(resourcePtr, 0, 0, resourcePtr->width,
+	    resourcePtr->height);
+    for (childPtr = resourcePtr->firstChildPtr; childPtr != NULL;
+	    childPtr = childPtr->nextSiblingPtr) {
+	if (childPtr->mapped) {
+	    BrowserQueueViewableExposeTree(childPtr);
+	}
+    }
 }
 
 int

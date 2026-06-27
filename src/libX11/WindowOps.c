@@ -1998,10 +1998,7 @@ XMapWindow(
     }
     (void)BrowserQueueMapNotify(resourcePtr);
     BrowserNotifyVisibilityTree(resourcePtr, VisibilityUnobscured);
-    if (resourcePtr->c_class != InputOnly) {
-	(void)BrowserQueueExpose(resourcePtr, 0, 0, resourcePtr->width,
-		resourcePtr->height);
-    }
+    BrowserQueueViewableExposeTree(resourcePtr);
     (void)BrowserQueuePointerCrossingEvents(browserDisplay.pointerState,
 	    browserDisplay.pointerX, browserDisplay.pointerY, CurrentTime);
     return Success;

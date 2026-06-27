@@ -45,6 +45,23 @@ test("structure notifications split child and parent masks", async ({ page }) =>
   expect(result).toBe(1);
 });
 
+test("XMapWindow exposes newly viewable mapped inferiors", async ({ page }) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestMapViewableExposeApis?: () => number } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestMapViewableExposeApis) {
+      throw new Error("missing map viewable expose test export");
+    }
+    return module._X11WasmTestMapViewableExposeApis();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XSetIconSizes updates browser WM_ICON_SIZE metadata", async ({ page }) => {
   await waitForX11Runtime(page);
   const windowId = await createMappedWindow(page);

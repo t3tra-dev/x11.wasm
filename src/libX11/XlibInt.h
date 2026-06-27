@@ -1390,6 +1390,8 @@ int BrowserQueueExpose(
     int y,
     unsigned int width,
     unsigned int height);
+void BrowserQueueViewableExposeTree(
+    X11WasmResource *resourcePtr);
 int BrowserQueueGraphicsExposeEvent(
     Drawable drawable,
     const XRectangle *rectPtr,

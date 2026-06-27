@@ -1266,10 +1266,7 @@ BrowserRetainSaveSetWindow(
 	(void)X11WasmJsMapWindow(BrowserJsXId(resourcePtr->id));
 	(void)BrowserQueueMapNotify(resourcePtr);
 	BrowserNotifyVisibilityTree(resourcePtr, VisibilityUnobscured);
-	if (resourcePtr->c_class != InputOnly) {
-	    (void)BrowserQueueExpose(resourcePtr, 0, 0, resourcePtr->width,
-		    resourcePtr->height);
-	}
+	BrowserQueueViewableExposeTree(resourcePtr);
     }
 }
 
