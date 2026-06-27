@@ -629,6 +629,85 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestGetWindowNamePropertiesDeletes(unsigned int window)
+{
+    static const char titleValue[] = "Deleted Title";
+    static const char iconNameValue[] = "Deleted Icon";
+    Display *display;
+    Window xid = (Window)window;
+    Atom actualType = None;
+    int actualFormat = 0;
+    unsigned long nitems = 0;
+    unsigned long bytesAfter = 0;
+    unsigned char *titleData = NULL;
+    unsigned char *iconNameData = NULL;
+    char *fetchedTitle = NULL;
+    char *fetchedIconName = NULL;
+    int result = 0;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    if (BrowserWindowResource(xid) == NULL) {
+	return 0;
+    }
+
+    if ((XStoreName(display, xid, titleValue) != Success)
+	    || (XSetIconName(display, xid, iconNameValue) != Success)) {
+	goto cleanup;
+    }
+    if ((XGetWindowProperty(display, xid, XA_WM_NAME, 0,
+		    (long)(LONG_MAX / 4L), True, AnyPropertyType, &actualType,
+		    &actualFormat, &nitems, &bytesAfter, &titleData) != Success)
+	    || (actualType != XA_STRING)
+	    || (actualFormat != 8)
+	    || (nitems != strlen(titleValue))
+	    || (bytesAfter != 0)
+	    || (titleData == NULL)
+	    || (memcmp(titleData, titleValue, strlen(titleValue)) != 0)
+	    || (titleData[nitems] != '\0')) {
+	goto cleanup;
+    }
+    actualType = None;
+    actualFormat = 0;
+    nitems = 0;
+    bytesAfter = 0;
+    if ((XGetWindowProperty(display, xid, XA_WM_ICON_NAME, 0,
+		    (long)(LONG_MAX / 4L), True, AnyPropertyType, &actualType,
+		    &actualFormat, &nitems, &bytesAfter, &iconNameData) != Success)
+	    || (actualType != XA_STRING)
+	    || (actualFormat != 8)
+	    || (nitems != strlen(iconNameValue))
+	    || (bytesAfter != 0)
+	    || (iconNameData == NULL)
+	    || (memcmp(iconNameData, iconNameValue, strlen(iconNameValue)) != 0)
+	    || (iconNameData[nitems] != '\0')) {
+	goto cleanup;
+    }
+    if (XFetchName(display, xid, &fetchedTitle)
+	    || (fetchedTitle != NULL)
+	    || XGetIconName(display, xid, &fetchedIconName)
+	    || (fetchedIconName != NULL)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    if (titleData != NULL) {
+	XFree(titleData);
+    }
+    if (iconNameData != NULL) {
+	XFree(iconNameData);
+    }
+    if (fetchedTitle != NULL) {
+	XFree(fetchedTitle);
+    }
+    if (fetchedIconName != NULL) {
+	XFree(fetchedIconName);
+    }
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestSetWindowNetWmNameProperties(unsigned int window, int mode)
 {
     static const char netTitle[] = "Net " "\xe2\x98\x83" " Title";

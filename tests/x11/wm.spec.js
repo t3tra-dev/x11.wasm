@@ -565,6 +565,52 @@ test("XRotateWindowProperties reapplies browser name metadata", async ({
   });
 });
 
+test("XGetWindowProperty delete clears browser name metadata", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+  const windowId = await createMappedWindow(page);
+
+  const metadata = await page.evaluate((windowId) => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestGetWindowNamePropertiesDeletes?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    const resource = backend?.resources.get(windowId);
+    const element = resource?.element;
+    if (
+      !module?._X11WasmTestGetWindowNamePropertiesDeletes ||
+      !backend ||
+      !resource ||
+      !(element instanceof HTMLElement)
+    ) {
+      throw new Error("missing window name delete metadata test hooks");
+    }
+
+    const deleteResult =
+      module._X11WasmTestGetWindowNamePropertiesDeletes(windowId);
+    backend.flush?.();
+    return {
+      attrIconName: element.getAttribute("data-x11-wasm-icon-name"),
+      attrTitle: element.getAttribute("data-x11-wasm-title"),
+      documentTitle: document.title,
+      resourceIconName: resource.iconName,
+      resourceTitle: resource.title,
+      deleteResult,
+    };
+  }, windowId);
+
+  expect(metadata).toEqual({
+    attrIconName: "",
+    attrTitle: "",
+    documentTitle: "",
+    resourceIconName: "",
+    resourceTitle: "",
+    deleteResult: 1,
+  });
+});
+
 test("_NET_WM_WINDOW_TYPE updates browser window type metadata", async ({
   page,
 }) => {
