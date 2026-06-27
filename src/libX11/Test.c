@@ -2170,6 +2170,25 @@ BrowserTestPopConfigureRequestEvent(
 }
 
 static int
+BrowserTestPopResizeRequestEvent(
+    Window window,
+    int width,
+    int height)
+{
+    XEvent event;
+
+    memset(&event, 0, sizeof(event));
+    if (!BrowserPopMatchingEvent(window, ResizeRedirectMask, &event)
+	    || (event.type != ResizeRequest)
+	    || (event.xresizerequest.window != window)
+	    || (event.xresizerequest.width != width)
+	    || (event.xresizerequest.height != height)) {
+	return 0;
+    }
+    return 1;
+}
+
+static int
 BrowserTestWindowGeometryAttributes(
     Display *display,
     Window window,
@@ -3600,6 +3619,109 @@ X11WasmTestMapViewableExposeApis(void)
 	    || (XEventsQueued(display, QueuedAlready) != 0)
 	    || !XGetWindowAttributes(display, child, &windowAttributes)
 	    || (windowAttributes.map_state != IsViewable)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    BrowserClearEventQueue();
+    if (parent != None) {
+	(void)XDestroyWindow(display, parent);
+    }
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestResizeRequestRedirectApis(void)
+{
+    Display *display;
+    XWindowChanges changes;
+    Window parent = None;
+    Window target = None;
+    int result = 0;
+    int screen;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+
+    parent = XCreateWindow(display, browserDisplay.rootWindow, 0, 0, 100, 80,
+	    0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL);
+    target = (parent != None) ? XCreateWindow(display, parent, 3, 4, 20, 21,
+	    1, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL) : None;
+    if ((parent == None) || (target == None)
+	    || (XSelectInput(display, target,
+		    ResizeRedirectMask | StructureNotifyMask)
+		    != Success)) {
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    if ((XResizeWindow(display, target, 25, 27) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserTestPopResizeRequestEvent(target, 25, 27)
+	    || (XEventsQueued(display, QueuedAlready) != 0)
+	    || !BrowserTestWindowGeometryAttributes(display, target, 3, 4,
+		    20, 21, 1)) {
+	goto cleanup;
+    }
+
+    if (XSelectInput(display, target, ResizeRedirectMask) != Success) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+    if ((XMoveResizeWindow(display, target, 8, 9, 30, 31) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserTestPopResizeRequestEvent(target, 30, 31)
+	    || (XEventsQueued(display, QueuedAlready) != 0)
+	    || !BrowserTestWindowGeometryAttributes(display, target, 8, 9,
+		    20, 21, 1)) {
+	goto cleanup;
+    }
+
+    memset(&changes, 0, sizeof(changes));
+    changes.width = 32;
+    changes.border_width = 3;
+    BrowserClearEventQueue();
+    if ((XConfigureWindow(display, target, CWWidth | CWBorderWidth,
+	    &changes) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserTestPopResizeRequestEvent(target, 32, 21)
+	    || (XEventsQueued(display, QueuedAlready) != 0)
+	    || !BrowserTestWindowGeometryAttributes(display, target, 8, 9,
+		    20, 21, 3)) {
+	goto cleanup;
+    }
+
+    if (XSelectInput(display, parent, SubstructureRedirectMask) != Success) {
+	goto cleanup;
+    }
+    memset(&changes, 0, sizeof(changes));
+    changes.x = 11;
+    changes.width = 40;
+    changes.height = 41;
+    BrowserClearEventQueue();
+    if ((XConfigureWindow(display, target, CWX | CWWidth | CWHeight,
+	    &changes) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserTestPopConfigureRequestEvent(parent, target, 11, 9,
+		    40, 41, 3, None, Above, CWX | CWWidth | CWHeight)
+	    || (XEventsQueued(display, QueuedAlready) != 0)
+	    || !BrowserTestWindowGeometryAttributes(display, target, 8, 9,
+		    20, 21, 3)) {
+	goto cleanup;
+    }
+
+    if (XSelectInput(display, parent, NoEventMask) != Success) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+    if ((XMoveWindow(display, target, 12, 13) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 0)
+	    || !BrowserTestWindowGeometryAttributes(display, target, 12, 13,
+		    20, 21, 3)) {
 	goto cleanup;
     }
     result = 1;

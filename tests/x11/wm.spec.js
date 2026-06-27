@@ -119,6 +119,25 @@ test("XCirculateSubwindows redirects circulate requests to selecting parents", a
   expect(result).toBe(1);
 });
 
+test("XResizeWindow redirects resize requests to selecting windows", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestResizeRequestRedirectApis?: () => number } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestResizeRequestRedirectApis) {
+      throw new Error("missing resize request redirect test export");
+    }
+    return module._X11WasmTestResizeRequestRedirectApis();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XSetIconSizes updates browser WM_ICON_SIZE metadata", async ({ page }) => {
   await waitForX11Runtime(page);
   const windowId = await createMappedWindow(page);

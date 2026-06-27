@@ -1992,6 +1992,24 @@ BrowserWindowSubstructureIsRedirected(
 }
 
 static int
+BrowserWindowResizeIsRedirected(
+    X11WasmResource *resourcePtr,
+    unsigned int valueMask,
+    XWindowChanges *changes)
+{
+    if ((resourcePtr == NULL)
+	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)
+	    || (changes == NULL)
+	    || !BrowserResourceWantsEvent(resourcePtr, ResizeRedirectMask)) {
+	return 0;
+    }
+    return ((valueMask & CWWidth)
+	    && (resourcePtr->width != (unsigned int)changes->width))
+	    || ((valueMask & CWHeight)
+	    && (resourcePtr->height != (unsigned int)changes->height));
+}
+
+static int
 BrowserMapWindowResource(
     Display *display,
     X11WasmResource *resourcePtr,
@@ -2191,10 +2209,13 @@ XConfigureWindow(
 {
     X11WasmResource *resourcePtr = BrowserWindowResourceOrError(&display,
 	    window, X11_WASM_XREQ_CONFIGURE_WINDOW);
+    int configureNotify = 1;
+    int resizeRedirected = 0;
     int sizeChanged;
     unsigned int oldWidth;
     unsigned int oldHeight;
     Window above = None;
+    XWindowChanges effectiveChanges;
 
     if (resourcePtr == NULL) {
 	return Success;
@@ -2213,6 +2234,18 @@ XConfigureWindow(
 	(void)BrowserQueueConfigureRequest(resourcePtr, valueMask, changes);
 	return Success;
     }
+    if (BrowserWindowResizeIsRedirected(resourcePtr, valueMask, changes)) {
+	effectiveChanges = *changes;
+	(void)BrowserQueueResizeRequest(resourcePtr, valueMask, changes);
+	resizeRedirected = 1;
+	if (valueMask & CWWidth) {
+	    effectiveChanges.width = (int)resourcePtr->width;
+	}
+	if (valueMask & CWHeight) {
+	    effectiveChanges.height = (int)resourcePtr->height;
+	}
+	changes = &effectiveChanges;
+    }
     oldWidth = resourcePtr->width;
     oldHeight = resourcePtr->height;
     sizeChanged = ((valueMask & CWWidth)
@@ -2226,6 +2259,11 @@ XConfigureWindow(
     if (valueMask & CWBorderWidth) {
 	resourcePtr->borderWidth = (unsigned int)changes->border_width;
     }
+    if (resizeRedirected) {
+	configureNotify = ((valueMask & CWX) || (valueMask & CWY)
+		|| (valueMask & CWBorderWidth)
+		|| (valueMask & (CWSibling | CWStackMode)));
+    }
     if (valueMask & (CWSibling | CWStackMode)) {
 	BrowserRestackWindow(resourcePtr, valueMask, changes);
 	if (resourcePtr->prevSiblingPtr != NULL) {
@@ -2235,7 +2273,9 @@ XConfigureWindow(
     (void)X11WasmJsConfigureWindow(BrowserJsXId(window), resourcePtr->x,
 	    resourcePtr->y, resourcePtr->width, resourcePtr->height,
 	    resourcePtr->borderWidth, valueMask);
-    (void)BrowserQueueConfigureNotify(resourcePtr, above);
+    if (configureNotify) {
+	(void)BrowserQueueConfigureNotify(resourcePtr, above);
+    }
     if (sizeChanged) {
 	BrowserApplyChildWinGravity(resourcePtr, oldWidth, oldHeight);
     }

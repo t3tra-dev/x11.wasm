@@ -1726,6 +1726,30 @@ BrowserQueueConfigureRequest(
 }
 
 int
+BrowserQueueResizeRequest(
+    X11WasmResource *resourcePtr,
+    unsigned int valueMask,
+    XWindowChanges *changes)
+{
+    XEvent event;
+
+    if ((resourcePtr == NULL)
+	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)
+	    || (changes == NULL)
+	    || !BrowserResourceWantsEvent(resourcePtr, ResizeRedirectMask)) {
+	return 0;
+    }
+    BrowserSetCommonEventFields(&event, ResizeRequest,
+	    (Window)resourcePtr->id, CurrentTime);
+    event.xresizerequest.window = (Window)resourcePtr->id;
+    event.xresizerequest.width = (valueMask & CWWidth)
+	    ? changes->width : (int)resourcePtr->width;
+    event.xresizerequest.height = (valueMask & CWHeight)
+	    ? changes->height : (int)resourcePtr->height;
+    return BrowserQueueEvent(&event);
+}
+
+int
 BrowserQueueCirculateNotify(
     X11WasmResource *resourcePtr,
     int place)

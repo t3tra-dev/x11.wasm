@@ -1362,6 +1362,10 @@ int BrowserQueueConfigureRequest(
     X11WasmResource *resourcePtr,
     unsigned int valueMask,
     XWindowChanges *changes);
+int BrowserQueueResizeRequest(
+    X11WasmResource *resourcePtr,
+    unsigned int valueMask,
+    XWindowChanges *changes);
 int BrowserQueueCirculateNotify(
     X11WasmResource *resourcePtr,
     int place);
