@@ -800,6 +800,82 @@ test("XGetWindowProperty delete clears browser size hints metadata", async ({
   });
 });
 
+test("XGetWindowProperty delete clears browser collection metadata", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+  const [windowId, colormapWindowId] = await createMappedWindows(page, 2);
+
+  const metadata = await page.evaluate(
+    ({ colormapWindowId, windowId }) => {
+      const module =
+        /** @type {Window & { Module?: { _X11WasmTestGetWindowCollectionPropertiesDeletes?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+          window
+        ).Module;
+      const backend = module?.x11WasmBackend;
+      const resource = backend?.resources.get(windowId);
+      const element = resource?.element;
+      if (
+        !module?._X11WasmTestGetWindowCollectionPropertiesDeletes ||
+        !backend ||
+        !resource ||
+        !(element instanceof HTMLElement)
+      ) {
+        throw new Error("missing collection delete metadata test hooks");
+      }
+
+      const deleteResult =
+        module._X11WasmTestGetWindowCollectionPropertiesDeletes(
+          windowId,
+          colormapWindowId,
+        );
+      backend.flush?.();
+      return {
+        colormapWindowCount: element.getAttribute(
+          "data-x11-wasm-colormap-window-count",
+        ),
+        colormapWindows: element.getAttribute(
+          "data-x11-wasm-colormap-windows",
+        ),
+        deleteResult,
+        iconSizeCount: element.getAttribute("data-x11-wasm-icon-size-count"),
+        iconSizes: element.getAttribute("data-x11-wasm-icon-sizes"),
+        protocols: element.getAttribute("data-x11-wasm-protocols"),
+        resourceColormapWindows: [...(resource.colormapWindows ?? [])],
+        resourceIconSizeCount: resource.iconSizeCount,
+        resourceIconSizes: resource.iconSizes,
+        resourceProtocols: [...(resource.protocols ?? [])],
+        resourceStandardColormaps: JSON.parse(
+          JSON.stringify(resource.standardColormaps ?? {}),
+        ),
+        standardColormapCount: element.getAttribute(
+          "data-x11-wasm-standard-colormap-count",
+        ),
+        standardColormaps: element.getAttribute(
+          "data-x11-wasm-standard-colormaps",
+        ),
+      };
+    },
+    { colormapWindowId, windowId },
+  );
+
+  expect(metadata).toEqual({
+    colormapWindowCount: null,
+    colormapWindows: null,
+    deleteResult: 1,
+    iconSizeCount: null,
+    iconSizes: null,
+    protocols: null,
+    resourceColormapWindows: [],
+    resourceIconSizeCount: 0,
+    resourceIconSizes: "",
+    resourceProtocols: [],
+    resourceStandardColormaps: {},
+    standardColormapCount: null,
+    standardColormaps: null,
+  });
+});
+
 test("_NET_WM_WINDOW_TYPE updates browser window type metadata", async ({
   page,
 }) => {

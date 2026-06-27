@@ -1039,6 +1039,207 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestGetWindowCollectionPropertiesDeletes(
+    unsigned int window,
+    unsigned int colormapWindow)
+{
+    Display *display;
+    Window xid = (Window)window;
+    Window colorXid = (Window)colormapWindow;
+    Atom protocols[2];
+    Atom standardColormapProperty;
+    XIconSize iconSizes[2];
+    XIconSize *remainingIconSizes = NULL;
+    int remainingIconSizeCount = -1;
+    Window colormapWindows[2];
+    Window *remainingColormapWindows = NULL;
+    int remainingColormapWindowCount = -1;
+    Atom *remainingProtocols = NULL;
+    int remainingProtocolCount = -1;
+    XStandardColormap colormaps[2];
+    XStandardColormap *remainingColormaps = NULL;
+    int remainingColormapCount = -1;
+    Atom actualType = None;
+    int actualFormat = 0;
+    unsigned long nitems = 0;
+    unsigned long bytesAfter = 0;
+    unsigned char *iconSizeData = NULL;
+    unsigned char *protocolData = NULL;
+    unsigned char *colormapWindowData = NULL;
+    unsigned char *standardColormapData = NULL;
+    int result = 0;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    if ((BrowserWindowResource(xid) == NULL)
+	    || (BrowserWindowResource(colorXid) == NULL)) {
+	return 0;
+    }
+
+    memset(iconSizes, 0, sizeof(iconSizes));
+    iconSizes[0].min_width = 12;
+    iconSizes[0].min_height = 16;
+    iconSizes[0].max_width = 48;
+    iconSizes[0].max_height = 64;
+    iconSizes[0].width_inc = 6;
+    iconSizes[0].height_inc = 8;
+    iconSizes[1].min_width = 24;
+    iconSizes[1].min_height = 24;
+    iconSizes[1].max_width = 96;
+    iconSizes[1].max_height = 96;
+    iconSizes[1].width_inc = 12;
+    iconSizes[1].height_inc = 12;
+
+    protocols[0] = XInternAtom(display, "WM_DELETE_WINDOW", False);
+    protocols[1] = XInternAtom(display, "WM_TAKE_FOCUS", False);
+    standardColormapProperty = XInternAtom(display,
+	    "_X11_WASM_TEST_RGB_MAP_DELETE", False);
+    colormapWindows[0] = xid;
+    colormapWindows[1] = colorXid;
+
+    memset(colormaps, 0, sizeof(colormaps));
+    colormaps[0].colormap = browserDisplay.defaultColormap;
+    colormaps[0].red_max = 255;
+    colormaps[0].red_mult = 65536;
+    colormaps[0].green_max = 255;
+    colormaps[0].green_mult = 256;
+    colormaps[0].blue_max = 255;
+    colormaps[0].blue_mult = 1;
+    colormaps[0].base_pixel = 0;
+    colormaps[0].visualid = browserDisplay.visual.visualid;
+    colormaps[0].killid = ReleaseByFreeingColormap;
+    colormaps[1] = colormaps[0];
+    colormaps[1].base_pixel = 32;
+    colormaps[1].red_max = 31;
+    colormaps[1].green_max = 63;
+    colormaps[1].blue_max = 31;
+
+    if ((protocols[0] == None) || (protocols[1] == None)
+	    || (standardColormapProperty == None)
+	    || (XSetIconSizes(display, xid, iconSizes, 2) != Success)
+	    || !XSetWMProtocols(display, xid, protocols, 2)
+	    || !XSetWMColormapWindows(display, xid, colormapWindows, 2)) {
+	goto cleanup;
+    }
+    XSetRGBColormaps(display, xid, colormaps, 2, standardColormapProperty);
+
+    if ((XGetWindowProperty(display, xid, XA_WM_ICON_SIZE, 0,
+		    (long)(LONG_MAX / 4L), True, XA_WM_ICON_SIZE,
+		    &actualType, &actualFormat, &nitems, &bytesAfter,
+		    &iconSizeData) != Success)
+	    || (actualType != XA_WM_ICON_SIZE)
+	    || (actualFormat != 32)
+	    || (nitems != (sizeof(iconSizes) / 4UL))
+	    || (bytesAfter != 0)
+	    || (iconSizeData == NULL)
+	    || (memcmp(iconSizeData, iconSizes, sizeof(iconSizes)) != 0)) {
+	goto cleanup;
+    }
+
+    actualType = None;
+    actualFormat = 0;
+    nitems = 0;
+    bytesAfter = 0;
+    if ((XGetWindowProperty(display, xid, BrowserWmProtocolsAtom(), 0,
+		    (long)(LONG_MAX / 4L), True, XA_ATOM, &actualType,
+		    &actualFormat, &nitems, &bytesAfter,
+		    &protocolData) != Success)
+	    || (actualType != XA_ATOM)
+	    || (actualFormat != 32)
+	    || (nitems != 2)
+	    || (bytesAfter != 0)
+	    || (protocolData == NULL)
+	    || (BrowserPropertyAtomAt(protocolData, 0) != protocols[0])
+	    || (BrowserPropertyAtomAt(protocolData, 1) != protocols[1])) {
+	goto cleanup;
+    }
+
+    actualType = None;
+    actualFormat = 0;
+    nitems = 0;
+    bytesAfter = 0;
+    if ((XGetWindowProperty(display, xid, BrowserWmColormapWindowsAtom(), 0,
+		    (long)(LONG_MAX / 4L), True, XA_WINDOW, &actualType,
+		    &actualFormat, &nitems, &bytesAfter,
+		    &colormapWindowData) != Success)
+	    || (actualType != XA_WINDOW)
+	    || (actualFormat != 32)
+	    || (nitems != 2)
+	    || (bytesAfter != 0)
+	    || (colormapWindowData == NULL)
+	    || ((Window)BrowserPropertyAtomAt(colormapWindowData, 0) != xid)
+	    || ((Window)BrowserPropertyAtomAt(colormapWindowData, 1)
+		    != colorXid)) {
+	goto cleanup;
+    }
+
+    actualType = None;
+    actualFormat = 0;
+    nitems = 0;
+    bytesAfter = 0;
+    if ((XGetWindowProperty(display, xid, standardColormapProperty, 0,
+		    (long)(LONG_MAX / 4L), True, XA_RGB_COLOR_MAP,
+		    &actualType, &actualFormat, &nitems, &bytesAfter,
+		    &standardColormapData) != Success)
+	    || (actualType != XA_RGB_COLOR_MAP)
+	    || (actualFormat != 32)
+	    || (nitems != (sizeof(colormaps) / 4UL))
+	    || (bytesAfter != 0)
+	    || (standardColormapData == NULL)
+	    || (memcmp(standardColormapData, colormaps, sizeof(colormaps))
+		    != 0)) {
+	goto cleanup;
+    }
+
+    if (XGetIconSizes(display, xid, &remainingIconSizes,
+		    &remainingIconSizeCount)
+	    || (remainingIconSizes != NULL)
+	    || (remainingIconSizeCount != 0)
+	    || XGetWMProtocols(display, xid, &remainingProtocols,
+		    &remainingProtocolCount)
+	    || (remainingProtocols != NULL)
+	    || (remainingProtocolCount != 0)
+	    || XGetWMColormapWindows(display, xid, &remainingColormapWindows,
+		    &remainingColormapWindowCount)
+	    || (remainingColormapWindows != NULL)
+	    || (remainingColormapWindowCount != 0)
+	    || XGetRGBColormaps(display, xid, &remainingColormaps,
+		    &remainingColormapCount, standardColormapProperty)
+	    || (remainingColormaps != NULL)
+	    || (remainingColormapCount != 0)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    if (iconSizeData != NULL) {
+	XFree(iconSizeData);
+    }
+    if (protocolData != NULL) {
+	XFree(protocolData);
+    }
+    if (colormapWindowData != NULL) {
+	XFree(colormapWindowData);
+    }
+    if (standardColormapData != NULL) {
+	XFree(standardColormapData);
+    }
+    if (remainingIconSizes != NULL) {
+	XFree(remainingIconSizes);
+    }
+    if (remainingProtocols != NULL) {
+	XFree(remainingProtocols);
+    }
+    if (remainingColormapWindows != NULL) {
+	XFree(remainingColormapWindows);
+    }
+    if (remainingColormaps != NULL) {
+	XFree(remainingColormaps);
+    }
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestSetWindowNetWmNameProperties(unsigned int window, int mode)
 {
     static const char netTitle[] = "Net " "\xe2\x98\x83" " Title";

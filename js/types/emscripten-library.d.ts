@@ -472,6 +472,10 @@ declare const Module: {
     groupWindow: number,
   ) => number;
   _X11WasmTestGetWindowNormalHintsDeletes?: (window: number) => number;
+  _X11WasmTestGetWindowCollectionPropertiesDeletes?: (
+    window: number,
+    colormapWindow: number,
+  ) => number;
   _X11WasmTestSetWindowMetadataTargetProperty?: (
     window: number,
     target: number,
