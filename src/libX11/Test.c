@@ -11852,6 +11852,7 @@ X11WasmTestResourceManagerApis(void)
 	    "wish*geometry: wildcard-geometry\n"
 	    "wish.geometry: exact-geometry\n"
 	    "wish.background: black\n"
+	    "wish.main.foreground: multilevel-foreground\n"
 	    "*foreground: white\n"
 	    "standalone: bare-value\n"
 	    "wish.continued: root\\\n"
@@ -11862,6 +11863,7 @@ X11WasmTestResourceManagerApis(void)
 	    "wish.geometry: second\n";
     const char databaseDefaultText[] =
 	    "wish.geometry: database-geometry\n"
+	    "wish.main.foreground: database-multilevel-foreground\n"
 	    "*foreground: database-foreground\n";
     const char screenResourceText[] = "screen.option: screen-value\n";
     Atom screenResourcesAtom;
@@ -11928,6 +11930,8 @@ X11WasmTestResourceManagerApis(void)
 	return 0;
     }
     if ((XGetDefault(display, "other", "background") != NULL)
+	    || (XGetDefault(display, "wish", "main.foreground") != NULL)
+	    || (XGetDefault(display, "wish", "main*foreground") != NULL)
 	    || (XGetDefault(display, NULL, NULL) != NULL)) {
 	return 0;
     }
@@ -11963,6 +11967,9 @@ X11WasmTestResourceManagerApis(void)
     defaultValue = XGetDefault(display, "other", "foreground");
     if ((defaultValue == NULL)
 	    || (strcmp(defaultValue, "database-foreground") != 0)) {
+	return 0;
+    }
+    if (XGetDefault(display, "wish", "main.foreground") != NULL) {
 	return 0;
     }
     XrmSetDatabase(display, NULL);

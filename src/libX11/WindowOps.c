@@ -92,6 +92,14 @@ BrowserDefaultProgramName(
     return (slash != NULL) ? slash + 1 : program;
 }
 
+static int
+BrowserDefaultOptionIsSingleComponent(
+    const char *option)
+{
+    return (option != NULL) && (option[0] != '\0')
+	    && (strchr(option, '.') == NULL) && (strchr(option, '*') == NULL);
+}
+
 static const char *
 BrowserSkipDefaultSpaces(
     const char *text,
@@ -1377,7 +1385,7 @@ XGetDefault(
     value.size = 0U;
     value.addr = NULL;
     if ((programName == NULL) || (programName[0] == '\0')
-	    || (option == NULL) || (option[0] == '\0')) {
+	    || !BrowserDefaultOptionIsSingleComponent(option)) {
 	return NULL;
     }
     database = BrowserGetDefaultDatabase(display);
