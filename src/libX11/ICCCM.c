@@ -4528,6 +4528,13 @@ XCirculateSubwindows(
 	    X11_WASM_XREQ_CIRCULATE_WINDOW)) {
 	return Success;
     }
+    resourcePtr = BrowserFindCirculateSubwindow(parentPtr, direction, &place);
+    if (BrowserResourceWantsEvent(parentPtr, SubstructureRedirectMask)) {
+	if (resourcePtr != NULL) {
+	    (void)BrowserQueueCirculateRequest(resourcePtr, place);
+	}
+	return Success;
+    }
     resourcePtr = BrowserCirculateSubwindow(parentPtr, direction, &place);
     if (resourcePtr != NULL) {
 	(void)BrowserQueueCirculateNotify(resourcePtr, place);

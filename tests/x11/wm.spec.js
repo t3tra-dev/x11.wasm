@@ -100,6 +100,25 @@ test("XConfigureWindow redirects configure requests to selecting parents", async
   expect(result).toBe(1);
 });
 
+test("XCirculateSubwindows redirects circulate requests to selecting parents", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestCirculateRequestRedirectApis?: () => number } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestCirculateRequestRedirectApis) {
+      throw new Error("missing circulate request redirect test export");
+    }
+    return module._X11WasmTestCirculateRequestRedirectApis();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XSetIconSizes updates browser WM_ICON_SIZE metadata", async ({ page }) => {
   await waitForX11Runtime(page);
   const windowId = await createMappedWindow(page);

@@ -561,6 +561,7 @@ declare const Module: {
   _X11WasmTestClearAreaApis?: () => number;
   _X11WasmTestConfigureStackingApis?: () => number;
   _X11WasmTestConfigureRequestRedirectApis?: () => number;
+  _X11WasmTestCirculateRequestRedirectApis?: () => number;
   _X11WasmTestSubstructureNotifyApis?: () => number;
   _X11WasmTestMapViewableExposeApis?: () => number;
   _X11WasmTestMapRequestRedirectApis?: () => number;

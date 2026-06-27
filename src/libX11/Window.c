@@ -1759,6 +1759,30 @@ BrowserQueueCirculateNotify(
 }
 
 int
+BrowserQueueCirculateRequest(
+    X11WasmResource *resourcePtr,
+    int place)
+{
+    X11WasmResource *parentPtr;
+    XEvent event;
+
+    if ((resourcePtr == NULL)
+	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)) {
+	return 0;
+    }
+    parentPtr = BrowserWindowResource(resourcePtr->parent);
+    if (!BrowserResourceWantsEvent(parentPtr, SubstructureRedirectMask)) {
+	return 0;
+    }
+    BrowserSetCommonEventFields(&event, CirculateRequest,
+	    (Window)parentPtr->id, CurrentTime);
+    event.xcirculaterequest.parent = (Window)parentPtr->id;
+    event.xcirculaterequest.window = (Window)resourcePtr->id;
+    event.xcirculaterequest.place = place;
+    return BrowserQueueEvent(&event);
+}
+
+int
 BrowserQueueGravityNotify(
     X11WasmResource *resourcePtr)
 {

@@ -2722,6 +2722,25 @@ BrowserTestPopCirculateEvent(
     return 1;
 }
 
+static int
+BrowserTestPopCirculateRequestEvent(
+    Window parent,
+    Window window,
+    int place)
+{
+    XEvent event;
+
+    memset(&event, 0, sizeof(event));
+    if (!BrowserPopMatchingEvent(parent, SubstructureRedirectMask, &event)
+	    || (event.type != CirculateRequest)
+	    || (event.xcirculaterequest.parent != parent)
+	    || (event.xcirculaterequest.window != window)
+	    || (event.xcirculaterequest.place != place)) {
+	return 0;
+    }
+    return 1;
+}
+
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestConfigureStackingApis(void)
 {
@@ -3581,6 +3600,95 @@ X11WasmTestMapViewableExposeApis(void)
 	    || (XEventsQueued(display, QueuedAlready) != 0)
 	    || !XGetWindowAttributes(display, child, &windowAttributes)
 	    || (windowAttributes.map_state != IsViewable)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    BrowserClearEventQueue();
+    if (parent != None) {
+	(void)XDestroyWindow(display, parent);
+    }
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestCirculateRequestRedirectApis(void)
+{
+    Display *display;
+    Window parent = None;
+    Window bottom = None;
+    Window middle = None;
+    Window top = None;
+    Window expected[3];
+    int result = 0;
+    int screen;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+
+    parent = XCreateWindow(display, browserDisplay.rootWindow, 0, 0, 80, 60,
+	    0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL);
+    bottom = (parent != None) ? XCreateWindow(display, parent, 0, 0, 30, 30,
+	    0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL) : None;
+    middle = (parent != None) ? XCreateWindow(display, parent, 5, 5, 30, 30,
+	    0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL) : None;
+    top = (parent != None) ? XCreateWindow(display, parent, 10, 10, 30, 30,
+	    0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL) : None;
+    if ((parent == None) || (bottom == None) || (middle == None)
+	    || (top == None)
+	    || (XMapWindow(display, parent) != Success)
+	    || (XMapWindow(display, bottom) != Success)
+	    || (XMapWindow(display, middle) != Success)
+	    || (XMapWindow(display, top) != Success)
+	    || (XSelectInput(display, parent, SubstructureRedirectMask)
+		    != Success)) {
+	goto cleanup;
+    }
+    expected[0] = bottom;
+    expected[1] = middle;
+    expected[2] = top;
+    if (!BrowserTestQueryTreeOrder(display, parent, expected, 3)) {
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    if ((XCirculateSubwindowsUp(display, parent) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserTestPopCirculateRequestEvent(parent, bottom,
+		    PlaceOnTop)
+	    || (XEventsQueued(display, QueuedAlready) != 0)
+	    || !BrowserTestQueryTreeOrder(display, parent, expected, 3)) {
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    if ((XCirculateSubwindowsDown(display, parent) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserTestPopCirculateRequestEvent(parent, top,
+		    PlaceOnBottom)
+	    || (XEventsQueued(display, QueuedAlready) != 0)
+	    || !BrowserTestQueryTreeOrder(display, parent, expected, 3)) {
+	goto cleanup;
+    }
+
+    if (XSelectInput(display, parent, NoEventMask) != Success) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+    if ((XCirculateSubwindowsUp(display, parent) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    expected[0] = middle;
+    expected[1] = top;
+    expected[2] = bottom;
+    if (!BrowserTestQueryTreeOrder(display, parent, expected, 3)) {
 	goto cleanup;
     }
     result = 1;

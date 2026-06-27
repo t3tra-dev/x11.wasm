@@ -611,6 +611,10 @@ X11WasmResource *BrowserCirculateSubwindow(
     X11WasmResource *parentPtr,
     int direction,
     int *placePtr);
+X11WasmResource *BrowserFindCirculateSubwindow(
+    X11WasmResource *parentPtr,
+    int direction,
+    int *placePtr);
 Atom BrowserAtomPairAtom(void);
 Atom BrowserClipboardSelectionAtom(void);
 int BrowserCollectVisualInfos(
@@ -1359,6 +1363,9 @@ int BrowserQueueConfigureRequest(
     unsigned int valueMask,
     XWindowChanges *changes);
 int BrowserQueueCirculateNotify(
+    X11WasmResource *resourcePtr,
+    int place);
+int BrowserQueueCirculateRequest(
     X11WasmResource *resourcePtr,
     int place);
 int BrowserQueueCopyExposureEvents(
