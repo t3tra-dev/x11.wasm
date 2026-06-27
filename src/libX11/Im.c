@@ -1,6 +1,6 @@
 #include "XlibInt.h"
 
-static unsigned char
+unsigned char
 BrowserApplyControlModifier(
     unsigned char byte)
 {
@@ -198,10 +198,12 @@ XwcLookupString(
     KeySym *keySym,
     Status *status)
 {
-    int index = ((event != NULL) && (event->state & ShiftMask)) ? 1 : 0;
-    KeySym sym = XLookupKeysym(event, index);
-    unsigned int codepoint = 0;
-    unsigned char latin1;
+    char *utf8 = NULL;
+    int utf8Length;
+    int wideLength;
+    KeySym sym = NoSymbol;
+    Status utf8Status = XLookupNone;
+    int result = 0;
 
     if (!BrowserICAllowsLookup(inputContext, event)) {
 	if (keySym != NULL) {
@@ -212,34 +214,40 @@ XwcLookupString(
 	}
 	return 0;
     }
+    utf8Length = BrowserLookupUtf8String(event, NULL, 0, &sym, &utf8Status);
     if (keySym != NULL) {
 	*keySym = sym;
     }
-    if (BrowserIsUnicodeKeySym(sym)) {
-	codepoint = ((unsigned int)sym & 0x00ffffffU);
-    } else if (BrowserLatin1FromKeySym(sym, &latin1)) {
-	codepoint = (unsigned int)latin1;
-    }
-    if (codepoint == 0U) {
+    if (utf8Length <= 0) {
 	if (status != NULL) {
-	    *status = BrowserLookupStatus(0, sym);
+	    *status = utf8Status;
 	}
 	return 0;
     }
-    if ((buffer == NULL) || (wchars < 1)) {
+    utf8 = (char *)ckalloc((size_t)utf8Length + 1U);
+    memset(utf8, 0, (size_t)utf8Length + 1U);
+    if (BrowserLookupUtf8String(event, utf8, utf8Length, &sym,
+	    &utf8Status) != utf8Length) {
+	goto cleanup;
+    }
+    wideLength = BrowserWideCharCountFromUtf8(utf8, utf8Length);
+    if ((buffer == NULL) || (wchars < wideLength)) {
 	if (status != NULL) {
 	    *status = XBufferOverflow;
 	}
-	return 1;
+	result = wideLength;
+	goto cleanup;
     }
-    if ((sizeof(wchar_t) < 4U) && (codepoint > 0xffffU)) {
-	codepoint = 0xfffdU;
-    }
-    buffer[0] = (wchar_t)codepoint;
+    result = BrowserWideCharsFromUtf8(utf8, utf8Length, buffer, wchars);
     if (status != NULL) {
-	*status = BrowserLookupStatus(1, sym);
+	*status = BrowserLookupStatus(result, sym);
     }
-    return 1;
+
+cleanup:
+    if (utf8 != NULL) {
+	ckfree(utf8);
+    }
+    return result;
 }
 
 wchar_t *

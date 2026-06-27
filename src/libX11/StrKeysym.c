@@ -2675,6 +2675,119 @@ BrowserUtf8DecodeOne(
     return 0xfffdU;
 }
 
+static int
+BrowserUtf8DecodeOneCounted(
+    const unsigned char *bytes,
+    int length,
+    unsigned int *codepointPtr)
+{
+    unsigned int b0;
+    unsigned int codepoint = 0xfffdU;
+    int consumed = 1;
+
+    if ((bytes == NULL) || (length <= 0)) {
+	if (codepointPtr != NULL) {
+	    *codepointPtr = 0;
+	}
+	return 0;
+    }
+    b0 = bytes[0];
+    if (b0 < 0x80U) {
+	codepoint = b0;
+    } else if (((b0 & 0xe0U) == 0xc0U) && (length >= 2)
+	    && ((bytes[1] & 0xc0U) == 0x80U)) {
+	codepoint = ((b0 & 0x1fU) << 6) | (bytes[1] & 0x3fU);
+	if (codepoint >= 0x80U) {
+	    consumed = 2;
+	} else {
+	    codepoint = 0xfffdU;
+	}
+    } else if (((b0 & 0xf0U) == 0xe0U) && (length >= 3)
+	    && ((bytes[1] & 0xc0U) == 0x80U)
+	    && ((bytes[2] & 0xc0U) == 0x80U)) {
+	codepoint = ((b0 & 0x0fU) << 12) | ((bytes[1] & 0x3fU) << 6)
+		| (bytes[2] & 0x3fU);
+	if ((codepoint >= 0x800U)
+		&& ((codepoint < 0xd800U) || (codepoint > 0xdfffU))) {
+	    consumed = 3;
+	} else {
+	    codepoint = 0xfffdU;
+	}
+    } else if (((b0 & 0xf8U) == 0xf0U) && (length >= 4)
+	    && ((bytes[1] & 0xc0U) == 0x80U)
+	    && ((bytes[2] & 0xc0U) == 0x80U)
+	    && ((bytes[3] & 0xc0U) == 0x80U)) {
+	codepoint = ((b0 & 0x07U) << 18) | ((bytes[1] & 0x3fU) << 12)
+		| ((bytes[2] & 0x3fU) << 6) | (bytes[3] & 0x3fU);
+	if ((codepoint >= 0x10000U) && (codepoint <= 0x10ffffU)) {
+	    consumed = 4;
+	} else {
+	    codepoint = 0xfffdU;
+	}
+    }
+    if ((sizeof(wchar_t) < 4U) && (codepoint > 0xffffU)) {
+	codepoint = 0xfffdU;
+    }
+    if (codepointPtr != NULL) {
+	*codepointPtr = codepoint;
+    }
+    return consumed;
+}
+
+int
+BrowserWideCharCountFromUtf8(
+    const char *utf8,
+    int utf8Length)
+{
+    const unsigned char *bytes = (const unsigned char *)utf8;
+    int count = 0;
+    int offset = 0;
+
+    if ((bytes == NULL) || (utf8Length <= 0)) {
+	return 0;
+    }
+    while (offset < utf8Length) {
+	int consumed = BrowserUtf8DecodeOneCounted(bytes + offset,
+		utf8Length - offset, NULL);
+
+	if (consumed <= 0) {
+	    break;
+	}
+	offset += consumed;
+	count++;
+    }
+    return count;
+}
+
+int
+BrowserWideCharsFromUtf8(
+    const char *utf8,
+    int utf8Length,
+    wchar_t *buffer,
+    int wchars)
+{
+    const unsigned char *bytes = (const unsigned char *)utf8;
+    int offset = 0;
+    int out = 0;
+
+    if ((bytes == NULL) || (utf8Length <= 0) || (buffer == NULL)
+	    || (wchars <= 0)) {
+	return 0;
+    }
+    while ((offset < utf8Length) && (out < wchars)) {
+	unsigned int codepoint;
+	int consumed = BrowserUtf8DecodeOneCounted(bytes + offset,
+		utf8Length - offset, &codepoint);
+
+	if (consumed <= 0) {
+	    break;
+	}
+	buffer[out++] = (wchar_t)codepoint;
+	offset += consumed;
+    }
+    return out;
+}
+
 wchar_t *
 BrowserWideStringFromUtf8(
     const char *utf8)

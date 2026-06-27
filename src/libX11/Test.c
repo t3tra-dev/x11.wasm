@@ -39,6 +39,7 @@ X11WasmTestKeyboardAsciiMapping(void)
     Window focusWindow = None;
     Window grabWindow = None;
     char buffer[8];
+    wchar_t wideBuffer[8];
     int keysymsPerKeycode = 0;
     int lookupLength;
     int keyboardGrabbed = 0;
@@ -83,6 +84,25 @@ X11WasmTestKeyboardAsciiMapping(void)
     if ((lookupLength != 1) || (buffer[0] != 1) || (lookupSym != XK_a)) {
 	goto cleanup;
     }
+    memset(buffer, 0, sizeof(buffer));
+    lookupSym = NoSymbol;
+    lookupStatus = XLookupNone;
+    lookupLength = Xutf8LookupString(NULL, &event, buffer,
+	    (int)sizeof(buffer), &lookupSym, &lookupStatus);
+    if ((lookupLength != 1) || (buffer[0] != 1) || (lookupSym != XK_a)
+	    || (lookupStatus != XLookupBoth)) {
+	goto cleanup;
+    }
+    memset(wideBuffer, 0, sizeof(wideBuffer));
+    lookupSym = NoSymbol;
+    lookupStatus = XLookupNone;
+    lookupLength = XwcLookupString(NULL, &event, wideBuffer,
+	    (int)(sizeof(wideBuffer) / sizeof(wideBuffer[0])), &lookupSym,
+	    &lookupStatus);
+    if ((lookupLength != 1) || (wideBuffer[0] != 1)
+	    || (lookupSym != XK_a) || (lookupStatus != XLookupBoth)) {
+	goto cleanup;
+    }
     event.state = 0;
     if (XRebindKeysym(display, XK_a, NULL, 0,
 	    (const unsigned char *)"alpha", 5) != Success) {
@@ -99,6 +119,43 @@ X11WasmTestKeyboardAsciiMapping(void)
     lookupLength = XLookupString(&event, buffer, 2, &lookupSym, NULL);
     if ((lookupLength != 2) || (memcmp(buffer, "al", 2) != 0)
 	    || (lookupSym != XK_a)) {
+	goto cleanup;
+    }
+    memset(buffer, 0, sizeof(buffer));
+    lookupSym = NoSymbol;
+    lookupStatus = XLookupNone;
+    lookupLength = Xutf8LookupString(NULL, &event, buffer,
+	    (int)sizeof(buffer), &lookupSym, &lookupStatus);
+    if ((lookupLength != 5) || (memcmp(buffer, "alpha", 5) != 0)
+	    || (lookupSym != XK_a) || (lookupStatus != XLookupBoth)) {
+	goto cleanup;
+    }
+    memset(buffer, 0, sizeof(buffer));
+    lookupSym = NoSymbol;
+    lookupStatus = XLookupNone;
+    lookupLength = Xutf8LookupString(NULL, &event, buffer, 2, &lookupSym,
+	    &lookupStatus);
+    if ((lookupLength != 5) || (lookupSym != XK_a)
+	    || (lookupStatus != XBufferOverflow)) {
+	goto cleanup;
+    }
+    memset(wideBuffer, 0, sizeof(wideBuffer));
+    lookupSym = NoSymbol;
+    lookupStatus = XLookupNone;
+    lookupLength = XwcLookupString(NULL, &event, wideBuffer,
+	    (int)(sizeof(wideBuffer) / sizeof(wideBuffer[0])), &lookupSym,
+	    &lookupStatus);
+    if ((lookupLength != 5) || (wcsncmp(wideBuffer, L"alpha", 5) != 0)
+	    || (lookupSym != XK_a) || (lookupStatus != XLookupBoth)) {
+	goto cleanup;
+    }
+    memset(wideBuffer, 0, sizeof(wideBuffer));
+    lookupSym = NoSymbol;
+    lookupStatus = XLookupNone;
+    lookupLength = XwcLookupString(NULL, &event, wideBuffer, 2, &lookupSym,
+	    &lookupStatus);
+    if ((lookupLength != 5) || (lookupSym != XK_a)
+	    || (lookupStatus != XBufferOverflow)) {
 	goto cleanup;
     }
     rebindModifiers[0] = XK_Shift_L;
@@ -158,22 +215,52 @@ X11WasmTestKeyboardAsciiMapping(void)
     event.window = grabWindow;
     event.root = browserDisplay.rootWindow;
     event.keycode = keycode;
+    event.state = ControlMask;
+    memset(buffer, 0, sizeof(buffer));
     lookupSym = NoSymbol;
     lookupStatus = XLookupNone;
     lookupLength = Xutf8LookupString(inputContext, &event, buffer,
 	    (int)sizeof(buffer), &lookupSym, &lookupStatus);
-    if ((lookupLength != 1) || (buffer[0] != 'a') || (lookupSym != XK_a)
-	    || ((lookupStatus != XLookupChars)
-		    && (lookupStatus != XLookupBoth))) {
+    if ((lookupLength != 1) || (buffer[0] != 1) || (lookupSym != XK_a)
+	    || (lookupStatus != XLookupBoth)) {
+	goto cleanup;
+    }
+    memset(wideBuffer, 0, sizeof(wideBuffer));
+    lookupSym = NoSymbol;
+    lookupStatus = XLookupNone;
+    lookupLength = XwcLookupString(inputContext, &event, wideBuffer,
+	    (int)(sizeof(wideBuffer) / sizeof(wideBuffer[0])), &lookupSym,
+	    &lookupStatus);
+    if ((lookupLength != 1) || (wideBuffer[0] != 1)
+	    || (lookupSym != XK_a) || (lookupStatus != XLookupBoth)) {
+	goto cleanup;
+    }
+    event.state = 0;
+    memset(buffer, 0, sizeof(buffer));
+    lookupSym = NoSymbol;
+    lookupStatus = XLookupNone;
+    lookupLength = Xutf8LookupString(inputContext, &event, buffer,
+	    (int)sizeof(buffer), &lookupSym, &lookupStatus);
+    if ((lookupLength != 5) || (memcmp(buffer, "alpha", 5) != 0)
+	    || (lookupSym != XK_a) || (lookupStatus != XLookupBoth)) {
 	goto cleanup;
     }
     lookupSym = NoSymbol;
     lookupStatus = XLookupNone;
     lookupLength = Xutf8LookupString(grabInputContext, &event, buffer,
 	    (int)sizeof(buffer), &lookupSym, &lookupStatus);
-    if ((lookupLength != 1) || (buffer[0] != 'a') || (lookupSym != XK_a)
-	    || ((lookupStatus != XLookupChars)
-		    && (lookupStatus != XLookupBoth))) {
+    if ((lookupLength != 5) || (memcmp(buffer, "alpha", 5) != 0)
+	    || (lookupSym != XK_a) || (lookupStatus != XLookupBoth)) {
+	goto cleanup;
+    }
+    memset(wideBuffer, 0, sizeof(wideBuffer));
+    lookupSym = NoSymbol;
+    lookupStatus = XLookupNone;
+    lookupLength = XwcLookupString(inputContext, &event, wideBuffer,
+	    (int)(sizeof(wideBuffer) / sizeof(wideBuffer[0])), &lookupSym,
+	    &lookupStatus);
+    if ((lookupLength != 5) || (wcsncmp(wideBuffer, L"alpha", 5) != 0)
+	    || (lookupSym != XK_a) || (lookupStatus != XLookupBoth)) {
 	goto cleanup;
     }
     result = 1;

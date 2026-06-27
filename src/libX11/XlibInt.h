@@ -1165,6 +1165,8 @@ unsigned int BrowserKnownKeycodeForKeySym(
 int BrowserLatin1FromKeySym(
     KeySym keySym,
     unsigned char *bytePtr);
+unsigned char BrowserApplyControlModifier(
+    unsigned char byte);
 int BrowserLookupReboundKeySym(
     KeySym keySym,
     unsigned int state,
@@ -1931,6 +1933,14 @@ char *BrowserUtf8FromWideStringCount(
     const wchar_t *string,
     int count,
     int *lengthPtr);
+int BrowserWideCharCountFromUtf8(
+    const char *utf8,
+    int utf8Length);
+int BrowserWideCharsFromUtf8(
+    const char *utf8,
+    int utf8Length,
+    wchar_t *buffer,
+    int wchars);
 char *BrowserUtf8FromXChar2bString(
     const XChar2b *string,
     int count,

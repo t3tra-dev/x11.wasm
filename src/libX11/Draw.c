@@ -3558,6 +3558,32 @@ BrowserLookupStatus(
     return XLookupNone;
 }
 
+static int
+BrowserLookupReboundKeySymRequired(
+    KeySym keySym,
+    unsigned int state,
+    const unsigned char **stringPtr)
+{
+    X11WasmKeyBinding *bindingPtr;
+    unsigned int modifierState = state & (ShiftMask | LockMask | ControlMask
+	    | Mod1Mask | Mod2Mask | Mod3Mask | Mod4Mask | Mod5Mask);
+
+    if (stringPtr != NULL) {
+	*stringPtr = NULL;
+    }
+    for (bindingPtr = keyBindingList; bindingPtr != NULL;
+	    bindingPtr = bindingPtr->nextPtr) {
+	if ((bindingPtr->keySym == keySym)
+		&& (bindingPtr->state == modifierState)) {
+	    if (stringPtr != NULL) {
+		*stringPtr = bindingPtr->string;
+	    }
+	    return bindingPtr->length;
+	}
+    }
+    return -1;
+}
+
 int
 BrowserLookupUtf8String(
     XKeyPressedEvent *event,
@@ -3568,6 +3594,7 @@ BrowserLookupUtf8String(
 {
     int index = ((event != NULL) && (event->state & ShiftMask)) ? 1 : 0;
     KeySym sym = XLookupKeysym(event, index);
+    const unsigned char *rebound = NULL;
     unsigned int codepoint = 0;
     unsigned char latin1;
     int required = 0;
@@ -3576,10 +3603,34 @@ BrowserLookupUtf8String(
     if (keySymReturn != NULL) {
 	*keySymReturn = sym;
     }
+    required = BrowserLookupReboundKeySymRequired(sym,
+	    (event != NULL) ? event->state : 0U, &rebound);
+    if (required >= 0) {
+	if (required == 0) {
+	    if (statusReturn != NULL) {
+		*statusReturn = BrowserLookupStatus(0, sym);
+	    }
+	    return 0;
+	}
+	if ((buffer == NULL) || (bytes < required)) {
+	    if (statusReturn != NULL) {
+		*statusReturn = XBufferOverflow;
+	    }
+	    return required;
+	}
+	memcpy(buffer, rebound, (size_t)required);
+	if (statusReturn != NULL) {
+	    *statusReturn = BrowserLookupStatus(required, sym);
+	}
+	return required;
+    }
     if (BrowserIsUnicodeKeySym(sym)) {
 	codepoint = ((unsigned int)sym & 0x00ffffffU);
 	required = BrowserUtf8CodepointLength(codepoint);
     } else if (BrowserLatin1FromKeySym(sym, &latin1)) {
+	if ((event != NULL) && (event->state & ControlMask)) {
+	    latin1 = BrowserApplyControlModifier(latin1);
+	}
 	codepoint = (unsigned int)latin1;
 	required = BrowserUtf8CodepointLength(codepoint);
     }
