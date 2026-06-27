@@ -627,13 +627,14 @@ BrowserXrmPartMatchesQuarkPair(
     int nameCount,
     XrmClassList classes,
     int classCount,
-    int index)
+    int index,
+    int allowQuestionWildcard)
 {
-    return BrowserXrmPartIsQuestion(partPtr)
-	    || ((index < nameCount)
+    return ((index < nameCount)
 		    && BrowserXrmPartMatchesQuark(partPtr, names[index]))
 	    || ((index < classCount)
-		    && BrowserXrmPartMatchesQuark(partPtr, classes[index]));
+		    && BrowserXrmPartMatchesQuark(partPtr, classes[index]))
+	    || (allowQuestionWildcard && BrowserXrmPartIsQuestion(partPtr));
 }
 
 static int
@@ -667,7 +668,8 @@ BrowserXrmEntryMatchesEnumerationPrefixAt(
 	return 0;
     }
     if (BrowserXrmPartMatchesQuarkPair(&parts[partIndex], names,
-	    nameCount, classes, classCount, prefixIndex)
+	    nameCount, classes, classCount, prefixIndex,
+	    (partIndex + 1) < partCount)
 	    && BrowserXrmEntryMatchesEnumerationPrefixAt(parts, partCount,
 		    partIndex + 1, names, nameCount, classes, classCount,
 		    prefixIndex + 1, prefixCount, mode)) {
@@ -751,7 +753,8 @@ BrowserXrmPartMatchType(
     int nameCount,
     const BrowserXrmComponent *classParts,
     int classCount,
-    int componentIndex)
+    int componentIndex,
+    int allowQuestionWildcard)
 {
     if ((partPtr == NULL) || (componentIndex < 0)
 	    || (componentIndex >= nameCount)) {
@@ -767,7 +770,7 @@ BrowserXrmPartMatchType(
 		    classParts[componentIndex].end)) {
 	return 2;
     }
-    if (((partPtr->end - partPtr->start) == 1) && (*partPtr->start == '?')) {
+    if (allowQuestionWildcard && BrowserXrmPartIsQuestion(partPtr)) {
 	return 1;
     }
     return 0;
@@ -847,7 +850,8 @@ BrowserXrmBindingBestMatchAt(
 
 	for (index = componentIndex; index < nameCount; index++) {
 	    int matchType = BrowserXrmPartMatchType(&parts[partIndex],
-		    nameParts, nameCount, classParts, classCount, index);
+		    nameParts, nameCount, classParts, classCount, index,
+		    (partIndex + 1) < partCount);
 
 	    if (matchType > 0) {
 		unsigned char oldScore = candidateLevels[index];
@@ -864,7 +868,8 @@ BrowserXrmBindingBestMatchAt(
     }
     if (componentIndex < nameCount) {
 	int matchType = BrowserXrmPartMatchType(&parts[partIndex], nameParts,
-		nameCount, classParts, classCount, componentIndex);
+		nameCount, classParts, classCount, componentIndex,
+		(partIndex + 1) < partCount);
 
 	if (matchType > 0) {
 	    unsigned char oldScore = candidateLevels[componentIndex];

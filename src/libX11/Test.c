@@ -10918,6 +10918,7 @@ BrowserTestXrmDatabaseApis(void)
     const char xrmMissingPath[] = "x11wasm-xrm-missing.txt";
     XrmDatabase database = NULL;
     XrmDatabase precedenceDatabase = NULL;
+    XrmDatabase finalQuestionDatabase = NULL;
     XrmDatabase enumeratePrefixDatabase = NULL;
     XrmDatabase enumerateQuestionDatabase = NULL;
     XrmDatabase enumerateBacktrackDatabase = NULL;
@@ -11028,6 +11029,18 @@ BrowserTestXrmDatabaseApis(void)
 	    || !BrowserTestXrmResourceEquals(precedenceDatabase,
 		    "wish.main.panel.accent", "Wish.Main.Panel.Accent",
 		    "question-accent")) {
+	goto cleanup;
+    }
+    finalQuestionDatabase = XrmGetStringDatabase(
+	    "wish.?: literal-question\n"
+	    "wish.?.accent: question-accent\n");
+    if ((finalQuestionDatabase == NULL)
+	    || (XrmGetResource(finalQuestionDatabase, "wish.main",
+		    "Wish.Main", NULL, NULL) != False)
+	    || !BrowserTestXrmResourceEquals(finalQuestionDatabase,
+		    "wish.?", "Wish.Question", "literal-question")
+	    || !BrowserTestXrmResourceEquals(finalQuestionDatabase,
+		    "wish.main.accent", "Wish.Main.Accent", "question-accent")) {
 	goto cleanup;
     }
     permanentAllocation = Xpermalloc(4);
@@ -11450,6 +11463,9 @@ cleanup:
     }
     if (enumeratePrefixDatabase != NULL) {
 	XrmDestroyDatabase(enumeratePrefixDatabase);
+    }
+    if (finalQuestionDatabase != NULL) {
+	XrmDestroyDatabase(finalQuestionDatabase);
     }
     if (precedenceDatabase != NULL) {
 	XrmDestroyDatabase(precedenceDatabase);
