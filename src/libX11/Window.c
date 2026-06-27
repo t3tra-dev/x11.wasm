@@ -1498,6 +1498,28 @@ BrowserQueueMapNotify(
 }
 
 int
+BrowserQueueMapRequest(
+    X11WasmResource *resourcePtr)
+{
+    X11WasmResource *parentPtr;
+    XEvent event;
+
+    if ((resourcePtr == NULL)
+	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)) {
+	return 0;
+    }
+    parentPtr = BrowserWindowResource(resourcePtr->parent);
+    if (!BrowserResourceWantsEvent(parentPtr, SubstructureRedirectMask)) {
+	return 0;
+    }
+    BrowserSetCommonEventFields(&event, MapRequest, (Window)parentPtr->id,
+	    CurrentTime);
+    event.xmaprequest.parent = (Window)parentPtr->id;
+    event.xmaprequest.window = (Window)resourcePtr->id;
+    return BrowserQueueEvent(&event);
+}
+
+int
 BrowserQueueUnmapNotify(
     X11WasmResource *resourcePtr,
     Bool fromConfigure)

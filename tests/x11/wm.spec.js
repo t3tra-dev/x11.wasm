@@ -62,6 +62,25 @@ test("XMapWindow exposes newly viewable mapped inferiors", async ({ page }) => {
   expect(result).toBe(1);
 });
 
+test("XMapWindow redirects map requests to selecting parents", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestMapRequestRedirectApis?: () => number } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestMapRequestRedirectApis) {
+      throw new Error("missing map request redirect test export");
+    }
+    return module._X11WasmTestMapRequestRedirectApis();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XSetIconSizes updates browser WM_ICON_SIZE metadata", async ({ page }) => {
   await waitForX11Runtime(page);
   const windowId = await createMappedWindow(page);

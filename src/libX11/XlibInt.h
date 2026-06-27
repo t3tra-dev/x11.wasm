@@ -1401,6 +1401,8 @@ int BrowserQueueGravityNotify(
     X11WasmResource *resourcePtr);
 int BrowserQueueMapNotify(
     X11WasmResource *resourcePtr);
+int BrowserQueueMapRequest(
+    X11WasmResource *resourcePtr);
 int BrowserQueueKeyEventFields(
     int type,
     unsigned int window,

@@ -1976,20 +1976,46 @@ BrowserDestroyWindowResource(
     return Success;
 }
 
-int
-XMapWindow(
-    Display *display,
-    Window window)
+static int
+BrowserWindowMapIsRedirected(
+    X11WasmResource *resourcePtr)
 {
-    X11WasmResource *resourcePtr = BrowserWindowResourceOrError(&display,
-	    window, X11_WASM_XREQ_MAP_WINDOW);
+    X11WasmResource *parentPtr;
 
+    if ((resourcePtr == NULL)
+	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)
+	    || resourcePtr->atts.override_redirect) {
+	return 0;
+    }
+    parentPtr = BrowserWindowResource(resourcePtr->parent);
+    return BrowserResourceWantsEvent(parentPtr, SubstructureRedirectMask);
+}
+
+static int
+BrowserMapWindowResource(
+    Display *display,
+    X11WasmResource *resourcePtr,
+    int *mappedReturn)
+{
+    Window window;
+
+    if (mappedReturn != NULL) {
+	*mappedReturn = 0;
+    }
     if (resourcePtr == NULL) {
 	return Success;
     }
     if (resourcePtr->mapped) {
+	if (mappedReturn != NULL) {
+	    *mappedReturn = 1;
+	}
 	return Success;
     }
+    if (BrowserWindowMapIsRedirected(resourcePtr)) {
+	(void)BrowserQueueMapRequest(resourcePtr);
+	return Success;
+    }
+    window = (Window)resourcePtr->id;
     resourcePtr->mapped = 1;
     (void)X11WasmJsMapWindow(BrowserJsXId(window));
     if (BrowserWindowMetadataTarget(window) == window) {
@@ -2001,7 +2027,21 @@ XMapWindow(
     BrowserQueueViewableExposeTree(resourcePtr);
     (void)BrowserQueuePointerCrossingEvents(browserDisplay.pointerState,
 	    browserDisplay.pointerX, browserDisplay.pointerY, CurrentTime);
+    if (mappedReturn != NULL) {
+	*mappedReturn = 1;
+    }
     return Success;
+}
+
+int
+XMapWindow(
+    Display *display,
+    Window window)
+{
+    X11WasmResource *resourcePtr = BrowserWindowResourceOrError(&display,
+	    window, X11_WASM_XREQ_MAP_WINDOW);
+
+    return BrowserMapWindowResource(display, resourcePtr, NULL);
 }
 
 int
@@ -2009,9 +2049,13 @@ XMapRaised(
     Display *display,
     Window window)
 {
-    int result = XMapWindow(display, window);
+    X11WasmResource *resourcePtr = BrowserWindowResourceOrError(&display,
+	    window, X11_WASM_XREQ_MAP_WINDOW);
+    int mapped = 0;
+    int result;
 
-    if (result == Success) {
+    result = BrowserMapWindowResource(display, resourcePtr, &mapped);
+    if ((result == Success) && mapped) {
 	(void)XRaiseWindow(display, window);
     }
     return result;

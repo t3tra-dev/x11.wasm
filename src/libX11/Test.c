@@ -3561,6 +3561,122 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestMapRequestRedirectApis(void)
+{
+    Display *display;
+    XSetWindowAttributes attributes;
+    XWindowAttributes windowAttributes;
+    XEvent event;
+    Window parent = None;
+    Window redirected = None;
+    Window overrideChild = None;
+    Window raiseTarget = None;
+    Window raiseTop = None;
+    Window expected[4];
+    int result = 0;
+    int screen;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+
+    parent = XCreateWindow(display, browserDisplay.rootWindow, 0, 0, 80, 60,
+	    0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL);
+    redirected = (parent != None) ? XCreateWindow(display, parent, 1, 2, 12,
+	    10, 0, CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    0, NULL) : None;
+    if ((parent == None) || (redirected == None)
+	    || (XSelectInput(display, parent, SubstructureRedirectMask)
+		    != Success)
+	    || (XSelectInput(display, redirected, StructureNotifyMask)
+		    != Success)) {
+	goto cleanup;
+    }
+
+    BrowserClearEventQueue();
+    memset(&event, 0, sizeof(event));
+    memset(&windowAttributes, 0, sizeof(windowAttributes));
+    if ((XMapWindow(display, redirected) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserPopMatchingEvent(parent, SubstructureRedirectMask,
+		    &event)
+	    || (event.type != MapRequest)
+	    || (event.xmaprequest.parent != parent)
+	    || (event.xmaprequest.window != redirected)
+	    || (XEventsQueued(display, QueuedAlready) != 0)
+	    || !XGetWindowAttributes(display, redirected, &windowAttributes)
+	    || (windowAttributes.map_state != IsUnmapped)) {
+	goto cleanup;
+    }
+
+    memset(&attributes, 0, sizeof(attributes));
+    attributes.override_redirect = True;
+    overrideChild = XCreateWindow(display, parent, 3, 4, 13, 11, 0,
+	    CopyFromParent, InputOutput, DefaultVisual(display, screen),
+	    CWOverrideRedirect, &attributes);
+    if ((overrideChild == None)
+	    || (XSelectInput(display, overrideChild, StructureNotifyMask)
+		    != Success)) {
+	goto cleanup;
+    }
+    BrowserClearEventQueue();
+    memset(&event, 0, sizeof(event));
+    memset(&windowAttributes, 0, sizeof(windowAttributes));
+    if ((XMapWindow(display, overrideChild) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserPopMatchingEvent(overrideChild, StructureNotifyMask,
+		    &event)
+	    || (event.type != MapNotify)
+	    || (event.xmap.event != overrideChild)
+	    || (event.xmap.window != overrideChild)
+	    || (event.xmap.override_redirect != True)
+	    || (XEventsQueued(display, QueuedAlready) != 0)
+	    || !XGetWindowAttributes(display, overrideChild, &windowAttributes)
+	    || (windowAttributes.map_state != IsUnviewable)) {
+	goto cleanup;
+    }
+
+    raiseTarget = XCreateWindow(display, parent, 5, 6, 14, 12, 0,
+	    CopyFromParent, InputOutput, DefaultVisual(display, screen), 0,
+	    NULL);
+    raiseTop = (raiseTarget != None) ? XCreateWindow(display, parent, 7, 8,
+	    15, 13, 0, CopyFromParent, InputOutput,
+	    DefaultVisual(display, screen), 0, NULL) : None;
+    if ((raiseTarget == None) || (raiseTop == None)) {
+	goto cleanup;
+    }
+    expected[0] = redirected;
+    expected[1] = overrideChild;
+    expected[2] = raiseTarget;
+    expected[3] = raiseTop;
+    BrowserClearEventQueue();
+    memset(&event, 0, sizeof(event));
+    memset(&windowAttributes, 0, sizeof(windowAttributes));
+    if ((XMapRaised(display, raiseTarget) != Success)
+	    || (XEventsQueued(display, QueuedAlready) != 1)
+	    || !BrowserPopMatchingEvent(parent, SubstructureRedirectMask,
+		    &event)
+	    || (event.type != MapRequest)
+	    || (event.xmaprequest.parent != parent)
+	    || (event.xmaprequest.window != raiseTarget)
+	    || (XEventsQueued(display, QueuedAlready) != 0)
+	    || !XGetWindowAttributes(display, raiseTarget, &windowAttributes)
+	    || (windowAttributes.map_state != IsUnmapped)
+	    || !BrowserTestQueryTreeOrder(display, parent, expected, 4)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    BrowserClearEventQueue();
+    if (parent != None) {
+	(void)XDestroyWindow(display, parent);
+    }
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestXlibApis(void)
 {
     char buffer[64];
