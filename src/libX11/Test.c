@@ -4029,7 +4029,10 @@ X11WasmTestXlibApis(void)
 	    || (browserDisplay.display.max_request_size != 65535U)
 	    || (XMaxRequestSize(&browserDisplay.display) != 65535L)
 	    || (XMaxRequestSize(NULL) != 65535L)
-	    || (XExtendedMaxRequestSize(&browserDisplay.display) != 0L)
+	    || (XExtendedMaxRequestSize(&browserDisplay.display)
+		    != X11_WASM_EXTENDED_MAX_REQUEST_SIZE)
+	    || (XExtendedMaxRequestSize(NULL)
+		    != X11_WASM_EXTENDED_MAX_REQUEST_SIZE)
 	    || (XDisplayMotionBufferSize(&browserDisplay.display)
 		    != X11_WASM_MOTION_BUFFER_SIZE)
 	    || (XAllPlanes() != AllPlanes)
@@ -4300,6 +4303,16 @@ X11WasmTestXlibApis(void)
 	return 0;
     }
     majorOpcode = firstEvent = firstError = -1;
+    if (XQueryExtension(&browserDisplay.display,
+	    X11_WASM_BIG_REQUESTS_EXTENSION_NAME, &majorOpcode, &firstEvent,
+	    &firstError) != True) {
+	return 0;
+    }
+    if ((majorOpcode != X11_WASM_BIG_REQUESTS_MAJOR_OPCODE)
+	    || (firstEvent != 0) || (firstError != 0)) {
+	return 0;
+    }
+    majorOpcode = firstEvent = firstError = -1;
     if (XScreenSaverQueryExtension(&browserDisplay.display, &firstEvent,
 	    &firstError) != True) {
 	return 0;
@@ -4324,12 +4337,15 @@ X11WasmTestXlibApis(void)
 	return 0;
     }
     extensionList = XListExtensions(&browserDisplay.display, &extensionCount);
-    if ((extensionList == NULL) || (extensionCount != 2)
+    if ((extensionList == NULL) || (extensionCount != 3)
 	    || (extensionList[0] == NULL)
 	    || (strcmp(extensionList[0], X11_WASM_EXTENSION_NAME) != 0)
 	    || (extensionList[1] == NULL)
-	    || (strcmp(extensionList[1], ScreenSaverName) != 0)
-	    || (extensionList[2] != NULL)) {
+	    || (strcmp(extensionList[1],
+		    X11_WASM_BIG_REQUESTS_EXTENSION_NAME) != 0)
+	    || (extensionList[2] == NULL)
+	    || (strcmp(extensionList[2], ScreenSaverName) != 0)
+	    || (extensionList[3] != NULL)) {
 	goto cleanup;
     }
     XFreeExtensionList(extensionList);

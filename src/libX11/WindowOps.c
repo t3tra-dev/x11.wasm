@@ -2745,8 +2745,8 @@ long
 XExtendedMaxRequestSize(
     Display *display)
 {
-    (void)display;
-    return 0L;
+    display = BrowserAccessorDisplay(display);
+    return (display != NULL) ? X11_WASM_EXTENDED_MAX_REQUEST_SIZE : 0L;
 }
 
 unsigned long
