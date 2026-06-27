@@ -3113,6 +3113,7 @@ XCopyColormapAndFree(
 		? sourcePtr->colormapInstalled : 1;
     }
     BrowserCopyColormapColors(colormap, copy);
+    BrowserFreeColorList(sourcePtr);
     return copy;
 }
 

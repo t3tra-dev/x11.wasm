@@ -9601,6 +9601,13 @@ X11WasmTestColormapApis(void)
 	    || (storedColor.blue != 0)) {
 	goto cleanup;
     }
+    storedColor.pixel = 0x010206UL;
+    if ((XQueryColor(display, colormap, &storedColor) != Success)
+	    || (storedColor.red != 0x0101)
+	    || (storedColor.green != 0x0202)
+	    || (storedColor.blue != 0x0606)) {
+	goto cleanup;
+    }
 
     if ((XInstallColormap(display, colormap) != Success)
 	    || ((installedColormaps = XListInstalledColormaps(display, window,
