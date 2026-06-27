@@ -114,6 +114,8 @@ XrmStringToQuarkList(
 {
     const char *segmentStart;
     const char *p;
+    int emitted = 0;
+    int endedWithSeparator = 0;
 
     if (quarksReturn == NULL) {
 	return;
@@ -124,23 +126,21 @@ XrmStringToQuarkList(
     }
     segmentStart = string;
     for (p = string; *p != '\0'; p++) {
-	if (*p == '*') {
+	if ((*p == '.') || (*p == '*')) {
 	    if (p > segmentStart) {
 		*quarksReturn++ = BrowserQuarkFromRange(segmentStart, p);
-	    }
-	    if (p[1] == '\0') {
-		*quarksReturn++ = BrowserQuarkFromRange(p, p + 1);
+		emitted = 1;
 	    }
 	    segmentStart = p + 1;
-	} else if (*p == '.') {
-	    if (p > segmentStart) {
-		*quarksReturn++ = BrowserQuarkFromRange(segmentStart, p);
-	    }
-	    segmentStart = p + 1;
+	    endedWithSeparator = 1;
+	} else {
+	    endedWithSeparator = 0;
 	}
     }
     if (p > segmentStart) {
 	*quarksReturn++ = BrowserQuarkFromRange(segmentStart, p);
+    } else if (!emitted || endedWithSeparator) {
+	*quarksReturn++ = BrowserQuarkFromRange(p, p);
     }
     *quarksReturn = NULLQUARK;
 }
@@ -154,6 +154,8 @@ XrmStringToBindingQuarkList(
     const char *segmentStart;
     const char *p;
     XrmBinding binding = XrmBindTightly;
+    int emitted = 0;
+    int endedWithSeparator = 0;
 
     if (quarksReturn == NULL) {
 	return;
@@ -164,35 +166,22 @@ XrmStringToBindingQuarkList(
     }
     segmentStart = string;
     for (p = string; *p != '\0'; p++) {
-	if (*p == '*') {
-	    XrmBinding starBinding = (p > segmentStart)
-		    ? XrmBindLoosely : binding;
-
+	if ((*p == '.') || (*p == '*')) {
 	    if (p > segmentStart) {
 		if (bindingsReturn != NULL) {
 		    *bindingsReturn++ = binding;
 		}
 		*quarksReturn++ = BrowserQuarkFromRange(segmentStart, p);
+		emitted = 1;
 		binding = XrmBindTightly;
 	    }
 	    segmentStart = p + 1;
-	    if (p[1] == '\0') {
-		if (bindingsReturn != NULL) {
-		    *bindingsReturn++ = starBinding;
-		}
-		*quarksReturn++ = BrowserQuarkFromRange(p, p + 1);
-	    } else {
+	    if (*p == '*') {
 		binding = XrmBindLoosely;
 	    }
-	} else if (*p == '.') {
-	    if (p > segmentStart) {
-		if (bindingsReturn != NULL) {
-		    *bindingsReturn++ = binding;
-		}
-		*quarksReturn++ = BrowserQuarkFromRange(segmentStart, p);
-		binding = XrmBindTightly;
-	    }
-	    segmentStart = p + 1;
+	    endedWithSeparator = 1;
+	} else {
+	    endedWithSeparator = 0;
 	}
     }
     if (p > segmentStart) {
@@ -200,6 +189,11 @@ XrmStringToBindingQuarkList(
 	    *bindingsReturn++ = binding;
 	}
 	*quarksReturn++ = BrowserQuarkFromRange(segmentStart, p);
+    } else if (!emitted || endedWithSeparator) {
+	if (bindingsReturn != NULL) {
+	    *bindingsReturn++ = binding;
+	}
+	*quarksReturn++ = BrowserQuarkFromRange(p, p);
     }
     *quarksReturn = NULLQUARK;
 }

@@ -430,29 +430,31 @@ BrowserXrmComponentCount(
     const char *text)
 {
     int count = 0;
+    int emitted = 0;
+    int endedWithSeparator = 0;
     const char *p;
+    const char *segmentStart;
 
     if (text == NULL) {
 	return 0;
     }
-    for (p = text; *p != '\0'; ) {
-	const char *start;
-
-	while ((*p == '.') || ((*p == '*') && (p[1] != '\0'))) {
-	    p++;
+    segmentStart = text;
+    for (p = text; *p != '\0'; p++) {
+	if ((*p == '.') || (*p == '*')) {
+	    if (p > segmentStart) {
+		count++;
+		emitted = 1;
+	    }
+	    segmentStart = p + 1;
+	    endedWithSeparator = 1;
+	} else {
+	    endedWithSeparator = 0;
 	}
-	if ((*p == '*') && (p[1] == '\0')) {
-	    count++;
-	    p++;
-	    continue;
-	}
-	start = p;
-	while ((*p != '\0') && (*p != '.') && (*p != '*')) {
-	    p++;
-	}
-	if (p > start) {
-	    count++;
-	}
+    }
+    if (p > segmentStart) {
+	count++;
+    } else if (!emitted || endedWithSeparator) {
+	count++;
     }
     return count;
 }
@@ -465,7 +467,10 @@ BrowserXrmSplitComponents(
     BrowserXrmComponent *parts;
     int count;
     int index = 0;
+    int emitted = 0;
+    int endedWithSeparator = 0;
     const char *p;
+    const char *segmentStart;
 
     count = BrowserXrmComponentCount(text);
     if (countPtr != NULL) {
@@ -475,28 +480,29 @@ BrowserXrmSplitComponents(
 	return NULL;
     }
     parts = (BrowserXrmComponent *)ckalloc(sizeof(*parts) * (size_t)count);
-    for (p = text; *p != '\0'; ) {
-	const char *start;
-
-	while ((*p == '.') || ((*p == '*') && (p[1] != '\0'))) {
-	    p++;
+    segmentStart = text;
+    for (p = text; *p != '\0'; p++) {
+	if ((*p == '.') || (*p == '*')) {
+	    if (p > segmentStart) {
+		parts[index].start = segmentStart;
+		parts[index].end = p;
+		index++;
+		emitted = 1;
+	    }
+	    segmentStart = p + 1;
+	    endedWithSeparator = 1;
+	} else {
+	    endedWithSeparator = 0;
 	}
-	if ((*p == '*') && (p[1] == '\0')) {
-	    parts[index].start = p;
-	    parts[index].end = p + 1;
-	    index++;
-	    p++;
-	    continue;
-	}
-	start = p;
-	while ((*p != '\0') && (*p != '.') && (*p != '*')) {
-	    p++;
-	}
-	if (p > start) {
-	    parts[index].start = start;
-	    parts[index].end = p;
-	    index++;
-	}
+    }
+    if (p > segmentStart) {
+	parts[index].start = segmentStart;
+	parts[index].end = p;
+	index++;
+    } else if (!emitted || endedWithSeparator) {
+	parts[index].start = p;
+	parts[index].end = p;
+	index++;
     }
     return parts;
 }
@@ -506,24 +512,30 @@ BrowserXrmBindingPartCount(
     const char *binding)
 {
     int count = 0;
+    int emitted = 0;
+    int endedWithSeparator = 0;
     const char *p;
+    const char *segmentStart;
 
     if (binding == NULL) {
 	return 0;
     }
-    for (p = binding; *p != '\0'; ) {
-	if ((*p == '.') || ((*p == '*') && (p[1] != '\0'))) {
-	    p++;
-	    continue;
+    segmentStart = binding;
+    for (p = binding; *p != '\0'; p++) {
+	if ((*p == '.') || (*p == '*')) {
+	    if (p > segmentStart) {
+		count++;
+		emitted = 1;
+	    }
+	    segmentStart = p + 1;
+	    endedWithSeparator = 1;
+	} else {
+	    endedWithSeparator = 0;
 	}
-	if ((*p == '*') && (p[1] == '\0')) {
-	    count++;
-	    p++;
-	    continue;
-	}
-	while ((*p != '\0') && (*p != '.') && (*p != '*')) {
-	    p++;
-	}
+    }
+    if (p > segmentStart) {
+	count++;
+    } else if (!emitted || endedWithSeparator) {
 	count++;
     }
     return count;
@@ -540,7 +552,10 @@ BrowserXrmSplitBinding(
     int count;
     int index = 0;
     char separator = '\0';
+    int emitted = 0;
+    int endedWithSeparator = 0;
     const char *p;
+    const char *segmentStart;
 
     if (dotCountPtr != NULL) {
 	*dotCountPtr = 0;
@@ -556,49 +571,43 @@ BrowserXrmSplitBinding(
 	return NULL;
     }
     parts = (BrowserXrmBindingPart *)ckalloc(sizeof(*parts) * (size_t)count);
-    for (p = binding; *p != '\0'; ) {
-	const char *start;
-
-	if (*p == '.') {
-	    separator = *p;
-	    if (dotCountPtr != NULL) {
-		(*dotCountPtr)++;
-	    }
-	    p++;
-	    continue;
-	}
-	if (*p == '*') {
-	    if (p[1] == '\0') {
-		parts[index].start = p;
-		parts[index].end = p + 1;
-		if (separator == '\0') {
-		    separator = '*';
-		    if (starCountPtr != NULL) {
-			(*starCountPtr)++;
-		    }
-		}
+    segmentStart = binding;
+    for (p = binding; *p != '\0'; p++) {
+	if ((*p == '.') || (*p == '*')) {
+	    if (p > segmentStart) {
+		parts[index].start = segmentStart;
+		parts[index].end = p;
 		parts[index].separator = separator;
 		index++;
+		emitted = 1;
 		separator = '\0';
-		p++;
-		continue;
 	    }
-	    separator = *p;
-	    if (starCountPtr != NULL) {
-		(*starCountPtr)++;
+	    if (*p == '.') {
+		if (dotCountPtr != NULL) {
+		    (*dotCountPtr)++;
+		}
+	    } else {
+		separator = '*';
+		if (starCountPtr != NULL) {
+		    (*starCountPtr)++;
+		}
 	    }
-	    p++;
-	    continue;
+	    segmentStart = p + 1;
+	    endedWithSeparator = 1;
+	} else {
+	    endedWithSeparator = 0;
 	}
-	start = p;
-	while ((*p != '\0') && (*p != '.') && (*p != '*')) {
-	    p++;
-	}
-	parts[index].start = start;
+    }
+    if (p > segmentStart) {
+	parts[index].start = segmentStart;
 	parts[index].end = p;
 	parts[index].separator = separator;
 	index++;
-	separator = '\0';
+    } else if (!emitted || endedWithSeparator) {
+	parts[index].start = p;
+	parts[index].end = p;
+	parts[index].separator = separator;
+	index++;
     }
     return parts;
 }

@@ -10920,6 +10920,7 @@ BrowserTestXrmDatabaseApis(void)
     XrmDatabase precedenceDatabase = NULL;
     XrmDatabase finalQuestionDatabase = NULL;
     XrmDatabase trailingStarDatabase = NULL;
+    XrmDatabase terminalDotDatabase = NULL;
     XrmDatabase dotStarDatabase = NULL;
     XrmDatabase enumeratePrefixDatabase = NULL;
     XrmDatabase enumerateQuestionDatabase = NULL;
@@ -11054,12 +11055,26 @@ BrowserTestXrmDatabaseApis(void)
 	    || !BrowserTestXrmResourceEquals(trailingStarDatabase,
 		    "wish*", "WishStar", "trailing-star")
 	    || !BrowserTestXrmResourceEquals(trailingStarDatabase,
+		    "wish.", "Wish.", "trailing-star")
+	    || !BrowserTestXrmResourceEquals(trailingStarDatabase,
 		    "wish.main*", "Wish.MainStar", "trailing-star")
 	    || (XrmGetResource(trailingStarDatabase, "wish.main",
 		    "Wish.Main", NULL, NULL) != False)
 	    || !BrowserTestXrmResourceEquals(trailingStarDatabase,
 		    "wish.main.foreground", "Wish.Main.Foreground",
 		    "trailing-loose-foreground")) {
+	goto cleanup;
+    }
+    terminalDotDatabase = XrmGetStringDatabase("wish.: terminal-dot\n");
+    if ((terminalDotDatabase == NULL)
+	    || (XrmGetResource(terminalDotDatabase, "wish", "Wish",
+		    NULL, NULL) != False)
+	    || !BrowserTestXrmResourceEquals(terminalDotDatabase,
+		    "wish*", "WishStar", "terminal-dot")
+	    || !BrowserTestXrmResourceEquals(terminalDotDatabase,
+		    "wish.", "Wish.", "terminal-dot")
+	    || (XrmGetResource(terminalDotDatabase, "wish.main*",
+		    "Wish.MainStar", NULL, NULL) != False)) {
 	goto cleanup;
     }
     dotStarDatabase = XrmGetStringDatabase("wish.*: dot-star\n");
@@ -11070,8 +11085,10 @@ BrowserTestXrmDatabaseApis(void)
 		    "wish*", "WishStar", "dot-star")
 	    || !BrowserTestXrmResourceEquals(dotStarDatabase,
 		    "wish.*", "Wish.Star", "dot-star")
-	    || (XrmGetResource(dotStarDatabase, "wish.main*",
-		    "Wish.MainStar", NULL, NULL) != False)) {
+	    || !BrowserTestXrmResourceEquals(dotStarDatabase,
+		    "wish.main*", "Wish.MainStar", "dot-star")
+	    || (XrmGetResource(dotStarDatabase, "wish.main",
+		    "Wish.Main", NULL, NULL) != False)) {
 	goto cleanup;
     }
     permanentAllocation = Xpermalloc(4);
@@ -11111,9 +11128,14 @@ BrowserTestXrmDatabaseApis(void)
 		    "wildcard-foreground") != 0)) {
 	goto cleanup;
     }
+    XrmStringToQuarkList("", qNames);
+    if ((qNames[0] != XrmStringToName(""))
+	    || (qNames[1] != NULLQUARK)) {
+	goto cleanup;
+    }
     XrmStringToQuarkList("wish*", qNames);
     if ((qNames[0] != XrmStringToName("wish"))
-	    || (qNames[1] != XrmStringToName("*"))
+	    || (qNames[1] != XrmStringToName(""))
 	    || (qNames[2] != NULLQUARK)) {
 	goto cleanup;
     }
@@ -11318,19 +11340,39 @@ BrowserTestXrmDatabaseApis(void)
 	    "q-background")) {
 	goto cleanup;
     }
+    XrmStringToBindingQuarkList("", qBindings, qQuarks);
+    if ((qBindings[0] != XrmBindTightly)
+	    || (qQuarks[0] != XrmStringToQuark(""))
+	    || (qQuarks[1] != NULLQUARK)) {
+	goto cleanup;
+    }
+    XrmStringToBindingQuarkList("*", qBindings, qQuarks);
+    if ((qBindings[0] != XrmBindLoosely)
+	    || (qQuarks[0] != XrmStringToQuark(""))
+	    || (qQuarks[1] != NULLQUARK)) {
+	goto cleanup;
+    }
     XrmStringToBindingQuarkList("wish*", qBindings, qQuarks);
     if ((qBindings[0] != XrmBindTightly)
 	    || (qBindings[1] != XrmBindLoosely)
 	    || (qQuarks[0] != XrmStringToQuark("wish"))
-	    || (qQuarks[1] != XrmStringToQuark("*"))
+	    || (qQuarks[1] != XrmStringToQuark(""))
+	    || (qQuarks[2] != NULLQUARK)) {
+	goto cleanup;
+    }
+    XrmStringToBindingQuarkList("wish.", qBindings, qQuarks);
+    if ((qBindings[0] != XrmBindTightly)
+	    || (qBindings[1] != XrmBindTightly)
+	    || (qQuarks[0] != XrmStringToQuark("wish"))
+	    || (qQuarks[1] != XrmStringToQuark(""))
 	    || (qQuarks[2] != NULLQUARK)) {
 	goto cleanup;
     }
     XrmStringToBindingQuarkList("wish.*", qBindings, qQuarks);
     if ((qBindings[0] != XrmBindTightly)
-	    || (qBindings[1] != XrmBindTightly)
+	    || (qBindings[1] != XrmBindLoosely)
 	    || (qQuarks[0] != XrmStringToQuark("wish"))
-	    || (qQuarks[1] != XrmStringToQuark("*"))
+	    || (qQuarks[1] != XrmStringToQuark(""))
 	    || (qQuarks[2] != NULLQUARK)) {
 	goto cleanup;
     }
@@ -11522,6 +11564,9 @@ cleanup:
     }
     if (dotStarDatabase != NULL) {
 	XrmDestroyDatabase(dotStarDatabase);
+    }
+    if (terminalDotDatabase != NULL) {
+	XrmDestroyDatabase(terminalDotDatabase);
     }
     if (trailingStarDatabase != NULL) {
 	XrmDestroyDatabase(trailingStarDatabase);
