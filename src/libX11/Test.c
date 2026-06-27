@@ -11042,6 +11042,7 @@ BrowserTestXrmDatabaseApis(void)
     XrmDatabase trailingStarDatabase = NULL;
     XrmDatabase terminalDotDatabase = NULL;
     XrmDatabase dotStarDatabase = NULL;
+    XrmDatabase separatorDatabase = NULL;
     XrmDatabase enumeratePrefixDatabase = NULL;
     XrmDatabase enumerateQuestionDatabase = NULL;
     XrmDatabase enumerateBacktrackDatabase = NULL;
@@ -11221,6 +11222,19 @@ BrowserTestXrmDatabaseApis(void)
 		    "wish.main*", "Wish.MainStar", "dot-star")
 	    || (XrmGetResource(dotStarDatabase, "wish.main",
 		    "Wish.Main", NULL, NULL) != False)) {
+	goto cleanup;
+    }
+    separatorDatabase = XrmGetStringDatabase(
+	    "wish..geometry: collapsed-dots\n"
+	    "wish.geometry: exact-dot\n"
+	    "wish**foreground: loose-star\n"
+	    "wish.*foreground: collapsed-star\n");
+    if ((separatorDatabase == NULL)
+	    || !BrowserTestXrmResourceEquals(separatorDatabase,
+		    "wish.geometry", "Wish.Geometry", "exact-dot")
+	    || !BrowserTestXrmResourceEquals(separatorDatabase,
+		    "wish.main.foreground", "Wish.Main.Foreground",
+		    "collapsed-star")) {
 	goto cleanup;
     }
     permanentAllocation = Xpermalloc(4);
@@ -11474,6 +11488,10 @@ BrowserTestXrmDatabaseApis(void)
     XrmPutStringResource(&putDatabase, "wish.geometry", "put-geometry");
     XrmPutStringResource(&putDatabase, "wish.geometry",
 	    "put-geometry-override");
+    XrmPutLineResource(&putDatabase, "wish..geometry: put-collapsed-dots");
+    XrmPutLineResource(&putDatabase, "wish.geometry: put-dot-override");
+    XrmPutLineResource(&putDatabase, "wish.*foreground: put-star");
+    XrmPutLineResource(&putDatabase, "wish**foreground: put-star-override");
     XrmPutLineResource(&putDatabase, "wish*foreground: put-foreground");
     XrmPutLineResource(&putDatabase, "! ignored");
     XrmPutLineResource(&putDatabase, "wish.empty:");
@@ -11483,7 +11501,7 @@ BrowserTestXrmDatabaseApis(void)
     binaryValue.size = (unsigned int)sizeof(binaryData);
     XrmPutResource(&putDatabase, "wish.binary", "Binary", &binaryValue);
     if (!BrowserTestXrmResourceEquals(putDatabase, "wish.geometry",
-	    "Wish.Geometry", "put-geometry-override")
+	    "Wish.Geometry", "put-dot-override")
 	    || !BrowserTestXrmResourceEquals(putDatabase,
 		    "wish.main.foreground", "Wish.Main.Foreground",
 		    "put-foreground")
@@ -11521,6 +11539,17 @@ BrowserTestXrmDatabaseApis(void)
     if (!BrowserTestXrmResourceEquals(putDatabase,
 	    "wish.main.palette.background", "Wish.Main.Palette.Background",
 	    "q-background")) {
+	goto cleanup;
+    }
+    XrmStringToBindingQuarkList("wish..panel.*accent", qBindings,
+	    qQuarks);
+    if ((qBindings[0] != XrmBindTightly)
+	    || (qBindings[1] != XrmBindTightly)
+	    || (qBindings[2] != XrmBindLoosely)
+	    || (qQuarks[0] != XrmStringToQuark("wish"))
+	    || (qQuarks[1] != XrmStringToQuark("panel"))
+	    || (qQuarks[2] != XrmStringToQuark("accent"))
+	    || (qQuarks[3] != NULLQUARK)) {
 	goto cleanup;
     }
     XrmStringToBindingQuarkList("", qBindings, qQuarks);
@@ -11608,7 +11637,7 @@ BrowserTestXrmDatabaseApis(void)
     XrmCombineDatabase(mergeDatabase, &putDatabase, False);
     mergeDatabase = NULL;
     if (!BrowserTestXrmResourceEquals(putDatabase, "wish.geometry",
-	    "Wish.Geometry", "put-geometry-override")
+	    "Wish.Geometry", "put-dot-override")
 	    || !BrowserTestXrmResourceEquals(putDatabase, "wish.background",
 		    "Wish.Background", "combine-background")) {
 	goto cleanup;
@@ -11766,6 +11795,9 @@ cleanup:
     }
     if (dotStarDatabase != NULL) {
 	XrmDestroyDatabase(dotStarDatabase);
+    }
+    if (separatorDatabase != NULL) {
+	XrmDestroyDatabase(separatorDatabase);
     }
     if (terminalDotDatabase != NULL) {
 	XrmDestroyDatabase(terminalDotDatabase);

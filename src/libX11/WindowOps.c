@@ -1084,6 +1084,36 @@ BrowserXrmFindExactEntry(
 }
 
 static void
+BrowserXrmNormalizeBinding(
+    char *binding)
+{
+    char *readPtr;
+    char *writePtr;
+
+    if (binding == NULL) {
+	return;
+    }
+    readPtr = binding;
+    writePtr = binding;
+    while (*readPtr != '\0') {
+	if ((*readPtr == '.') || (*readPtr == '*')) {
+	    int hasStar = 0;
+
+	    do {
+		if (*readPtr == '*') {
+		    hasStar = 1;
+		}
+		readPtr++;
+	    } while ((*readPtr == '.') || (*readPtr == '*'));
+	    *writePtr++ = hasStar ? '*' : '.';
+	    continue;
+	}
+	*writePtr++ = *readPtr++;
+    }
+    *writePtr = '\0';
+}
+
+static void
 BrowserXrmAppendEntryObject(
     XrmDatabase database,
     BrowserXrmEntry *entryPtr)
@@ -1107,6 +1137,7 @@ BrowserXrmStoreEntry(
 {
     BrowserXrmEntry *entryPtr;
 
+    BrowserXrmNormalizeBinding(binding);
     entryPtr = BrowserXrmFindExactEntry(database, binding);
     if (entryPtr != NULL) {
 	ckfree(entryPtr->binding);
