@@ -322,9 +322,10 @@ X11WasmQueueFullscreenState(
 {
     XEvent event;
     Atom fullscreenAtom;
-    Window xid = (Window)window;
+    Window xid;
 
     BrowserInitDisplay();
+    xid = BrowserWindowStateSource((Window)window);
     if (BrowserWindowResource(xid) == NULL) {
 	return 0;
     }

@@ -2221,6 +2221,8 @@ void BrowserForgetWindowMetadataSource(
     Window window);
 Window BrowserWindowMetadataTarget(
     Window window);
+Window BrowserWindowStateSource(
+    Window window);
 Atom BrowserWindowOpacityAtom(void);
 X11WasmResource *BrowserWindowParentResource(
     X11WasmResource *resourcePtr);

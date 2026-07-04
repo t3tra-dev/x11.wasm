@@ -577,6 +577,44 @@ BrowserWindowMetadataTarget(
 	    ? (Window)topLevelPtr->id : window;
 }
 
+Window
+BrowserWindowStateSource(
+    Window window)
+{
+    X11WasmResource *resourcePtr = BrowserWindowResource(window);
+    X11WasmResource *candidatePtr;
+    Atom netWmStateAtom;
+    Window fallback = window;
+
+    if (resourcePtr == NULL) {
+	return window;
+    }
+    netWmStateAtom = BrowserNetWmStateAtom();
+    if (BrowserFindProperty(resourcePtr, netWmStateAtom) != NULL) {
+	return window;
+    }
+    for (candidatePtr = browserDisplay.resourceList; candidatePtr != NULL;
+	    candidatePtr = candidatePtr->nextPtr) {
+	Window candidate;
+
+	if ((candidatePtr->type != X11_WASM_RESOURCE_WINDOW)
+		|| (candidatePtr == resourcePtr)) {
+	    continue;
+	}
+	candidate = (Window)candidatePtr->id;
+	if (BrowserWindowMetadataTarget(candidate) != window) {
+	    continue;
+	}
+	if (candidatePtr->metadataTarget == window) {
+	    fallback = candidate;
+	}
+	if (BrowserFindProperty(candidatePtr, netWmStateAtom) != NULL) {
+	    return candidate;
+	}
+    }
+    return fallback;
+}
+
 static Atom
 BrowserWindowMetadataTargetAtom(void)
 {

@@ -1534,6 +1534,126 @@ test("browser fullscreen exit synchronizes _NET_WM_STATE_FULLSCREEN", async ({
   });
 });
 
+test("browser fullscreen exit synchronizes metadata target state source", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+  const [sourceId, targetId] = await createMappedWindows(page, 2);
+
+  const metadata = await page.evaluate(async ({ sourceId, targetId }) => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestSendNetWmStateMessage?: Function, _X11WasmTestSetWindowMetadataTargetProperty?: Function, _X11WasmTestWindowHasNetWmState?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { flush?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    const source = backend?.resources.get(sourceId);
+    const target = backend?.resources.get(targetId);
+    const sourceElement = source?.element;
+    const targetElement = target?.element;
+    if (
+      !module?._X11WasmTestSendNetWmStateMessage ||
+      !module._X11WasmTestSetWindowMetadataTargetProperty ||
+      !module._X11WasmTestWindowHasNetWmState ||
+      !backend ||
+      !source ||
+      !target ||
+      !(sourceElement instanceof HTMLElement) ||
+      !(targetElement instanceof HTMLElement)
+    ) {
+      throw new Error("missing metadata target fullscreen test hooks");
+    }
+    const sendNetWmStateMessage = module._X11WasmTestSendNetWmStateMessage;
+    const setMetadataTarget =
+      module._X11WasmTestSetWindowMetadataTargetProperty;
+    const windowHasNetWmState = module._X11WasmTestWindowHasNetWmState;
+
+    /** @type {Element | null} */
+    let activeFullscreenElement = null;
+    const requestCalls = [];
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      get: () => activeFullscreenElement,
+    });
+    Object.defineProperty(targetElement, "requestFullscreen", {
+      configurable: true,
+      value: () => {
+        requestCalls.push(targetId);
+        activeFullscreenElement = targetElement;
+        document.dispatchEvent(new Event("fullscreenchange"));
+        return Promise.resolve();
+      },
+    });
+
+    const snapshot = () => ({
+      sourceAttrFullscreen: sourceElement.getAttribute(
+        "data-x11-wasm-fullscreen",
+      ),
+      sourceFullscreen: !!source.fullscreen,
+      sourceHasState: !!windowHasNetWmState(sourceId, 4),
+      targetAttrFullscreen: targetElement.getAttribute(
+        "data-x11-wasm-fullscreen",
+      ),
+      targetFullscreen: !!target.fullscreen,
+      targetHasState: !!windowHasNetWmState(targetId, 4),
+      requestCount: backend.fullscreenRequestCount,
+      exitCount: backend.fullscreenExitCount,
+      changeCount: backend.fullscreenChangeCount,
+      requestWindow: backend.fullscreenRequestWindow,
+      status: backend.fullscreenRequestStatus,
+    });
+
+    const targetResult = setMetadataTarget(sourceId, targetId, 1);
+    const addResult = sendNetWmStateMessage(sourceId, 1, 4, 0);
+    backend.flush?.();
+    await Promise.resolve();
+    const afterAdd = snapshot();
+
+    activeFullscreenElement = null;
+    document.dispatchEvent(new Event("fullscreenchange"));
+    backend.flush?.();
+    await Promise.resolve();
+    const afterBrowserExit = snapshot();
+
+    return {
+      addResult,
+      afterAdd,
+      afterBrowserExit,
+      requestCalls,
+      targetResult,
+    };
+  }, { sourceId, targetId });
+
+  expect(metadata.targetResult).toBe(1);
+  expect(metadata.addResult).toBe(1);
+  expect(metadata.requestCalls).toEqual([targetId]);
+  expect(metadata.afterAdd).toEqual({
+    sourceAttrFullscreen: null,
+    sourceFullscreen: false,
+    sourceHasState: true,
+    targetAttrFullscreen: "1",
+    targetFullscreen: true,
+    targetHasState: false,
+    requestCount: 1,
+    exitCount: 0,
+    changeCount: 1,
+    requestWindow: targetId,
+    status: "active",
+  });
+  expect(metadata.afterBrowserExit).toEqual({
+    sourceAttrFullscreen: null,
+    sourceFullscreen: false,
+    sourceHasState: false,
+    targetAttrFullscreen: null,
+    targetFullscreen: false,
+    targetHasState: false,
+    requestCount: 1,
+    exitCount: 0,
+    changeCount: 2,
+    requestWindow: 0,
+    status: "exited",
+  });
+});
+
 test("metadata target properties forward ICCCM metadata to another window", async ({
   page,
 }) => {
