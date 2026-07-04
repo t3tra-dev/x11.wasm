@@ -10421,6 +10421,207 @@ error:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestDisplayModelLimits(void)
+{
+    Display *display;
+    int screen;
+    Visual *defaultVisual;
+    Visual mismatchedVisual;
+    XVisualInfo visualTemplate;
+    XVisualInfo visualInfo;
+    XVisualInfo *visualList = NULL;
+    XPixmapFormatValues *pixmapFormats = NULL;
+    int *depthList = NULL;
+    int visualCount = -1;
+    int pixmapFormatCount = -1;
+    int depthCount = -1;
+    XErrorHandler oldHandler = NULL;
+    int errorHandlerInstalled = 0;
+    Window invalidDepthWindow = None;
+    Window invalidVisualWindow = None;
+    Colormap colormap = None;
+    Colormap invalidVisualColormap = None;
+    int result = 0;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    screen = DefaultScreen(display);
+    defaultVisual = DefaultVisual(display, screen);
+    if ((display == NULL) || (screen != 0) || (ScreenCount(display) != 1)
+	    || (XScreenCount(display) != 1) || (DefaultScreen(display) != 0)
+	    || (RootWindow(display, 0) != browserDisplay.rootWindow)
+	    || (DefaultRootWindow(display) != browserDisplay.rootWindow)
+	    || (DefaultDepth(display, 0) != 24)
+	    || (XDefaultDepth(display, 1) != 0) || (defaultVisual == NULL)) {
+	return 10;
+    }
+
+    if ((defaultVisual->visualid != 1) || (defaultVisual->c_class != TrueColor)
+	    || (defaultVisual->red_mask != 0xff0000UL)
+	    || (defaultVisual->green_mask != 0x00ff00UL)
+	    || (defaultVisual->blue_mask != 0x0000ffUL)
+	    || (defaultVisual->bits_per_rgb != 8)
+	    || (defaultVisual->map_entries != 256)) {
+	return 11;
+    }
+
+    pixmapFormats = XListPixmapFormats(display, &pixmapFormatCount);
+    if ((pixmapFormats == NULL) || (pixmapFormatCount != 2)
+	    || (pixmapFormats[0].depth != 1)
+	    || (pixmapFormats[0].bits_per_pixel != 1)
+	    || (pixmapFormats[0].scanline_pad != 32)
+	    || (pixmapFormats[1].depth != 24)
+	    || (pixmapFormats[1].bits_per_pixel != 32)
+	    || (pixmapFormats[1].scanline_pad != 32)) {
+	result = 20;
+	goto cleanup;
+    }
+
+    depthList = XListDepths(display, screen, &depthCount);
+    if ((depthList == NULL) || (depthCount != 1) || (depthList[0] != 24)) {
+	result = 30;
+	goto cleanup;
+    }
+    XFree(depthList);
+    depthList = XListDepths(display, screen + 1, &depthCount);
+    if ((depthList != NULL) || (depthCount != 0)) {
+	result = 31;
+	goto cleanup;
+    }
+
+    visualList = XGetVisualInfo(display, VisualNoMask, NULL, &visualCount);
+    if ((visualList == NULL) || (visualCount != 1)
+	    || (visualList[0].visual != defaultVisual)
+	    || (visualList[0].visualid != defaultVisual->visualid)
+	    || (visualList[0].screen != 0) || (visualList[0].depth != 24)
+	    || (visualList[0].c_class != TrueColor)
+	    || (visualList[0].red_mask != 0xff0000UL)
+	    || (visualList[0].green_mask != 0x00ff00UL)
+	    || (visualList[0].blue_mask != 0x0000ffUL)) {
+	result = 40;
+	goto cleanup;
+    }
+    XFree(visualList);
+    visualList = NULL;
+    memset(&visualTemplate, 0, sizeof(visualTemplate));
+    visualTemplate.screen = 0;
+    visualTemplate.depth = 24;
+    visualTemplate.c_class = TrueColor;
+    if (!XMatchVisualInfo(display, 0, 24, TrueColor, &visualInfo)
+	    || (visualInfo.visual != defaultVisual)
+	    || XMatchVisualInfo(display, 0, 1, TrueColor, &visualInfo)
+	    || XMatchVisualInfo(display, 0, 32, TrueColor, &visualInfo)
+	    || XMatchVisualInfo(display, 0, 24, PseudoColor, &visualInfo)
+	    || XMatchVisualInfo(display, 1, 24, TrueColor, &visualInfo)
+	    || XMatchVisualInfo(display, 0, 24, TrueColor, NULL)) {
+	result = 41;
+	goto cleanup;
+    }
+
+    visualList = XGetVisualInfo(
+	    display, VisualScreenMask, &visualTemplate, &visualCount);
+    if ((visualList == NULL) || (visualCount != 1)) {
+	result = 42;
+	goto cleanup;
+    }
+    XFree(visualList);
+    visualList = NULL;
+    visualTemplate.screen = 1;
+    visualList = XGetVisualInfo(
+	    display, VisualScreenMask, &visualTemplate, &visualCount);
+    if ((visualList != NULL) || (visualCount != 0)) {
+	result = 43;
+	goto cleanup;
+    }
+    visualTemplate.screen = 0;
+    visualTemplate.depth = 32;
+    visualList = XGetVisualInfo(display,
+	    VisualScreenMask | VisualDepthMask, &visualTemplate, &visualCount);
+    if ((visualList != NULL) || (visualCount != 0)) {
+	result = 44;
+	goto cleanup;
+    }
+    visualTemplate.depth = 24;
+    visualTemplate.c_class = PseudoColor;
+    visualList = XGetVisualInfo(display,
+	    VisualScreenMask | VisualDepthMask | VisualClassMask,
+	    &visualTemplate, &visualCount);
+    if ((visualList != NULL) || (visualCount != 0)) {
+	result = 45;
+	goto cleanup;
+    }
+
+    mismatchedVisual = *defaultVisual;
+    mismatchedVisual.visualid++;
+    oldHandler = XSetErrorHandler(BrowserTestXErrorHandler);
+    errorHandlerInstalled = 1;
+    browserTestXErrorCount = 0;
+    browserTestLastErrorCode = Success;
+    invalidDepthWindow = XCreateWindow(display, browserDisplay.rootWindow, 0, 0,
+	    1, 1, 0, 32, InputOutput, defaultVisual, 0, NULL);
+    if ((invalidDepthWindow != None) || (browserTestXErrorCount != 1)
+	    || (browserTestLastErrorCode != BadMatch)
+	    || (browserTestLastRequestCode != X11_WASM_XREQ_CREATE_WINDOW)) {
+	result = 50;
+	goto cleanup;
+    }
+    browserTestXErrorCount = 0;
+    browserTestLastErrorCode = Success;
+    invalidVisualWindow = XCreateWindow(display, browserDisplay.rootWindow, 0, 0,
+	    1, 1, 0, CopyFromParent, InputOutput, &mismatchedVisual, 0, NULL);
+    if ((invalidVisualWindow != None) || (browserTestXErrorCount != 1)
+	    || (browserTestLastErrorCode != BadMatch)
+	    || (browserTestLastRequestCode != X11_WASM_XREQ_CREATE_WINDOW)) {
+	result = 51;
+	goto cleanup;
+    }
+    colormap = XCreateColormap(
+	    display, browserDisplay.rootWindow, defaultVisual, AllocNone);
+    if (colormap == None) {
+	result = 52;
+	goto cleanup;
+    }
+    browserTestXErrorCount = 0;
+    browserTestLastErrorCode = Success;
+    invalidVisualColormap = XCreateColormap(
+	    display, browserDisplay.rootWindow, &mismatchedVisual, AllocNone);
+    if ((invalidVisualColormap != None) || (browserTestXErrorCount != 1)
+	    || (browserTestLastErrorCode != BadMatch)
+	    || (browserTestLastRequestCode != X11_WASM_XREQ_CREATE_COLORMAP)) {
+	result = 53;
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    if (errorHandlerInstalled) {
+	(void)XSetErrorHandler(oldHandler);
+    }
+    if (visualList != NULL) {
+	XFree(visualList);
+    }
+    if (pixmapFormats != NULL) {
+	XFree(pixmapFormats);
+    }
+    if (depthList != NULL) {
+	XFree(depthList);
+    }
+    if (colormap != None) {
+	(void)XFreeColormap(display, colormap);
+    }
+    if (invalidVisualColormap != None) {
+	(void)XFreeColormap(display, invalidVisualColormap);
+    }
+    if (invalidDepthWindow != None) {
+	(void)XDestroyWindow(display, invalidDepthWindow);
+    }
+    if (invalidVisualWindow != None) {
+	(void)XDestroyWindow(display, invalidVisualWindow);
+    }
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestColormapApis(void)
 {
     Display *display;

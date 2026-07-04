@@ -1125,6 +1125,26 @@ test("Xlib colormap compatibility APIs are stable", async ({ page }) => {
   expect(result).toBe(1);
 });
 
+test("X11 display model limits are explicit", async ({ page }) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestDisplayModelLimits?: Function } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestDisplayModelLimits) {
+      throw new Error("missing X11 display model test hooks");
+    }
+    return module._X11WasmTestDisplayModelLimits();
+  });
+
+  expect(result).toBe(1);
+});
+
 test("XBM bitmap file APIs read and write pixmaps", async ({ page }) => {
   await page.goto("/x11.html");
   await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
