@@ -371,9 +371,11 @@
       }
       this.listenersInstalled = true;
 
+      root.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+      });
       root.addEventListener("pointerdown", (event) => {
         this.recordUserActivity();
-        void this.syncExternalClipboardText();
         const inputWasFocused = document.activeElement === input;
         this.queuePointerEvent(BUTTON_PRESS, event);
         this.capturePointer(root, event);
@@ -415,14 +417,12 @@
         this.capturedPointerElement = null;
       });
       root.addEventListener("focus", () => {
-        void this.syncExternalClipboardText();
         if (this.focusedResourceAcceptsInput()) {
           input.focus();
         }
       });
 
       input.addEventListener("focus", (event) => {
-        void this.syncExternalClipboardText();
         if (this.suppressInputFocusEvents > 0) {
           return;
         }
@@ -436,7 +436,6 @@
       });
       input.addEventListener("keydown", (event) => {
         this.recordUserActivity();
-        void this.syncExternalClipboardText();
         this.handleKeyDown(event);
       });
       input.addEventListener("keyup", (event) => {

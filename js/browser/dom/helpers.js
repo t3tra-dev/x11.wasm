@@ -697,6 +697,8 @@
   isolation: isolate;
   touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 .x11-wasm-window {
   position: absolute;
@@ -725,7 +727,14 @@
   border: 0;
   padding: 0;
   opacity: 0;
+  outline: none;
+  color: transparent;
+  background: transparent;
+  caret-color: transparent;
   resize: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   pointer-events: none;
 }
 `;
