@@ -147,6 +147,36 @@
     return (unsignedInt(style.planeMask, 0xffffffff) & 0xffffff) === 0xffffff;
   }
 
+  /**
+   * @param {CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D} context
+   * @param {number} fontPixelSize
+   * @param {string} fontFamily
+   */
+  function prepareTextContext(context, fontPixelSize, fontFamily) {
+    context.font = `${positiveInt(fontPixelSize, 14)}px ${fontFamilyToCss(
+      fontFamily,
+    )}`;
+    context.textBaseline = "alphabetic";
+    if ("fontKerning" in context) {
+      context.fontKerning = "none";
+    }
+    if ("letterSpacing" in context) {
+      context.letterSpacing = "0px";
+    }
+    if ("wordSpacing" in context) {
+      context.wordSpacing = "0px";
+    }
+  }
+
+  /**
+   * @param {CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D} context
+   * @param {string} text
+   * @returns {number}
+   */
+  function textAdvanceWidth(context, text) {
+    return Math.max(0, Math.ceil(context.measureText(text).width));
+  }
+
   Object.assign(X11WasmDOMBackend.prototype, /** @type {any} */ ({
     /**
      * @param {boolean} enabled
@@ -1338,17 +1368,14 @@
       if (!context || text.length === 0) {
         return 0;
       }
-      const font = `${positiveInt(
-        this.currentDrawStyle.fontPixelSize,
-        14,
-      )}px ${fontFamilyToCss(this.currentDrawStyle.fontFamily)}`;
+      const fontPixelSize = this.currentDrawStyle.fontPixelSize;
+      const fontFamily = this.currentDrawStyle.fontFamily;
       const drawTextRun = (drawContext = context) => {
         drawContext.fillStyle = this.paintStyleForPixel(drawContext, pixel);
-        drawContext.font = font;
-        drawContext.textBaseline = "alphabetic";
+        prepareTextContext(drawContext, fontPixelSize, fontFamily);
         drawContext.fillText(text, x, y);
       };
-      context.font = font;
+      prepareTextContext(context, fontPixelSize, fontFamily);
       const metrics = context.measureText(text);
       const left = Math.floor(x - (metrics.actualBoundingBoxLeft || 0) - 1);
       const top = Math.floor(y - (metrics.actualBoundingBoxAscent || 11) - 1);
@@ -1399,10 +1426,8 @@
       if (!context || text.length === 0) {
         return 0;
       }
-      context.font = `${positiveInt(fontPixelSize, 14)}px ${fontFamilyToCss(
-        fontFamily,
-      )}`;
-      return Math.max(0, Math.ceil(context.measureText(text).width));
+      prepareTextContext(context, fontPixelSize, fontFamily);
+      return textAdvanceWidth(context, text);
     },
 
     /**

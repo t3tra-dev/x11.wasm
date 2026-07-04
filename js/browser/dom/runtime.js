@@ -792,15 +792,15 @@ applyRootSelectionOwnerState() {
       const data = event.clipboardData;
       let text;
 
+      this.hostPasteShortcutActive = false;
+      event.preventDefault();
       if (!data || typeof data.getData !== "function") {
         return;
       }
       text = data.getData("text/plain") || "";
       this.setExternalClipboardText(text);
-      this.hostPasteShortcutActive = false;
       if (this.focusedResourceAcceptsInput()) {
         this.queuePasteShortcut(eventTime(event.timeStamp));
-        event.preventDefault();
       }
     },
 

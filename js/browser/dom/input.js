@@ -355,6 +355,8 @@
       input.autocapitalize = "off";
       input.spellcheck = false;
       input.rows = 1;
+      input.cols = 1;
+      input.wrap = "off";
       input.value = "";
       root.appendChild(input);
       this.inputElement = input;
@@ -437,6 +439,10 @@
       input.addEventListener("keydown", (event) => {
         this.recordUserActivity();
         this.handleKeyDown(event);
+      });
+      input.addEventListener("keypress", (event) => {
+        this.recordUserActivity();
+        this.handleKeyPress(event);
       });
       input.addEventListener("keyup", (event) => {
         this.recordUserActivity();
@@ -724,6 +730,24 @@
         eventTime(event.timeStamp),
       );
       event.preventDefault();
+    },
+
+    /**
+     * @param {KeyboardEvent} event
+     */
+    handleKeyPress(event) {
+      if (this.isImeKeyEvent(event)) {
+        return;
+      }
+      if (this.isHostPasteShortcut(event)) {
+        return;
+      }
+      if (this.plainTextFromKeyboardEvent(event) !== null) {
+        return;
+      }
+      if (keySymForKeyboardEvent(event) !== 0) {
+        event.preventDefault();
+      }
     },
 
     /**
