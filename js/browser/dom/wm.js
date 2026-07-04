@@ -1106,6 +1106,187 @@ syncDocumentIconFromResources() {
       return 0;
     },
 
+    installFullscreenEventListeners() {
+      const document = this.document;
+      if (!document || this.fullscreenChangeHandler) {
+        return;
+      }
+      this.fullscreenChangeHandler = (event) => {
+        this.handleFullscreenChange(event);
+      };
+      this.fullscreenErrorHandler = (event) => {
+        this.handleFullscreenError(event);
+      };
+      document.addEventListener("fullscreenchange", this.fullscreenChangeHandler);
+      document.addEventListener("fullscreenerror", this.fullscreenErrorHandler);
+    },
+
+    /**
+     * @param {Element | null} element
+     * @returns {X11WasmDOMResource | null}
+     */
+    fullscreenResourceForElement(element) {
+      if (!element) {
+        return null;
+      }
+      for (const resource of this.resources.values()) {
+        if (resource.element === element) {
+          return resource;
+        }
+      }
+      return null;
+    },
+
+    /**
+     * @param {X11WasmDOMResource} resource
+     */
+    applyWindowStateAttributes(resource) {
+      const element = resource.element;
+      if (!element) {
+        return;
+      }
+      const setBooleanAttribute = (attribute, value) => {
+        if (value) {
+          element.setAttribute(attribute, "1");
+        } else {
+          element.removeAttribute(attribute);
+        }
+      };
+      setBooleanAttribute("data-x11-wasm-topmost", resource.topmost);
+      setBooleanAttribute("data-x11-wasm-zoomed", resource.zoomed);
+      setBooleanAttribute("data-x11-wasm-fullscreen", resource.fullscreen);
+    },
+
+    /**
+     * @param {X11WasmDOMResource} resource
+     * @param {boolean} fullscreen
+     * @param {number=} time
+     * @returns {number}
+     */
+    queueFullscreenState(resource, fullscreen, time = 0) {
+      const queue = this.module && this.module["_X11WasmQueueFullscreenState"];
+      if (typeof queue !== "function") {
+        this.fullscreenRequestStatus = "queue-missing";
+        return 0;
+      }
+      return queue(resource.id, fullscreen ? 1 : 0, positiveInt(time, 0)) ? 1 : 0;
+    },
+
+    /**
+     * @param {X11WasmDOMResource} resource
+     * @param {boolean} previousFullscreen
+     */
+    syncWindowFullscreen(resource, previousFullscreen) {
+      const document = this.document;
+      const element = resource.element;
+      if (!document || !element) {
+        return;
+      }
+      const activeElement = document.fullscreenElement || null;
+      if (resource.fullscreen) {
+        this.fullscreenRequestWindow = resource.id;
+        if (activeElement === element) {
+          this.fullscreenElement = element;
+          this.fullscreenRequestStatus = "active";
+          this.fullscreenRequestError = "";
+          return;
+        }
+        if (
+          previousFullscreen &&
+          this.fullscreenRequestWindow === resource.id &&
+          this.fullscreenRequestStatus !== "exited"
+        ) {
+          return;
+        }
+        if (typeof element.requestFullscreen !== "function") {
+          this.fullscreenRequestStatus = "unsupported";
+          this.fullscreenRequestError = "Element.requestFullscreen unavailable";
+          return;
+        }
+        this.fullscreenRequestCount += 1;
+        this.fullscreenRequestStatus = "requested";
+        this.fullscreenRequestError = "";
+        try {
+          Promise.resolve(element.requestFullscreen()).catch((error) => {
+            this.fullscreenRequestStatus = "error";
+            this.fullscreenRequestError =
+              error instanceof Error ? error.message : String(error);
+          });
+        } catch (error) {
+          this.fullscreenRequestStatus = "error";
+          this.fullscreenRequestError =
+            error instanceof Error ? error.message : String(error);
+        }
+        return;
+      }
+
+      if (activeElement === element && typeof document.exitFullscreen === "function") {
+        this.fullscreenExitCount += 1;
+        this.fullscreenRequestStatus = "exit-requested";
+        this.fullscreenRequestError = "";
+        try {
+          Promise.resolve(document.exitFullscreen()).catch((error) => {
+            this.fullscreenRequestStatus = "error";
+            this.fullscreenRequestError =
+              error instanceof Error ? error.message : String(error);
+          });
+        } catch (error) {
+          this.fullscreenRequestStatus = "error";
+          this.fullscreenRequestError =
+            error instanceof Error ? error.message : String(error);
+        }
+      } else if (this.fullscreenRequestWindow === resource.id) {
+        this.fullscreenRequestWindow = 0;
+        this.fullscreenElement = activeElement;
+        this.fullscreenRequestStatus = "exited";
+      }
+    },
+
+    /**
+     * @param {Event} event
+     */
+    handleFullscreenChange(event) {
+      const document = this.document;
+      if (!document) {
+        return;
+      }
+      const activeElement = document.fullscreenElement || null;
+      const activeResource = this.fullscreenResourceForElement(activeElement);
+      const previousWindow = this.fullscreenRequestWindow;
+      this.fullscreenChangeCount += 1;
+      this.fullscreenElement = activeElement;
+      if (activeResource) {
+        this.fullscreenRequestWindow = activeResource.id;
+        this.fullscreenRequestStatus = "active";
+        this.fullscreenRequestError = "";
+        if (!activeResource.fullscreen) {
+          this.queueFullscreenState(
+            activeResource,
+            true,
+            eventTime(event.timeStamp),
+          );
+        }
+        return;
+      }
+      if (previousWindow) {
+        const resource = this.resources.get(previousWindow);
+        if (resource?.fullscreen) {
+          this.queueFullscreenState(resource, false, eventTime(event.timeStamp));
+        }
+      }
+      this.fullscreenRequestWindow = 0;
+      this.fullscreenRequestStatus = "exited";
+    },
+
+    /**
+     * @param {Event} event
+     */
+    handleFullscreenError(event) {
+      this.fullscreenErrorCount += 1;
+      this.fullscreenRequestStatus = "error";
+      this.fullscreenRequestError = event.type || "fullscreenerror";
+    },
+
     /**
      * @param {number} id
      * @param {boolean} topmost
@@ -1116,24 +1297,14 @@ syncDocumentIconFromResources() {
     setWindowState(id, topmost, zoomed, fullscreen) {
       const resource = this.resources.get(id);
       if (resource) {
+        const previousFullscreen = !!resource.fullscreen;
         resource.topmost = !!topmost;
         resource.zoomed = !!zoomed;
         resource.fullscreen = !!fullscreen;
-        if (resource.element) {
-          const element = resource.element;
-          const setBooleanAttribute = (attribute, value) => {
-            if (value) {
-              element.setAttribute(attribute, "1");
-            } else {
-              element.removeAttribute(attribute);
-            }
-          };
-          setBooleanAttribute("data-x11-wasm-topmost", resource.topmost);
-          setBooleanAttribute("data-x11-wasm-zoomed", resource.zoomed);
-          setBooleanAttribute("data-x11-wasm-fullscreen", resource.fullscreen);
-        }
+        this.applyWindowStateAttributes(resource);
         this.applyGeometry(resource);
         this.applyTransientDescendantGeometry(resource);
+        this.syncWindowFullscreen(resource, previousFullscreen);
       }
       return 0;
     },

@@ -145,6 +145,13 @@ interface X11WasmBackend {
   screenWakeLockStatus: string;
   screenWakeLockError: string;
   screenWakeLockType: string;
+  fullscreenRequestStatus: string;
+  fullscreenRequestError: string;
+  fullscreenRequestWindow: number;
+  fullscreenRequestCount: number;
+  fullscreenExitCount: number;
+  fullscreenChangeCount: number;
+  fullscreenErrorCount: number;
   recordUserActivity(): void;
   getUserIdleTime(): number;
   hostAccessEnabled: boolean;
@@ -409,6 +416,11 @@ declare const Module: {
     window: number,
     protocolUtf8: number,
     protocolUtf8Length: number,
+    time: number,
+  ) => number;
+  _X11WasmQueueFullscreenState?: (
+    window: number,
+    fullscreen: number,
     time: number,
   ) => number;
   _X11WasmQueuePointerEvent?: (

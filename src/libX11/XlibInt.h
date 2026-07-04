@@ -481,6 +481,10 @@ int X11WasmQueueCompositionEvent(
     unsigned int window,
     const char *utf8,
     int utf8Length);
+int X11WasmQueueFullscreenState(
+    unsigned int window,
+    int fullscreen,
+    unsigned int time);
 char *X11WasmTakeCompositionText(
     XEvent *eventPtr,
     int *utf8LengthReturn);

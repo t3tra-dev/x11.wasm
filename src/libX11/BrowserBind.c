@@ -314,6 +314,39 @@ X11WasmQueueWindowProtocol(
     return BrowserQueueEvent(&event);
 }
 
+EMSCRIPTEN_KEEPALIVE int
+X11WasmQueueFullscreenState(
+    unsigned int window,
+    int fullscreen,
+    unsigned int time)
+{
+    XEvent event;
+    Atom fullscreenAtom;
+    Window xid = (Window)window;
+
+    BrowserInitDisplay();
+    if (BrowserWindowResource(xid) == NULL) {
+	return 0;
+    }
+    fullscreenAtom = XInternAtom(&browserDisplay.display,
+	    "_NET_WM_STATE_FULLSCREEN", False);
+    if (fullscreenAtom == None) {
+	return 0;
+    }
+
+    BrowserSetCommonEventFields(&event, ClientMessage, xid, (Time)time);
+    event.xclient.window = xid;
+    event.xclient.message_type = BrowserNetWmStateAtom();
+    event.xclient.format = 32;
+    event.xclient.data.l[0] = fullscreen ? 1L : 0L;
+    event.xclient.data.l[1] = (long)fullscreenAtom;
+    event.xclient.data.l[2] = 0L;
+    event.xclient.data.l[3] = 1L;
+    event.xclient.data.l[4] = 0L;
+    BrowserApplyNetWmStateClientMessage(&event.xclient);
+    return 1;
+}
+
 static void
 BrowserQueueImplicitPointerCrossingEvents(
     int type,

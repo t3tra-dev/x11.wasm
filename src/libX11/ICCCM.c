@@ -1589,6 +1589,28 @@ X11WasmTestSendNetWmStateMessage(
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestWindowHasNetWmState(
+    unsigned int window,
+    int state)
+{
+    X11WasmResource *resourcePtr;
+    X11WasmProperty *propertyPtr;
+    Atom stateAtom;
+
+    BrowserInitDisplay();
+    resourcePtr = BrowserWindowResource((Window)window);
+    if (resourcePtr == NULL) {
+	return 0;
+    }
+    stateAtom = BrowserTestNetWmStateAtom(state);
+    if (stateAtom == None) {
+	return 0;
+    }
+    propertyPtr = BrowserFindProperty(resourcePtr, BrowserNetWmStateAtom());
+    return BrowserWindowHasStateAtom(propertyPtr, stateAtom) ? 1 : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestSetWindowMetadataTargetProperty(
     unsigned int window,
     unsigned int target,

@@ -239,6 +239,19 @@
       this.screenWakeLock = null;
       /** @private */
       this.screenWakeLockRequestId = 0;
+      this.fullscreenRequestStatus = "idle";
+      this.fullscreenRequestError = "";
+      this.fullscreenRequestWindow = 0;
+      this.fullscreenRequestCount = 0;
+      this.fullscreenExitCount = 0;
+      this.fullscreenChangeCount = 0;
+      this.fullscreenErrorCount = 0;
+      /** @private @type {Element | null} */
+      this.fullscreenElement = null;
+      /** @private @type {((event: Event) => void) | null} */
+      this.fullscreenChangeHandler = null;
+      /** @private @type {((event: Event) => void) | null} */
+      this.fullscreenErrorHandler = null;
       this.hostAccessEnabled = true;
       this.hostAccessList = "";
       /** @type {X11WasmDOMHostAccessEntry[]} */

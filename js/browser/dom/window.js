@@ -267,6 +267,7 @@
       this.applyRootServerGrabState();
       this.applyRootSelectionOwnerState();
       this.installWindowCloseListener(this.resources.get(rootXid));
+      this.installFullscreenEventListeners();
       return 0;
     },
 
