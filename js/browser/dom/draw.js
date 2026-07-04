@@ -169,12 +169,30 @@
   }
 
   /**
-   * @param {CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D} context
    * @param {string} text
+   * @returns {string[]}
+   */
+  function textSegments(text) {
+    return Array.from(text);
+  }
+
+  /**
+   * @param {CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D} context
+   * @param {string[]} segments
+   * @returns {number[]}
+   */
+  function textSegmentAdvanceWidths(context, segments) {
+    return segments.map((segment) =>
+      Math.max(0, Math.ceil(context.measureText(segment).width)),
+    );
+  }
+
+  /**
+   * @param {number[]} advances
    * @returns {number}
    */
-  function textAdvanceWidth(context, text) {
-    return Math.max(0, Math.ceil(context.measureText(text).width));
+  function textAdvanceWidth(advances) {
+    return advances.reduce((total, advance) => total + advance, 0);
   }
 
   Object.assign(X11WasmDOMBackend.prototype, /** @type {any} */ ({
@@ -1370,25 +1388,43 @@
       }
       const fontPixelSize = this.currentDrawStyle.fontPixelSize;
       const fontFamily = this.currentDrawStyle.fontFamily;
+      const segments = textSegments(text);
+      prepareTextContext(context, fontPixelSize, fontFamily);
+      const advances = textSegmentAdvanceWidths(context, segments);
+      const advanceWidth = textAdvanceWidth(advances);
       const drawTextRun = (drawContext = context) => {
+        let segmentX = x;
         drawContext.fillStyle = this.paintStyleForPixel(drawContext, pixel);
         prepareTextContext(drawContext, fontPixelSize, fontFamily);
-        drawContext.fillText(text, x, y);
+        for (let index = 0; index < segments.length; index += 1) {
+          drawContext.fillText(segments[index], segmentX, y);
+          segmentX += advances[index];
+        }
       };
-      prepareTextContext(context, fontPixelSize, fontFamily);
-      const metrics = context.measureText(text);
-      const left = Math.floor(x - (metrics.actualBoundingBoxLeft || 0) - 1);
-      const top = Math.floor(y - (metrics.actualBoundingBoxAscent || 11) - 1);
-      const right = Math.ceil(
-        x +
-          Math.max(
-            metrics.width,
-            metrics.actualBoundingBoxRight || 0,
-            text.length * 8,
-          ) +
-          1,
-      );
-      const bottom = Math.ceil(y + (metrics.actualBoundingBoxDescent || 3) + 1);
+      let minLeft = 0;
+      let maxRight = advanceWidth;
+      let maxAscent = 11;
+      let maxDescent = 3;
+      let segmentX = 0;
+      for (let index = 0; index < segments.length; index += 1) {
+        const metrics = context.measureText(segments[index]);
+        minLeft = Math.min(
+          minLeft,
+          segmentX - (metrics.actualBoundingBoxLeft || 0),
+        );
+        maxRight = Math.max(
+          maxRight,
+          segmentX +
+            Math.max(advances[index], metrics.actualBoundingBoxRight || 0),
+        );
+        maxAscent = Math.max(maxAscent, metrics.actualBoundingBoxAscent || 0);
+        maxDescent = Math.max(maxDescent, metrics.actualBoundingBoxDescent || 0);
+        segmentX += advances[index];
+      }
+      const left = Math.floor(x + minLeft - 1);
+      const top = Math.floor(y - maxAscent - 1);
+      const right = Math.ceil(x + maxRight + 1);
+      const bottom = Math.ceil(y + maxDescent + 1);
       const bounds = {
         x: left,
         y: top,
@@ -1427,7 +1463,9 @@
         return 0;
       }
       prepareTextContext(context, fontPixelSize, fontFamily);
-      return textAdvanceWidth(context, text);
+      return textAdvanceWidth(
+        textSegmentAdvanceWidths(context, textSegments(text)),
+      );
     },
 
     /**

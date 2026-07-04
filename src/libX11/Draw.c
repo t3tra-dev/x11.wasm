@@ -1607,10 +1607,14 @@ BrowserAllocFontStruct(
     int pointSize)
 {
     XFontStruct *fontPtr = (XFontStruct *)ckalloc(sizeof(XFontStruct));
+    XCharStruct *perCharPtr;
     int charWidth;
+    int minWidth = 0;
+    int maxWidth = 0;
     int ascent;
     int descent;
     int propIndex = 0;
+    int i;
 
     BrowserFontMetricsForPixelSize(pixelSize, &charWidth, &ascent, &descent);
     memset(fontPtr, 0, sizeof(XFontStruct));
@@ -1620,14 +1624,45 @@ BrowserAllocFontStruct(
     fontPtr->max_char_or_byte2 = 255;
     fontPtr->all_chars_exist = True;
     fontPtr->default_char = '?';
-    fontPtr->min_bounds.width = (short)charWidth;
-    fontPtr->max_bounds.width = (short)charWidth;
-    fontPtr->min_bounds.rbearing = (short)charWidth;
-    fontPtr->max_bounds.rbearing = (short)charWidth;
-    fontPtr->min_bounds.ascent = (short)ascent;
-    fontPtr->max_bounds.ascent = (short)ascent;
-    fontPtr->min_bounds.descent = (short)descent;
-    fontPtr->max_bounds.descent = (short)descent;
+    perCharPtr = (XCharStruct *)ckalloc(sizeof(XCharStruct) * 256);
+    memset(perCharPtr, 0, sizeof(XCharStruct) * 256);
+    for (i = 0; i < 256; i++) {
+	char utf8[2];
+	int measured = 0;
+	int width;
+
+	if ((i >= 32) && (i < 127)) {
+	    utf8[0] = (char)i;
+	    utf8[1] = '\0';
+	    measured = X11WasmJsMeasureText(pixelSize, familyName, utf8, 1);
+	}
+	width = (measured > 0) ? measured : charWidth;
+	perCharPtr[i].width = BrowserClampShort(width);
+	perCharPtr[i].rbearing = BrowserClampShort(width);
+	perCharPtr[i].ascent = BrowserClampShort(ascent);
+	perCharPtr[i].descent = BrowserClampShort(descent);
+	if ((minWidth == 0) || (width < minWidth)) {
+	    minWidth = width;
+	}
+	if (width > maxWidth) {
+	    maxWidth = width;
+	}
+    }
+    if (minWidth <= 0) {
+	minWidth = charWidth;
+    }
+    if (maxWidth <= 0) {
+	maxWidth = charWidth;
+    }
+    fontPtr->per_char = perCharPtr;
+    fontPtr->min_bounds.width = BrowserClampShort(minWidth);
+    fontPtr->max_bounds.width = BrowserClampShort(maxWidth);
+    fontPtr->min_bounds.rbearing = BrowserClampShort(minWidth);
+    fontPtr->max_bounds.rbearing = BrowserClampShort(maxWidth);
+    fontPtr->min_bounds.ascent = BrowserClampShort(ascent);
+    fontPtr->max_bounds.ascent = BrowserClampShort(ascent);
+    fontPtr->min_bounds.descent = BrowserClampShort(descent);
+    fontPtr->max_bounds.descent = BrowserClampShort(descent);
     fontPtr->ascent = ascent;
     fontPtr->descent = descent;
     fontPtr->n_properties = 10;
