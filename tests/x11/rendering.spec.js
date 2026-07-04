@@ -874,6 +874,240 @@ test("Xlib text drawing decodes Tcl Unicode escape runs", async ({ page }) => {
   expect(result.drawnTexts).not.toContain("\\u65e5\\u672c");
 });
 
+test("browser text measurement uses grapheme cluster advances", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+
+  const metrics = await page.evaluate(() => {
+    const backend =
+      /** @type {Window & { Module?: { x11WasmBackend?: X11WasmBackendSnapshot & { measureText?: Function } } }} */ (
+        window
+      ).Module?.x11WasmBackend;
+    if (!backend?.measureText) {
+      throw new Error("missing text measurement backend");
+    }
+    const measureText = backend.measureText.bind(backend);
+    const fontPixelSize = 32;
+    const fontFamily = "sans-serif";
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("missing measurement context");
+    }
+    context.font = `${fontPixelSize}px "sans-serif", sans-serif`;
+    context.textBaseline = "alphabetic";
+    if ("fontKerning" in context) {
+      context.fontKerning = "none";
+    }
+    if ("letterSpacing" in context) {
+      context.letterSpacing = "0px";
+    }
+    if ("wordSpacing" in context) {
+      context.wordSpacing = "0px";
+    }
+    const width = (text) =>
+      Math.max(0, Math.ceil(context.measureText(text).width));
+    const cases = [
+      {
+        name: "grapheme flag",
+        text: "🇯🇵x",
+        segments: ["🇯🇵", "x"],
+      },
+      {
+        name: "combining mark",
+        text: "e\u0301x",
+        segments: ["e\u0301", "x"],
+      },
+      {
+        name: "emoji zwj",
+        text: "👩‍💻!",
+        segments: ["👩‍💻", "!"],
+      },
+      {
+        name: "rtl hebrew",
+        text: "שלום",
+        segments: ["ש", "ל", "ו", "ם"],
+      },
+      {
+        name: "cjk",
+        text: "日本語",
+        segments: ["日", "本", "語"],
+      },
+    ];
+
+    return cases.map((entry) => ({
+      name: entry.name,
+      actual: measureText(fontPixelSize, fontFamily, entry.text),
+      expected: entry.segments.reduce(
+        (total, segment) => total + width(segment),
+        0,
+      ),
+      codepointAdvance: Array.from(entry.text).reduce(
+        (total, segment) => total + width(segment),
+        0,
+      ),
+      codepointCount: Array.from(entry.text).length,
+      segmentCount: entry.segments.length,
+    }));
+  });
+
+  for (const metric of metrics) {
+    expect(metric.actual, metric.name).toBe(metric.expected);
+    expect(metric.actual, metric.name).toBeGreaterThan(0);
+  }
+  expect(
+    metrics.find((metric) => metric.name === "grapheme flag"),
+  ).toMatchObject({
+    codepointCount: 3,
+    segmentCount: 2,
+  });
+  expect(
+    metrics.find((metric) => metric.name === "combining mark"),
+  ).toMatchObject({
+    codepointCount: 3,
+    segmentCount: 2,
+  });
+  expect(metrics.find((metric) => metric.name === "emoji zwj")).toMatchObject({
+    codepointCount: 4,
+    segmentCount: 2,
+  });
+});
+
+test("browser text drawing keeps grapheme clusters intact on canvas", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+
+  const result = await page.evaluate(async () => {
+    const backend =
+      /** @type {Window & { Module?: { x11WasmBackend?: X11WasmBackendSnapshot & { rootWindow?: number, createWindow?: Function, mapWindow?: Function, drawText?: Function, setDrawStyle?: Function, flush?: Function } } }} */ (
+        window
+      ).Module?.x11WasmBackend;
+    if (
+      !backend?.createWindow ||
+      !backend.mapWindow ||
+      !backend.drawText ||
+      !backend.setDrawStyle ||
+      !backend.flush
+    ) {
+      throw new Error("missing text drawing backend");
+    }
+
+    const cases = [
+      {
+        name: "grapheme flag",
+        text: "🇯🇵x",
+        segments: ["🇯🇵", "x"],
+      },
+      {
+        name: "combining mark",
+        text: "e\u0301x",
+        segments: ["e\u0301", "x"],
+      },
+      {
+        name: "emoji zwj",
+        text: "👩‍💻!",
+        segments: ["👩‍💻", "!"],
+      },
+      {
+        name: "rtl hebrew",
+        text: "שלום",
+        segments: ["ש", "ל", "ו", "ם"],
+      },
+      {
+        name: "cjk",
+        text: "日本語",
+        segments: ["日", "本", "語"],
+      },
+    ];
+    const rootWindow = backend.rootWindow || 1;
+    const windowId = 0x740601;
+    backend.createWindow(windowId, rootWindow, 0, 0, 280, 170, 24, 0);
+    backend.mapWindow(windowId);
+    backend.setDrawStyle(
+      3,
+      1,
+      0,
+      1,
+      0,
+      0,
+      4,
+      [],
+      0,
+      0,
+      0,
+      0,
+      0,
+      0xffffff,
+      28,
+      "sans-serif",
+    );
+
+    const originalFillText = CanvasRenderingContext2D.prototype.fillText;
+    const rows = [];
+    CanvasRenderingContext2D.prototype.fillText = function (
+      text,
+      x,
+      y,
+      maxWidth,
+    ) {
+      const current = rows[rows.length - 1];
+      if (current) {
+        current.calls.push(String(text));
+      }
+      if (arguments.length >= 4) {
+        return originalFillText.call(this, text, x, y, maxWidth);
+      }
+      return originalFillText.call(this, text, x, y);
+    };
+    try {
+      cases.forEach((entry, index) => {
+        rows.push({ name: entry.name, expected: entry.segments, calls: [] });
+        backend.drawText(windowId, 0x000000, 8, 30 + index * 28, entry.text);
+      });
+      backend.flush();
+    } finally {
+      CanvasRenderingContext2D.prototype.fillText = originalFillText;
+    }
+
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
+    const resource = backend.resources.get(windowId);
+    const canvas = resource?.canvas;
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      throw new Error("missing text drawing canvas");
+    }
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("missing text drawing context");
+    }
+    const inkPixels = (row) => {
+      const data = context.getImageData(0, 8 + row * 28, 270, 28).data;
+      let count = 0;
+      for (let offset = 0; offset < data.length; offset += 4) {
+        if (data[offset + 3] > 0) {
+          count++;
+        }
+      }
+      return count;
+    };
+
+    return rows.map((row, index) => ({
+      name: row.name,
+      calls: row.calls,
+      expected: row.expected,
+      inkPixels: inkPixels(index),
+    }));
+  });
+
+  for (const row of result) {
+    expect(row.calls, row.name).toEqual(row.expected);
+    expect(row.inkPixels, row.name).toBeGreaterThan(0);
+  }
+});
+
 test("browser backend applies GC raster operations to putImage", async ({
   page,
 }) => {

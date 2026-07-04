@@ -139,6 +139,9 @@
     throw new Error("X11WasmDOMBackend core must be loaded first");
   }
 
+  /** @type {{ segment(text: string): Iterable<{ segment: string }> } | null} */
+  let graphemeSegmenter = null;
+
   /**
    * @param {X11WasmDOMDrawStyle} style
    * @returns {boolean}
@@ -173,6 +176,22 @@
    * @returns {string[]}
    */
   function textSegments(text) {
+    const IntlSegmenter =
+      typeof Intl !== "undefined" &&
+      /** @type {typeof Intl & { Segmenter?: new (locales?: string | string[], options?: { granularity?: string }) => { segment(text: string): Iterable<{ segment: string }> } }} */ (
+        Intl
+      ).Segmenter;
+    if (IntlSegmenter) {
+      if (!graphemeSegmenter) {
+        graphemeSegmenter = new IntlSegmenter(undefined, {
+          granularity: "grapheme",
+        });
+      }
+      return Array.from(
+        graphemeSegmenter.segment(text),
+        (part) => part.segment,
+      );
+    }
     return Array.from(text);
   }
 
