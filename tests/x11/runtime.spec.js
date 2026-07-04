@@ -1230,7 +1230,7 @@ test("external clipboard selection returns target-specific text properties", asy
   expect(result).toBe(1);
 });
 
-test("DOM paste queues text input events", async ({ page }) => {
+test("DOM paste queues paste shortcut events", async ({ page }) => {
   await waitForX11Runtime(page);
   const windowId = await createMappedWindow(page);
 
@@ -1276,7 +1276,7 @@ test("DOM paste queues text input events", async ({ page }) => {
   expect(state.text).toBe(text);
   expect(state.focusedWindow).toBe(windowId);
   expect(state.defaultPrevented).toBe(true);
-  expect(state.after - state.before).toBe(Array.from(text).length);
+  expect(state.after - state.before).toBe(2);
 });
 
 test("XOpenDisplay rejects non-browser display names", async ({ page }) => {

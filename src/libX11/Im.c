@@ -1451,6 +1451,9 @@ XCreateFontSet(
     int charWidth;
     int ascent;
     int descent;
+    int maxWidth;
+    int maxAscent;
+    int maxDescent;
     int fontCount;
     int i;
 
@@ -1477,6 +1480,9 @@ XCreateFontSet(
     firstFontName = BrowserFirstFontName(baseFontNameList);
     BrowserFontMetricsFromName(firstFontName, NULL, &charWidth, &ascent,
 	    &descent);
+    maxWidth = charWidth;
+    maxAscent = ascent;
+    maxDescent = descent;
     BrowserSetFontSetExtents(&fontSet->extents, charWidth, ascent, descent);
     fontCount = BrowserFontNameListCount(baseFontNameList);
     if (fontCount <= 0) {
@@ -1499,12 +1505,27 @@ XCreateFontSet(
 	}
 	fontSet->fontNameList[i] = BrowserFontXLFD(fontName, 0);
 	fontSet->fontStructList[i] = XLoadQueryFont(display, fontName);
+	if (fontSet->fontStructList[i] != NULL) {
+	    XFontStruct *fontStruct = fontSet->fontStructList[i];
+
+	    if (fontStruct->max_bounds.width > maxWidth) {
+		maxWidth = fontStruct->max_bounds.width;
+	    }
+	    if (fontStruct->ascent > maxAscent) {
+		maxAscent = fontStruct->ascent;
+	    }
+	    if (fontStruct->descent > maxDescent) {
+		maxDescent = fontStruct->descent;
+	    }
+	}
 	if (i == 0) {
 	    fontSet->fontName = fontSet->fontNameList[i];
 	    fontSet->fontStruct = fontSet->fontStructList[i];
 	}
 	ckfree(fontName);
     }
+    BrowserSetFontSetExtents(&fontSet->extents, maxWidth, maxAscent,
+	    maxDescent);
     ckfree(firstFontName);
     return fontSet;
 }

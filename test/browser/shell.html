@@ -84,6 +84,43 @@
     </section>
   </main>
   <script>
+    (function installTextDecoderResizableArrayBufferWorkaround() {
+      "use strict";
+
+      const NativeTextDecoder = globalThis.TextDecoder;
+      if (typeof NativeTextDecoder !== "function") {
+        return;
+      }
+
+      function copyBufferSource(input) {
+        if (ArrayBuffer.isView(input)) {
+          return Uint8Array.from(new Uint8Array(
+            input.buffer,
+            input.byteOffset,
+            input.byteLength
+          ));
+        }
+        if (input instanceof ArrayBuffer) {
+          return input.slice(0);
+        }
+        return input;
+      }
+
+      globalThis.TextDecoder = class TextDecoder extends NativeTextDecoder {
+        decode(input, options) {
+          try {
+            return super.decode(input, options);
+          } catch (error) {
+            if (!/resizable/i.test(String(error && error.message))) {
+              throw error;
+            }
+            return super.decode(copyBufferSource(input), options);
+          }
+        }
+      };
+    })();
+  </script>
+  <script>
     var Module = {
       x11WasmRoot: "#x11-wasm-root",
       print: function(text) {

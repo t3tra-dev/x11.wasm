@@ -2493,9 +2493,23 @@ int
 BrowserFontUnderlineThickness(
     const XFontStruct *fontPtr)
 {
-    int width = BrowserFontCharWidth(fontPtr);
-    int thickness = width / 3;
+    int width = 0;
+    int thickness;
 
+    if (fontPtr != NULL) {
+	X11WasmResource *resourcePtr = X11WasmFindResource(fontPtr->fid);
+
+	if ((resourcePtr != NULL)
+		&& (resourcePtr->type == X11_WASM_RESOURCE_FONT)
+		&& (resourcePtr->fontPixelSize > 0)) {
+	    BrowserFontMetricsForPixelSize(resourcePtr->fontPixelSize, &width,
+		    NULL, NULL);
+	}
+    }
+    if (width <= 0) {
+	width = BrowserFontCharWidth(fontPtr);
+    }
+    thickness = width / 3;
     return (thickness > 0) ? thickness : 1;
 }
 
