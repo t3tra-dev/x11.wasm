@@ -901,6 +901,7 @@ X11WasmQueueFocusEvent(
     }
 
     BrowserSetCommonEventFields(&event, type, eventTarget, (Time)time);
+    event.xfocus.send_event = True;
     event.xfocus.serial = ++LastKnownRequestProcessed(&browserDisplay.display);
     BrowserSyncRequestState(&browserDisplay.display);
     event.xfocus.mode = NotifyNormal;
