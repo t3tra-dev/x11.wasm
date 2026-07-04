@@ -837,6 +837,43 @@ test("browser backend applies GC raster operations to vector drawing", async ({
   expect(samples.darkTextPixels).toBeGreaterThan(8);
 });
 
+test("Xlib text drawing decodes Tcl Unicode escape runs", async ({ page }) => {
+  await page.goto("/x11.html");
+  await expect(page.locator("#x11-wasm-status")).toHaveText("running", {
+    timeout: 15000,
+  });
+
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestUnicodeEscapeTextDrawing?: Function, x11WasmBackend?: X11WasmBackendSnapshot & { drawText?: Function } } }} */ (
+        window
+      ).Module;
+    const backend = module?.x11WasmBackend;
+    if (!module?._X11WasmTestUnicodeEscapeTextDrawing || !backend?.drawText) {
+      throw new Error("missing Unicode escape text drawing test hooks");
+    }
+    const drawnTexts = [];
+    const drawText = backend.drawText.bind(backend);
+
+    backend.drawText = function (...args) {
+      drawnTexts.push(String(args[4] || ""));
+      return drawText(...args);
+    };
+    try {
+      return {
+        ok: module._X11WasmTestUnicodeEscapeTextDrawing(),
+        drawnTexts,
+      };
+    } finally {
+      backend.drawText = drawText;
+    }
+  });
+
+  expect(result.ok).toBe(1);
+  expect(result.drawnTexts).toContain("日本");
+  expect(result.drawnTexts).not.toContain("\\u65e5\\u672c");
+});
+
 test("browser backend applies GC raster operations to putImage", async ({
   page,
 }) => {

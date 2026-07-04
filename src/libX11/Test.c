@@ -13917,6 +13917,71 @@ X11WasmTestXErrorHandler(void)
     return 1;
 }
 
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestUnicodeEscapeTextDrawing(void)
+{
+    Display *display = &browserDisplay.display;
+    Pixmap pixmap = None;
+    GC gc = NULL;
+    Font font = None;
+    XFontStruct *fontStruct = NULL;
+    XChar2b unicodeText[2];
+    XTextItem textItems[1];
+    const char escapedText[] = "\\u65e5\\u672c";
+    int escapedWidth;
+    int unicodeWidth;
+    int result = 0;
+
+    BrowserInitDisplay();
+    unicodeText[0].byte1 = 0x65;
+    unicodeText[0].byte2 = 0xe5;
+    unicodeText[1].byte1 = 0x67;
+    unicodeText[1].byte2 = 0x2c;
+    pixmap = XCreatePixmap(display,
+	    RootWindow(display, DefaultScreen(display)), 160, 40,
+	    (unsigned int)DefaultDepth(display, DefaultScreen(display)));
+    gc = (pixmap != None) ? XCreateGC(display, (Drawable)pixmap, 0, NULL)
+	    : NULL;
+    font = XLoadFont(display, "Helvetica 16");
+    fontStruct = (font != None) ? XQueryFont(display, font) : NULL;
+    if ((pixmap == None) || (gc == NULL) || (font == None)
+	    || (fontStruct == NULL)
+	    || (XSetFont(display, gc, font) != Success)) {
+	goto cleanup;
+    }
+    escapedWidth = XTextWidth(fontStruct, escapedText,
+	    (int)strlen(escapedText));
+    unicodeWidth = XTextWidth16(fontStruct, unicodeText, 2);
+    if ((escapedWidth <= 0) || (escapedWidth != unicodeWidth)) {
+	goto cleanup;
+    }
+    memset(textItems, 0, sizeof(textItems));
+    textItems[0].chars = (char *)escapedText;
+    textItems[0].nchars = (int)strlen(escapedText);
+    if ((XDrawString(display, (Drawable)pixmap, gc, 2, 16, escapedText,
+		    (int)strlen(escapedText)) != Success)
+	    || (XDrawText(display, (Drawable)pixmap, gc, 2, 34, textItems, 1)
+		    != Success)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    if (fontStruct != NULL) {
+	XFreeFontInfo(NULL, fontStruct, 1);
+    }
+    if (font != None) {
+	(void)XUnloadFont(display, font);
+    }
+    if (gc != NULL) {
+	(void)XFreeGC(display, gc);
+    }
+    if (pixmap != None) {
+	(void)XFreePixmap(display, pixmap);
+    }
+    return result;
+}
+
 int
 XFree(
     void *data)

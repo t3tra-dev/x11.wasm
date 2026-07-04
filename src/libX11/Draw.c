@@ -2114,7 +2114,7 @@ XTextWidth(
     int utf8Length;
     int width;
 
-    utf8 = BrowserUtf8FromLatin1String(string, count, &utf8Length);
+    utf8 = BrowserUtf8FromLatin1OrUnicodeEscapes(string, count, &utf8Length);
     if (utf8 == NULL) {
 	return 0;
     }
@@ -2240,7 +2240,8 @@ XQueryTextExtents(
 	char *utf8;
 	int utf8Length;
 
-	utf8 = BrowserUtf8FromLatin1String(string, nchars, &utf8Length);
+	utf8 = BrowserUtf8FromLatin1OrUnicodeEscapes(string, nchars,
+		&utf8Length);
 	if (utf8 != NULL) {
 	    width = BrowserFontResourceTextWidth(resourcePtr, charWidth, utf8,
 		    utf8Length);
@@ -2397,7 +2398,7 @@ XDrawString(
     int utf8Length;
     int result;
 
-    utf8 = BrowserUtf8FromLatin1String(string, length, &utf8Length);
+    utf8 = BrowserUtf8FromLatin1OrUnicodeEscapes(string, length, &utf8Length);
     if (utf8 == NULL) {
 	return Success;
     }
@@ -2421,7 +2422,7 @@ XDrawImageString(
     int utf8Length;
     int result;
 
-    utf8 = BrowserUtf8FromLatin1String(string, length, &utf8Length);
+    utf8 = BrowserUtf8FromLatin1OrUnicodeEscapes(string, length, &utf8Length);
     if (utf8 == NULL) {
 	return Success;
     }
@@ -2523,8 +2524,8 @@ XDrawText(
 	    }
 	    activeFont = items[i].font;
 	}
-	utf8 = BrowserUtf8FromLatin1String(items[i].chars, items[i].nchars,
-		&utf8Length);
+	utf8 = BrowserUtf8FromLatin1OrUnicodeEscapes(items[i].chars,
+		items[i].nchars, &utf8Length);
 	if (utf8 == NULL) {
 	    x += items[i].delta;
 	    continue;

@@ -1993,6 +1993,10 @@ char *BrowserUtf8FromLatin1String(
     const char *string,
     int count,
     int *lengthPtr);
+char *BrowserUtf8FromLatin1OrUnicodeEscapes(
+    const char *string,
+    int count,
+    int *lengthPtr);
 char *BrowserUtf8FromWideString(
     const wchar_t *string);
 char *BrowserUtf8FromWideStringCount(

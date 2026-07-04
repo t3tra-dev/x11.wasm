@@ -2565,6 +2565,108 @@ BrowserUtf8FromLatin1String(
     return utf8;
 }
 
+static int
+BrowserParseUnicodeEscape(
+    const char *string,
+    int count,
+    unsigned int *codepointPtr)
+{
+    unsigned int codepoint = 0;
+    int digitCount;
+    int i;
+
+    if ((string == NULL) || (count < 2) || (string[0] != '\\')
+	    || ((string[1] != 'u') && (string[1] != 'U'))) {
+	return 0;
+    }
+    digitCount = (string[1] == 'u') ? 4 : 8;
+    if (count < digitCount + 2) {
+	return 0;
+    }
+    for (i = 0; i < digitCount; i++) {
+	int digit = BrowserHexDigit((unsigned char)string[i + 2]);
+
+	if (digit < 0) {
+	    return 0;
+	}
+	codepoint = (codepoint << 4) | (unsigned int)digit;
+    }
+    if ((string[1] == 'u') && ((codepoint & 0xfc00U) == 0xd800U)
+	    && (count >= 12) && (string[6] == '\\') && (string[7] == 'u')) {
+	unsigned int low = 0;
+
+	for (i = 0; i < 4; i++) {
+	    int digit = BrowserHexDigit((unsigned char)string[i + 8]);
+
+	    if (digit < 0) {
+		low = 0;
+		break;
+	    }
+	    low = (low << 4) | (unsigned int)digit;
+	}
+	if ((low & 0xfc00U) == 0xdc00U) {
+	    *codepointPtr = (((codepoint & 0x3ffU) << 10)
+		    | (low & 0x3ffU)) + 0x10000U;
+	    return 12;
+	}
+    }
+    if (((codepoint & 0xfc00U) == 0xd800U)
+	    || ((codepoint & 0xfc00U) == 0xdc00U)
+	    || (codepoint > 0x10ffffU)) {
+	codepoint = 0xfffdU;
+    }
+    *codepointPtr = codepoint;
+    return digitCount + 2;
+}
+
+char *
+BrowserUtf8FromLatin1OrUnicodeEscapes(
+    const char *string,
+    int count,
+    int *lengthPtr)
+{
+    char *utf8;
+    int out = 0;
+    int i;
+
+    if (lengthPtr != NULL) {
+	*lengthPtr = 0;
+    }
+    if ((string == NULL) || (count <= 0)) {
+	return NULL;
+    }
+    utf8 = (char *)ckalloc((unsigned int)(count * 2 + 1));
+    for (i = 0; i < count; ) {
+	unsigned int codepoint = (unsigned char)string[i];
+	int consumed = 1;
+	int written;
+
+	if (string[i] == '\\') {
+	    unsigned int escapedCodepoint = 0;
+	    int escapedLength = BrowserParseUnicodeEscape(string + i,
+		    count - i, &escapedCodepoint);
+
+	    if (escapedLength > 0) {
+		codepoint = escapedCodepoint;
+		consumed = escapedLength;
+	    }
+	}
+	written = BrowserUtf8FromCodepoint(codepoint, utf8 + out,
+		count * 2 - out);
+	if (written <= 0) {
+	    i += consumed;
+	    continue;
+	}
+	out += written;
+	i += consumed;
+    }
+    utf8[out] = '\0';
+    if (lengthPtr != NULL) {
+	*lengthPtr = out;
+    }
+    return utf8;
+}
+
 char *
 BrowserUtf8FromXChar2bString(
     const XChar2b *string,
