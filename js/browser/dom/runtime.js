@@ -797,8 +797,9 @@ applyRootSelectionOwnerState() {
       }
       text = data.getData("text/plain") || "";
       this.setExternalClipboardText(text);
-      if (text && this.focusedResourceAcceptsInput()) {
-        this.flushInputText(text);
+      this.hostPasteShortcutActive = false;
+      if (this.focusedResourceAcceptsInput()) {
+        this.queuePasteShortcut(eventTime(event.timeStamp));
         event.preventDefault();
       }
     },

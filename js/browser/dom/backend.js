@@ -202,6 +202,8 @@
       /** @private @type {Element | null} */
       this.capturedPointerElement = null;
       /** @private */
+      this.hostPasteShortcutActive = false;
+      /** @private */
       this.suppressInputFocusEvents = 0;
       /** @private */
       this.flushScheduled = false;

@@ -705,6 +705,10 @@
         this.queueImeKeyEvent(KEY_PRESS, event);
         return;
       }
+      if (this.isHostPasteShortcut(event)) {
+        this.hostPasteShortcutActive = true;
+        return;
+      }
       if (this.plainTextFromKeyboardEvent(event) !== null) {
         return;
       }
@@ -730,6 +734,10 @@
         this.queueImeKeyEvent(KEY_RELEASE, event);
         return;
       }
+      if (this.hostPasteShortcutActive && this.isPasteShortcutKey(event)) {
+        this.hostPasteShortcutActive = false;
+        return;
+      }
       const text = this.plainTextFromKeyboardEvent(event);
       if (text !== null) {
         this.queueTextEvent(
@@ -753,6 +761,63 @@
         eventTime(event.timeStamp),
       );
       event.preventDefault();
+    },
+
+    /**
+     * @returns {boolean}
+     */
+    isMacHostPlatform() {
+      const navigator = global.navigator || {};
+      const userAgentData = navigator.userAgentData;
+      const platform =
+        userAgentData && typeof userAgentData.platform === "string"
+          ? userAgentData.platform
+          : typeof navigator.platform === "string"
+            ? navigator.platform
+            : "";
+      return /Mac|iPhone|iPad|iPod/i.test(platform);
+    },
+
+    /**
+     * @param {KeyboardEvent} event
+     * @returns {string}
+     */
+    shortcutKey(event) {
+      return typeof event.key === "string" ? event.key.toLowerCase() : "";
+    },
+
+    /**
+     * @param {KeyboardEvent} event
+     * @returns {boolean}
+     */
+    isHostShortcutModifier(event) {
+      if (event.altKey) {
+        return false;
+      }
+      if (this.isMacHostPlatform()) {
+        return event.metaKey && !event.ctrlKey;
+      }
+      return event.ctrlKey && !event.metaKey;
+    },
+
+    /**
+     * @param {KeyboardEvent} event
+     * @returns {boolean}
+     */
+    isPasteShortcutKey(event) {
+      return this.shortcutKey(event) === "v";
+    },
+
+    /**
+     * @param {KeyboardEvent} event
+     * @returns {boolean}
+     */
+    isHostPasteShortcut(event) {
+      return (
+        this.isHostShortcutModifier(event) &&
+        !event.shiftKey &&
+        this.isPasteShortcutKey(event)
+      );
     },
 
     /**
@@ -929,6 +994,17 @@
       this.withUtf8String(text, (pointer, byteLength) =>
         queue(phase, targetWindow, pointer, byteLength),
       );
+    },
+
+    /**
+     * @param {number} time
+     */
+    queuePasteShortcut(time) {
+      const keySym = codepointToKeysym("v".codePointAt(0) || 0);
+      const keyCode = 86;
+
+      this.queueKeyEvent(KEY_PRESS, keySym, keyCode, CONTROL_MASK, time);
+      this.queueKeyEvent(KEY_RELEASE, keySym, keyCode, CONTROL_MASK, time);
     },
 
     /**
