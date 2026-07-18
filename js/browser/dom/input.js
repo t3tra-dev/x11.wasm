@@ -234,6 +234,45 @@
     },
 
     /**
+     * @param {{ suppressFocusEvent?: boolean }=} options
+     * @returns {boolean}
+     */
+    restoreFocusedInput(options = {}) {
+      const input = this.inputElement;
+      const document = this.document;
+      const suppressFocusEvent = options.suppressFocusEvent === true;
+
+      if (!input || !this.focusedResourceAcceptsInput()) {
+        return false;
+      }
+      if (
+        document &&
+        typeof document.hasFocus === "function" &&
+        !document.hasFocus()
+      ) {
+        return false;
+      }
+      if (document && document.activeElement === input) {
+        return false;
+      }
+      if (suppressFocusEvent) {
+        this.suppressInputFocusEvents += 1;
+      }
+      try {
+        input.focus({ preventScroll: true });
+      } catch (error) {
+        this.inputFocusRestoreError =
+          error instanceof Error ? error.message : String(error || "");
+        return false;
+      } finally {
+        if (suppressFocusEvent) {
+          this.suppressInputFocusEvents -= 1;
+        }
+      }
+      return !document || document.activeElement === input;
+    },
+
+    /**
      * @param {boolean} focused
      * @param {number=} window
      * @param {boolean=} hasSpot
@@ -388,12 +427,14 @@
           this.queueFocusEvent(FOCUS_IN, eventTime(event.timeStamp));
         }
         event.preventDefault();
+        this.serviceUserActivationEvents();
       });
       root.addEventListener("pointerup", (event) => {
         this.recordUserActivity();
         this.queuePointerEvent(BUTTON_RELEASE, event);
         this.releasePointer(root, event);
         event.preventDefault();
+        this.serviceUserActivationEvents();
       });
       root.addEventListener("pointermove", (event) => {
         this.recordUserActivity();
@@ -419,22 +460,32 @@
         this.capturedPointerElement = null;
       });
       root.addEventListener("focus", () => {
-        if (this.focusedResourceAcceptsInput()) {
-          input.focus();
-        }
+        this.restoreFocusedInput();
       });
 
       input.addEventListener("focus", (event) => {
         if (this.suppressInputFocusEvents > 0) {
           return;
         }
-        this.queueFocusEvent(FOCUS_IN, eventTime(event.timeStamp));
+        this.queueFocusEvent(
+          FOCUS_IN,
+          eventTime(event.timeStamp),
+          this.focusedWindow || this.rootWindow,
+        );
       });
       input.addEventListener("blur", (event) => {
         if (this.suppressInputFocusEvents > 0) {
           return;
         }
-        this.queueFocusEvent(FOCUS_OUT, eventTime(event.timeStamp));
+        if (this.suppressTransientInputBlurEvents > 0) {
+          this.transientInputBlurred = true;
+          return;
+        }
+        this.queueFocusEvent(
+          FOCUS_OUT,
+          eventTime(event.timeStamp),
+          this.focusedWindow || this.rootWindow,
+        );
       });
       input.addEventListener("keydown", (event) => {
         this.recordUserActivity();
@@ -478,6 +529,51 @@
           this.flushInputText();
         }
       });
+    },
+
+    serviceUserActivationEvents() {
+      const service =
+        this.module && this.module.x11WasmServiceUserActivationEvents;
+
+      if (typeof service !== "function" || this.servicingUserActivationEvents) {
+        return;
+      }
+      this.servicingUserActivationEvents = true;
+      this.suppressTransientInputBlurEvents =
+        (this.suppressTransientInputBlurEvents || 0) + 1;
+      const finishUserActivationService = () => {
+        const transientInputBlurred = this.transientInputBlurred === true;
+        this.transientInputBlurred = false;
+        this.suppressTransientInputBlurEvents = Math.max(
+          0,
+          (this.suppressTransientInputBlurEvents || 0) - 1,
+        );
+        if (
+          this.restoreFocusedInput({
+            suppressFocusEvent: transientInputBlurred,
+          }) &&
+          !transientInputBlurred
+        ) {
+          service();
+        }
+        this.servicingUserActivationEvents = false;
+      };
+      try {
+        const result = service();
+        if (result && typeof result.then === "function") {
+          result.then(finishUserActivationService).catch((error) => {
+            this.userActivationServiceError =
+              error instanceof Error ? error.message : String(error || "");
+            finishUserActivationService();
+          });
+        } else {
+          finishUserActivationService();
+        }
+      } catch (error) {
+        this.userActivationServiceError =
+          error instanceof Error ? error.message : String(error || "");
+        finishUserActivationService();
+      }
     },
 
     /**
@@ -561,11 +657,12 @@
     /**
      * @param {number} type
      * @param {number} time
+     * @param {number=} window
      */
-    queueFocusEvent(type, time) {
+    queueFocusEvent(type, time, window = 0) {
       const queue = this.module && this.module["_X11WasmQueueFocusEvent"];
       if (typeof queue === "function") {
-        queue(type, this.rootWindow, time);
+        queue(type, unsignedInt(window, this.rootWindow), time);
       }
     },
 
@@ -729,6 +826,9 @@
         modifierState(event),
         eventTime(event.timeStamp),
       );
+      if (event.ctrlKey || event.metaKey || event.altKey) {
+        this.serviceUserActivationEvents();
+      }
       event.preventDefault();
     },
 
@@ -784,6 +884,9 @@
         modifierState(event),
         eventTime(event.timeStamp),
       );
+      if (event.ctrlKey || event.metaKey || event.altKey) {
+        this.serviceUserActivationEvents();
+      }
       event.preventDefault();
     },
 
