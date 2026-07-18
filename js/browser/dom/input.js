@@ -894,7 +894,10 @@
      * @returns {boolean}
      */
     isMacHostPlatform() {
-      const navigator = global.navigator || {};
+      const navigator =
+        /** @type {Navigator & { userAgentData?: { platform?: string } }} */ (
+          global.navigator || {}
+        );
       const userAgentData = navigator.userAgentData;
       const platform =
         userAgentData && typeof userAgentData.platform === "string"
