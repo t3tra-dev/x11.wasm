@@ -1770,6 +1770,56 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestDomCrossingPairs(void)
+{
+    Display *display = XOpenDisplay(NULL);
+    Window root = DefaultRootWindow(display);
+    Window left = XCreateSimpleWindow(display, root, 10, 10, 20, 20, 0, 0, 0);
+    Window right = XCreateSimpleWindow(display, root, 50, 10, 20, 20, 0, 0, 0);
+    XEvent event;
+    int result = 0;
+
+    XMapWindow(display, left);
+    XMapWindow(display, right);
+    XSelectInput(display, root, NoEventMask);
+    XSelectInput(display, left, EnterWindowMask | LeaveWindowMask);
+    XSelectInput(display, right, EnterWindowMask | LeaveWindowMask | PointerMotionMask);
+    BrowserUpdatePointerState(left, 15, 15, 0);
+    BrowserClearEventQueue();
+    if (!X11WasmQueueCrossingEvent(LeaveNotify, root, ShiftMask, 55, 15, 1)
+	    || X11WasmQueueCrossingEvent(EnterNotify, root, ShiftMask, 55, 15, 1)
+	    || !X11WasmQueuePointerEvent(MotionNotify, root, 0, ShiftMask, 55, 15, 1)
+	    || !BrowserPopEvent(&event, NULL)
+	    || (event.type != LeaveNotify) || (event.xcrossing.window != left)
+	    || (event.xcrossing.detail != NotifyNonlinear)
+	    || (event.xcrossing.state != ShiftMask)
+	    || !BrowserPopEvent(&event, NULL)
+	    || (event.type != EnterNotify) || (event.xcrossing.window != right)
+	    || (event.xcrossing.detail != NotifyNonlinear)
+	    || (event.xcrossing.x != 5) || (event.xcrossing.y != 5)
+	    || !BrowserPopEvent(&event, NULL)
+	    || (event.type != MotionNotify) || (event.xmotion.window != right)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    if (!X11WasmQueueCrossingEvent(EnterNotify, root, 0, 15, 15, 2)
+	    || X11WasmQueueCrossingEvent(LeaveNotify, root, 0, 15, 15, 2)
+	    || !BrowserPopEvent(&event, NULL)
+	    || (event.type != LeaveNotify) || (event.xcrossing.window != right)
+	    || !BrowserPopEvent(&event, NULL)
+	    || (event.type != EnterNotify) || (event.xcrossing.window != left)
+	    || (XEventsQueued(display, QueuedAlready) != 0)) {
+	goto cleanup;
+    }
+    result = 1;
+cleanup:
+    XDestroyWindow(display, left);
+    XDestroyWindow(display, right);
+    BrowserClearEventQueue();
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestCrossingEventHierarchy(void)
 {
     Display *display;

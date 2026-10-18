@@ -472,6 +472,9 @@ extern const char *const x11wasm_browserFontFallbackFamilies[];
 int X11WasmQueueTextEventFields(
     int type, unsigned int window, unsigned int codepoint,
     unsigned int state, unsigned int time);
+int X11WasmQueueCrossingEvent(
+    int type, unsigned int window, unsigned int state,
+    int x, int y, unsigned int time);
 int X11WasmQueueTextEventFieldsAtWindow(
     int type, unsigned int window, unsigned int codepoint,
     unsigned int state, unsigned int time);

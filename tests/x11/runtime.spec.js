@@ -178,6 +178,14 @@ test("pointer events identify the child of their final delivery window", async (
   })).toBe(1);
 });
 
+test("DOM out and over notifications preserve both X11 crossing endpoints", async ({ page }) => {
+  await waitForX11Runtime(page);
+  expect(await page.evaluate(() => {
+    const module = /** @type {Window & { Module?: { _X11WasmTestDomCrossingPairs?: () => number } }} */ (window).Module;
+    return module?._X11WasmTestDomCrossingPairs?.();
+  })).toBe(1);
+});
+
 test("X event queue and display keycode APIs preserve ordering", async ({
   page,
 }) => {

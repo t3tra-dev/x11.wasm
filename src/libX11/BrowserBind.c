@@ -811,33 +811,6 @@ BrowserQueuePointerCrossingEventPath(
     return queued;
 }
 
-static int
-BrowserCrossingEndpointDetail(
-    int type,
-    Window oldTarget,
-    Window nextTarget)
-{
-    int nextIsInferior = BrowserWindowInTree(nextTarget, oldTarget);
-    int oldIsInferior = BrowserWindowInTree(oldTarget, nextTarget);
-
-    if (type == LeaveNotify) {
-	if (nextIsInferior) {
-	    return NotifyInferior;
-	}
-	if (oldIsInferior) {
-	    return NotifyAncestor;
-	}
-	return NotifyNonlinear;
-    }
-    if (nextIsInferior) {
-	return NotifyAncestor;
-    }
-    if (oldIsInferior) {
-	return NotifyInferior;
-    }
-    return NotifyNonlinear;
-}
-
 int
 BrowserQueuePointerCrossingEvents(
     unsigned int state,
@@ -877,48 +850,14 @@ X11WasmQueueCrossingEvent(
     int y,
     unsigned int time)
 {
-    Window target;
-    Window nextTarget;
-    Window oldTarget;
-    int rootX = x;
-    int rootY = y;
-    int oldRootX;
-    int oldRootY;
-
     if ((type != EnterNotify) && (type != LeaveNotify)) {
 	return 0;
     }
     BrowserInitDisplay();
-    state = BrowserMappedPointerState(state);
     (void)window;
-    BrowserClampPointerToGrabConfine(&rootX, &rootY);
-    oldTarget = x11wasm_browserDisplay.pointerWindow;
-    nextTarget = BrowserHitTestRoot(rootX, rootY, NULL, NULL);
-    if (nextTarget == oldTarget) {
-	BrowserUpdatePointerState(nextTarget, rootX, rootY, state);
-	return 0;
-    }
-    oldRootX = x11wasm_browserDisplay.pointerX;
-    oldRootY = x11wasm_browserDisplay.pointerY;
-    if (type == LeaveNotify) {
-	if (!BrowserWindowCanReceiveEvents(x11wasm_browserDisplay.pointerWindow)) {
-	    BrowserUpdatePointerState(nextTarget, rootX, rootY, state);
-	    return 0;
-	}
-	target = x11wasm_browserDisplay.pointerWindow;
-    } else {
-	if (!BrowserWindowCanReceiveEvents(nextTarget)) {
-	    BrowserUpdatePointerState(nextTarget, rootX, rootY, state);
-	    return 0;
-	}
-	target = nextTarget;
-    }
-    BrowserUpdatePointerState(nextTarget, rootX, rootY, state);
-    return BrowserQueueCrossingEventForTarget(type, target, state, rootX,
-	    rootY, (Time)time,
-	    BrowserCrossingEndpointDetail(type, oldTarget, nextTarget),
-	    (type == LeaveNotify) ? oldRootX : rootX,
-	    (type == LeaveNotify) ? oldRootY : rootY);
+    /* DOM out/over notifications describe one transition, not two endpoints. */
+    return BrowserQueuePointerCrossingEvents(BrowserMappedPointerState(state),
+	    x, y, time) != 0;
 }
 
 EMSCRIPTEN_KEEPALIVE int
