@@ -244,16 +244,16 @@ BrowserParseColor(
 	    normalized[normalizedLength++] = (char)tolower(ch);
 	}
 	normalized[normalizedLength] = '\0';
-	for (i = 0; i < browserNamedColorCount;
+	for (i = 0; i < x11wasm_browserNamedColorCount;
 		i++) {
-	    if (strcmp(normalized, browserNamedColors[i].name) == 0) {
-		red = browserNamedColors[i].red;
-		green = browserNamedColors[i].green;
-		blue = browserNamedColors[i].blue;
+	    if (strcmp(normalized, x11wasm_browserNamedColors[i].name) == 0) {
+		red = x11wasm_browserNamedColors[i].red;
+		green = x11wasm_browserNamedColors[i].green;
+		blue = x11wasm_browserNamedColors[i].blue;
 		break;
 	    }
 	}
-	if (i == browserNamedColorCount) {
+	if (i == x11wasm_browserNamedColorCount) {
 	    const char *suffix = NULL;
 
 	    if (strncmp(normalized, "gray", 4) == 0) {

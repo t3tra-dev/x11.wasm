@@ -6,7 +6,7 @@ BrowserSyncSelectionOwner(
     Window owner,
     Time time)
 {
-    char *selectionName = XGetAtomName(&browserDisplay.display, selection);
+    char *selectionName = XGetAtomName(&x11wasm_browserDisplay.display, selection);
 
     if (selectionName == NULL) {
 	return;
@@ -23,7 +23,7 @@ BrowserFindSelectionOwner(
 {
     X11WasmSelectionOwner *ownerPtr;
 
-    for (ownerPtr = selectionOwnerList; ownerPtr != NULL;
+    for (ownerPtr = x11wasm_selectionOwnerList; ownerPtr != NULL;
 	    ownerPtr = ownerPtr->nextPtr) {
 	if (ownerPtr->selection == selection) {
 	    return ownerPtr;
@@ -45,8 +45,8 @@ BrowserCreateSelectionOwner(
 	    sizeof(X11WasmSelectionOwner));
     memset(ownerPtr, 0, sizeof(X11WasmSelectionOwner));
     ownerPtr->selection = selection;
-    ownerPtr->nextPtr = selectionOwnerList;
-    selectionOwnerList = ownerPtr;
+    ownerPtr->nextPtr = x11wasm_selectionOwnerList;
+    x11wasm_selectionOwnerList = ownerPtr;
     return ownerPtr;
 }
 
@@ -54,7 +54,7 @@ void
 BrowserDeleteSelectionOwner(
     Atom selection)
 {
-    X11WasmSelectionOwner **linkPtr = &selectionOwnerList;
+    X11WasmSelectionOwner **linkPtr = &x11wasm_selectionOwnerList;
 
     while (*linkPtr != NULL) {
 	X11WasmSelectionOwner *ownerPtr = *linkPtr;
@@ -72,14 +72,14 @@ void
 BrowserDeleteSelectionOwnersForWindow(
     Window window)
 {
-    X11WasmSelectionOwner **linkPtr = &selectionOwnerList;
+    X11WasmSelectionOwner **linkPtr = &x11wasm_selectionOwnerList;
 
     while (*linkPtr != NULL) {
 	X11WasmSelectionOwner *ownerPtr = *linkPtr;
 
 	if (ownerPtr->owner == window) {
 	    BrowserFailQueuedSelectionRequestsForOwner(window);
-	    BrowserSyncSelectionOwner(ownerPtr->selection, None, eventTime);
+	    BrowserSyncSelectionOwner(ownerPtr->selection, None, x11wasm_eventTime);
 	    *linkPtr = ownerPtr->nextPtr;
 	    ckfree(ownerPtr);
 	    continue;
@@ -98,7 +98,7 @@ BrowserSelectionOwnerWindow(
 	return None;
     }
     if (BrowserWindowResource(ownerPtr->owner) == NULL) {
-	BrowserSyncSelectionOwner(selection, None, eventTime);
+	BrowserSyncSelectionOwner(selection, None, x11wasm_eventTime);
 	BrowserDeleteSelectionOwner(selection);
 	return None;
     }
@@ -109,7 +109,7 @@ Time
 BrowserSelectionEventTime(
     Time time)
 {
-    return (time == CurrentTime) ? eventTime : time;
+    return (time == CurrentTime) ? x11wasm_eventTime : time;
 }
 
 int
@@ -207,7 +207,7 @@ BrowserExternalClipboardTextProperty(
 	return XNoMemory;
     }
     memset(textPropPtr, 0, sizeof(*textPropPtr));
-    if (externalClipboardText == NULL) {
+    if (x11wasm_externalClipboardText == NULL) {
 	return XConverterNotFound;
     }
     if (target == XA_STRING) {
@@ -222,11 +222,11 @@ BrowserExternalClipboardTextProperty(
 	return XConverterNotFound;
     }
 
-    list[0] = externalClipboardText;
-    result = BrowserTextListToTextProperty(&browserDisplay.display, list, 1,
+    list[0] = x11wasm_externalClipboardText;
+    result = BrowserTextListToTextProperty(&x11wasm_browserDisplay.display, list, 1,
 	    style, textPropPtr);
     if ((result == XConverterNotFound) && (target == XA_STRING)) {
-	result = BrowserTextListToTextProperty(&browserDisplay.display, list, 1,
+	result = BrowserTextListToTextProperty(&x11wasm_browserDisplay.display, list, 1,
 		XUTF8StringStyle, textPropPtr);
     }
     return result;
@@ -240,7 +240,7 @@ BrowserStoreExternalClipboardTarget(
     Time time)
 {
     unsigned int targets[8];
-    Time timestamp = externalClipboardTime;
+    Time timestamp = x11wasm_externalClipboardTime;
 
     if ((property == None) || (BrowserWindowResource(requestor) == NULL)) {
 	return 0;
@@ -254,7 +254,7 @@ BrowserStoreExternalClipboardTarget(
 	targets[5] = (unsigned int)BrowserTimestampAtom();
 	targets[6] = (unsigned int)BrowserMultipleAtom();
 	targets[7] = (unsigned int)BrowserLengthAtom();
-	(void)XChangeProperty(&browserDisplay.display, requestor,
+	(void)XChangeProperty(&x11wasm_browserDisplay.display, requestor,
 		property, XA_ATOM, 32, PropModeReplace,
 		(const unsigned char *)targets,
 		(int)(sizeof(targets) / sizeof(targets[0])));
@@ -267,7 +267,7 @@ BrowserStoreExternalClipboardTarget(
 	    timestamp = BrowserSelectionEventTime(time);
 	}
 	timestampValue = (unsigned int)timestamp;
-	(void)XChangeProperty(&browserDisplay.display, requestor,
+	(void)XChangeProperty(&x11wasm_browserDisplay.display, requestor,
 		property, XA_INTEGER, 32, PropModeReplace,
 		(const unsigned char *)&timestampValue, 1);
 	return 1;
@@ -275,10 +275,10 @@ BrowserStoreExternalClipboardTarget(
     if (target == BrowserLengthAtom()) {
 	unsigned int lengthValue = 0;
 
-	if (externalClipboardText != NULL) {
-	    lengthValue = (unsigned int)strlen(externalClipboardText);
+	if (x11wasm_externalClipboardText != NULL) {
+	    lengthValue = (unsigned int)strlen(x11wasm_externalClipboardText);
 	}
-	(void)XChangeProperty(&browserDisplay.display, requestor,
+	(void)XChangeProperty(&x11wasm_browserDisplay.display, requestor,
 		property, XA_INTEGER, 32, PropModeReplace,
 		(const unsigned char *)&lengthValue, 1);
 	return 1;
@@ -297,7 +297,7 @@ BrowserStoreExternalClipboardTarget(
 	    }
 	    return 0;
 	}
-	(void)XChangeProperty(&browserDisplay.display, requestor,
+	(void)XChangeProperty(&x11wasm_browserDisplay.display, requestor,
 		property, textProp.encoding, textProp.format,
 		PropModeReplace, (const unsigned char *)textProp.value,
 		(int)textProp.nitems);
@@ -326,7 +326,7 @@ BrowserConvertExternalClipboardMultiple(
     if ((property == None) || (BrowserWindowResource(requestor) == NULL)) {
 	return 0;
     }
-    if (XGetWindowProperty(&browserDisplay.display, requestor, property, 0,
+    if (XGetWindowProperty(&x11wasm_browserDisplay.display, requestor, property, 0,
 	    (long)(LONG_MAX / 4L), False, BrowserAtomPairAtom(), &actualType,
 	    &actualFormat, &nitems, &bytesAfter, &data) != Success) {
 	goto cleanup;
@@ -347,7 +347,7 @@ BrowserConvertExternalClipboardMultiple(
 	    pairs[i + 1UL] = (unsigned int)None;
 	}
     }
-    (void)XChangeProperty(&browserDisplay.display, requestor, property,
+    (void)XChangeProperty(&x11wasm_browserDisplay.display, requestor, property,
 	    BrowserAtomPairAtom(), 32, PropModeReplace, data, (int)nitems);
     ok = 1;
 
@@ -369,7 +369,7 @@ BrowserConvertExternalClipboardSelection(
     Atom effectiveProperty = property;
 
     if ((selection != BrowserClipboardSelectionAtom())
-	    || !externalClipboardAvailable) {
+	    || !x11wasm_externalClipboardAvailable) {
 	return 0;
     }
     if (target == BrowserMultipleAtom()) {
@@ -402,16 +402,16 @@ BrowserFailQueuedSelectionRequestsForOwner(
     if (owner == None) {
 	return;
     }
-    for (offset = 0; offset < eventQueueCount; offset++) {
-	int index = (eventQueueHead + offset) % eventQueueCapacity;
+    for (offset = 0; offset < x11wasm_eventQueueCount; offset++) {
+	int index = (x11wasm_eventQueueHead + offset) % x11wasm_eventQueueCapacity;
 	XSelectionRequestEvent request;
 	XEvent notify;
 
-	if ((eventQueue[index].event.type != SelectionRequest)
-		|| (eventQueue[index].event.xselectionrequest.owner != owner)) {
+	if ((x11wasm_eventQueue[index].event.type != SelectionRequest)
+		|| (x11wasm_eventQueue[index].event.xselectionrequest.owner != owner)) {
 	    continue;
 	}
-	request = eventQueue[index].event.xselectionrequest;
+	request = x11wasm_eventQueue[index].event.xselectionrequest;
 	BrowserSetCommonEventFields(&notify, SelectionNotify, request.requestor,
 		request.time);
 	notify.xselection.requestor = request.requestor;
@@ -419,7 +419,7 @@ BrowserFailQueuedSelectionRequestsForOwner(
 	notify.xselection.target = request.target;
 	notify.xselection.property = None;
 	notify.xselection.time = BrowserSelectionEventTime(request.time);
-	eventQueue[index].event = notify;
+	x11wasm_eventQueue[index].event = notify;
     }
     BrowserUpdateQueueLength();
 }
@@ -453,7 +453,7 @@ BrowserPopEvent(
     XEvent *eventPtr,
     int *internalPtr)
 {
-    return BrowserTakeQueuedEvent(&browserDisplay.display, NULL, NULL, 1,
+    return BrowserTakeQueuedEvent(&x11wasm_browserDisplay.display, NULL, NULL, 1,
 	    eventPtr, internalPtr);
 }
 
@@ -461,8 +461,8 @@ void
 BrowserClearEventQueue(void)
 {
     BrowserClearCompositionPayloads();
-    eventQueueHead = 0;
-    eventQueueCount = 0;
+    x11wasm_eventQueueHead = 0;
+    x11wasm_eventQueueCount = 0;
     BrowserUpdateQueueLength();
 }
 
@@ -602,7 +602,7 @@ BrowserPointerGrabAllowsEvent(
 {
     long eventMask;
 
-    if (!BrowserWindowCanReceiveEvents(browserDisplay.pointerGrabWindow)) {
+    if (!BrowserWindowCanReceiveEvents(x11wasm_browserDisplay.pointerGrabWindow)) {
 	return 1;
     }
     switch (eventPtr != NULL ? eventPtr->type : 0) {
@@ -619,12 +619,12 @@ BrowserPointerGrabAllowsEvent(
     if (eventMask == NoEventMask) {
 	return 1;
     }
-    if (browserDisplay.pointerGrabOwnerEvents
+    if (x11wasm_browserDisplay.pointerGrabOwnerEvents
 	    && (BrowserSelectedEventTarget(BrowserEventWindow(eventPtr),
 		    eventMask, 1) != None)) {
 	return 1;
     }
-    return (browserDisplay.pointerGrabEventMask & eventMask) != 0;
+    return (x11wasm_browserDisplay.pointerGrabEventMask & eventMask) != 0;
 }
 
 int
@@ -679,19 +679,19 @@ BrowserSendEventTarget(
 
     BrowserInitDisplay();
     if (window == PointerWindow) {
-	Window pointerWindow = browserDisplay.pointerWindow;
+	Window pointerWindow = x11wasm_browserDisplay.pointerWindow;
 
 	if (!BrowserWindowCanReceiveEvents(pointerWindow)) {
-	    pointerWindow = BrowserHitTestRoot(browserDisplay.pointerX,
-		    browserDisplay.pointerY, NULL, NULL);
+	    pointerWindow = BrowserHitTestRoot(x11wasm_browserDisplay.pointerX,
+		    x11wasm_browserDisplay.pointerY, NULL, NULL);
 	}
 	window = BrowserWindowCanReceiveEvents(pointerWindow)
-		? pointerWindow : browserDisplay.rootWindow;
+		? pointerWindow : x11wasm_browserDisplay.rootWindow;
     } else if (window == InputFocus) {
-	Window focusWindow = browserDisplay.focusWindow;
+	Window focusWindow = x11wasm_browserDisplay.focusWindow;
 
 	window = BrowserWindowCanReceiveEvents(focusWindow)
-		? focusWindow : browserDisplay.rootWindow;
+		? focusWindow : x11wasm_browserDisplay.rootWindow;
     } else {
 	window = BrowserResolveEventWindow(window);
     }
@@ -708,7 +708,7 @@ BrowserSendEventTarget(
 	if (resourcePtr->atts.do_not_propagate_mask & eventMask) {
 	    return None;
 	}
-	if (resourcePtr->id == browserDisplay.rootWindow) {
+	if (resourcePtr->id == x11wasm_browserDisplay.rootWindow) {
 	    break;
 	}
     }
@@ -739,7 +739,7 @@ BrowserSelectedEventTarget(
 	if (resourcePtr->atts.do_not_propagate_mask & eventMask) {
 	    return None;
 	}
-	if (resourcePtr->id == browserDisplay.rootWindow) {
+	if (resourcePtr->id == x11wasm_browserDisplay.rootWindow) {
 	    break;
 	}
     }
@@ -775,32 +775,32 @@ BrowserTakeQueuedEvent(
 	display = X11WasmGetDisplay(NULL);
     }
     BrowserInitDisplay();
-    for (offset = 0; offset < eventQueueCount; offset++) {
-	int index = (eventQueueHead + offset) % eventQueueCapacity;
+    for (offset = 0; offset < x11wasm_eventQueueCount; offset++) {
+	int index = (x11wasm_eventQueueHead + offset) % x11wasm_eventQueueCapacity;
 
 	if ((predicate != NULL)
-		&& !predicate(display, &eventQueue[index].event, arg)) {
+		&& !predicate(display, &x11wasm_eventQueue[index].event, arg)) {
 	    continue;
 	}
 	if (eventPtr != NULL) {
-	    *eventPtr = eventQueue[index].event;
+	    *eventPtr = x11wasm_eventQueue[index].event;
 	}
 	if (internalPtr != NULL) {
-	    *internalPtr = eventQueue[index].internal;
+	    *internalPtr = x11wasm_eventQueue[index].internal;
 	}
 	if (remove) {
 	    if (offset == 0) {
-		eventQueueHead = (eventQueueHead + 1) % eventQueueCapacity;
+		x11wasm_eventQueueHead = (x11wasm_eventQueueHead + 1) % x11wasm_eventQueueCapacity;
 	    } else {
-		while (offset < eventQueueCount - 1) {
-		    int dest = (eventQueueHead + offset) % eventQueueCapacity;
-		    int src = (eventQueueHead + offset + 1) % eventQueueCapacity;
+		while (offset < x11wasm_eventQueueCount - 1) {
+		    int dest = (x11wasm_eventQueueHead + offset) % x11wasm_eventQueueCapacity;
+		    int src = (x11wasm_eventQueueHead + offset + 1) % x11wasm_eventQueueCapacity;
 
-		    eventQueue[dest] = eventQueue[src];
+		    x11wasm_eventQueue[dest] = x11wasm_eventQueue[src];
 		    offset++;
 		}
 	    }
-	    eventQueueCount--;
+	    x11wasm_eventQueueCount--;
 	}
 	BrowserUpdateQueueLength();
 	return 1;
@@ -825,7 +825,7 @@ BrowserPopMatchingEvent(
 
     match[0] = (long)window;
     match[1] = mask;
-    return BrowserTakeQueuedEvent(&browserDisplay.display,
+    return BrowserTakeQueuedEvent(&x11wasm_browserDisplay.display,
 	    BrowserWindowMaskQueuedEvent, (XPointer)match, 1, eventPtr, NULL);
 }
 
@@ -840,7 +840,7 @@ BrowserWindowRootOffset(
     X11WasmResource *resourcePtr;
 
     for (resourcePtr = X11WasmFindResource(window);
-	    resourcePtr != NULL && resourcePtr->id != browserDisplay.rootWindow;
+	    resourcePtr != NULL && resourcePtr->id != x11wasm_browserDisplay.rootWindow;
 	    resourcePtr = X11WasmFindResource(resourcePtr->parent)) {
 	x += resourcePtr->x;
 	y += resourcePtr->y;
@@ -1011,13 +1011,13 @@ BrowserStackingResource(
     while ((currentPtr != NULL) && (guard++ < 1024)) {
 	X11WasmResource *parentPtr;
 
-	if (currentPtr->parent == browserDisplay.rootWindow) {
+	if (currentPtr->parent == x11wasm_browserDisplay.rootWindow) {
 	    break;
 	}
 	parentPtr = (currentPtr->parentPtr != NULL)
 		? currentPtr->parentPtr : BrowserWindowResource(currentPtr->parent);
 	if ((parentPtr == NULL) || (parentPtr->type != X11_WASM_RESOURCE_WINDOW)
-		|| (parentPtr->id == browserDisplay.rootWindow)) {
+		|| (parentPtr->id == x11wasm_browserDisplay.rootWindow)) {
 	    break;
 	}
 	currentPtr = parentPtr;
@@ -1149,14 +1149,14 @@ BrowserSyncTransientStacking(void)
     int resourceCount = 0;
     int pass;
 
-    for (resourcePtr = browserDisplay.resourceList; resourcePtr != NULL;
+    for (resourcePtr = x11wasm_browserDisplay.resourceList; resourcePtr != NULL;
 	    resourcePtr = resourcePtr->nextPtr) {
 	resourceCount++;
     }
     for (pass = 0; pass < resourceCount; pass++) {
 	int changed = 0;
 
-	for (resourcePtr = browserDisplay.resourceList; resourcePtr != NULL;
+	for (resourcePtr = x11wasm_browserDisplay.resourceList; resourcePtr != NULL;
 		resourcePtr = resourcePtr->nextPtr) {
 	    Window transientFor = BrowserWindowTransientFor(resourcePtr);
 	    X11WasmResource *parentPtr;
@@ -1210,7 +1210,7 @@ BrowserRestackWindow(
 
     if ((resourcePtr == NULL)
 	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)
-	    || (resourcePtr->id == browserDisplay.rootWindow)) {
+	    || (resourcePtr->id == x11wasm_browserDisplay.rootWindow)) {
 	return;
     }
     parentPtr = BrowserWindowResource(resourcePtr->parent);
@@ -1376,7 +1376,7 @@ BrowserResourceIsVisible(
 		&& !resourcePtr->mapped) {
 	    return 0;
 	}
-	if (resourcePtr->id == browserDisplay.rootWindow) {
+	if (resourcePtr->id == x11wasm_browserDisplay.rootWindow) {
 	    return 1;
 	}
 	resourcePtr = (resourcePtr->parentPtr != NULL)
@@ -1425,7 +1425,7 @@ BrowserHitTestRoot(
     int y = rootY;
 
     BrowserInitDisplay();
-    resourcePtr = &browserDisplay.rootResource;
+    resourcePtr = &x11wasm_browserDisplay.rootResource;
     while ((childPtr = BrowserFindTopVisibleChildAt(resourcePtr, x, y))
 	    != NULL) {
 	x -= childPtr->x;
@@ -1475,10 +1475,10 @@ BrowserClampPointerToGrabConfine(
     long rootY;
 
     if ((rootXPtr == NULL) || (rootYPtr == NULL)
-	    || (browserDisplay.pointerGrabConfineWindow == None)) {
+	    || (x11wasm_browserDisplay.pointerGrabConfineWindow == None)) {
 	return;
     }
-    resourcePtr = BrowserWindowResource(browserDisplay.pointerGrabConfineWindow);
+    resourcePtr = BrowserWindowResource(x11wasm_browserDisplay.pointerGrabConfineWindow);
     if ((resourcePtr == NULL) || !BrowserResourceIsVisible(resourcePtr)) {
 	return;
     }
@@ -1531,7 +1531,7 @@ X11WasmResource *
 BrowserWindowParentResource(
     X11WasmResource *resourcePtr)
 {
-    if ((resourcePtr == NULL) || (resourcePtr->id == browserDisplay.rootWindow)) {
+    if ((resourcePtr == NULL) || (resourcePtr->id == x11wasm_browserDisplay.rootWindow)) {
 	return NULL;
     }
     if (resourcePtr->parentPtr != NULL) {
@@ -1547,7 +1547,7 @@ BrowserWindowTreeDepth(
     int depth = 0;
 
     while ((resourcePtr != NULL)
-	    && (resourcePtr->id != browserDisplay.rootWindow)) {
+	    && (resourcePtr->id != x11wasm_browserDisplay.rootWindow)) {
 	resourcePtr = BrowserWindowParentResource(resourcePtr);
 	depth++;
     }
@@ -1623,7 +1623,7 @@ BrowserWindowInTree(
 	return 1;
     }
     for (resourcePtr = X11WasmFindResource(window);
-	    resourcePtr != NULL && resourcePtr->id != browserDisplay.rootWindow;
+	    resourcePtr != NULL && resourcePtr->id != x11wasm_browserDisplay.rootWindow;
 	    resourcePtr = X11WasmFindResource(resourcePtr->parent)) {
 	if (resourcePtr->parent == ancestor) {
 	    return 1;
@@ -1648,16 +1648,16 @@ BrowserResolvePointerEventWindow(
     (void)window;
     BrowserInitDisplay();
     rawTarget = BrowserHitTestRoot(rootX, rootY, NULL, NULL);
-    grabWindow = browserDisplay.pointerGrabWindow;
+    grabWindow = x11wasm_browserDisplay.pointerGrabWindow;
     hasGrab = BrowserWindowCanReceiveEvents(grabWindow);
 
     target = rawTarget;
-    if (hasGrab && !browserDisplay.pointerGrabOwnerEvents) {
+    if (hasGrab && !x11wasm_browserDisplay.pointerGrabOwnerEvents) {
 	target = grabWindow;
     } else if (!hasGrab
 	    && BrowserWindowCanReceiveEvents(
-		    browserDisplay.pointerCaptureWindow)) {
-	target = browserDisplay.pointerCaptureWindow;
+		    x11wasm_browserDisplay.pointerCaptureWindow)) {
+	target = x11wasm_browserDisplay.pointerCaptureWindow;
     }
     if (!BrowserWindowCanReceiveEvents(target)) {
 	target = BrowserResolveEventWindow(target);
@@ -1677,10 +1677,10 @@ BrowserUpdatePointerState(
     int rootY,
     unsigned int state)
 {
-    browserDisplay.pointerWindow = window;
-    browserDisplay.pointerX = rootX;
-    browserDisplay.pointerY = rootY;
-    browserDisplay.pointerState = state;
+    x11wasm_browserDisplay.pointerWindow = window;
+    x11wasm_browserDisplay.pointerX = rootX;
+    x11wasm_browserDisplay.pointerY = rootY;
+    x11wasm_browserDisplay.pointerState = state;
     BrowserSyncPointerState();
 }
 
@@ -1698,11 +1698,11 @@ BrowserUpdateKeymapState(
     index = keycode >> 3;
     mask = (unsigned char)(1U << (keycode & 7U));
     if (pressed) {
-	browserDisplay.keymap[index] =
-		(char)((unsigned char)browserDisplay.keymap[index] | mask);
+	x11wasm_browserDisplay.keymap[index] =
+		(char)((unsigned char)x11wasm_browserDisplay.keymap[index] | mask);
     } else {
-	browserDisplay.keymap[index] =
-		(char)((unsigned char)browserDisplay.keymap[index] & ~mask);
+	x11wasm_browserDisplay.keymap[index] =
+		(char)((unsigned char)x11wasm_browserDisplay.keymap[index] & ~mask);
     }
 }
 
@@ -1719,9 +1719,9 @@ BrowserResolvePinnedKeyEventWindow(
     }
     target = window;
 
-    grabWindow = browserDisplay.keyboardGrabWindow;
+    grabWindow = x11wasm_browserDisplay.keyboardGrabWindow;
     if (BrowserWindowCanReceiveEvents(grabWindow)) {
-	grabOwnerEvents = browserDisplay.keyboardGrabOwnerEvents;
+	grabOwnerEvents = x11wasm_browserDisplay.keyboardGrabOwnerEvents;
     } else {
 	grabWindow = BrowserGetGrabWindow();
 	grabOwnerEvents = 1;
@@ -1777,9 +1777,9 @@ BrowserQueueKeyEventFieldsToTarget(
     BrowserWindowCoordinatesFromRoot(target, rootX, rootY, &x, &y);
 
     BrowserSetCommonEventFields(&event, type, target, (Time)time);
-    event.xkey.root = browserDisplay.rootWindow;
+    event.xkey.root = x11wasm_browserDisplay.rootWindow;
     event.xkey.subwindow = None;
-    event.xkey.time = eventTime;
+    event.xkey.time = x11wasm_eventTime;
     event.xkey.x = x;
     event.xkey.y = y;
     event.xkey.x_root = rootX;
@@ -1794,8 +1794,8 @@ BrowserQueueKeyEventFieldsToTarget(
     event.xkey.keycode = resolvedKeycode;
     event.xkey.same_screen = True;
     BrowserUpdateKeymapState(resolvedKeycode, type == KeyPress);
-    forceTarget = BrowserWindowCanReceiveEvents(browserDisplay.keyboardGrabWindow)
-	    && !browserDisplay.keyboardGrabOwnerEvents;
+    forceTarget = BrowserWindowCanReceiveEvents(x11wasm_browserDisplay.keyboardGrabWindow)
+	    && !x11wasm_browserDisplay.keyboardGrabOwnerEvents;
     deliveryTarget = forceTarget ? target
 	    : BrowserSelectedEventTarget(target, BrowserEventMask(&event), 1);
     if (deliveryTarget == None) {

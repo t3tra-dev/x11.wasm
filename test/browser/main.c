@@ -3,6 +3,14 @@
 #include <X11/XlibWasm.h>
 #include <emscripten.h>
 
+/* These application symbols must not collide with Xlib's private state. */
+int errorHandler;
+int eventQueue;
+int atomList;
+int localeModifiers;
+int browserDisplay;
+int damageSerial;
+
 static void
 SetStatus(
     const char *text)

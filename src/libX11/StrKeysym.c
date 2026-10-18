@@ -71,10 +71,10 @@ BrowserFindExtension(
     if (name == NULL) {
 	return NULL;
     }
-    for (i = 0; i < browserExtensionCount;
+    for (i = 0; i < x11wasm_browserExtensionCount;
 	    i++) {
-	if (strcmp(name, browserExtensions[i].name) == 0) {
-	    return &browserExtensions[i];
+	if (strcmp(name, x11wasm_browserExtensions[i].name) == 0) {
+	    return &x11wasm_browserExtensions[i];
 	}
     }
     return NULL;
@@ -237,9 +237,9 @@ BrowserReportXError(
 
     BrowserInitDisplay();
     if (display == NULL) {
-	display = &browserDisplay.display;
+	display = &x11wasm_browserDisplay.display;
     }
-    handler = (errorHandler != NULL) ? errorHandler : BrowserDefaultErrorHandler;
+    handler = (x11wasm_errorHandler != NULL) ? x11wasm_errorHandler : BrowserDefaultErrorHandler;
     memset(&event, 0, sizeof(event));
     event.display = display;
     event.resourceid = resourceId;
@@ -257,14 +257,14 @@ BrowserTestXErrorHandler(
     XErrorEvent *eventPtr)
 {
     (void)display;
-    browserTestXErrorCount++;
-    browserTestLastErrorCode = eventPtr->error_code;
-    browserTestLastRequestCode = eventPtr->request_code;
-    browserTestLastResourceId = eventPtr->resourceid;
-    browserTestLastSerial = eventPtr->serial;
-    browserTestRequestCodeSum += eventPtr->request_code;
+    x11wasm_browserTestXErrorCount++;
+    x11wasm_browserTestLastErrorCode = eventPtr->error_code;
+    x11wasm_browserTestLastRequestCode = eventPtr->request_code;
+    x11wasm_browserTestLastResourceId = eventPtr->resourceid;
+    x11wasm_browserTestLastSerial = eventPtr->serial;
+    x11wasm_browserTestRequestCodeSum += eventPtr->request_code;
     if (eventPtr->request_code < 64) {
-	browserTestRequestCodeMask |= 1ULL << eventPtr->request_code;
+	x11wasm_browserTestRequestCodeMask |= 1ULL << eventPtr->request_code;
     }
     return 0;
 }
@@ -274,7 +274,7 @@ BrowserTestXIOErrorHandler(
     Display *display)
 {
     (void)display;
-    browserTestXIOErrorCount++;
+    x11wasm_browserTestXIOErrorCount++;
     return 0;
 }
 
@@ -284,10 +284,10 @@ BrowserTestIMInstantiateCallback(
     XPointer clientData,
     XPointer callData)
 {
-    browserTestIMInstantiateCount++;
-    browserTestIMInstantiateDisplay = display;
-    browserTestIMInstantiateClientData = clientData;
-    browserTestIMInstantiateCallData = callData;
+    x11wasm_browserTestIMInstantiateCount++;
+    x11wasm_browserTestIMInstantiateDisplay = display;
+    x11wasm_browserTestIMInstantiateClientData = clientData;
+    x11wasm_browserTestIMInstantiateCallData = callData;
     (void)XUnregisterIMInstantiateCallback(display, NULL, NULL, NULL,
 	    BrowserTestIMInstantiateCallback, clientData);
 }
@@ -298,10 +298,10 @@ BrowserTestIMDestroyCallback(
     XPointer clientData,
     XPointer callData)
 {
-    browserTestIMDestroyCount++;
-    browserTestIMDestroyMethod = inputMethod;
-    browserTestIMDestroyClientData = clientData;
-    browserTestIMDestroyCallData = callData;
+    x11wasm_browserTestIMDestroyCount++;
+    x11wasm_browserTestIMDestroyMethod = inputMethod;
+    x11wasm_browserTestIMDestroyClientData = clientData;
+    x11wasm_browserTestIMDestroyCallData = callData;
 }
 
 int
@@ -505,7 +505,7 @@ BrowserColormapOrError(
 	}
     }
     if (((colormap == None) && allowNone)
-	    || (colormap == browserDisplay.defaultColormap)) {
+	    || (colormap == x11wasm_browserDisplay.defaultColormap)) {
 	return 1;
     }
     resourcePtr = X11WasmFindResource((XID)colormap);
@@ -527,7 +527,7 @@ BrowserTrackedGC(
     if (gc == NULL) {
 	return NULL;
     }
-    for (gcPtr = gcList; gcPtr != NULL; gcPtr = gcPtr->nextPtr) {
+    for (gcPtr = x11wasm_gcList; gcPtr != NULL; gcPtr = gcPtr->nextPtr) {
 	if (gcPtr->gc == gc) {
 	    return gcPtr;
 	}
@@ -544,7 +544,7 @@ BrowserTrackedGCForGContext(
     if (gcontext == None) {
 	return NULL;
     }
-    for (gcPtr = gcList; gcPtr != NULL; gcPtr = gcPtr->nextPtr) {
+    for (gcPtr = x11wasm_gcList; gcPtr != NULL; gcPtr = gcPtr->nextPtr) {
 	if (gcPtr->gcontext == gcontext) {
 	    return gcPtr;
 	}
@@ -559,9 +559,9 @@ BrowserGCDepth(
     X11WasmTrackedGC *gcPtr;
 
     BrowserInitDisplay();
-    if (gc == &browserDisplay.defaultGC) {
-	return (unsigned int)DefaultDepth(&browserDisplay.display,
-		DefaultScreen(&browserDisplay.display));
+    if (gc == &x11wasm_browserDisplay.defaultGC) {
+	return (unsigned int)DefaultDepth(&x11wasm_browserDisplay.display,
+		DefaultScreen(&x11wasm_browserDisplay.display));
     }
     gcPtr = BrowserTrackedGC(gc);
     return (gcPtr != NULL) ? gcPtr->depth : 0U;
@@ -574,8 +574,8 @@ BrowserGCContext(
     X11WasmTrackedGC *gcPtr;
 
     BrowserInitDisplay();
-    if (gc == &browserDisplay.defaultGC) {
-	return browserDisplay.defaultGCContext;
+    if (gc == &x11wasm_browserDisplay.defaultGC) {
+	return x11wasm_browserDisplay.defaultGCContext;
     }
     gcPtr = BrowserTrackedGC(gc);
     return (gcPtr != NULL) ? gcPtr->gcontext : None;
@@ -596,18 +596,18 @@ BrowserRegisterGC(
     gcPtr->gc = gc;
     gcPtr->gcontext = gcontext;
     gcPtr->depth = depth;
-    gcPtr->clientSerial = browserDisplay.currentClientSerial;
+    gcPtr->clientSerial = x11wasm_browserDisplay.currentClientSerial;
     gcPtr->retained = 0;
     gcPtr->temporary = 0;
-    gcPtr->nextPtr = gcList;
-    gcList = gcPtr;
+    gcPtr->nextPtr = x11wasm_gcList;
+    x11wasm_gcList = gcPtr;
 }
 
 int
 BrowserUnregisterGC(
     GC gc)
 {
-    X11WasmTrackedGC **linkPtr = &gcList;
+    X11WasmTrackedGC **linkPtr = &x11wasm_gcList;
 
     while (*linkPtr != NULL) {
 	X11WasmTrackedGC *gcPtr = *linkPtr;
@@ -643,7 +643,7 @@ BrowserIsKnownGC(
 	return 0;
     }
     BrowserInitDisplay();
-    if (gc == &browserDisplay.defaultGC) {
+    if (gc == &x11wasm_browserDisplay.defaultGC) {
 	return 1;
     }
     return BrowserTrackedGC(gc) != NULL;
@@ -1221,8 +1221,8 @@ BrowserSyncHostAccessControl(void)
     int i;
 
     X11WasmDStringInit(&hosts);
-    for (i = 0; i < browserDisplay.hostCount; i++) {
-	X11WasmHostEntry *hostPtr = &browserDisplay.hosts[i];
+    for (i = 0; i < x11wasm_browserDisplay.hostCount; i++) {
+	X11WasmHostEntry *hostPtr = &x11wasm_browserDisplay.hosts[i];
 	char prefix[64];
 	int j;
 
@@ -1237,16 +1237,16 @@ BrowserSyncHostAccessControl(void)
 		    (unsigned char)hostPtr->address[j]);
 	}
     }
-    (void)X11WasmJsSetHostAccessControl(browserDisplay.hostAccessEnabled,
+    (void)X11WasmJsSetHostAccessControl(x11wasm_browserDisplay.hostAccessEnabled,
 	    X11WasmDStringValue(&hosts), X11WasmDStringLength(&hosts),
-	    browserDisplay.hostCount);
+	    x11wasm_browserDisplay.hostCount);
     X11WasmDStringFree(&hosts);
 }
 
 void
 BrowserSyncServerGrabState(void)
 {
-    (void)X11WasmJsSetServerGrabState(browserDisplay.serverGrabDepth);
+    (void)X11WasmJsSetServerGrabState(x11wasm_browserDisplay.serverGrabDepth);
 }
 
 int
@@ -1473,15 +1473,15 @@ BrowserRememberKeycode(
     KeySym keySym)
 {
     if ((keycode <= X11_WASM_MAX_KEYCODE) && (keySym != NoSymbol)) {
-	if (browserDisplay.keycodeMapExplicit[keycode]) {
+	if (x11wasm_browserDisplay.keycodeMapExplicit[keycode]) {
 	    return;
 	}
-	if (browserDisplay.keycodeMap[keycode][0] == keySym) {
+	if (x11wasm_browserDisplay.keycodeMap[keycode][0] == keySym) {
 	    return;
 	}
-	browserDisplay.keycodeMap[keycode][0] = keySym;
-	browserDisplay.keycodeMap[keycode][1] = NoSymbol;
-	browserDisplay.keyboardMapSerial++;
+	x11wasm_browserDisplay.keycodeMap[keycode][0] = keySym;
+	x11wasm_browserDisplay.keycodeMap[keycode][1] = NoSymbol;
+	x11wasm_browserDisplay.keyboardMapSerial++;
     }
 }
 
@@ -1502,13 +1502,13 @@ BrowserSetKeycodeMapping(
 	KeySym keySym = (level < keysymsPerKeycode)
 		? keysyms[level] : NoSymbol;
 
-	if (browserDisplay.keycodeMap[keycode][level] != keySym) {
-	    browserDisplay.keycodeMap[keycode][level] = keySym;
+	if (x11wasm_browserDisplay.keycodeMap[keycode][level] != keySym) {
+	    x11wasm_browserDisplay.keycodeMap[keycode][level] = keySym;
 	    changed = 1;
 	}
     }
-    if (!browserDisplay.keycodeMapExplicit[keycode]) {
-	browserDisplay.keycodeMapExplicit[keycode] = 1;
+    if (!x11wasm_browserDisplay.keycodeMapExplicit[keycode]) {
+	x11wasm_browserDisplay.keycodeMapExplicit[keycode] = 1;
 	changed = 1;
     }
     return changed;
@@ -1536,12 +1536,12 @@ BrowserClearKeycodeRange(
 	last = X11_WASM_MAX_KEYCODE;
     }
     for (keycode = first; keycode <= last; keycode++) {
-	if (!browserDisplay.keycodeMapExplicit[keycode]) {
-	    browserDisplay.keycodeMap[keycode][0] = NoSymbol;
-	    browserDisplay.keycodeMap[keycode][1] = NoSymbol;
+	if (!x11wasm_browserDisplay.keycodeMapExplicit[keycode]) {
+	    x11wasm_browserDisplay.keycodeMap[keycode][0] = NoSymbol;
+	    x11wasm_browserDisplay.keycodeMap[keycode][1] = NoSymbol;
 	}
     }
-    browserDisplay.keyboardMapSerial++;
+    x11wasm_browserDisplay.keyboardMapSerial++;
 }
 
 unsigned int
@@ -1612,11 +1612,11 @@ BrowserKnownKeySymForKeycode(
 unsigned int
 BrowserNextSyntheticKeycode(void)
 {
-    unsigned int keycode = browserDisplay.nextSyntheticKeycode;
+    unsigned int keycode = x11wasm_browserDisplay.nextSyntheticKeycode;
 
-    browserDisplay.nextSyntheticKeycode++;
-    if (browserDisplay.nextSyntheticKeycode > X11_WASM_MAX_KEYCODE) {
-	browserDisplay.nextSyntheticKeycode = X11_WASM_SYNTHETIC_KEYCODE_START;
+    x11wasm_browserDisplay.nextSyntheticKeycode++;
+    if (x11wasm_browserDisplay.nextSyntheticKeycode > X11_WASM_MAX_KEYCODE) {
+	x11wasm_browserDisplay.nextSyntheticKeycode = X11_WASM_SYNTHETIC_KEYCODE_START;
     }
     return keycode;
 }
@@ -1822,8 +1822,8 @@ BrowserKeySymForKeycodeLevel(
 	return NoSymbol;
     }
     if ((keycode <= X11_WASM_MAX_KEYCODE)
-	    && browserDisplay.keycodeMapExplicit[keycode]) {
-	return browserDisplay.keycodeMap[keycode][index];
+	    && x11wasm_browserDisplay.keycodeMapExplicit[keycode]) {
+	return x11wasm_browserDisplay.keycodeMap[keycode][index];
     }
     if (baseKeySym != NoSymbol) {
 	if (index & 1) {
@@ -1841,8 +1841,8 @@ BrowserKeySymForKeycodeLevel(
     }
     if ((keycode <= X11_WASM_MAX_KEYCODE)
 	    && (index == 0)
-	    && (browserDisplay.keycodeMap[keycode][0] != NoSymbol)) {
-	return browserDisplay.keycodeMap[keycode][0];
+	    && (x11wasm_browserDisplay.keycodeMap[keycode][0] != NoSymbol)) {
+	return x11wasm_browserDisplay.keycodeMap[keycode][0];
     }
     if ((keycode >= X11_WASM_MIN_KEYCODE)
 	    && (keycode <= X11_WASM_MAX_KEYCODE)) {
@@ -1863,27 +1863,27 @@ BrowserKeycodeFromKeySym(
     }
     for (keycode = X11_WASM_MIN_KEYCODE; keycode <= X11_WASM_MAX_KEYCODE;
 	    keycode++) {
-	if (!browserDisplay.keycodeMapExplicit[keycode]) {
+	if (!x11wasm_browserDisplay.keycodeMapExplicit[keycode]) {
 	    continue;
 	}
 	for (level = 0; level < X11_WASM_KEYSYMS_PER_KEYCODE; level++) {
-	    if (browserDisplay.keycodeMap[keycode][level] == keySym) {
+	    if (x11wasm_browserDisplay.keycodeMap[keycode][level] == keySym) {
 		return keycode;
 	    }
 	}
     }
     for (keycode = X11_WASM_MIN_KEYCODE; keycode <= X11_WASM_MAX_KEYCODE;
 	    keycode++) {
-	if (browserDisplay.keycodeMapExplicit[keycode]) {
+	if (x11wasm_browserDisplay.keycodeMapExplicit[keycode]) {
 	    continue;
 	}
-	if (browserDisplay.keycodeMap[keycode][0] == keySym) {
+	if (x11wasm_browserDisplay.keycodeMap[keycode][0] == keySym) {
 	    return keycode;
 	}
     }
     keycode = BrowserKnownKeycodeForKeySym(keySym);
     if (keycode != 0) {
-	if (browserDisplay.keycodeMapExplicit[keycode]) {
+	if (x11wasm_browserDisplay.keycodeMapExplicit[keycode]) {
 	    return 0;
 	}
 	BrowserRememberKeycode(keycode, keySym);
@@ -1891,7 +1891,7 @@ BrowserKeycodeFromKeySym(
     }
     keycode = BrowserAsciiKeycodeFromKeySym(keySym);
     if (keycode != 0) {
-	if (browserDisplay.keycodeMapExplicit[keycode]) {
+	if (x11wasm_browserDisplay.keycodeMapExplicit[keycode]) {
 	    return 0;
 	}
 	BrowserRememberKeycode(keycode, keySym);
@@ -1903,7 +1903,7 @@ BrowserKeycodeFromKeySym(
 	    || (keycode > X11_WASM_MAX_KEYCODE)) {
 	keycode = BrowserNextSyntheticKeycode();
     }
-    if (browserDisplay.keycodeMapExplicit[keycode]) {
+    if (x11wasm_browserDisplay.keycodeMapExplicit[keycode]) {
 	return 0;
     }
     BrowserRememberKeycode(keycode, keySym);
@@ -2263,7 +2263,7 @@ BrowserFontPatternHasWildcards(
     return 0;
 }
 
-const char *const browserFontFallbackFamilies[] = {
+const char *const x11wasm_browserFontFallbackFamilies[] = {
     "fixed",
     "Helvetica",
     "Times",

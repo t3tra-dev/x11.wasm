@@ -63,14 +63,14 @@ BrowserModifierMaskForKeySym(
     unsigned int mask = 0;
     int modifier;
     int slot;
-    int maxKeyPerMod = browserDisplay.modifierMapMaxKeyPerMod;
+    int maxKeyPerMod = x11wasm_browserDisplay.modifierMapMaxKeyPerMod;
 
     if ((keySym == NoSymbol) || (maxKeyPerMod <= 0)) {
 	return 0;
     }
     for (modifier = 0; modifier < X11_WASM_MODIFIER_COUNT; modifier++) {
 	for (slot = 0; slot < maxKeyPerMod; slot++) {
-	    KeyCode keycode = browserDisplay.modifierMap[
+	    KeyCode keycode = x11wasm_browserDisplay.modifierMap[
 		    modifier * maxKeyPerMod + slot];
 
 	    if ((keycode != 0)
@@ -122,8 +122,8 @@ XRebindKeysym(
 	    | Mod1Mask | Mod2Mask | Mod3Mask | Mod4Mask | Mod5Mask);
     bindingPtr->string = copy;
     bindingPtr->length = bytesString;
-    bindingPtr->nextPtr = keyBindingList;
-    keyBindingList = bindingPtr;
+    bindingPtr->nextPtr = x11wasm_keyBindingList;
+    x11wasm_keyBindingList = bindingPtr;
     return Success;
 }
 
@@ -138,7 +138,7 @@ BrowserLookupReboundKeySym(
     unsigned int modifierState = state & (ShiftMask | LockMask | ControlMask
 	    | Mod1Mask | Mod2Mask | Mod3Mask | Mod4Mask | Mod5Mask);
 
-    for (bindingPtr = keyBindingList; bindingPtr != NULL;
+    for (bindingPtr = x11wasm_keyBindingList; bindingPtr != NULL;
 	    bindingPtr = bindingPtr->nextPtr) {
 	if ((bindingPtr->keySym == keySym)
 		&& (bindingPtr->state == modifierState)) {
@@ -311,7 +311,7 @@ BrowserDiscardICCompositionEvents(
     if (target == None) {
 	return;
     }
-    while (BrowserTakeQueuedEvent(&browserDisplay.display,
+    while (BrowserTakeQueuedEvent(&x11wasm_browserDisplay.display,
 	    BrowserCompositionQueuedEvent, (XPointer)(uintptr_t)target, 1,
 	    &event, NULL)) {
 	BrowserForgetCompositionPayload((unsigned long)event.xclient.data.l[2]);
@@ -327,18 +327,18 @@ BrowserUpdateFocusedICPreedit(
 {
     Window focusWindow;
 
-    if ((focusedInputContext == NULL) || !focusedInputContext->focused) {
+    if ((x11wasm_focusedInputContext == NULL) || !x11wasm_focusedInputContext->focused) {
 	return;
     }
-    focusWindow = BrowserInputContextWindow(focusedInputContext);
+    focusWindow = BrowserInputContextWindow(x11wasm_focusedInputContext);
     if ((focusWindow == None) || (target != focusWindow)) {
 	return;
     }
     if (phase == X11_WASM_COMPOSITION_END) {
-	BrowserClearICPreeditText(focusedInputContext);
+	BrowserClearICPreeditText(x11wasm_focusedInputContext);
     } else if ((phase == X11_WASM_COMPOSITION_START)
 	    || (phase == X11_WASM_COMPOSITION_UPDATE)) {
-	BrowserSetICPreeditText(focusedInputContext, utf8, utf8Length);
+	BrowserSetICPreeditText(x11wasm_focusedInputContext, utf8, utf8Length);
     }
 }
 
@@ -426,14 +426,14 @@ X11WasmTestXICLookupFocus(void)
     if (currentLocale == NULL) {
 	currentLocale = "C";
     }
-    savedLocaleModifiers = (localeModifiers != NULL)
-	    ? BrowserDupString(localeModifiers) : NULL;
+    savedLocaleModifiers = (x11wasm_localeModifiers != NULL)
+	    ? BrowserDupString(x11wasm_localeModifiers) : NULL;
     (void)XSetLocaleModifiers("@im=x11wasm");
-    inputMethod = XOpenIM(&browserDisplay.display, NULL, NULL, NULL);
+    inputMethod = XOpenIM(&x11wasm_browserDisplay.display, NULL, NULL, NULL);
     if (inputMethod == NULL) {
 	goto cleanup;
     }
-    if ((XDisplayOfIM(inputMethod) != &browserDisplay.display)
+    if ((XDisplayOfIM(inputMethod) != &x11wasm_browserDisplay.display)
 	    || (XDisplayOfIM(NULL) != NULL)
 	    || (XLocaleOfIM(inputMethod) == NULL)
 	    || (strcmp(XLocaleOfIM(inputMethod), currentLocale) != 0)
@@ -442,8 +442,8 @@ X11WasmTestXICLookupFocus(void)
     }
     inputContext = XCreateIC(inputMethod,
 	    XNInputStyle, XIMPreeditNothing | XIMStatusNothing,
-	    XNClientWindow, browserDisplay.rootWindow,
-	    XNFocusWindow, browserDisplay.rootWindow,
+	    XNClientWindow, x11wasm_browserDisplay.rootWindow,
+	    XNFocusWindow, x11wasm_browserDisplay.rootWindow,
 	    NULL);
     if (inputContext == NULL) {
 	goto cleanup;
@@ -456,8 +456,8 @@ X11WasmTestXICLookupFocus(void)
     }
     memset(&lookupEvent, 0, sizeof(lookupEvent));
     lookupEvent.type = KeyPress;
-    lookupEvent.display = &browserDisplay.display;
-    lookupEvent.window = browserDisplay.rootWindow;
+    lookupEvent.display = &x11wasm_browserDisplay.display;
+    lookupEvent.window = x11wasm_browserDisplay.rootWindow;
     lookupEvent.keycode = BrowserKeycodeFromKeySym(XK_a);
 
     lookupSym = XK_a;
@@ -481,12 +481,12 @@ X11WasmTestXICLookupFocus(void)
     XSetICFocus(inputContext);
     BrowserClearEventQueue();
     if (!X11WasmQueueCompositionEvent(X11_WASM_COMPOSITION_UPDATE,
-	    (unsigned int)browserDisplay.rootWindow, utf8Preedit, -1)) {
+	    (unsigned int)x11wasm_browserDisplay.rootWindow, utf8Preedit, -1)) {
 	goto cleanup;
     }
     resetUtf8 = Xutf8ResetIC(inputContext);
     if ((resetUtf8 == NULL) || (strcmp(resetUtf8, utf8Preedit) != 0)
-	    || (XEventsQueued(&browserDisplay.display, QueuedAlready) != 0)) {
+	    || (XEventsQueued(&x11wasm_browserDisplay.display, QueuedAlready) != 0)) {
 	goto cleanup;
     }
     XFree(resetUtf8);
@@ -495,18 +495,18 @@ X11WasmTestXICLookupFocus(void)
 	goto cleanup;
     }
     if (!X11WasmQueueCompositionEvent(X11_WASM_COMPOSITION_UPDATE,
-	    (unsigned int)browserDisplay.rootWindow, mbPreedit, -1)) {
+	    (unsigned int)x11wasm_browserDisplay.rootWindow, mbPreedit, -1)) {
 	goto cleanup;
     }
     resetMb = XmbResetIC(inputContext);
     if ((resetMb == NULL) || (strcmp(resetMb, mbPreedit) != 0)
-	    || (XEventsQueued(&browserDisplay.display, QueuedAlready) != 0)) {
+	    || (XEventsQueued(&x11wasm_browserDisplay.display, QueuedAlready) != 0)) {
 	goto cleanup;
     }
     XFree(resetMb);
     resetMb = NULL;
     if (!X11WasmQueueCompositionEvent(X11_WASM_COMPOSITION_UPDATE,
-	    (unsigned int)browserDisplay.rootWindow, widePreedit, -1)) {
+	    (unsigned int)x11wasm_browserDisplay.rootWindow, widePreedit, -1)) {
 	goto cleanup;
     }
     resetWide = XwcResetIC(inputContext);
@@ -515,20 +515,20 @@ X11WasmTestXICLookupFocus(void)
 	    || (resetWide[3] != L'e') || (resetWide[4] != L' ')
 	    || (resetWide[5] != (wchar_t)0x3044)
 	    || (resetWide[6] != L'\0')
-	    || (XEventsQueued(&browserDisplay.display, QueuedAlready) != 0)) {
+	    || (XEventsQueued(&x11wasm_browserDisplay.display, QueuedAlready) != 0)) {
 	goto cleanup;
     }
     XFree(resetWide);
     resetWide = NULL;
     if (!X11WasmQueueCompositionEvent(X11_WASM_COMPOSITION_UPDATE,
-	    (unsigned int)browserDisplay.rootWindow, utf8Preedit, -1)
+	    (unsigned int)x11wasm_browserDisplay.rootWindow, utf8Preedit, -1)
 	    || !X11WasmQueueCompositionEvent(X11_WASM_COMPOSITION_END,
-		    (unsigned int)browserDisplay.rootWindow, "final", -1)) {
+		    (unsigned int)x11wasm_browserDisplay.rootWindow, "final", -1)) {
 	goto cleanup;
     }
     resetUtf8 = Xutf8ResetIC(inputContext);
     if ((resetUtf8 != NULL)
-	    || (XEventsQueued(&browserDisplay.display, QueuedAlready) != 0)) {
+	    || (XEventsQueued(&x11wasm_browserDisplay.display, QueuedAlready) != 0)) {
 	goto cleanup;
     }
 
@@ -570,7 +570,7 @@ X11WasmTestXICLookupFocus(void)
 	goto cleanup;
     }
 
-    lookupEvent.window = browserDisplay.rootWindow;
+    lookupEvent.window = x11wasm_browserDisplay.rootWindow;
     XUnsetICFocus(inputContext);
     lookupSym = XK_a;
     lookupStatus = XLookupBoth;
@@ -620,10 +620,10 @@ cleanup:
     if (inputMethod != NULL) {
 	(void)XCloseIM(inputMethod);
     }
-    if (localeModifiers != NULL) {
-	ckfree(localeModifiers);
+    if (x11wasm_localeModifiers != NULL) {
+	ckfree(x11wasm_localeModifiers);
     }
-    localeModifiers = savedLocaleModifiers;
+    x11wasm_localeModifiers = savedLocaleModifiers;
     return result;
 }
 
@@ -655,10 +655,10 @@ X11WasmTestXICSpotLocationSync(
 	    inputMethod = NULL;
 	}
 	if (savedLocaleModifiersValid) {
-	    if (localeModifiers != NULL) {
-		ckfree(localeModifiers);
+	    if (x11wasm_localeModifiers != NULL) {
+		ckfree(x11wasm_localeModifiers);
 	    }
-	    localeModifiers = savedLocaleModifiers;
+	    x11wasm_localeModifiers = savedLocaleModifiers;
 	    savedLocaleModifiers = NULL;
 	    savedLocaleModifiersValid = 0;
 	}
@@ -670,11 +670,11 @@ X11WasmTestXICSpotLocationSync(
 	return 0;
     }
     if (inputContext == NULL) {
-	savedLocaleModifiers = (localeModifiers != NULL)
-		? BrowserDupString(localeModifiers) : NULL;
+	savedLocaleModifiers = (x11wasm_localeModifiers != NULL)
+		? BrowserDupString(x11wasm_localeModifiers) : NULL;
 	savedLocaleModifiersValid = 1;
 	(void)XSetLocaleModifiers("@im=x11wasm");
-	inputMethod = XOpenIM(&browserDisplay.display, NULL, NULL, NULL);
+	inputMethod = XOpenIM(&x11wasm_browserDisplay.display, NULL, NULL, NULL);
 	if (inputMethod == NULL) {
 	    goto cleanup;
 	}
@@ -716,10 +716,10 @@ cleanup:
 	    inputMethod = NULL;
 	}
 	if (savedLocaleModifiersValid) {
-	    if (localeModifiers != NULL) {
-		ckfree(localeModifiers);
+	    if (x11wasm_localeModifiers != NULL) {
+		ckfree(x11wasm_localeModifiers);
 	    }
-	    localeModifiers = savedLocaleModifiers;
+	    x11wasm_localeModifiers = savedLocaleModifiers;
 	    savedLocaleModifiers = NULL;
 	    savedLocaleModifiersValid = 0;
 	}
@@ -855,8 +855,8 @@ BrowserReadICAttributes(
 int
 BrowserLocaleModifiersDisableIM(void)
 {
-    return (localeModifiers != NULL)
-	    && (strstr(localeModifiers, "@im=none") != NULL);
+    return (x11wasm_localeModifiers != NULL)
+	    && (strstr(x11wasm_localeModifiers, "@im=none") != NULL);
 }
 
 int
@@ -867,7 +867,7 @@ BrowserIMInstantiateCallbackExists(
 {
     X11WasmIMInstantiateCallback *callbackPtr;
 
-    for (callbackPtr = imInstantiateCallbackList; callbackPtr != NULL;
+    for (callbackPtr = x11wasm_imInstantiateCallbackList; callbackPtr != NULL;
 	    callbackPtr = callbackPtr->nextPtr) {
 	if ((callbackPtr->display == display)
 		&& (callbackPtr->callback == callback)
@@ -882,7 +882,7 @@ void
 BrowserForgetIMInstantiateCallbacks(
     Display *display)
 {
-    X11WasmIMInstantiateCallback **linkPtr = &imInstantiateCallbackList;
+    X11WasmIMInstantiateCallback **linkPtr = &x11wasm_imInstantiateCallbackList;
 
     while (*linkPtr != NULL) {
 	X11WasmIMInstantiateCallback *callbackPtr = *linkPtr;
@@ -907,7 +907,7 @@ BrowserNotifyIMInstantiateCallbacks(void)
     if (BrowserLocaleModifiersDisableIM()) {
 	return;
     }
-    for (callbackPtr = imInstantiateCallbackList; callbackPtr != NULL;
+    for (callbackPtr = x11wasm_imInstantiateCallbackList; callbackPtr != NULL;
 	    callbackPtr = callbackPtr->nextPtr) {
 	count++;
     }
@@ -916,7 +916,7 @@ BrowserNotifyIMInstantiateCallbacks(void)
     }
     snapshot = (X11WasmIMInstantiateCallback *)ckalloc(
 	    sizeof(X11WasmIMInstantiateCallback) * (size_t)count);
-    for (callbackPtr = imInstantiateCallbackList; callbackPtr != NULL;
+    for (callbackPtr = x11wasm_imInstantiateCallbackList; callbackPtr != NULL;
 	    callbackPtr = callbackPtr->nextPtr) {
 	snapshot[i++] = *callbackPtr;
     }
@@ -1001,15 +1001,15 @@ XSetLocaleModifiers(
 	int wasDisabled = BrowserLocaleModifiersDisableIM();
 	char *copy = BrowserDupString(modifierList);
 
-	if (localeModifiers != NULL) {
-	    ckfree(localeModifiers);
+	if (x11wasm_localeModifiers != NULL) {
+	    ckfree(x11wasm_localeModifiers);
 	}
-	localeModifiers = copy;
+	x11wasm_localeModifiers = copy;
 	if (wasDisabled && !BrowserLocaleModifiersDisableIM()) {
 	    BrowserNotifyIMInstantiateCallbacks();
 	}
     }
-    return (localeModifiers != NULL) ? localeModifiers : (char *)"";
+    return (x11wasm_localeModifiers != NULL) ? x11wasm_localeModifiers : (char *)"";
 }
 
 Bool
@@ -1029,7 +1029,7 @@ XRegisterIMInstantiateCallback(
     if ((display == NULL) || (callback == NULL)) {
 	return False;
     }
-    for (callbackPtr = imInstantiateCallbackList; callbackPtr != NULL;
+    for (callbackPtr = x11wasm_imInstantiateCallbackList; callbackPtr != NULL;
 	    callbackPtr = callbackPtr->nextPtr) {
 	if ((callbackPtr->display == display)
 		&& (callbackPtr->callback == callback)
@@ -1043,8 +1043,8 @@ XRegisterIMInstantiateCallback(
     callbackPtr->display = display;
     callbackPtr->callback = callback;
     callbackPtr->clientData = clientData;
-    callbackPtr->nextPtr = imInstantiateCallbackList;
-    imInstantiateCallbackList = callbackPtr;
+    callbackPtr->nextPtr = x11wasm_imInstantiateCallbackList;
+    x11wasm_imInstantiateCallbackList = callbackPtr;
     return True;
 }
 
@@ -1057,7 +1057,7 @@ XUnregisterIMInstantiateCallback(
     XIDProc callback,
     XPointer clientData)
 {
-    X11WasmIMInstantiateCallback **linkPtr = &imInstantiateCallbackList;
+    X11WasmIMInstantiateCallback **linkPtr = &x11wasm_imInstantiateCallbackList;
 
     (void)rdb;
     (void)resourceName;
@@ -1135,9 +1135,9 @@ XDestroyIC(
     XIC inputContext)
 {
     if (inputContext != NULL) {
-	if (focusedInputContext == inputContext) {
+	if (x11wasm_focusedInputContext == inputContext) {
 	    BrowserClearInputContext();
-	    focusedInputContext = NULL;
+	    x11wasm_focusedInputContext = NULL;
 	}
 	BrowserClearICPreeditText(inputContext);
 	ckfree(inputContext);
@@ -1256,7 +1256,7 @@ XSetICFocus(
 {
     if (inputContext != NULL) {
 	inputContext->focused = 1;
-	focusedInputContext = inputContext;
+	x11wasm_focusedInputContext = inputContext;
 	BrowserSyncInputContext(inputContext);
     }
 }
@@ -1267,9 +1267,9 @@ XUnsetICFocus(
 {
     if (inputContext != NULL) {
 	inputContext->focused = 0;
-	if (focusedInputContext == inputContext) {
+	if (x11wasm_focusedInputContext == inputContext) {
 	    BrowserClearInputContext();
-	    focusedInputContext = NULL;
+	    x11wasm_focusedInputContext = NULL;
 	}
     }
 }
@@ -2921,7 +2921,7 @@ XGetModifierMapping(
     Display *display)
 {
     XModifierKeymap *mapPtr;
-    X11WasmDisplayState *state = &browserDisplay;
+    X11WasmDisplayState *state = &x11wasm_browserDisplay;
     int maxKeyPerMod;
     size_t mapSize;
 
@@ -3009,10 +3009,10 @@ BrowserKeycodeIsDown(
     unsigned int index = ((unsigned int)keycode) >> 3;
     unsigned int mask = 1U << (((unsigned int)keycode) & 7U);
 
-    if (index >= sizeof(browserDisplay.keymap)) {
+    if (index >= sizeof(x11wasm_browserDisplay.keymap)) {
 	return 0;
     }
-    return (((unsigned char)browserDisplay.keymap[index] & mask) != 0);
+    return (((unsigned char)x11wasm_browserDisplay.keymap[index] & mask) != 0);
 }
 
 static int
@@ -3037,12 +3037,12 @@ BrowserModifierMappingIsBusy(
     const XModifierKeymap *mapPtr)
 {
     int modifier;
-    int oldMaxKeyPerMod = browserDisplay.modifierMapMaxKeyPerMod;
+    int oldMaxKeyPerMod = x11wasm_browserDisplay.modifierMapMaxKeyPerMod;
     int newMaxKeyPerMod = mapPtr->max_keypermod;
 
     for (modifier = 0; modifier < X11_WASM_MODIFIER_COUNT; modifier++) {
 	const KeyCode *oldRow = (oldMaxKeyPerMod > 0)
-		? browserDisplay.modifierMap + modifier * oldMaxKeyPerMod
+		? x11wasm_browserDisplay.modifierMap + modifier * oldMaxKeyPerMod
 		: NULL;
 	const KeyCode *newRow = (newMaxKeyPerMod > 0)
 		? mapPtr->modifiermap + modifier * newMaxKeyPerMod : NULL;
@@ -3074,7 +3074,7 @@ XSetModifierMapping(
     } else {
 	BrowserInitDisplay();
     }
-    if ((display != &browserDisplay.display) || (mapPtr == NULL)
+    if ((display != &x11wasm_browserDisplay.display) || (mapPtr == NULL)
 	    || (mapPtr->max_keypermod < 0)) {
 	(void)XNoOp(display);
 	return MappingFailed;
@@ -3128,14 +3128,14 @@ XSetModifierMapping(
 	(void)XNoOp(display);
 	return MappingBusy;
     }
-    browserDisplay.modifierMapMaxKeyPerMod = maxKeyPerMod;
-    memset(browserDisplay.modifierMap, 0, sizeof(browserDisplay.modifierMap));
+    x11wasm_browserDisplay.modifierMapMaxKeyPerMod = maxKeyPerMod;
+    memset(x11wasm_browserDisplay.modifierMap, 0, sizeof(x11wasm_browserDisplay.modifierMap));
     mapSize = sizeof(KeyCode) * X11_WASM_MODIFIER_COUNT
 	    * (size_t)maxKeyPerMod;
     if (mapSize > 0) {
-	memcpy(browserDisplay.modifierMap, mapPtr->modifiermap, mapSize);
+	memcpy(x11wasm_browserDisplay.modifierMap, mapPtr->modifiermap, mapSize);
     }
-    browserDisplay.modifierMapSerial++;
+    x11wasm_browserDisplay.modifierMapSerial++;
     (void)BrowserQueueMappingNotify(MappingModifier, 0, 0);
     return XNoOp(display);
 }
@@ -3163,7 +3163,7 @@ int XRefreshKeyboardMapping(XMappingEvent *event)
 	BrowserClearKeycodeRange((unsigned int)event->first_keycode,
 		(unsigned int)event->count);
     } else if (event->request == MappingModifier) {
-	BrowserInitModifierMap(&browserDisplay);
+	BrowserInitModifierMap(&x11wasm_browserDisplay);
     }
     return Success;
 }

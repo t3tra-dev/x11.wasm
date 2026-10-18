@@ -25,7 +25,7 @@ BrowserAtomIsValid(
     if ((atom >= 1) && (atom <= XA_LAST_PREDEFINED)) {
 	return 1;
     }
-    for (atomPtr = atomList; atomPtr != NULL; atomPtr = atomPtr->nextPtr) {
+    for (atomPtr = x11wasm_atomList; atomPtr != NULL; atomPtr = atomPtr->nextPtr) {
 	if (atomPtr->atom == atom) {
 	    return 1;
 	}
@@ -262,7 +262,7 @@ BrowserNotifyProperty(
 	    (Window)resourcePtr->id, CurrentTime);
     event.xproperty.window = (Window)resourcePtr->id;
     event.xproperty.atom = atom;
-    event.xproperty.time = eventTime;
+    event.xproperty.time = x11wasm_eventTime;
     event.xproperty.state = state;
     (void)BrowserQueueEvent(&event);
 }
@@ -342,7 +342,7 @@ BrowserColormapResource(
 {
     X11WasmResource *resourcePtr;
 
-    if ((colormap == None) || (colormap == browserDisplay.defaultColormap)) {
+    if ((colormap == None) || (colormap == x11wasm_browserDisplay.defaultColormap)) {
 	return NULL;
     }
     resourcePtr = X11WasmFindResource((XID)colormap);
@@ -531,7 +531,7 @@ BrowserWindowToplevel(
     X11WasmResource *topLevelPtr = resourcePtr;
 
     while ((resourcePtr != NULL) && (resourcePtr->parentPtr != NULL)
-	    && ((Window)resourcePtr->parentPtr->id != browserDisplay.rootWindow)) {
+	    && ((Window)resourcePtr->parentPtr->id != x11wasm_browserDisplay.rootWindow)) {
 	resourcePtr = resourcePtr->parentPtr;
 	if (resourcePtr->type == X11_WASM_RESOURCE_WINDOW) {
 	    topLevelPtr = resourcePtr;
@@ -560,7 +560,7 @@ BrowserWindowIsRootToplevel(
     if ((targetPtr != NULL) && targetPtr->metadataRootToplevelSet) {
 	return targetPtr->metadataIsRootToplevel ? 1 : 0;
     }
-    return resourcePtr->parent == browserDisplay.rootWindow;
+    return resourcePtr->parent == x11wasm_browserDisplay.rootWindow;
 }
 
 Window
@@ -593,7 +593,7 @@ BrowserWindowStateSource(
     if (BrowserFindProperty(resourcePtr, netWmStateAtom) != NULL) {
 	return window;
     }
-    for (candidatePtr = browserDisplay.resourceList; candidatePtr != NULL;
+    for (candidatePtr = x11wasm_browserDisplay.resourceList; candidatePtr != NULL;
 	    candidatePtr = candidatePtr->nextPtr) {
 	Window candidate;
 
@@ -675,7 +675,7 @@ BrowserRebuildWindowMetadataTarget(
 	return;
     }
     BrowserClearWindowMetadataTarget(target, updatesDocument);
-    for (candidatePtr = browserDisplay.resourceList; candidatePtr != NULL;
+    for (candidatePtr = x11wasm_browserDisplay.resourceList; candidatePtr != NULL;
 	    candidatePtr = candidatePtr->nextPtr) {
 	if ((candidatePtr->type != X11_WASM_RESOURCE_WINDOW)
 		|| (BrowserWindowMetadataTarget((Window)candidatePtr->id)
@@ -1277,7 +1277,7 @@ BrowserWindowSupportsProtocol(
 	    return 1;
 	}
     }
-    for (candidatePtr = browserDisplay.resourceList; candidatePtr != NULL;
+    for (candidatePtr = x11wasm_browserDisplay.resourceList; candidatePtr != NULL;
 	    candidatePtr = candidatePtr->nextPtr) {
 	if ((candidatePtr == resourcePtr)
 		|| (candidatePtr->type != X11_WASM_RESOURCE_WINDOW)
@@ -1548,7 +1548,7 @@ BrowserApplyNetWmStateAtom(
 	return;
     }
     if (shouldHaveState) {
-	(void)XChangeProperty(&browserDisplay.display, window,
+	(void)XChangeProperty(&x11wasm_browserDisplay.display, window,
 		netWmStateAtom, XA_ATOM, 32, PropModeAppend,
 		(const unsigned char *)&stateAtom, 1);
     } else {
@@ -1568,11 +1568,11 @@ BrowserApplyNetWmStateAtom(
 	    }
 	}
 	if (outCount > 0) {
-	    (void)XChangeProperty(&browserDisplay.display, window,
+	    (void)XChangeProperty(&x11wasm_browserDisplay.display, window,
 		    netWmStateAtom, XA_ATOM, 32, PropModeReplace,
 		    (const unsigned char *)atoms, outCount);
 	} else {
-	    (void)XDeleteProperty(&browserDisplay.display, window,
+	    (void)XDeleteProperty(&x11wasm_browserDisplay.display, window,
 		    netWmStateAtom);
 	}
 	if (atoms != NULL) {
@@ -1763,7 +1763,7 @@ BrowserApplyWindowIconProperty(
 
     X11WasmDStringInit(&sizes);
     (void)XGetIconSizes(X11WasmGetDisplay(NULL),
-	    browserDisplay.rootWindow, &iconSizes, &iconSizeCount);
+	    x11wasm_browserDisplay.rootWindow, &iconSizes, &iconSizeCount);
     while (index + 2 <= nelements) {
 	unsigned int width = BrowserIconPropertyCardinal(data, index++);
 	unsigned int height = BrowserIconPropertyCardinal(data, index++);
@@ -2048,12 +2048,12 @@ BrowserApplyWindowMetadataProperty(
 void
 BrowserClearExternalClipboardText(void)
 {
-    if (externalClipboardText != NULL) {
-	ckfree(externalClipboardText);
-	externalClipboardText = NULL;
+    if (x11wasm_externalClipboardText != NULL) {
+	ckfree(x11wasm_externalClipboardText);
+	x11wasm_externalClipboardText = NULL;
     }
-    externalClipboardAvailable = 0;
-    externalClipboardTime = CurrentTime;
+    x11wasm_externalClipboardAvailable = 0;
+    x11wasm_externalClipboardTime = CurrentTime;
 }
 
 void
@@ -2075,7 +2075,7 @@ BrowserSetExternalClipboardText(
     }
     copy[utf8Length] = '\0';
     BrowserClearExternalClipboardText();
-    externalClipboardText = copy;
-    externalClipboardAvailable = 1;
-    externalClipboardTime = eventTime;
+    x11wasm_externalClipboardText = copy;
+    x11wasm_externalClipboardAvailable = 1;
+    x11wasm_externalClipboardTime = x11wasm_eventTime;
 }

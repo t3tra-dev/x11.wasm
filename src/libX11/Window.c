@@ -10,7 +10,7 @@ BrowserFindGCClip(
     if (gc == NULL) {
 	return NULL;
     }
-    for (clipPtr = gcClipList; clipPtr != NULL; clipPtr = clipPtr->nextPtr) {
+    for (clipPtr = x11wasm_gcClipList; clipPtr != NULL; clipPtr = clipPtr->nextPtr) {
 	if (clipPtr->gc == gc) {
 	    return clipPtr;
 	}
@@ -21,8 +21,8 @@ BrowserFindGCClip(
     clipPtr = (X11WasmGCClip *)ckalloc(sizeof(X11WasmGCClip));
     memset(clipPtr, 0, sizeof(X11WasmGCClip));
     clipPtr->gc = gc;
-    clipPtr->nextPtr = gcClipList;
-    gcClipList = clipPtr;
+    clipPtr->nextPtr = x11wasm_gcClipList;
+    x11wasm_gcClipList = clipPtr;
     return clipPtr;
 }
 
@@ -30,7 +30,7 @@ void
 BrowserDeleteGCClip(
     GC gc)
 {
-    X11WasmGCClip **linkPtr = &gcClipList;
+    X11WasmGCClip **linkPtr = &x11wasm_gcClipList;
 
     while (*linkPtr != NULL) {
 	X11WasmGCClip *clipPtr = *linkPtr;
@@ -57,7 +57,7 @@ BrowserFindGCDashes(
     if (gc == NULL) {
 	return NULL;
     }
-    for (dashPtr = gcDashList; dashPtr != NULL; dashPtr = dashPtr->nextPtr) {
+    for (dashPtr = x11wasm_gcDashList; dashPtr != NULL; dashPtr = dashPtr->nextPtr) {
 	if (dashPtr->gc == gc) {
 	    return dashPtr;
 	}
@@ -68,8 +68,8 @@ BrowserFindGCDashes(
     dashPtr = (X11WasmGCDashes *)ckalloc(sizeof(X11WasmGCDashes));
     memset(dashPtr, 0, sizeof(X11WasmGCDashes));
     dashPtr->gc = gc;
-    dashPtr->nextPtr = gcDashList;
-    gcDashList = dashPtr;
+    dashPtr->nextPtr = x11wasm_gcDashList;
+    x11wasm_gcDashList = dashPtr;
     return dashPtr;
 }
 
@@ -77,7 +77,7 @@ void
 BrowserDeleteGCDashes(
     GC gc)
 {
-    X11WasmGCDashes **linkPtr = &gcDashList;
+    X11WasmGCDashes **linkPtr = &x11wasm_gcDashList;
 
     while (*linkPtr != NULL) {
 	X11WasmGCDashes *dashPtr = *linkPtr;
@@ -1264,13 +1264,13 @@ void
 BrowserSetPointerGrabCursor(
     Cursor cursor)
 {
-    Cursor oldCursor = browserDisplay.pointerGrabCursor;
+    Cursor oldCursor = x11wasm_browserDisplay.pointerGrabCursor;
 
     if (oldCursor == cursor) {
 	return;
     }
     BrowserRetainCursor(cursor);
-    browserDisplay.pointerGrabCursor = cursor;
+    x11wasm_browserDisplay.pointerGrabCursor = cursor;
     BrowserReleaseCursor(oldCursor);
 }
 
@@ -1327,7 +1327,7 @@ BrowserSyncWindowStyle(
 void
 BrowserSyncPointerGrabCursor(void)
 {
-    Cursor cursor = browserDisplay.pointerGrabCursor;
+    Cursor cursor = x11wasm_browserDisplay.pointerGrabCursor;
     unsigned int cursorShape = BrowserCursorShape(cursor);
 
     (void)X11WasmJsSetPointerGrabCursor(
@@ -1337,20 +1337,20 @@ BrowserSyncPointerGrabCursor(void)
 void
 BrowserSyncPointerGrabState(void)
 {
-    Window grabWindow = browserDisplay.pointerGrabWindow;
-    Window confineWindow = browserDisplay.pointerGrabConfineWindow;
-    Cursor cursor = browserDisplay.pointerGrabCursor;
+    Window grabWindow = x11wasm_browserDisplay.pointerGrabWindow;
+    Window confineWindow = x11wasm_browserDisplay.pointerGrabConfineWindow;
+    Cursor cursor = x11wasm_browserDisplay.pointerGrabCursor;
     unsigned int cursorShape = BrowserCursorShape(cursor);
     int enabled = grabWindow != None;
 
     (void)X11WasmJsSetPointerGrabState(enabled,
 	    enabled ? BrowserJsXId(grabWindow) : 0,
-	    enabled ? browserDisplay.pointerGrabOwnerEvents : 0,
-	    enabled ? browserDisplay.pointerGrabEventMask : 0,
+	    enabled ? x11wasm_browserDisplay.pointerGrabOwnerEvents : 0,
+	    enabled ? x11wasm_browserDisplay.pointerGrabEventMask : 0,
 	    (enabled && (confineWindow != None)) ? BrowserJsXId(confineWindow) : 0,
 	    enabled ? cursorShape : 0,
-	    enabled ? browserDisplay.pointerGrabPointerMode : GrabModeAsync,
-	    enabled ? browserDisplay.pointerGrabKeyboardMode : GrabModeAsync);
+	    enabled ? x11wasm_browserDisplay.pointerGrabPointerMode : GrabModeAsync,
+	    enabled ? x11wasm_browserDisplay.pointerGrabKeyboardMode : GrabModeAsync);
 }
 
 void
@@ -1362,7 +1362,7 @@ BrowserSyncCursorUsers(
     if (cursor == None) {
 	return;
     }
-    for (resourcePtr = browserDisplay.resourceList; resourcePtr != NULL;
+    for (resourcePtr = x11wasm_browserDisplay.resourceList; resourcePtr != NULL;
 	    resourcePtr = resourcePtr->nextPtr) {
 	if ((resourcePtr->type == X11_WASM_RESOURCE_WINDOW)
 		&& (resourcePtr->atts.cursor == cursor)) {
@@ -1370,7 +1370,7 @@ BrowserSyncCursorUsers(
 	    BrowserSyncInheritedChildStyles(resourcePtr);
 	}
     }
-    if (browserDisplay.pointerGrabCursor == cursor) {
+    if (x11wasm_browserDisplay.pointerGrabCursor == cursor) {
 	BrowserSyncPointerGrabCursor();
 	BrowserSyncPointerGrabState();
     }
@@ -1379,25 +1379,25 @@ BrowserSyncCursorUsers(
 void
 BrowserSyncPointerState(void)
 {
-    (void)X11WasmJsSetPointerState(browserDisplay.pointerX,
-	    browserDisplay.pointerY,
-	    BrowserJsXId(browserDisplay.pointerWindow),
-	    browserDisplay.pointerState,
-	    (browserDisplay.pointerCaptureWindow != None)
-		? BrowserJsXId(browserDisplay.pointerCaptureWindow) : 0);
+    (void)X11WasmJsSetPointerState(x11wasm_browserDisplay.pointerX,
+	    x11wasm_browserDisplay.pointerY,
+	    BrowserJsXId(x11wasm_browserDisplay.pointerWindow),
+	    x11wasm_browserDisplay.pointerState,
+	    (x11wasm_browserDisplay.pointerCaptureWindow != None)
+		? BrowserJsXId(x11wasm_browserDisplay.pointerCaptureWindow) : 0);
 }
 
 void
 BrowserSyncKeyboardGrabState(void)
 {
-    Window grabWindow = browserDisplay.keyboardGrabWindow;
+    Window grabWindow = x11wasm_browserDisplay.keyboardGrabWindow;
     int enabled = grabWindow != None;
 
     (void)X11WasmJsSetKeyboardGrabState(enabled,
 	    enabled ? BrowserJsXId(grabWindow) : 0,
-	    enabled ? browserDisplay.keyboardGrabOwnerEvents : 0,
-	    enabled ? browserDisplay.keyboardGrabPointerMode : GrabModeAsync,
-	    enabled ? browserDisplay.keyboardGrabKeyboardMode : GrabModeAsync);
+	    enabled ? x11wasm_browserDisplay.keyboardGrabOwnerEvents : 0,
+	    enabled ? x11wasm_browserDisplay.keyboardGrabPointerMode : GrabModeAsync,
+	    enabled ? x11wasm_browserDisplay.keyboardGrabKeyboardMode : GrabModeAsync);
 }
 
 void
@@ -1511,7 +1511,7 @@ BrowserMarkResourceDamage(
     resourcePtr->damage.y = BrowserClampShort(y1);
     resourcePtr->damage.width = BrowserClampUShort((unsigned int)(x2 - x1));
     resourcePtr->damage.height = BrowserClampUShort((unsigned int)(y2 - y1));
-    resourcePtr->damageSerial = damageSerial++;
+    resourcePtr->damageSerial = x11wasm_damageSerial++;
 }
 
 int
@@ -2145,7 +2145,7 @@ BrowserWindowVisibleRects(
     *countPtr = 1;
 
     for (nodePtr = resourcePtr; nodePtr != NULL
-	    && nodePtr->id != browserDisplay.rootWindow;
+	    && nodePtr->id != x11wasm_browserDisplay.rootWindow;
 	    nodePtr = BrowserWindowParentResource(nodePtr)) {
 	X11WasmResource *parentPtr = BrowserWindowParentResource(nodePtr);
 	X11WasmResource *siblingPtr;

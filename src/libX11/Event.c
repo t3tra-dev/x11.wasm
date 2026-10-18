@@ -86,18 +86,18 @@ BrowserQueueScreenSaverNotify(
     XEvent event;
     XScreenSaverNotifyEvent *notifyPtr;
 
-    if ((browserDisplay.screenSaverEventMask & ScreenSaverNotifyMask) == 0) {
+    if ((x11wasm_browserDisplay.screenSaverEventMask & ScreenSaverNotifyMask) == 0) {
 	return 0;
     }
     BrowserSetCommonEventFields(&event,
 	    X11_WASM_SCREENSAVER_EVENT_BASE + ScreenSaverNotify,
-	    browserDisplay.rootWindow, CurrentTime);
+	    x11wasm_browserDisplay.rootWindow, CurrentTime);
     notifyPtr = (XScreenSaverNotifyEvent *)&event;
-    notifyPtr->root = browserDisplay.rootWindow;
+    notifyPtr->root = x11wasm_browserDisplay.rootWindow;
     notifyPtr->state = state;
     notifyPtr->kind = ScreenSaverInternal;
     notifyPtr->forced = forced ? True : False;
-    notifyPtr->time = eventTime;
+    notifyPtr->time = x11wasm_eventTime;
     return BrowserQueueEvent(&event);
 }
 
@@ -106,20 +106,20 @@ BrowserForceScreenSaverMode(
     int mode)
 {
     unsigned long idle = BrowserScreenSaverIdle();
-    int wasActive = browserDisplay.screenSaverActive;
+    int wasActive = x11wasm_browserDisplay.screenSaverActive;
 
     if (mode == ScreenSaverActive) {
-	if (!browserDisplay.screenSaverActive) {
-	    browserDisplay.screenSaverActivatedIdle = idle;
+	if (!x11wasm_browserDisplay.screenSaverActive) {
+	    x11wasm_browserDisplay.screenSaverActivatedIdle = idle;
 	}
-	browserDisplay.screenSaverActive = 1;
+	x11wasm_browserDisplay.screenSaverActive = 1;
 	if (!wasActive) {
 	    (void)BrowserQueueScreenSaverNotify(ScreenSaverOn, True);
 	}
     } else {
-	browserDisplay.screenSaverActive = 0;
-	browserDisplay.screenSaverActivatedIdle = 0UL;
-	browserDisplay.screenSaverTimerResetIdle = idle;
+	x11wasm_browserDisplay.screenSaverActive = 0;
+	x11wasm_browserDisplay.screenSaverActivatedIdle = 0UL;
+	x11wasm_browserDisplay.screenSaverTimerResetIdle = idle;
 	if (wasActive) {
 	    (void)BrowserQueueScreenSaverNotify(ScreenSaverOff, True);
 	}
@@ -130,11 +130,11 @@ BrowserForceScreenSaverMode(
 void
 BrowserResetScreenSaverForInput(void)
 {
-    int wasActive = browserDisplay.screenSaverActive;
+    int wasActive = x11wasm_browserDisplay.screenSaverActive;
 
-    browserDisplay.screenSaverActive = 0;
-    browserDisplay.screenSaverActivatedIdle = 0UL;
-    browserDisplay.screenSaverTimerResetIdle = BrowserScreenSaverIdle();
+    x11wasm_browserDisplay.screenSaverActive = 0;
+    x11wasm_browserDisplay.screenSaverActivatedIdle = 0UL;
+    x11wasm_browserDisplay.screenSaverTimerResetIdle = BrowserScreenSaverIdle();
     if (wasActive) {
 	(void)BrowserQueueScreenSaverNotify(ScreenSaverOff, False);
 	(void)X11WasmJsForceScreenSaver(ScreenSaverReset);
@@ -212,14 +212,14 @@ BrowserFreePassiveKeyGrab(
 static void
 BrowserDeactivatePointerGrab(void)
 {
-    browserDisplay.pointerGrabWindow = None;
-    browserDisplay.pointerGrabConfineWindow = None;
-    browserDisplay.pointerGrabOwnerEvents = 0;
-    browserDisplay.pointerGrabEventMask = 0;
+    x11wasm_browserDisplay.pointerGrabWindow = None;
+    x11wasm_browserDisplay.pointerGrabConfineWindow = None;
+    x11wasm_browserDisplay.pointerGrabOwnerEvents = 0;
+    x11wasm_browserDisplay.pointerGrabEventMask = 0;
     BrowserSetPointerGrabCursor(None);
-    browserDisplay.pointerGrabPointerMode = GrabModeAsync;
-    browserDisplay.pointerGrabKeyboardMode = GrabModeAsync;
-    browserDisplay.pointerGrabPassive = 0;
+    x11wasm_browserDisplay.pointerGrabPointerMode = GrabModeAsync;
+    x11wasm_browserDisplay.pointerGrabKeyboardMode = GrabModeAsync;
+    x11wasm_browserDisplay.pointerGrabPassive = 0;
     BrowserSyncPointerGrabCursor();
     BrowserSyncPointerGrabState();
 }
@@ -227,11 +227,11 @@ BrowserDeactivatePointerGrab(void)
 static void
 BrowserDeactivateKeyboardGrab(void)
 {
-    browserDisplay.keyboardGrabWindow = None;
-    browserDisplay.keyboardGrabOwnerEvents = 0;
-    browserDisplay.keyboardGrabPointerMode = GrabModeAsync;
-    browserDisplay.keyboardGrabKeyboardMode = GrabModeAsync;
-    browserDisplay.keyboardGrabPassive = 0;
+    x11wasm_browserDisplay.keyboardGrabWindow = None;
+    x11wasm_browserDisplay.keyboardGrabOwnerEvents = 0;
+    x11wasm_browserDisplay.keyboardGrabPointerMode = GrabModeAsync;
+    x11wasm_browserDisplay.keyboardGrabKeyboardMode = GrabModeAsync;
+    x11wasm_browserDisplay.keyboardGrabPassive = 0;
     BrowserSyncKeyboardGrabState();
 }
 
@@ -246,7 +246,7 @@ BrowserFindPassiveButtonGrab(
     if (!BrowserWindowCanReceiveEvents(eventWindow)) {
 	return NULL;
     }
-    for (grabPtr = browserDisplay.passiveButtonGrabs; grabPtr != NULL;
+    for (grabPtr = x11wasm_browserDisplay.passiveButtonGrabs; grabPtr != NULL;
 	    grabPtr = grabPtr->nextPtr) {
 	if (!BrowserWindowCanReceiveEvents(grabPtr->window)
 		|| ((grabPtr->button != AnyButton)
@@ -272,7 +272,7 @@ BrowserFindPassiveKeyGrab(
     if (!BrowserWindowCanReceiveEvents(eventWindow)) {
 	return NULL;
     }
-    for (grabPtr = browserDisplay.passiveKeyGrabs; grabPtr != NULL;
+    for (grabPtr = x11wasm_browserDisplay.passiveKeyGrabs; grabPtr != NULL;
 	    grabPtr = grabPtr->nextPtr) {
 	if (!BrowserWindowCanReceiveEvents(grabPtr->window)
 		|| ((grabPtr->keycode != AnyKey)
@@ -357,7 +357,7 @@ XEventsQueued(
 	(void)XFlush(display);
     }
     BrowserUpdateQueueLength();
-    return eventQueueCount;
+    return x11wasm_eventQueueCount;
 }
 
 int
@@ -550,11 +550,11 @@ XPutBackEvent(
 	return Success;
     }
     BrowserEnsureEventQueueSpace();
-    eventQueueHead = (eventQueueHead + eventQueueCapacity - 1)
-	    % eventQueueCapacity;
-    eventQueue[eventQueueHead].event = *event;
-    eventQueue[eventQueueHead].internal = 0;
-    eventQueueCount++;
+    x11wasm_eventQueueHead = (x11wasm_eventQueueHead + x11wasm_eventQueueCapacity - 1)
+	    % x11wasm_eventQueueCapacity;
+    x11wasm_eventQueue[x11wasm_eventQueueHead].event = *event;
+    x11wasm_eventQueue[x11wasm_eventQueueHead].internal = 0;
+    x11wasm_eventQueueCount++;
     BrowserUpdateQueueLength();
     return Success;
 }
@@ -651,8 +651,8 @@ XQueryPointer(
 {
     X11WasmResource *resourcePtr;
     X11WasmResource *childPtr = NULL;
-    int winX = browserDisplay.pointerX;
-    int winY = browserDisplay.pointerY;
+    int winX = x11wasm_browserDisplay.pointerX;
+    int winY = x11wasm_browserDisplay.pointerY;
 
     if (rootReturn) *rootReturn = None;
     if (childReturn) *childReturn = None;
@@ -667,18 +667,18 @@ XQueryPointer(
     if (resourcePtr == NULL) {
 	return False;
     }
-    BrowserWindowCoordinatesFromRoot(window, browserDisplay.pointerX,
-	    browserDisplay.pointerY, &winX, &winY);
+    BrowserWindowCoordinatesFromRoot(window, x11wasm_browserDisplay.pointerX,
+	    x11wasm_browserDisplay.pointerY, &winX, &winY);
     childPtr = BrowserFindTopVisibleChildAt(resourcePtr, winX, winY);
     if (rootReturn) *rootReturn = RootWindow(display, DefaultScreen(display));
     if (childReturn) {
 	*childReturn = (childPtr != NULL) ? (Window)childPtr->id : None;
     }
-    if (rootXReturn) *rootXReturn = browserDisplay.pointerX;
-    if (rootYReturn) *rootYReturn = browserDisplay.pointerY;
+    if (rootXReturn) *rootXReturn = x11wasm_browserDisplay.pointerX;
+    if (rootYReturn) *rootYReturn = x11wasm_browserDisplay.pointerY;
     if (winXReturn) *winXReturn = winX;
     if (winYReturn) *winYReturn = winY;
-    if (maskReturn) *maskReturn = browserDisplay.pointerState;
+    if (maskReturn) *maskReturn = x11wasm_browserDisplay.pointerState;
     return True;
 }
 
@@ -693,9 +693,9 @@ XGetInputFocus(
     }
     BrowserInitDisplay();
     if (focusReturn) {
-	*focusReturn = browserDisplay.focusWindow;
+	*focusReturn = x11wasm_browserDisplay.focusWindow;
     }
-    if (revertReturn) *revertReturn = browserDisplay.focusRevertTo;
+    if (revertReturn) *revertReturn = x11wasm_browserDisplay.focusRevertTo;
     return Success;
 }
 
@@ -739,8 +739,8 @@ BrowserQueueFocusEventForWindow(
 	return 0;
     }
     BrowserSetCommonEventFields(&event, type, window, time);
-    event.xfocus.serial = ++LastKnownRequestProcessed(&browserDisplay.display);
-    BrowserSyncRequestState(&browserDisplay.display);
+    event.xfocus.serial = ++LastKnownRequestProcessed(&x11wasm_browserDisplay.display);
+    BrowserSyncRequestState(&x11wasm_browserDisplay.display);
     event.xfocus.mode = NotifyNormal;
     event.xfocus.detail = detail;
     if (BrowserSelectedEventTarget(window, BrowserEventMask(&event), 0)
@@ -884,32 +884,32 @@ BrowserRevertInputFocusForUnviewableWindow(
 
     if ((resourcePtr == NULL)
 	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)
-	    || (resourcePtr == &browserDisplay.rootResource)
-	    || (browserDisplay.focusWindow == None)
-	    || (browserDisplay.focusWindow == PointerRoot)
-	    || !BrowserWindowInTree(browserDisplay.focusWindow,
+	    || (resourcePtr == &x11wasm_browserDisplay.rootResource)
+	    || (x11wasm_browserDisplay.focusWindow == None)
+	    || (x11wasm_browserDisplay.focusWindow == PointerRoot)
+	    || !BrowserWindowInTree(x11wasm_browserDisplay.focusWindow,
 		    (Window)resourcePtr->id)) {
 	return;
     }
-    focusPtr = BrowserWindowResource(browserDisplay.focusWindow);
+    focusPtr = BrowserWindowResource(x11wasm_browserDisplay.focusWindow);
     if (focusPtr == NULL) {
 	return;
     }
 
     oldFocusWindow = BrowserGetFocusWindow();
-    newFocus = browserDisplay.focusWindow;
-    newRevertTo = browserDisplay.focusRevertTo;
-    if (browserDisplay.focusRevertTo == RevertToParent) {
+    newFocus = x11wasm_browserDisplay.focusWindow;
+    newRevertTo = x11wasm_browserDisplay.focusRevertTo;
+    if (x11wasm_browserDisplay.focusRevertTo == RevertToParent) {
 	newFocus = BrowserClosestViewableFocusAncestor(focusPtr, resourcePtr);
 	newRevertTo = RevertToNone;
-    } else if (browserDisplay.focusRevertTo == RevertToPointerRoot) {
+    } else if (x11wasm_browserDisplay.focusRevertTo == RevertToPointerRoot) {
 	newFocus = PointerRoot;
     } else {
 	newFocus = None;
     }
 
-    browserDisplay.focusWindow = newFocus;
-    browserDisplay.focusRevertTo = newRevertTo;
+    x11wasm_browserDisplay.focusWindow = newFocus;
+    x11wasm_browserDisplay.focusRevertTo = newRevertTo;
     newFocusWindow = BrowserGetFocusWindow();
     (void)X11WasmJsSetInputFocus(newFocusWindow != None,
 	    (unsigned int)newFocusWindow);
@@ -1001,9 +1001,9 @@ BrowserAllowEventsTimeIsValid(
     Time time)
 {
     return (!BrowserAllowEventsAffectsPointer(mode)
-	    || BrowserRequestTimeIsValid(time, browserDisplay.pointerGrabTime))
+	    || BrowserRequestTimeIsValid(time, x11wasm_browserDisplay.pointerGrabTime))
 	    && (!BrowserAllowEventsAffectsKeyboard(mode)
-	    || BrowserRequestTimeIsValid(time, browserDisplay.keyboardGrabTime));
+	    || BrowserRequestTimeIsValid(time, x11wasm_browserDisplay.keyboardGrabTime));
 }
 
 static X11WasmPassiveButtonGrab *
@@ -1014,7 +1014,7 @@ BrowserFindExactPassiveButtonGrab(
 {
     X11WasmPassiveButtonGrab *grabPtr;
 
-    for (grabPtr = browserDisplay.passiveButtonGrabs; grabPtr != NULL;
+    for (grabPtr = x11wasm_browserDisplay.passiveButtonGrabs; grabPtr != NULL;
 	    grabPtr = grabPtr->nextPtr) {
 	if ((grabPtr->window == window) && (grabPtr->button == button)
 		&& (grabPtr->modifiers == modifiers)) {
@@ -1032,7 +1032,7 @@ BrowserFindExactPassiveKeyGrab(
 {
     X11WasmPassiveKeyGrab *grabPtr;
 
-    for (grabPtr = browserDisplay.passiveKeyGrabs; grabPtr != NULL;
+    for (grabPtr = x11wasm_browserDisplay.passiveKeyGrabs; grabPtr != NULL;
 	    grabPtr = grabPtr->nextPtr) {
 	if ((grabPtr->window == window) && (grabPtr->keycode == keycode)
 		&& (grabPtr->modifiers == modifiers)) {
@@ -1063,8 +1063,8 @@ BrowserInstallExactPassiveButtonGrab(
 	grabPtr->window = window;
 	grabPtr->button = button;
 	grabPtr->modifiers = modifiers;
-	grabPtr->nextPtr = browserDisplay.passiveButtonGrabs;
-	browserDisplay.passiveButtonGrabs = grabPtr;
+	grabPtr->nextPtr = x11wasm_browserDisplay.passiveButtonGrabs;
+	x11wasm_browserDisplay.passiveButtonGrabs = grabPtr;
     }
     grabPtr->ownerEvents = ownerEvents ? 1 : 0;
     grabPtr->eventMask = eventMask;
@@ -1137,8 +1137,8 @@ BrowserInstallExactPassiveKeyGrab(
 	grabPtr->window = window;
 	grabPtr->keycode = keycode;
 	grabPtr->modifiers = modifiers;
-	grabPtr->nextPtr = browserDisplay.passiveKeyGrabs;
-	browserDisplay.passiveKeyGrabs = grabPtr;
+	grabPtr->nextPtr = x11wasm_browserDisplay.passiveKeyGrabs;
+	x11wasm_browserDisplay.passiveKeyGrabs = grabPtr;
     }
     grabPtr->ownerEvents = ownerEvents ? 1 : 0;
     grabPtr->pointerMode = pointerMode;
@@ -1214,7 +1214,7 @@ BrowserRemovePassiveButtonGrabs(
     unsigned int button,
     unsigned int modifiers)
 {
-    X11WasmPassiveButtonGrab **linkPtr = &browserDisplay.passiveButtonGrabs;
+    X11WasmPassiveButtonGrab **linkPtr = &x11wasm_browserDisplay.passiveButtonGrabs;
 
     while (*linkPtr != NULL) {
 	X11WasmPassiveButtonGrab *grabPtr = *linkPtr;
@@ -1235,7 +1235,7 @@ BrowserRemovePassiveKeyGrabs(
     int keycode,
     unsigned int modifiers)
 {
-    X11WasmPassiveKeyGrab **linkPtr = &browserDisplay.passiveKeyGrabs;
+    X11WasmPassiveKeyGrab **linkPtr = &x11wasm_browserDisplay.passiveKeyGrabs;
 
     while (*linkPtr != NULL) {
 	X11WasmPassiveKeyGrab *grabPtr = *linkPtr;
@@ -1261,7 +1261,7 @@ BrowserRequestTimeIsValid(
     if ((lastChangeTime != CurrentTime) && (time < lastChangeTime)) {
 	return 0;
     }
-    if (time > eventTime) {
+    if (time > x11wasm_eventTime) {
 	return 0;
     }
     return 1;
@@ -1271,15 +1271,15 @@ Time
 BrowserRequestEffectiveTime(
     Time time)
 {
-    return (time == CurrentTime) ? eventTime : time;
+    return (time == CurrentTime) ? x11wasm_eventTime : time;
 }
 
 void
 BrowserRecordFocusChangeTime(
     Time time)
 {
-    if (BrowserRequestTimeIsValid(time, browserDisplay.focusTime)) {
-	browserDisplay.focusTime = BrowserRequestEffectiveTime(time);
+    if (BrowserRequestTimeIsValid(time, x11wasm_browserDisplay.focusTime)) {
+	x11wasm_browserDisplay.focusTime = BrowserRequestEffectiveTime(time);
     }
 }
 
@@ -1293,22 +1293,22 @@ BrowserActivatePassiveButtonGrab(
     X11WasmPassiveButtonGrab *grabPtr;
 
     BrowserInitDisplay();
-    if (BrowserWindowCanReceiveEvents(browserDisplay.pointerGrabWindow)) {
+    if (BrowserWindowCanReceiveEvents(x11wasm_browserDisplay.pointerGrabWindow)) {
 	return 0;
     }
     grabPtr = BrowserFindPassiveButtonGrab(eventWindow, button, state);
     if (grabPtr == NULL) {
 	return 0;
     }
-    browserDisplay.pointerGrabWindow = grabPtr->window;
-    browserDisplay.pointerGrabOwnerEvents = grabPtr->ownerEvents;
-    browserDisplay.pointerGrabEventMask = grabPtr->eventMask;
-    browserDisplay.pointerGrabConfineWindow = grabPtr->confineTo;
+    x11wasm_browserDisplay.pointerGrabWindow = grabPtr->window;
+    x11wasm_browserDisplay.pointerGrabOwnerEvents = grabPtr->ownerEvents;
+    x11wasm_browserDisplay.pointerGrabEventMask = grabPtr->eventMask;
+    x11wasm_browserDisplay.pointerGrabConfineWindow = grabPtr->confineTo;
     BrowserSetPointerGrabCursor(grabPtr->cursor);
-    browserDisplay.pointerGrabPointerMode = grabPtr->pointerMode;
-    browserDisplay.pointerGrabKeyboardMode = grabPtr->keyboardMode;
-    browserDisplay.pointerGrabTime = BrowserRequestEffectiveTime(time);
-    browserDisplay.pointerGrabPassive = 1;
+    x11wasm_browserDisplay.pointerGrabPointerMode = grabPtr->pointerMode;
+    x11wasm_browserDisplay.pointerGrabKeyboardMode = grabPtr->keyboardMode;
+    x11wasm_browserDisplay.pointerGrabTime = BrowserRequestEffectiveTime(time);
+    x11wasm_browserDisplay.pointerGrabPassive = 1;
     BrowserSyncPointerGrabCursor();
     BrowserSyncPointerGrabState();
     return 1;
@@ -1324,19 +1324,19 @@ BrowserActivatePassiveKeyGrab(
     X11WasmPassiveKeyGrab *grabPtr;
 
     BrowserInitDisplay();
-    if (BrowserWindowCanReceiveEvents(browserDisplay.keyboardGrabWindow)) {
+    if (BrowserWindowCanReceiveEvents(x11wasm_browserDisplay.keyboardGrabWindow)) {
 	return 0;
     }
     grabPtr = BrowserFindPassiveKeyGrab(eventWindow, keycode, state);
     if (grabPtr == NULL) {
 	return 0;
     }
-    browserDisplay.keyboardGrabWindow = grabPtr->window;
-    browserDisplay.keyboardGrabOwnerEvents = grabPtr->ownerEvents;
-    browserDisplay.keyboardGrabPointerMode = grabPtr->pointerMode;
-    browserDisplay.keyboardGrabKeyboardMode = grabPtr->keyboardMode;
-    browserDisplay.keyboardGrabTime = BrowserRequestEffectiveTime(time);
-    browserDisplay.keyboardGrabPassive = 1;
+    x11wasm_browserDisplay.keyboardGrabWindow = grabPtr->window;
+    x11wasm_browserDisplay.keyboardGrabOwnerEvents = grabPtr->ownerEvents;
+    x11wasm_browserDisplay.keyboardGrabPointerMode = grabPtr->pointerMode;
+    x11wasm_browserDisplay.keyboardGrabKeyboardMode = grabPtr->keyboardMode;
+    x11wasm_browserDisplay.keyboardGrabTime = BrowserRequestEffectiveTime(time);
+    x11wasm_browserDisplay.keyboardGrabPassive = 1;
     BrowserSyncKeyboardGrabState();
     return 1;
 }
@@ -1348,7 +1348,7 @@ BrowserReleasePassivePointerGrabIfIdle(
     const unsigned int buttonMask = Button1Mask | Button2Mask | Button3Mask
 	    | Button4Mask | Button5Mask;
 
-    if (browserDisplay.pointerGrabPassive && ((state & buttonMask) == 0)) {
+    if (x11wasm_browserDisplay.pointerGrabPassive && ((state & buttonMask) == 0)) {
 	BrowserDeactivatePointerGrab();
     }
 }
@@ -1358,11 +1358,11 @@ BrowserReleasePassiveKeyboardGrabIfIdle(void)
 {
     int i;
 
-    if (!browserDisplay.keyboardGrabPassive) {
+    if (!x11wasm_browserDisplay.keyboardGrabPassive) {
 	return;
     }
     for (i = 0; i < 32; i++) {
-	if (browserDisplay.keymap[i] != 0) {
+	if (x11wasm_browserDisplay.keymap[i] != 0) {
 	    return;
 	}
     }
@@ -1376,7 +1376,7 @@ BrowserDeletePassiveGrabsForWindow(
     X11WasmPassiveButtonGrab **buttonLinkPtr;
     X11WasmPassiveKeyGrab **keyLinkPtr;
 
-    buttonLinkPtr = &browserDisplay.passiveButtonGrabs;
+    buttonLinkPtr = &x11wasm_browserDisplay.passiveButtonGrabs;
     while (*buttonLinkPtr != NULL) {
 	X11WasmPassiveButtonGrab *grabPtr = *buttonLinkPtr;
 
@@ -1388,7 +1388,7 @@ BrowserDeletePassiveGrabsForWindow(
 	buttonLinkPtr = &grabPtr->nextPtr;
     }
 
-    keyLinkPtr = &browserDisplay.passiveKeyGrabs;
+    keyLinkPtr = &x11wasm_browserDisplay.passiveKeyGrabs;
     while (*keyLinkPtr != NULL) {
 	X11WasmPassiveKeyGrab *grabPtr = *keyLinkPtr;
 
@@ -1404,16 +1404,16 @@ BrowserDeletePassiveGrabsForWindow(
 void
 BrowserClearPassiveGrabs(void)
 {
-    while (browserDisplay.passiveButtonGrabs != NULL) {
-	X11WasmPassiveButtonGrab *grabPtr = browserDisplay.passiveButtonGrabs;
+    while (x11wasm_browserDisplay.passiveButtonGrabs != NULL) {
+	X11WasmPassiveButtonGrab *grabPtr = x11wasm_browserDisplay.passiveButtonGrabs;
 
-	browserDisplay.passiveButtonGrabs = grabPtr->nextPtr;
+	x11wasm_browserDisplay.passiveButtonGrabs = grabPtr->nextPtr;
 	BrowserFreePassiveButtonGrab(grabPtr);
     }
-    while (browserDisplay.passiveKeyGrabs != NULL) {
-	X11WasmPassiveKeyGrab *grabPtr = browserDisplay.passiveKeyGrabs;
+    while (x11wasm_browserDisplay.passiveKeyGrabs != NULL) {
+	X11WasmPassiveKeyGrab *grabPtr = x11wasm_browserDisplay.passiveKeyGrabs;
 
-	browserDisplay.passiveKeyGrabs = grabPtr->nextPtr;
+	x11wasm_browserDisplay.passiveKeyGrabs = grabPtr->nextPtr;
 	BrowserFreePassiveKeyGrab(grabPtr);
     }
 }
@@ -1458,12 +1458,12 @@ XSetInputFocus(
 	}
 	newFocus = focus;
     }
-    if (!BrowserRequestTimeIsValid(time, browserDisplay.focusTime)) {
+    if (!BrowserRequestTimeIsValid(time, x11wasm_browserDisplay.focusTime)) {
 	return Success;
     }
     effectiveTime = BrowserRequestEffectiveTime(time);
-    browserDisplay.focusRevertTo = revertTo;
-    browserDisplay.focusWindow = newFocus;
+    x11wasm_browserDisplay.focusRevertTo = revertTo;
+    x11wasm_browserDisplay.focusWindow = newFocus;
     BrowserRecordFocusChangeTime(effectiveTime);
     newFocusWindow = BrowserGetFocusWindow();
     (void)X11WasmJsSetInputFocus(newFocusWindow != None,
@@ -1481,7 +1481,7 @@ X11WasmTestXSendEventTargets(
     unsigned int focusWindowId,
     unsigned int pointerWindowId)
 {
-    Display *display = &browserDisplay.display;
+    Display *display = &x11wasm_browserDisplay.display;
     Window focusWindow = (Window)focusWindowId;
     Window pointerWindow = (Window)pointerWindowId;
     Window propagationChild = None;
@@ -1535,7 +1535,7 @@ X11WasmTestXSendEventTargets(
     event.type = KeyPress;
     event.xkey.display = display;
     event.xkey.window = InputFocus;
-    event.xkey.root = browserDisplay.rootWindow;
+    event.xkey.root = x11wasm_browserDisplay.rootWindow;
     event.xkey.keycode = XKeysymToKeycode(display, XK_a);
     if ((XSendEvent(display, InputFocus, False, KeyPressMask, &event)
 		    != True)
@@ -1641,7 +1641,7 @@ xsendPropagationCleanup:
 
     if ((XSetInputFocus(display, rootWindow, RevertToParent, CurrentTime)
 		    != Success)
-	    || (browserDisplay.focusWindow != rootWindow)) {
+	    || (x11wasm_browserDisplay.focusWindow != rootWindow)) {
 	return 0;
     }
     (void)XGetInputFocus(display, &returnedFocus, &returnedRevert);
@@ -1657,7 +1657,7 @@ xsendPropagationCleanup:
     event.type = ButtonPress;
     event.xbutton.display = display;
     event.xbutton.window = PointerWindow;
-    event.xbutton.root = browserDisplay.rootWindow;
+    event.xbutton.root = x11wasm_browserDisplay.rootWindow;
     event.xbutton.button = Button1;
     event.xbutton.x_root = rootX + 1;
     event.xbutton.y_root = rootY + 1;
@@ -1698,7 +1698,7 @@ xsendPropagationCleanup:
 	    || (received.xany.window != focusWindow)
 	    || (received.xmotion.x != 1)
 	    || (received.xmotion.y != 1)
-	    || (browserDisplay.pointerWindow != focusWindow)
+	    || (x11wasm_browserDisplay.pointerWindow != focusWindow)
 	    || (XEventsQueued(display, QueuedAlready) != 0)) {
 	return 0;
     }
@@ -1737,24 +1737,24 @@ XGrabKeyboard(
     if (resourcePtr == NULL) {
 	return GrabNotViewable;
     }
-    if (!BrowserRequestTimeIsValid(time, browserDisplay.keyboardGrabTime)) {
+    if (!BrowserRequestTimeIsValid(time, x11wasm_browserDisplay.keyboardGrabTime)) {
 	return GrabInvalidTime;
     }
     if (!BrowserResourceIsVisible(resourcePtr)) {
 	return GrabNotViewable;
     }
     resolvedWindow = BrowserResolveEventWindow(window);
-    if ((browserDisplay.keyboardGrabWindow != None)
-	    && BrowserWindowCanReceiveEvents(browserDisplay.keyboardGrabWindow)
-	    && (browserDisplay.keyboardGrabWindow != resolvedWindow)) {
+    if ((x11wasm_browserDisplay.keyboardGrabWindow != None)
+	    && BrowserWindowCanReceiveEvents(x11wasm_browserDisplay.keyboardGrabWindow)
+	    && (x11wasm_browserDisplay.keyboardGrabWindow != resolvedWindow)) {
 	return AlreadyGrabbed;
     }
-    browserDisplay.keyboardGrabWindow = resolvedWindow;
-    browserDisplay.keyboardGrabOwnerEvents = ownerEvents ? 1 : 0;
-    browserDisplay.keyboardGrabPointerMode = pointerMode;
-    browserDisplay.keyboardGrabKeyboardMode = keyboardMode;
-    browserDisplay.keyboardGrabTime = BrowserRequestEffectiveTime(time);
-    browserDisplay.keyboardGrabPassive = 0;
+    x11wasm_browserDisplay.keyboardGrabWindow = resolvedWindow;
+    x11wasm_browserDisplay.keyboardGrabOwnerEvents = ownerEvents ? 1 : 0;
+    x11wasm_browserDisplay.keyboardGrabPointerMode = pointerMode;
+    x11wasm_browserDisplay.keyboardGrabKeyboardMode = keyboardMode;
+    x11wasm_browserDisplay.keyboardGrabTime = BrowserRequestEffectiveTime(time);
+    x11wasm_browserDisplay.keyboardGrabPassive = 0;
     BrowserSyncKeyboardGrabState();
     return GrabSuccess;
 }
@@ -1810,7 +1810,7 @@ XGrabPointer(
 	    X11_WASM_XREQ_GRAB_POINTER) == NULL)) {
 	return BadCursor;
     }
-    if (!BrowserRequestTimeIsValid(time, browserDisplay.pointerGrabTime)) {
+    if (!BrowserRequestTimeIsValid(time, x11wasm_browserDisplay.pointerGrabTime)) {
 	return GrabInvalidTime;
     }
     if (!BrowserResourceIsVisible(grabPtr)
@@ -1818,24 +1818,24 @@ XGrabPointer(
 	return GrabNotViewable;
     }
     resolvedGrabWindow = BrowserResolveEventWindow(grabWindow);
-    if ((browserDisplay.pointerGrabWindow != None)
-	    && BrowserWindowCanReceiveEvents(browserDisplay.pointerGrabWindow)
-	    && (browserDisplay.pointerGrabWindow != resolvedGrabWindow)) {
+    if ((x11wasm_browserDisplay.pointerGrabWindow != None)
+	    && BrowserWindowCanReceiveEvents(x11wasm_browserDisplay.pointerGrabWindow)
+	    && (x11wasm_browserDisplay.pointerGrabWindow != resolvedGrabWindow)) {
 	return AlreadyGrabbed;
     }
-    browserDisplay.pointerGrabWindow = resolvedGrabWindow;
-    browserDisplay.pointerGrabOwnerEvents = ownerEvents ? 1 : 0;
-    browserDisplay.pointerGrabEventMask = eventMask;
-    browserDisplay.pointerGrabConfineWindow = confineTo;
+    x11wasm_browserDisplay.pointerGrabWindow = resolvedGrabWindow;
+    x11wasm_browserDisplay.pointerGrabOwnerEvents = ownerEvents ? 1 : 0;
+    x11wasm_browserDisplay.pointerGrabEventMask = eventMask;
+    x11wasm_browserDisplay.pointerGrabConfineWindow = confineTo;
     BrowserSetPointerGrabCursor(cursor);
-    browserDisplay.pointerGrabPointerMode = pointerMode;
-    browserDisplay.pointerGrabKeyboardMode = keyboardMode;
-    browserDisplay.pointerGrabTime = BrowserRequestEffectiveTime(time);
-    browserDisplay.pointerGrabPassive = 0;
-    BrowserClampPointerToGrabConfine(&browserDisplay.pointerX,
-	    &browserDisplay.pointerY);
-    browserDisplay.pointerWindow = BrowserHitTestRoot(browserDisplay.pointerX,
-	    browserDisplay.pointerY, NULL, NULL);
+    x11wasm_browserDisplay.pointerGrabPointerMode = pointerMode;
+    x11wasm_browserDisplay.pointerGrabKeyboardMode = keyboardMode;
+    x11wasm_browserDisplay.pointerGrabTime = BrowserRequestEffectiveTime(time);
+    x11wasm_browserDisplay.pointerGrabPassive = 0;
+    BrowserClampPointerToGrabConfine(&x11wasm_browserDisplay.pointerX,
+	    &x11wasm_browserDisplay.pointerY);
+    x11wasm_browserDisplay.pointerWindow = BrowserHitTestRoot(x11wasm_browserDisplay.pointerX,
+	    x11wasm_browserDisplay.pointerY, NULL, NULL);
     BrowserSyncPointerState();
     BrowserSyncPointerGrabCursor();
     BrowserSyncPointerGrabState();
@@ -1864,26 +1864,26 @@ XAllowEvents(
     if (!BrowserAllowEventsTimeIsValid(eventMode, time)) {
 	return Success;
     }
-    if (display == &browserDisplay.display) {
+    if (display == &x11wasm_browserDisplay.display) {
 	if ((eventMode == AsyncPointer) || (eventMode == ReplayPointer)
 		|| (eventMode == AsyncBoth)) {
-	    if (browserDisplay.pointerGrabWindow != None) {
-		browserDisplay.pointerGrabPointerMode = GrabModeAsync;
+	    if (x11wasm_browserDisplay.pointerGrabWindow != None) {
+		x11wasm_browserDisplay.pointerGrabPointerMode = GrabModeAsync;
 		pointerChanged = 1;
 	    }
-	    if (browserDisplay.keyboardGrabWindow != None) {
-		browserDisplay.keyboardGrabPointerMode = GrabModeAsync;
+	    if (x11wasm_browserDisplay.keyboardGrabWindow != None) {
+		x11wasm_browserDisplay.keyboardGrabPointerMode = GrabModeAsync;
 		keyboardChanged = 1;
 	    }
 	}
 	if ((eventMode == AsyncKeyboard) || (eventMode == ReplayKeyboard)
 		|| (eventMode == AsyncBoth)) {
-	    if (browserDisplay.pointerGrabWindow != None) {
-		browserDisplay.pointerGrabKeyboardMode = GrabModeAsync;
+	    if (x11wasm_browserDisplay.pointerGrabWindow != None) {
+		x11wasm_browserDisplay.pointerGrabKeyboardMode = GrabModeAsync;
 		pointerChanged = 1;
 	    }
-	    if (browserDisplay.keyboardGrabWindow != None) {
-		browserDisplay.keyboardGrabKeyboardMode = GrabModeAsync;
+	    if (x11wasm_browserDisplay.keyboardGrabWindow != None) {
+		x11wasm_browserDisplay.keyboardGrabKeyboardMode = GrabModeAsync;
 		keyboardChanged = 1;
 	    }
 	}
@@ -1918,12 +1918,12 @@ XChangeActivePointerGrab(
 	    X11_WASM_XREQ_CHANGE_ACTIVE_POINTER_GRAB) == NULL)) {
 	return Success;
     }
-    if (!BrowserRequestTimeIsValid(time, browserDisplay.pointerGrabTime)) {
+    if (!BrowserRequestTimeIsValid(time, x11wasm_browserDisplay.pointerGrabTime)) {
 	return Success;
     }
-    if ((display == &browserDisplay.display)
-	    && (browserDisplay.pointerGrabWindow != None)) {
-	browserDisplay.pointerGrabEventMask = eventMask;
+    if ((display == &x11wasm_browserDisplay.display)
+	    && (x11wasm_browserDisplay.pointerGrabWindow != None)) {
+	x11wasm_browserDisplay.pointerGrabEventMask = eventMask;
 	BrowserSetPointerGrabCursor(cursor);
 	BrowserSyncPointerGrabCursor();
 	BrowserSyncPointerGrabState();
@@ -1980,7 +1980,7 @@ XGrabButton(
 	    X11_WASM_XREQ_GRAB_BUTTON) == NULL)) {
 	return Success;
     }
-    if (display == &browserDisplay.display) {
+    if (display == &x11wasm_browserDisplay.display) {
 	BrowserInstallPassiveButtonGrab(grabWindow, button, modifiers,
 		ownerEvents, eventMask, pointerMode, keyboardMode, confineTo,
 		cursor);
@@ -2023,7 +2023,7 @@ XGrabKey(
 	    X11_WASM_XREQ_GRAB_KEY) == NULL) {
 	return Success;
     }
-    if (display == &browserDisplay.display) {
+    if (display == &x11wasm_browserDisplay.display) {
 	BrowserInstallPassiveKeyGrab(display, grabWindow, keycode, modifiers,
 		ownerEvents, pointerMode, keyboardMode);
     }
@@ -2054,7 +2054,7 @@ XUngrabButton(
 	    X11_WASM_XREQ_UNGRAB_BUTTON) == NULL) {
 	return Success;
     }
-    if (display == &browserDisplay.display) {
+    if (display == &x11wasm_browserDisplay.display) {
 	BrowserRemovePassiveButtonGrabs(grabWindow, button, modifiers);
     }
     return XNoOp(display);
@@ -2084,7 +2084,7 @@ XUngrabKey(
 	    X11_WASM_XREQ_UNGRAB_KEY) == NULL) {
 	return Success;
     }
-    if (display == &browserDisplay.display) {
+    if (display == &x11wasm_browserDisplay.display) {
 	BrowserRemovePassiveKeyGrabs(grabWindow, keycode, modifiers);
     }
     return XNoOp(display);
@@ -2102,12 +2102,12 @@ XUngrabKeyboard(
     } else {
 	BrowserInitDisplay();
     }
-    if ((display == &browserDisplay.display)
-	    && BrowserRequestTimeIsValid(time, browserDisplay.keyboardGrabTime)
-	    && (browserDisplay.keyboardGrabWindow != None)) {
+    if ((display == &x11wasm_browserDisplay.display)
+	    && BrowserRequestTimeIsValid(time, x11wasm_browserDisplay.keyboardGrabTime)
+	    && (x11wasm_browserDisplay.keyboardGrabWindow != None)) {
 	effectiveTime = BrowserRequestEffectiveTime(time);
 	BrowserDeactivateKeyboardGrab();
-	browserDisplay.keyboardGrabTime = effectiveTime;
+	x11wasm_browserDisplay.keyboardGrabTime = effectiveTime;
     }
     return XNoOp(display);
 }
@@ -2123,12 +2123,12 @@ XUngrabPointer(
     } else {
 	BrowserInitDisplay();
     }
-    if ((display == &browserDisplay.display)
-	    && BrowserRequestTimeIsValid(time, browserDisplay.pointerGrabTime)
-	    && (browserDisplay.pointerGrabWindow != None)) {
+    if ((display == &x11wasm_browserDisplay.display)
+	    && BrowserRequestTimeIsValid(time, x11wasm_browserDisplay.pointerGrabTime)
+	    && (x11wasm_browserDisplay.pointerGrabWindow != None)) {
 	effectiveTime = BrowserRequestEffectiveTime(time);
 	BrowserDeactivatePointerGrab();
-	browserDisplay.pointerGrabTime = effectiveTime;
+	x11wasm_browserDisplay.pointerGrabTime = effectiveTime;
     }
     return XNoOp(display);
 }
@@ -2172,8 +2172,8 @@ XWarpPointer(
 	if (sourcePtr == NULL) {
 	    return Success;
 	}
-	BrowserWindowCoordinatesFromRoot(src, browserDisplay.pointerX,
-		browserDisplay.pointerY, &pointerX, &pointerY);
+	BrowserWindowCoordinatesFromRoot(src, x11wasm_browserDisplay.pointerX,
+		x11wasm_browserDisplay.pointerY, &pointerX, &pointerY);
 	if ((pointerX < 0) || (pointerY < 0)
 		|| (pointerX >= (int)sourcePtr->width)
 		|| (pointerY >= (int)sourcePtr->height)) {
@@ -2202,18 +2202,18 @@ XWarpPointer(
 	rootX += destX;
 	rootY += destY;
     } else {
-	rootX = browserDisplay.pointerX + destX;
-	rootY = browserDisplay.pointerY + destY;
+	rootX = x11wasm_browserDisplay.pointerX + destX;
+	rootY = x11wasm_browserDisplay.pointerY + destY;
     }
 
-    (void)BrowserQueuePointerCrossingEvents(browserDisplay.pointerState,
+    (void)BrowserQueuePointerCrossingEvents(x11wasm_browserDisplay.pointerState,
 	    rootX, rootY, CurrentTime);
     (void)BrowserQueuePointerEventFields(MotionNotify,
-	    browserDisplay.rootWindow, 0, browserDisplay.pointerState, rootX,
+	    x11wasm_browserDisplay.rootWindow, 0, x11wasm_browserDisplay.pointerState, rootX,
 	    rootY, CurrentTime, 0);
-    (void)X11WasmJsWarpPointer(browserDisplay.pointerX,
-	    browserDisplay.pointerY, (unsigned int)browserDisplay.pointerWindow,
-	    (unsigned int)eventTime);
+    (void)X11WasmJsWarpPointer(x11wasm_browserDisplay.pointerX,
+	    x11wasm_browserDisplay.pointerY, (unsigned int)x11wasm_browserDisplay.pointerWindow,
+	    (unsigned int)x11wasm_eventTime);
     return Success;
 }
 
@@ -2231,10 +2231,10 @@ XBell(
 	    (percent >= -100) && (percent <= 100), X11_WASM_XREQ_BELL)) {
 	return Success;
     }
-    if (display == &browserDisplay.display) {
+    if (display == &x11wasm_browserDisplay.display) {
 	return X11WasmJsBell(BrowserEffectiveBellPercent(
-		browserDisplay.bellPercent, percent),
-		(int)browserDisplay.bellPitch, (int)browserDisplay.bellDuration);
+		x11wasm_browserDisplay.bellPercent, percent),
+		(int)x11wasm_browserDisplay.bellPitch, (int)x11wasm_browserDisplay.bellDuration);
     }
     return Success;
 }
@@ -2319,23 +2319,23 @@ XChangeKeyboardControl(
 	return Success;
     }
 
-    if (display == &browserDisplay.display) {
+    if (display == &x11wasm_browserDisplay.display) {
 	if (valueMask & KBKeyClickPercent) {
-	    browserDisplay.keyClickPercent =
+	    x11wasm_browserDisplay.keyClickPercent =
 		    (values->key_click_percent == -1) ? 0
 		    : values->key_click_percent;
 	}
 	if (valueMask & KBBellPercent) {
-	    browserDisplay.bellPercent =
+	    x11wasm_browserDisplay.bellPercent =
 		    (values->bell_percent == -1) ? 50 : values->bell_percent;
 	}
 	if (valueMask & KBBellPitch) {
-	    browserDisplay.bellPitch =
+	    x11wasm_browserDisplay.bellPitch =
 		    (values->bell_pitch == -1) ? 400
 		    : (unsigned int)values->bell_pitch;
 	}
 	if (valueMask & KBBellDuration) {
-	    browserDisplay.bellDuration =
+	    x11wasm_browserDisplay.bellDuration =
 		    (values->bell_duration == -1) ? 100
 		    : (unsigned int)values->bell_duration;
 	}
@@ -2343,19 +2343,19 @@ XChangeKeyboardControl(
 	    unsigned long ledMask = 1UL << (values->led - 1);
 
 	    if (values->led_mode == LedModeOn) {
-		browserDisplay.ledMask |= ledMask;
+		x11wasm_browserDisplay.ledMask |= ledMask;
 	    } else {
-		browserDisplay.ledMask &= ~ledMask;
+		x11wasm_browserDisplay.ledMask &= ~ledMask;
 	    }
 	}
 	if (valueMask & KBAutoRepeatMode) {
 	    int repeatOn = values->auto_repeat_mode != AutoRepeatModeOff;
 
 	    if (valueMask & KBKey) {
-		BrowserSetKeyBit(browserDisplay.autoRepeats,
+		BrowserSetKeyBit(x11wasm_browserDisplay.autoRepeats,
 			(unsigned int)values->key, repeatOn);
 	    } else {
-		browserDisplay.globalAutoRepeat = repeatOn
+		x11wasm_browserDisplay.globalAutoRepeat = repeatOn
 			? AutoRepeatModeOn : AutoRepeatModeOff;
 	    }
 	}
@@ -2395,14 +2395,14 @@ XGetKeyboardControl(
     } else {
 	BrowserInitDisplay();
     }
-    if ((display == &browserDisplay.display) && (valuesReturn != NULL)) {
-	valuesReturn->key_click_percent = browserDisplay.keyClickPercent;
-	valuesReturn->bell_percent = browserDisplay.bellPercent;
-	valuesReturn->bell_pitch = browserDisplay.bellPitch;
-	valuesReturn->bell_duration = browserDisplay.bellDuration;
-	valuesReturn->led_mask = browserDisplay.ledMask;
-	valuesReturn->global_auto_repeat = browserDisplay.globalAutoRepeat;
-	memcpy(valuesReturn->auto_repeats, browserDisplay.autoRepeats,
+    if ((display == &x11wasm_browserDisplay.display) && (valuesReturn != NULL)) {
+	valuesReturn->key_click_percent = x11wasm_browserDisplay.keyClickPercent;
+	valuesReturn->bell_percent = x11wasm_browserDisplay.bellPercent;
+	valuesReturn->bell_pitch = x11wasm_browserDisplay.bellPitch;
+	valuesReturn->bell_duration = x11wasm_browserDisplay.bellDuration;
+	valuesReturn->led_mask = x11wasm_browserDisplay.ledMask;
+	valuesReturn->global_auto_repeat = x11wasm_browserDisplay.globalAutoRepeat;
+	memcpy(valuesReturn->auto_repeats, x11wasm_browserDisplay.autoRepeats,
 		sizeof(valuesReturn->auto_repeats));
     } else if (valuesReturn != NULL) {
 	memset(valuesReturn, 0, sizeof(*valuesReturn));
@@ -2420,8 +2420,8 @@ XQueryKeymap(
     } else {
 	BrowserInitDisplay();
     }
-    if ((display == &browserDisplay.display) && (keysReturn != NULL)) {
-	memcpy(keysReturn, browserDisplay.keymap, sizeof(browserDisplay.keymap));
+    if ((display == &x11wasm_browserDisplay.display) && (keysReturn != NULL)) {
+	memcpy(keysReturn, x11wasm_browserDisplay.keymap, sizeof(x11wasm_browserDisplay.keymap));
     } else if (keysReturn != NULL) {
 	memset(keysReturn, 0, 32);
     }
@@ -2462,18 +2462,18 @@ XChangePointerControl(
 		    X11_WASM_XREQ_CHANGE_POINTER_CONTROL)) {
 	return Success;
     }
-    if (display == &browserDisplay.display) {
+    if (display == &x11wasm_browserDisplay.display) {
 	if (doAccel) {
 	    if ((accelNumerator == -1) || (accelDenominator == -1)) {
-		browserDisplay.pointerAccelNumerator = 1;
-		browserDisplay.pointerAccelDenominator = 1;
+		x11wasm_browserDisplay.pointerAccelNumerator = 1;
+		x11wasm_browserDisplay.pointerAccelDenominator = 1;
 	    } else {
-		browserDisplay.pointerAccelNumerator = accelNumerator;
-		browserDisplay.pointerAccelDenominator = accelDenominator;
+		x11wasm_browserDisplay.pointerAccelNumerator = accelNumerator;
+		x11wasm_browserDisplay.pointerAccelDenominator = accelDenominator;
 	    }
 	}
 	if (doThreshold) {
-	    browserDisplay.pointerThreshold =
+	    x11wasm_browserDisplay.pointerThreshold =
 		    (threshold == -1) ? 0 : threshold;
 	}
     }
@@ -2492,15 +2492,15 @@ XGetPointerControl(
     } else {
 	BrowserInitDisplay();
     }
-    if (display == &browserDisplay.display) {
+    if (display == &x11wasm_browserDisplay.display) {
 	if (accelNumeratorReturn != NULL) {
-	    *accelNumeratorReturn = browserDisplay.pointerAccelNumerator;
+	    *accelNumeratorReturn = x11wasm_browserDisplay.pointerAccelNumerator;
 	}
 	if (accelDenominatorReturn != NULL) {
-	    *accelDenominatorReturn = browserDisplay.pointerAccelDenominator;
+	    *accelDenominatorReturn = x11wasm_browserDisplay.pointerAccelDenominator;
 	}
 	if (thresholdReturn != NULL) {
-	    *thresholdReturn = browserDisplay.pointerThreshold;
+	    *thresholdReturn = x11wasm_browserDisplay.pointerThreshold;
 	}
     } else {
 	if (accelNumeratorReturn != NULL) {
@@ -2529,13 +2529,13 @@ XGetPointerMapping(
     } else {
 	BrowserInitDisplay();
     }
-    count = (display == &browserDisplay.display)
-	    ? browserDisplay.pointerMapCount : 0;
-    if ((display == &browserDisplay.display) && (mapReturn != NULL)
+    count = (display == &x11wasm_browserDisplay.display)
+	    ? x11wasm_browserDisplay.pointerMapCount : 0;
+    if ((display == &x11wasm_browserDisplay.display) && (mapReturn != NULL)
 	    && (nmap > 0)) {
 	int copyCount = (nmap < count) ? nmap : count;
 
-	memcpy(mapReturn, browserDisplay.pointerMap, (size_t)copyCount);
+	memcpy(mapReturn, x11wasm_browserDisplay.pointerMap, (size_t)copyCount);
     }
     (void)XNoOp(display);
     return count;
@@ -2572,12 +2572,12 @@ BrowserPointerMappingIsBusy(
 	unsigned int oldMask;
 	unsigned int newMask;
 
-	if (map[i] == browserDisplay.pointerMap[i]) {
+	if (map[i] == x11wasm_browserDisplay.pointerMap[i]) {
 	    continue;
 	}
-	oldMask = BrowserPointerButtonMask(browserDisplay.pointerMap[i]);
+	oldMask = BrowserPointerButtonMask(x11wasm_browserDisplay.pointerMap[i]);
 	newMask = BrowserPointerButtonMask(map[i]);
-	if (browserDisplay.pointerState & (oldMask | newMask)) {
+	if (x11wasm_browserDisplay.pointerState & (oldMask | newMask)) {
 	    return 1;
 	}
     }
@@ -2598,13 +2598,13 @@ XSetPointerMapping(
     } else {
 	BrowserInitDisplay();
     }
-    if ((display != &browserDisplay.display)
+    if ((display != &x11wasm_browserDisplay.display)
 	    || ((nmap > 0) && (map == NULL))) {
 	(void)XNoOp(display);
 	return MappingFailed;
     }
     if (!BrowserValueOrError(&display, nmap,
-	    nmap == browserDisplay.pointerMapCount,
+	    nmap == x11wasm_browserDisplay.pointerMapCount,
 	    X11_WASM_XREQ_SET_POINTER_MAPPING)) {
 	(void)XNoOp(display);
 	return MappingFailed;
@@ -2626,7 +2626,7 @@ XSetPointerMapping(
 	(void)XNoOp(display);
 	return MappingBusy;
     }
-    memcpy(browserDisplay.pointerMap, map, (size_t)nmap);
+    memcpy(x11wasm_browserDisplay.pointerMap, map, (size_t)nmap);
     (void)BrowserQueueMappingNotify(MappingPointer, 0, 0);
     (void)XNoOp(display);
     return MappingSuccess;
@@ -2642,22 +2642,22 @@ BrowserRecordPointerMotion(
 
     BrowserInitDisplay();
     if (time == CurrentTime) {
-	time = eventTime;
+	time = x11wasm_eventTime;
     }
-    if (browserDisplay.motionHistoryCount < X11_WASM_MOTION_BUFFER_SIZE) {
-	index = (browserDisplay.motionHistoryStart
-		+ browserDisplay.motionHistoryCount)
+    if (x11wasm_browserDisplay.motionHistoryCount < X11_WASM_MOTION_BUFFER_SIZE) {
+	index = (x11wasm_browserDisplay.motionHistoryStart
+		+ x11wasm_browserDisplay.motionHistoryCount)
 		% X11_WASM_MOTION_BUFFER_SIZE;
-	browserDisplay.motionHistoryCount++;
+	x11wasm_browserDisplay.motionHistoryCount++;
     } else {
-	index = browserDisplay.motionHistoryStart;
-	browserDisplay.motionHistoryStart =
-		(browserDisplay.motionHistoryStart + 1)
+	index = x11wasm_browserDisplay.motionHistoryStart;
+	x11wasm_browserDisplay.motionHistoryStart =
+		(x11wasm_browserDisplay.motionHistoryStart + 1)
 		% X11_WASM_MOTION_BUFFER_SIZE;
     }
-    browserDisplay.motionHistory[index].time = time;
-    browserDisplay.motionHistory[index].rootX = rootX;
-    browserDisplay.motionHistory[index].rootY = rootY;
+    x11wasm_browserDisplay.motionHistory[index].time = time;
+    x11wasm_browserDisplay.motionHistory[index].rootX = rootX;
+    x11wasm_browserDisplay.motionHistory[index].rootY = rootY;
 }
 
 static int
@@ -2726,17 +2726,17 @@ XGetMotionEvents(
     if (resourcePtr == NULL) {
 	return NULL;
     }
-    if ((display != &browserDisplay.display)
-	    || (browserDisplay.motionHistoryCount == 0)
+    if ((display != &x11wasm_browserDisplay.display)
+	    || (x11wasm_browserDisplay.motionHistoryCount == 0)
 	    || (start > stop)) {
 	(void)XNoOp(display);
 	return NULL;
     }
-    for (i = 0; i < browserDisplay.motionHistoryCount; i++) {
-	int index = (browserDisplay.motionHistoryStart + i)
+    for (i = 0; i < x11wasm_browserDisplay.motionHistoryCount; i++) {
+	int index = (x11wasm_browserDisplay.motionHistoryStart + i)
 		% X11_WASM_MOTION_BUFFER_SIZE;
 	X11WasmMotionRecord *recordPtr =
-		&browserDisplay.motionHistory[index];
+		&x11wasm_browserDisplay.motionHistory[index];
 
 	if (BrowserMotionRecordMatchesWindow(resourcePtr, recordPtr, start, stop,
 		NULL, NULL)) {
@@ -2748,11 +2748,11 @@ XGetMotionEvents(
 	return NULL;
     }
     events = (XTimeCoord *)ckalloc(sizeof(XTimeCoord) * (size_t)count);
-    for (i = 0; i < browserDisplay.motionHistoryCount; i++) {
-	int index = (browserDisplay.motionHistoryStart + i)
+    for (i = 0; i < x11wasm_browserDisplay.motionHistoryCount; i++) {
+	int index = (x11wasm_browserDisplay.motionHistoryStart + i)
 		% X11_WASM_MOTION_BUFFER_SIZE;
 	X11WasmMotionRecord *recordPtr =
-		&browserDisplay.motionHistory[index];
+		&x11wasm_browserDisplay.motionHistory[index];
 	int x;
 	int y;
 
@@ -2777,8 +2777,8 @@ BrowserFlushToJs(
     Display *display)
 {
     (void)display;
-    if (display == &browserDisplay.display) {
-	browserDisplay.flushSerial++;
+    if (display == &x11wasm_browserDisplay.display) {
+	x11wasm_browserDisplay.flushSerial++;
 	BrowserSyncRequestState(display);
     }
     return X11WasmJsFlush();
@@ -2788,11 +2788,11 @@ void
 BrowserSyncRequestState(
     Display *display)
 {
-    if (display == &browserDisplay.display) {
+    if (display == &x11wasm_browserDisplay.display) {
 	(void)X11WasmJsSetRequestState(
 		(unsigned int)LastKnownRequestProcessed(display),
-		(unsigned int)browserDisplay.flushSerial,
-		(unsigned int)browserDisplay.syncSerial);
+		(unsigned int)x11wasm_browserDisplay.flushSerial,
+		(unsigned int)x11wasm_browserDisplay.syncSerial);
     }
 }
 
@@ -2800,8 +2800,8 @@ void
 BrowserSyncSynchronizeState(
     Display *display)
 {
-    if (display == &browserDisplay.display) {
-	(void)X11WasmJsSetSynchronizeState(browserDisplay.synchronize != 0);
+    if (display == &x11wasm_browserDisplay.display) {
+	(void)X11WasmJsSetSynchronizeState(x11wasm_browserDisplay.synchronize != 0);
     }
 }
 
@@ -2814,8 +2814,8 @@ BrowserSynchronizedAfterFunction(
     } else {
 	BrowserInitDisplay();
     }
-    if (display == &browserDisplay.display) {
-	browserDisplay.syncSerial++;
+    if (display == &x11wasm_browserDisplay.display) {
+	x11wasm_browserDisplay.syncSerial++;
     }
     return BrowserFlushToJs(display);
 }
@@ -2827,16 +2827,16 @@ BrowserInvokeAfterFunction(
     XAfterFunction afterFunction;
     int result;
 
-    if (display != &browserDisplay.display) {
+    if (display != &x11wasm_browserDisplay.display) {
 	return Success;
     }
-    afterFunction = browserDisplay.afterFunction;
-    if ((afterFunction == NULL) || browserDisplay.runningAfterFunction) {
+    afterFunction = x11wasm_browserDisplay.afterFunction;
+    if ((afterFunction == NULL) || x11wasm_browserDisplay.runningAfterFunction) {
 	return Success;
     }
-    browserDisplay.runningAfterFunction = 1;
+    x11wasm_browserDisplay.runningAfterFunction = 1;
     result = afterFunction(display);
-    browserDisplay.runningAfterFunction = 0;
+    x11wasm_browserDisplay.runningAfterFunction = 0;
     return result;
 }
 
@@ -2877,8 +2877,8 @@ int XSync(Display *display, Bool discard)
 	BrowserInitDisplay();
     }
     LastKnownRequestProcessed(display)++;
-    if (display == &browserDisplay.display) {
-	browserDisplay.syncSerial++;
+    if (display == &x11wasm_browserDisplay.display) {
+	x11wasm_browserDisplay.syncSerial++;
     }
     result = BrowserFlushToJs(display);
     if (discard) {
@@ -2896,8 +2896,8 @@ int XGrabServer(Display *display)
 	display = X11WasmGetDisplay(NULL);
     }
     BrowserInitDisplay();
-    if (display == &browserDisplay.display) {
-	browserDisplay.serverGrabDepth++;
+    if (display == &x11wasm_browserDisplay.display) {
+	x11wasm_browserDisplay.serverGrabDepth++;
 	BrowserSyncServerGrabState();
     }
     return XNoOp(display);
@@ -2908,11 +2908,11 @@ int XUngrabServer(Display *display)
 	display = X11WasmGetDisplay(NULL);
     }
     BrowserInitDisplay();
-    if ((display == &browserDisplay.display)
-	    && (browserDisplay.serverGrabDepth > 0)) {
-	browserDisplay.serverGrabDepth--;
+    if ((display == &x11wasm_browserDisplay.display)
+	    && (x11wasm_browserDisplay.serverGrabDepth > 0)) {
+	x11wasm_browserDisplay.serverGrabDepth--;
     }
-    if (display == &browserDisplay.display) {
+    if (display == &x11wasm_browserDisplay.display) {
 	BrowserSyncServerGrabState();
     }
     return XFlush(display);
@@ -2938,7 +2938,7 @@ BrowserChangeSaveSet(
 	    X11_WASM_XREQ_CHANGE_SAVE_SET) == NULL) {
 	return Success;
     }
-    if (display == &browserDisplay.display) {
+    if (display == &x11wasm_browserDisplay.display) {
 	X11WasmResource *resourcePtr = BrowserWindowResource(window);
 
 	if (resourcePtr != NULL) {
@@ -2989,8 +2989,8 @@ XSetCloseDownMode(
 	    X11_WASM_XREQ_SET_CLOSE_DOWN_MODE)) {
 	return Success;
     }
-    if (display == &browserDisplay.display) {
-	browserDisplay.closeDownMode = mode;
+    if (display == &x11wasm_browserDisplay.display) {
+	x11wasm_browserDisplay.closeDownMode = mode;
     }
     return XNoOp(display);
 }
@@ -3019,15 +3019,15 @@ XKillClient(
 		X11_WASM_XREQ_KILL_CLIENT);
 	return Success;
     }
-    if ((display == &browserDisplay.display) && (resource == AllTemporary)) {
+    if ((display == &x11wasm_browserDisplay.display) && (resource == AllTemporary)) {
 	BrowserDeleteTemporaryResources();
-    } else if ((display == &browserDisplay.display)
+    } else if ((display == &x11wasm_browserDisplay.display)
 	    && ((resourcePtr != NULL) || (gcPtr != NULL))) {
 	clientSerial = (resourcePtr != NULL) ? resourcePtr->clientSerial
 		: gcPtr->clientSerial;
-	if (clientSerial == browserDisplay.currentClientSerial) {
+	if (clientSerial == x11wasm_browserDisplay.currentClientSerial) {
 	    BrowserApplyCloseDownMode();
-	    browserDisplay.closeDownMode = DestroyAll;
+	    x11wasm_browserDisplay.closeDownMode = DestroyAll;
 	    BrowserStartNextClient();
 	} else {
 	    BrowserDeleteClientResources(clientSerial);
@@ -3039,7 +3039,7 @@ XKillClient(
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestTemporaryResourceKill(void)
 {
-    Display *display = &browserDisplay.display;
+    Display *display = &x11wasm_browserDisplay.display;
     int screen;
     Window destroyWindow = None;
     Window permanentWindow = None;
@@ -3070,7 +3070,7 @@ X11WasmTestTemporaryResourceKill(void)
     screen = DefaultScreen(display);
     (void)XSetCloseDownMode(display, DestroyAll);
 
-    destroyWindow = XCreateWindow(display, browserDisplay.rootWindow, 0, 0,
+    destroyWindow = XCreateWindow(display, x11wasm_browserDisplay.rootWindow, 0, 0,
 	    11, 11, 0, CopyFromParent, InputOutput,
 	    DefaultVisual(display, screen), 0, NULL);
     if ((destroyWindow == None)
@@ -3079,7 +3079,7 @@ X11WasmTestTemporaryResourceKill(void)
 	goto cleanup;
     }
 
-    permanentWindow = XCreateWindow(display, browserDisplay.rootWindow, 0, 0,
+    permanentWindow = XCreateWindow(display, x11wasm_browserDisplay.rootWindow, 0, 0,
 	    11, 11, 0, CopyFromParent, InputOutput,
 	    DefaultVisual(display, screen), 0, NULL);
     if ((permanentWindow == None)
@@ -3094,10 +3094,10 @@ X11WasmTestTemporaryResourceKill(void)
 	    || (X11WasmFindResource((XID)permanentWindow) == NULL)) {
 	goto cleanup;
     }
-    specificWindow = XCreateWindow(display, browserDisplay.rootWindow, 2, 2,
+    specificWindow = XCreateWindow(display, x11wasm_browserDisplay.rootWindow, 2, 2,
 	    13, 13, 0, CopyFromParent, InputOutput,
 	    DefaultVisual(display, screen), 0, NULL);
-    specificPixmap = XCreatePixmap(display, browserDisplay.rootWindow, 3, 3,
+    specificPixmap = XCreatePixmap(display, x11wasm_browserDisplay.rootWindow, 3, 3,
 	    DefaultDepth(display, screen));
     specificFont = XLoadFont(display, "fixed");
     specificGC = (specificWindow != None)
@@ -3127,7 +3127,7 @@ X11WasmTestTemporaryResourceKill(void)
 	goto cleanup;
     }
 
-    saveSetParent = XCreateWindow(display, browserDisplay.rootWindow, 0, 0,
+    saveSetParent = XCreateWindow(display, x11wasm_browserDisplay.rootWindow, 0, 0,
 	    24, 24, 0, CopyFromParent, InputOutput,
 	    DefaultVisual(display, screen), 0, NULL);
     saveSetWindow = XCreateWindow(display, saveSetParent, 2, 3, 12, 12, 0,
@@ -3147,8 +3147,8 @@ X11WasmTestTemporaryResourceKill(void)
 	goto cleanup;
     }
     resourcePtr = X11WasmFindResource((XID)saveSetWindow);
-    if ((resourcePtr == NULL) || (resourcePtr->parent != browserDisplay.rootWindow)
-	    || (resourcePtr->parentPtr != &browserDisplay.rootResource)
+    if ((resourcePtr == NULL) || (resourcePtr->parent != x11wasm_browserDisplay.rootWindow)
+	    || (resourcePtr->parentPtr != &x11wasm_browserDisplay.rootResource)
 	    || (resourcePtr->x != 0) || (resourcePtr->y != 0)
 	    || !resourcePtr->mapped || !resourcePtr->retained
 	    || resourcePtr->temporary || resourcePtr->inSaveSet) {
@@ -3158,12 +3158,12 @@ X11WasmTestTemporaryResourceKill(void)
     if (XSetCloseDownMode(display, RetainTemporary) != Success) {
 	goto cleanup;
     }
-    temporaryWindow = XCreateWindow(display, browserDisplay.rootWindow, 1, 1,
+    temporaryWindow = XCreateWindow(display, x11wasm_browserDisplay.rootWindow, 1, 1,
 	    12, 12, 0, CopyFromParent, InputOutput,
 	    DefaultVisual(display, screen), 0, NULL);
-    temporaryPixmap = XCreatePixmap(display, browserDisplay.rootWindow, 2, 2,
+    temporaryPixmap = XCreatePixmap(display, x11wasm_browserDisplay.rootWindow, 2, 2,
 	    DefaultDepth(display, screen));
-    temporaryColormap = XCreateColormap(display, browserDisplay.rootWindow,
+    temporaryColormap = XCreateColormap(display, x11wasm_browserDisplay.rootWindow,
 	    DefaultVisual(display, screen), AllocNone);
     temporaryFont = XLoadFont(display, "fixed");
     temporaryGC = (temporaryWindow != None) ? XCreateGC(display,
@@ -3217,7 +3217,7 @@ X11WasmTestTemporaryResourceKill(void)
     if (XSetCloseDownMode(display, RetainTemporary) != Success) {
 	goto cleanup;
     }
-    retainedKillWindow = XCreateWindow(display, browserDisplay.rootWindow, 2, 2,
+    retainedKillWindow = XCreateWindow(display, x11wasm_browserDisplay.rootWindow, 2, 2,
 	    10, 10, 0, CopyFromParent, InputOutput,
 	    DefaultVisual(display, screen), 0, NULL);
     retainedKillGC = (retainedKillWindow != None) ? XCreateGC(display,
@@ -3244,10 +3244,10 @@ X11WasmTestTemporaryResourceKill(void)
 	    || (BrowserTrackedGCForGContext(retainedKillGContext) != NULL)) {
 	goto cleanup;
     }
-    activeWindow = XCreateWindow(display, browserDisplay.rootWindow, 3, 3,
+    activeWindow = XCreateWindow(display, x11wasm_browserDisplay.rootWindow, 3, 3,
 	    12, 12, 0, CopyFromParent, InputOutput,
 	    DefaultVisual(display, screen), 0, NULL);
-    activePixmap = XCreatePixmap(display, browserDisplay.rootWindow, 2, 2,
+    activePixmap = XCreatePixmap(display, x11wasm_browserDisplay.rootWindow, 2, 2,
 	    DefaultDepth(display, screen));
     activeGC = (activeWindow != None) ? XCreateGC(display, activeWindow, 0,
 	    NULL) : NULL;
@@ -3357,19 +3357,19 @@ X11WasmTestCompleteRequests(
 	return BadValue;
     }
     for (i = 0; i < noOpCount; i++) {
-	result = XNoOp(&browserDisplay.display);
+	result = XNoOp(&x11wasm_browserDisplay.display);
 	if (result != Success) {
 	    return result;
 	}
     }
     for (i = 0; i < flushCount; i++) {
-	result = XFlush(&browserDisplay.display);
+	result = XFlush(&x11wasm_browserDisplay.display);
 	if (result != Success) {
 	    return result;
 	}
     }
     for (i = 0; i < syncCount; i++) {
-	result = XSync(&browserDisplay.display, discard ? True : False);
+	result = XSync(&x11wasm_browserDisplay.display, discard ? True : False);
 	if (result != Success) {
 	    return result;
 	}
@@ -3384,11 +3384,11 @@ X11WasmTestSetServerGrabDepth(int depth)
     if ((depth < 0) || (depth > 16)) {
 	return BadValue;
     }
-    while (browserDisplay.serverGrabDepth > depth) {
-	(void)XUngrabServer(&browserDisplay.display);
+    while (x11wasm_browserDisplay.serverGrabDepth > depth) {
+	(void)XUngrabServer(&x11wasm_browserDisplay.display);
     }
-    while (browserDisplay.serverGrabDepth < depth) {
-	(void)XGrabServer(&browserDisplay.display);
+    while (x11wasm_browserDisplay.serverGrabDepth < depth) {
+	(void)XGrabServer(&x11wasm_browserDisplay.display);
     }
     return Success;
 }
@@ -3404,7 +3404,7 @@ int XForceScreenSaver(Display *display, int mode)
 		X11_WASM_XREQ_FORCE_SCREEN_SAVER);
 	return Success;
     }
-    if (display == &browserDisplay.display) {
+    if (display == &x11wasm_browserDisplay.display) {
 	BrowserForceScreenSaverMode(mode);
     }
     return XNoOp(display);
@@ -3436,15 +3436,15 @@ XSetScreenSaver(
 		    allowExposures, X11_WASM_XREQ_SET_SCREEN_SAVER)) {
 	return Success;
     }
-    if (display == &browserDisplay.display) {
+    if (display == &x11wasm_browserDisplay.display) {
 	timeout = (timeout == -1) ? X11_WASM_DEFAULT_SCREEN_SAVER_TIMEOUT
 		: timeout;
 	interval = (interval == -1) ? X11_WASM_DEFAULT_SCREEN_SAVER_INTERVAL
 		: interval;
-	browserDisplay.screenSaverTimeout = timeout;
-	browserDisplay.screenSaverInterval = interval;
-	browserDisplay.screenSaverPreferBlanking = preferBlanking;
-	browserDisplay.screenSaverAllowExposures = allowExposures;
+	x11wasm_browserDisplay.screenSaverTimeout = timeout;
+	x11wasm_browserDisplay.screenSaverInterval = interval;
+	x11wasm_browserDisplay.screenSaverPreferBlanking = preferBlanking;
+	x11wasm_browserDisplay.screenSaverAllowExposures = allowExposures;
 	(void)X11WasmJsSetScreenSaverSettings(timeout, interval,
 		preferBlanking, allowExposures);
     }
@@ -3464,16 +3464,16 @@ XGetScreenSaver(
     }
     BrowserInitDisplay();
     if (timeoutReturn != NULL) {
-	*timeoutReturn = browserDisplay.screenSaverTimeout;
+	*timeoutReturn = x11wasm_browserDisplay.screenSaverTimeout;
     }
     if (intervalReturn != NULL) {
-	*intervalReturn = browserDisplay.screenSaverInterval;
+	*intervalReturn = x11wasm_browserDisplay.screenSaverInterval;
     }
     if (preferBlankingReturn != NULL) {
-	*preferBlankingReturn = browserDisplay.screenSaverPreferBlanking;
+	*preferBlankingReturn = x11wasm_browserDisplay.screenSaverPreferBlanking;
     }
     if (allowExposuresReturn != NULL) {
-	*allowExposuresReturn = browserDisplay.screenSaverAllowExposures;
+	*allowExposuresReturn = x11wasm_browserDisplay.screenSaverAllowExposures;
     }
     return XNoOp(display);
 }
@@ -3534,25 +3534,25 @@ XScreenSaverQueryInfo(
 	return False;
     }
     idle = BrowserScreenSaverIdle();
-    timeout = (unsigned long)browserDisplay.screenSaverTimeout * 1000UL;
+    timeout = (unsigned long)x11wasm_browserDisplay.screenSaverTimeout * 1000UL;
     memset(infoPtr, 0, sizeof(*infoPtr));
     infoPtr->window = (Window)resourcePtr->id;
     infoPtr->kind = ScreenSaverInternal;
-    if (browserDisplay.screenSaverActive) {
+    if (x11wasm_browserDisplay.screenSaverActive) {
 	infoPtr->state = ScreenSaverOn;
-	infoPtr->til_or_since = (idle >= browserDisplay.screenSaverActivatedIdle)
-		? (idle - browserDisplay.screenSaverActivatedIdle) : 0UL;
-    } else if (browserDisplay.screenSaverTimeout == 0) {
+	infoPtr->til_or_since = (idle >= x11wasm_browserDisplay.screenSaverActivatedIdle)
+		? (idle - x11wasm_browserDisplay.screenSaverActivatedIdle) : 0UL;
+    } else if (x11wasm_browserDisplay.screenSaverTimeout == 0) {
 	infoPtr->state = ScreenSaverDisabled;
 	infoPtr->til_or_since = 0UL;
     } else {
 	infoPtr->state = ScreenSaverOff;
-	elapsed = (idle >= browserDisplay.screenSaverTimerResetIdle)
-		? (idle - browserDisplay.screenSaverTimerResetIdle) : 0UL;
+	elapsed = (idle >= x11wasm_browserDisplay.screenSaverTimerResetIdle)
+		? (idle - x11wasm_browserDisplay.screenSaverTimerResetIdle) : 0UL;
 	infoPtr->til_or_since = (timeout > elapsed) ? (timeout - elapsed) : 0UL;
     }
     infoPtr->idle = idle;
-    infoPtr->eventMask = browserDisplay.screenSaverEventMask;
+    infoPtr->eventMask = x11wasm_browserDisplay.screenSaverEventMask;
     return True;
 }
 
@@ -3585,8 +3585,8 @@ XScreenSaverSelectInput(
 		X11_WASM_SCREENSAVER_SELECT_INPUT_MINOR_OPCODE);
 	return;
     }
-    if (display == &browserDisplay.display) {
-	browserDisplay.screenSaverEventMask = eventMask;
+    if (display == &x11wasm_browserDisplay.display) {
+	x11wasm_browserDisplay.screenSaverEventMask = eventMask;
     }
 }
 
@@ -3599,19 +3599,19 @@ XScreenSaverSuspend(
 	display = X11WasmGetDisplay(NULL);
     }
     BrowserInitDisplay();
-    if (display == &browserDisplay.display) {
+    if (display == &x11wasm_browserDisplay.display) {
 	if (suspend) {
-	    if (browserDisplay.screenSaverSuspendCount < INT_MAX) {
-		browserDisplay.screenSaverSuspendCount++;
+	    if (x11wasm_browserDisplay.screenSaverSuspendCount < INT_MAX) {
+		x11wasm_browserDisplay.screenSaverSuspendCount++;
 	    }
-	    if (browserDisplay.screenSaverSuspendCount == 1) {
+	    if (x11wasm_browserDisplay.screenSaverSuspendCount == 1) {
 		(void)X11WasmJsSetScreenSaverSuspended(True);
 	    }
-	} else if (browserDisplay.screenSaverSuspendCount > 0) {
-	    browserDisplay.screenSaverSuspendCount--;
-	    if (browserDisplay.screenSaverSuspendCount == 0) {
-		if (!browserDisplay.screenSaverActive) {
-		    browserDisplay.screenSaverTimerResetIdle =
+	} else if (x11wasm_browserDisplay.screenSaverSuspendCount > 0) {
+	    x11wasm_browserDisplay.screenSaverSuspendCount--;
+	    if (x11wasm_browserDisplay.screenSaverSuspendCount == 0) {
+		if (!x11wasm_browserDisplay.screenSaverActive) {
+		    x11wasm_browserDisplay.screenSaverTimerResetIdle =
 			    BrowserScreenSaverIdle();
 		}
 		(void)X11WasmJsSetScreenSaverSuspended(False);
@@ -3732,10 +3732,10 @@ X11WasmTestSetScreenSaverSettings(int enabled)
 {
     BrowserInitDisplay();
     if (!enabled) {
-	return XSetScreenSaver(&browserDisplay.display, -1, -1,
+	return XSetScreenSaver(&x11wasm_browserDisplay.display, -1, -1,
 		DefaultBlanking, DefaultExposures);
     }
-    return XSetScreenSaver(&browserDisplay.display, 120, 30,
+    return XSetScreenSaver(&x11wasm_browserDisplay.display, 120, 30,
 	    PreferBlanking, AllowExposures);
 }
 
@@ -3744,10 +3744,10 @@ X11WasmTestSetScreenSaverWakeLock(int enabled)
 {
     BrowserInitDisplay();
     if (!enabled) {
-	return XSetScreenSaver(&browserDisplay.display, -1, -1,
+	return XSetScreenSaver(&x11wasm_browserDisplay.display, -1, -1,
 		DefaultBlanking, DefaultExposures);
     }
-    return XSetScreenSaver(&browserDisplay.display, 120, 30,
+    return XSetScreenSaver(&x11wasm_browserDisplay.display, 120, 30,
 	    DontPreferBlanking, AllowExposures);
 }
 
@@ -3755,14 +3755,14 @@ EMSCRIPTEN_KEEPALIVE int
 X11WasmTestSuspendScreenSaver(int suspended)
 {
     BrowserInitDisplay();
-    XScreenSaverSuspend(&browserDisplay.display, suspended ? True : False);
+    XScreenSaverSuspend(&x11wasm_browserDisplay.display, suspended ? True : False);
     return Success;
 }
 
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestScreenSaverRegistration(void)
 {
-    Display *display = &browserDisplay.display;
+    Display *display = &x11wasm_browserDisplay.display;
     Atom property;
     Atom type;
     Atom actualType = None;
@@ -3789,16 +3789,16 @@ X11WasmTestScreenSaverRegistration(void)
 	goto cleanup;
     }
     if (XScreenSaverRegister(display, DefaultScreen(display),
-	    browserDisplay.rootWindow, type) != True) {
+	    x11wasm_browserDisplay.rootWindow, type) != True) {
 	goto cleanup;
     }
     if ((XScreenSaverGetRegistered(display, DefaultScreen(display),
 		    &actualXid, &actualType) != True)
-	    || (actualXid != browserDisplay.rootWindow)
+	    || (actualXid != x11wasm_browserDisplay.rootWindow)
 	    || (actualType != type)) {
 	goto cleanup;
     }
-    properties = XListProperties(display, browserDisplay.rootWindow,
+    properties = XListProperties(display, x11wasm_browserDisplay.rootWindow,
 	    &propertyCount);
     for (i = 0; i < propertyCount; i++) {
 	if (properties[i] == property) {
@@ -3829,7 +3829,7 @@ cleanup:
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestForceScreenSaverState(void)
 {
-    Display *display = &browserDisplay.display;
+    Display *display = &x11wasm_browserDisplay.display;
     XEvent event;
     XScreenSaverInfo info;
     XScreenSaverNotifyEvent *notifyPtr;
@@ -3842,7 +3842,7 @@ X11WasmTestForceScreenSaverState(void)
 
     BrowserInitDisplay();
     (void)XResetScreenSaver(display);
-    XScreenSaverSelectInput(display, browserDisplay.rootWindow, 0);
+    XScreenSaverSelectInput(display, x11wasm_browserDisplay.rootWindow, 0);
     BrowserClearEventQueue();
     if ((XScreenSaverQueryExtension(display, &eventBase, &errorBase) != True)
 	    || (eventBase != X11_WASM_SCREENSAVER_EVENT_BASE)
@@ -3852,9 +3852,9 @@ X11WasmTestForceScreenSaverState(void)
     eventType = eventBase + ScreenSaverNotify;
     if ((XSetScreenSaver(display, 120, 30, PreferBlanking, AllowExposures)
 		    != Success)
-	    || (XScreenSaverQueryInfo(display, browserDisplay.rootWindow,
+	    || (XScreenSaverQueryInfo(display, x11wasm_browserDisplay.rootWindow,
 		    &info) != True)
-	    || (info.window != browserDisplay.rootWindow)
+	    || (info.window != x11wasm_browserDisplay.rootWindow)
 	    || (info.state != ScreenSaverOff)
 	    || (info.kind != ScreenSaverInternal)
 	    || (info.eventMask != 0UL)
@@ -3864,48 +3864,48 @@ X11WasmTestForceScreenSaverState(void)
 
     XScreenSaverSuspend(display, True);
     XScreenSaverSuspend(display, True);
-    if (browserDisplay.screenSaverSuspendCount != 2) {
+    if (x11wasm_browserDisplay.screenSaverSuspendCount != 2) {
 	goto cleanup;
     }
     XScreenSaverSuspend(display, False);
-    if ((browserDisplay.screenSaverSuspendCount != 1)
-	    || (XScreenSaverQueryInfo(display, browserDisplay.rootWindow,
+    if ((x11wasm_browserDisplay.screenSaverSuspendCount != 1)
+	    || (XScreenSaverQueryInfo(display, x11wasm_browserDisplay.rootWindow,
 		    &info) != True)
 	    || (info.state != ScreenSaverOff)
 	    || (XActivateScreenSaver(display) != Success)
-	    || (XScreenSaverQueryInfo(display, browserDisplay.rootWindow,
+	    || (XScreenSaverQueryInfo(display, x11wasm_browserDisplay.rootWindow,
 		    &info) != True)
 	    || (info.state != ScreenSaverOn)) {
 	goto cleanup;
     }
     XScreenSaverSuspend(display, False);
-    if (browserDisplay.screenSaverSuspendCount != 0) {
+    if (x11wasm_browserDisplay.screenSaverSuspendCount != 0) {
 	goto cleanup;
     }
     (void)XResetScreenSaver(display);
 
-    XScreenSaverSelectInput(display, browserDisplay.rootWindow,
+    XScreenSaverSelectInput(display, x11wasm_browserDisplay.rootWindow,
 	    ScreenSaverNotifyMask);
-    if ((XScreenSaverQueryInfo(display, browserDisplay.rootWindow,
+    if ((XScreenSaverQueryInfo(display, x11wasm_browserDisplay.rootWindow,
 		    &info) != True)
 	    || (info.eventMask != ScreenSaverNotifyMask)) {
 	goto cleanup;
     }
     oldHandler = XSetErrorHandler(BrowserTestXErrorHandler);
-    browserTestLastErrorCode = Success;
-    browserTestLastRequestCode = 0;
-    browserTestLastResourceId = None;
-    browserTestLastSerial = 0;
-    XScreenSaverSelectInput(display, browserDisplay.rootWindow,
+    x11wasm_browserTestLastErrorCode = Success;
+    x11wasm_browserTestLastRequestCode = 0;
+    x11wasm_browserTestLastResourceId = None;
+    x11wasm_browserTestLastSerial = 0;
+    XScreenSaverSelectInput(display, x11wasm_browserDisplay.rootWindow,
 	    ScreenSaverNotifyMask | (1UL << 7));
     (void)XSetErrorHandler(oldHandler);
-    if ((browserTestLastErrorCode != BadValue)
-	    || (browserTestLastRequestCode != X11_WASM_SCREENSAVER_MAJOR_OPCODE)
-	    || (browserTestLastResourceId != (XID)(ScreenSaverNotifyMask
+    if ((x11wasm_browserTestLastErrorCode != BadValue)
+	    || (x11wasm_browserTestLastRequestCode != X11_WASM_SCREENSAVER_MAJOR_OPCODE)
+	    || (x11wasm_browserTestLastResourceId != (XID)(ScreenSaverNotifyMask
 		    | (1UL << 7)))) {
 	goto cleanup;
     }
-    if ((XScreenSaverQueryInfo(display, browserDisplay.rootWindow,
+    if ((XScreenSaverQueryInfo(display, x11wasm_browserDisplay.rootWindow,
 		    &info) != True)
 	    || (info.eventMask != ScreenSaverNotifyMask)) {
 	goto cleanup;
@@ -3916,8 +3916,8 @@ X11WasmTestForceScreenSaverState(void)
 	goto cleanup;
     }
     notifyPtr = (XScreenSaverNotifyEvent *)&event;
-    if ((notifyPtr->window != browserDisplay.rootWindow)
-	    || (notifyPtr->root != browserDisplay.rootWindow)
+    if ((notifyPtr->window != x11wasm_browserDisplay.rootWindow)
+	    || (notifyPtr->root != x11wasm_browserDisplay.rootWindow)
 	    || (notifyPtr->state != ScreenSaverOn)
 	    || (notifyPtr->kind != ScreenSaverInternal)
 	    || (notifyPtr->forced != True)) {
@@ -3933,9 +3933,9 @@ X11WasmTestForceScreenSaverState(void)
 	    || (notifyPtr->forced != True)) {
 	goto cleanup;
     }
-    XScreenSaverSelectInput(display, browserDisplay.rootWindow,
+    XScreenSaverSelectInput(display, x11wasm_browserDisplay.rootWindow,
 	    ScreenSaverNotifyMask | ScreenSaverCycleMask);
-    if ((XScreenSaverQueryInfo(display, browserDisplay.rootWindow,
+    if ((XScreenSaverQueryInfo(display, x11wasm_browserDisplay.rootWindow,
 		    &info) != True)
 	    || (info.eventMask != (ScreenSaverNotifyMask
 		    | ScreenSaverCycleMask))) {
@@ -3943,7 +3943,7 @@ X11WasmTestForceScreenSaverState(void)
     }
 
     if ((XActivateScreenSaver(display) != Success)
-	    || (XScreenSaverQueryInfo(display, browserDisplay.rootWindow,
+	    || (XScreenSaverQueryInfo(display, x11wasm_browserDisplay.rootWindow,
 		    &info) != True)
 	    || (info.state != ScreenSaverOn)
 	    || (info.kind != ScreenSaverInternal)
@@ -3953,14 +3953,14 @@ X11WasmTestForceScreenSaverState(void)
 
     if ((XSetScreenSaver(display, 0, 30, PreferBlanking, AllowExposures)
 		    != Success)
-	    || (XScreenSaverQueryInfo(display, browserDisplay.rootWindow,
+	    || (XScreenSaverQueryInfo(display, x11wasm_browserDisplay.rootWindow,
 		    &info) != True)
 	    || (info.state != ScreenSaverOn)) {
 	goto cleanup;
     }
 
     if ((XResetScreenSaver(display) != Success)
-	    || (XScreenSaverQueryInfo(display, browserDisplay.rootWindow,
+	    || (XScreenSaverQueryInfo(display, x11wasm_browserDisplay.rootWindow,
 		    &info) != True)
 	    || (info.state != ScreenSaverDisabled)
 	    || (info.til_or_since != 0UL)) {
@@ -3972,17 +3972,17 @@ X11WasmTestForceScreenSaverState(void)
 	    || (XActivateScreenSaver(display) != Success)) {
 	goto cleanup;
     }
-    if ((XWarpPointer(display, None, browserDisplay.rootWindow, 0, 0, 0, 0,
+    if ((XWarpPointer(display, None, x11wasm_browserDisplay.rootWindow, 0, 0, 0, 0,
 		    2, 3) != Success)
-	    || (XScreenSaverQueryInfo(display, browserDisplay.rootWindow,
+	    || (XScreenSaverQueryInfo(display, x11wasm_browserDisplay.rootWindow,
 		    &info) != True)
 	    || (info.state != ScreenSaverOn)) {
 	goto cleanup;
     }
     BrowserClearEventQueue();
-    (void)X11WasmQueuePointerEvent(MotionNotify, browserDisplay.rootWindow,
+    (void)X11WasmQueuePointerEvent(MotionNotify, x11wasm_browserDisplay.rootWindow,
 	    0, 0, 4, 5, CurrentTime);
-    if ((XScreenSaverQueryInfo(display, browserDisplay.rootWindow, &info)
+    if ((XScreenSaverQueryInfo(display, x11wasm_browserDisplay.rootWindow, &info)
 		    != True)
 	    || (info.state != ScreenSaverOff)
 	    || (XCheckTypedEvent(display, eventType, &event) != True)) {
@@ -4000,9 +4000,9 @@ X11WasmTestForceScreenSaverState(void)
     if ((XActivateScreenSaver(display) != Success) || (keycode == 0)) {
 	goto cleanup;
     }
-    (void)BrowserQueueKeyEventFields(KeyPress, browserDisplay.rootWindow,
+    (void)BrowserQueueKeyEventFields(KeyPress, x11wasm_browserDisplay.rootWindow,
 	    keycode, NoSymbol, 0, 2, 3, CurrentTime, 0);
-    if ((XScreenSaverQueryInfo(display, browserDisplay.rootWindow, &info)
+    if ((XScreenSaverQueryInfo(display, x11wasm_browserDisplay.rootWindow, &info)
 		    != True)
 	    || (info.state != ScreenSaverOff)) {
 	goto cleanup;
@@ -4011,11 +4011,11 @@ X11WasmTestForceScreenSaverState(void)
     result = 1;
 
 cleanup:
-    while (browserDisplay.screenSaverSuspendCount > 0) {
+    while (x11wasm_browserDisplay.screenSaverSuspendCount > 0) {
 	XScreenSaverSuspend(display, False);
     }
     (void)XResetScreenSaver(display);
-    XScreenSaverSelectInput(display, browserDisplay.rootWindow, 0);
+    XScreenSaverSelectInput(display, x11wasm_browserDisplay.rootWindow, 0);
     (void)XSetScreenSaver(display, -1, -1, DefaultBlanking, DefaultExposures);
     BrowserClearEventQueue();
     return result;
@@ -4032,10 +4032,10 @@ XSetAfterFunction(
 	display = X11WasmGetDisplay(NULL);
     }
     BrowserInitDisplay();
-    if (display == &browserDisplay.display) {
-	oldAfterFunction = browserDisplay.afterFunction;
-	browserDisplay.afterFunction = procedure;
-	browserDisplay.synchronize =
+    if (display == &x11wasm_browserDisplay.display) {
+	oldAfterFunction = x11wasm_browserDisplay.afterFunction;
+	x11wasm_browserDisplay.afterFunction = procedure;
+	x11wasm_browserDisplay.synchronize =
 		(procedure == BrowserSynchronizedAfterFunction) ? 1 : 0;
 	BrowserSyncSynchronizeState(display);
     }
@@ -4059,7 +4059,7 @@ EMSCRIPTEN_KEEPALIVE int
 X11WasmTestSetSynchronizeState(int enabled)
 {
     BrowserInitDisplay();
-    (void)XSynchronize(&browserDisplay.display, enabled ? True : False);
+    (void)XSynchronize(&x11wasm_browserDisplay.display, enabled ? True : False);
     return Success;
 }
 
@@ -4067,9 +4067,9 @@ XErrorHandler
 XSetErrorHandler(
     XErrorHandler handler)
 {
-    XErrorHandler oldHandler = (errorHandler != NULL) ? errorHandler
+    XErrorHandler oldHandler = (x11wasm_errorHandler != NULL) ? x11wasm_errorHandler
 	    : BrowserDefaultErrorHandler;
-    errorHandler = (handler != NULL) ? handler : BrowserDefaultErrorHandler;
+    x11wasm_errorHandler = (handler != NULL) ? handler : BrowserDefaultErrorHandler;
     return oldHandler;
 }
 
@@ -4077,9 +4077,9 @@ XIOErrorHandler
 XSetIOErrorHandler(
     XIOErrorHandler handler)
 {
-    XIOErrorHandler oldHandler = (ioErrorHandler != NULL) ? ioErrorHandler
+    XIOErrorHandler oldHandler = (x11wasm_ioErrorHandler != NULL) ? x11wasm_ioErrorHandler
 	    : BrowserDefaultIOErrorHandler;
-    ioErrorHandler = (handler != NULL) ? handler : BrowserDefaultIOErrorHandler;
+    x11wasm_ioErrorHandler = (handler != NULL) ? handler : BrowserDefaultIOErrorHandler;
     return oldHandler;
 }
 
@@ -4148,13 +4148,13 @@ XListExtensions(
     int *nextensionsReturn)
 {
     char **list;
-    size_t count = browserExtensionCount;
+    size_t count = x11wasm_browserExtensionCount;
     size_t i;
 
     (void)display;
     list = (char **)ckalloc(sizeof(char *) * (count + 1U));
     for (i = 0; i < count; i++) {
-	list[i] = BrowserDupString(browserExtensions[i].name);
+	list[i] = BrowserDupString(x11wasm_browserExtensions[i].name);
     }
     list[count] = NULL;
     if (nextensionsReturn != NULL) {

@@ -15,7 +15,7 @@ BrowserResizeRoot(
     unsigned int height,
     int queueEvents)
 {
-    X11WasmDisplayState *state = &browserDisplay;
+    X11WasmDisplayState *state = &x11wasm_browserDisplay;
     unsigned int oldWidth;
     unsigned int oldHeight;
 
@@ -52,10 +52,10 @@ BrowserResizeRoot(
 void
 BrowserInitDisplay(void)
 {
-    X11WasmDisplayState *state = &browserDisplay;
+    X11WasmDisplayState *state = &x11wasm_browserDisplay;
     int rootWidth, rootHeight;
 
-    if (browserDisplayInitialized) {
+    if (x11wasm_browserDisplayInitialized) {
 	return;
     }
     memset(state, 0, sizeof(*state));
@@ -174,7 +174,7 @@ BrowserInitDisplay(void)
 	    | ButtonReleaseMask | PointerMotionMask;
     state->resourceList = &state->rootResource;
 
-    browserDisplayInitialized = 1;
+    x11wasm_browserDisplayInitialized = 1;
     (void)X11WasmJsInit(state->screen.width, state->screen.height,
 	    BrowserJsXId(state->rootWindow));
     rootWidth = X11WasmJsGetRootWidth();
@@ -186,8 +186,8 @@ BrowserInitDisplay(void)
 void
 BrowserUpdateQueueLength(void)
 {
-    if (browserDisplayInitialized) {
-	browserDisplay.display.qlen = eventQueueCount;
+    if (x11wasm_browserDisplayInitialized) {
+	x11wasm_browserDisplay.display.qlen = x11wasm_eventQueueCount;
     }
 }
 
@@ -215,33 +215,33 @@ BrowserResolveEventWindow(
     if (BrowserWindowCanReceiveEvents(focusWindow)) {
 	return focusWindow;
     }
-    if (BrowserWindowCanReceiveEvents(browserDisplay.focusWindow)) {
-	return browserDisplay.focusWindow;
+    if (BrowserWindowCanReceiveEvents(x11wasm_browserDisplay.focusWindow)) {
+	return x11wasm_browserDisplay.focusWindow;
     }
-    return browserDisplay.rootWindow;
+    return x11wasm_browserDisplay.rootWindow;
 }
 
 Window
 BrowserGetFocusWindow(void)
 {
     BrowserInitDisplay();
-    if (browserDisplay.focusWindow == PointerRoot) {
-	if (BrowserWindowCanReceiveEvents(browserDisplay.pointerWindow)) {
-	    return browserDisplay.pointerWindow;
+    if (x11wasm_browserDisplay.focusWindow == PointerRoot) {
+	if (BrowserWindowCanReceiveEvents(x11wasm_browserDisplay.pointerWindow)) {
+	    return x11wasm_browserDisplay.pointerWindow;
 	}
-	return browserDisplay.rootWindow;
+	return x11wasm_browserDisplay.rootWindow;
     }
-    return browserDisplay.focusWindow;
+    return x11wasm_browserDisplay.focusWindow;
 }
 
 Window
 BrowserGetGrabWindow(void)
 {
     BrowserInitDisplay();
-    if (browserDisplay.pointerGrabWindow != None) {
-	return browserDisplay.pointerGrabWindow;
+    if (x11wasm_browserDisplay.pointerGrabWindow != None) {
+	return x11wasm_browserDisplay.pointerGrabWindow;
     }
-    return browserDisplay.keyboardGrabWindow;
+    return x11wasm_browserDisplay.keyboardGrabWindow;
 }
 
 Window
@@ -262,9 +262,9 @@ BrowserResolveKeyEventWindow(
 	target = BrowserResolveEventWindow(window);
     }
 
-    grabWindow = browserDisplay.keyboardGrabWindow;
+    grabWindow = x11wasm_browserDisplay.keyboardGrabWindow;
     if (BrowserWindowCanReceiveEvents(grabWindow)) {
-	grabOwnerEvents = browserDisplay.keyboardGrabOwnerEvents;
+	grabOwnerEvents = x11wasm_browserDisplay.keyboardGrabOwnerEvents;
     } else {
 	grabWindow = BrowserGetGrabWindow();
 	grabOwnerEvents = 1;
@@ -289,14 +289,14 @@ BrowserSetCommonEventFields(
 {
     memset(eventPtr, 0, sizeof(XEvent));
     eventPtr->xany.type = type;
-    eventPtr->xany.serial = eventSerial++;
+    eventPtr->xany.serial = x11wasm_eventSerial++;
     eventPtr->xany.send_event = False;
-    eventPtr->xany.display = &browserDisplay.display;
+    eventPtr->xany.display = &x11wasm_browserDisplay.display;
     eventPtr->xany.window = window;
     if (time != CurrentTime) {
-	eventTime = time;
+	x11wasm_eventTime = time;
     } else {
-	eventTime++;
+	x11wasm_eventTime++;
     }
 }
 
@@ -307,13 +307,13 @@ BrowserEnsureEventQueueSpace(void)
     int capacity;
     int i;
 
-    if (eventQueueCount < eventQueueCapacity) {
+    if (x11wasm_eventQueueCount < x11wasm_eventQueueCapacity) {
 	return;
     }
-    if (eventQueueCapacity > INT_MAX / 2) {
+    if (x11wasm_eventQueueCapacity > INT_MAX / 2) {
 	abort();
     }
-    capacity = eventQueueCapacity ? eventQueueCapacity * 2
+    capacity = x11wasm_eventQueueCapacity ? x11wasm_eventQueueCapacity * 2
 	    : X11_WASM_EVENT_QUEUE_INITIAL_CAPACITY;
     if ((size_t)capacity > SIZE_MAX / sizeof(*newQueue)) {
 	abort();
@@ -321,13 +321,13 @@ BrowserEnsureEventQueueSpace(void)
     newQueue = (X11WasmQueuedEvent *)ckalloc(
 	    (size_t)capacity * sizeof(*newQueue));
     /* Linearize the live ring before changing its modulus. */
-    for (i = 0; i < eventQueueCount; i++) {
-	newQueue[i] = eventQueue[(eventQueueHead + i) % eventQueueCapacity];
+    for (i = 0; i < x11wasm_eventQueueCount; i++) {
+	newQueue[i] = x11wasm_eventQueue[(x11wasm_eventQueueHead + i) % x11wasm_eventQueueCapacity];
     }
-    ckfree(eventQueue);
-    eventQueue = newQueue;
-    eventQueueCapacity = capacity;
-    eventQueueHead = 0;
+    ckfree(x11wasm_eventQueue);
+    x11wasm_eventQueue = newQueue;
+    x11wasm_eventQueueCapacity = capacity;
+    x11wasm_eventQueueHead = 0;
 }
 
 int
@@ -339,10 +339,10 @@ BrowserQueueEventInternal(
 
     BrowserInitDisplay();
     BrowserEnsureEventQueueSpace();
-    tail = (eventQueueHead + eventQueueCount) % eventQueueCapacity;
-    eventQueue[tail].event = *eventPtr;
-    eventQueue[tail].internal = internal;
-    eventQueueCount++;
+    tail = (x11wasm_eventQueueHead + x11wasm_eventQueueCount) % x11wasm_eventQueueCapacity;
+    x11wasm_eventQueue[tail].event = *eventPtr;
+    x11wasm_eventQueue[tail].internal = internal;
+    x11wasm_eventQueueCount++;
     BrowserUpdateQueueLength();
     return 1;
 }

@@ -66,7 +66,7 @@ BrowserResourceManagerString(void)
     X11WasmProperty *propertyPtr;
 
     BrowserInitDisplay();
-    propertyPtr = BrowserFindProperty(&browserDisplay.rootResource,
+    propertyPtr = BrowserFindProperty(&x11wasm_browserDisplay.rootResource,
 	    XA_RESOURCE_MANAGER);
     if ((propertyPtr == NULL) || (propertyPtr->type != XA_STRING)
 	    || (propertyPtr->format != 8) || (propertyPtr->data == NULL)) {
@@ -1551,7 +1551,7 @@ BrowserNotifyColormapInstallState(
 {
     X11WasmResource *resourcePtr;
 
-    for (resourcePtr = browserDisplay.resourceList; resourcePtr != NULL;
+    for (resourcePtr = x11wasm_browserDisplay.resourceList; resourcePtr != NULL;
 	    resourcePtr = resourcePtr->nextPtr) {
 	if ((resourcePtr->type == X11_WASM_RESOURCE_WINDOW)
 		&& (resourcePtr->atts.colormap == colormap)) {
@@ -2297,13 +2297,13 @@ XrmParseCommand(
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestOpenDisplayNames(void)
 {
-    if ((XOpenDisplay(NULL) != &browserDisplay.display)
-	    || (XOpenDisplay("") != &browserDisplay.display)
-	    || (XOpenDisplay("browser") != &browserDisplay.display)
-	    || (XOpenDisplay(":0") != &browserDisplay.display)
-	    || (XOpenDisplay(":0.0") != &browserDisplay.display)
-	    || (XOpenDisplay("browser:0") != &browserDisplay.display)
-	    || (XOpenDisplay("browser:0.0") != &browserDisplay.display)) {
+    if ((XOpenDisplay(NULL) != &x11wasm_browserDisplay.display)
+	    || (XOpenDisplay("") != &x11wasm_browserDisplay.display)
+	    || (XOpenDisplay("browser") != &x11wasm_browserDisplay.display)
+	    || (XOpenDisplay(":0") != &x11wasm_browserDisplay.display)
+	    || (XOpenDisplay(":0.0") != &x11wasm_browserDisplay.display)
+	    || (XOpenDisplay("browser:0") != &x11wasm_browserDisplay.display)
+	    || (XOpenDisplay("browser:0.0") != &x11wasm_browserDisplay.display)) {
 	return 0;
     }
     if ((XOpenDisplay("definitely-invalid") != NULL)
@@ -2322,38 +2322,38 @@ XCloseDisplay(
 	display = X11WasmGetDisplay(NULL);
     }
     BrowserForgetIMInstantiateCallbacks(display);
-    focusedInputContext = NULL;
-    if (display == &browserDisplay.display) {
+    x11wasm_focusedInputContext = NULL;
+    if (display == &x11wasm_browserDisplay.display) {
 	BrowserResetHostAccessControl();
 	BrowserClearFontPath();
 	BrowserClearPassiveGrabs();
-	browserDisplay.pointerGrabWindow = None;
-	browserDisplay.pointerGrabConfineWindow = None;
+	x11wasm_browserDisplay.pointerGrabWindow = None;
+	x11wasm_browserDisplay.pointerGrabConfineWindow = None;
 	BrowserSetPointerGrabCursor(None);
-	browserDisplay.pointerGrabEventMask = 0;
-	browserDisplay.pointerGrabOwnerEvents = 0;
-	browserDisplay.pointerGrabPointerMode = GrabModeAsync;
-	browserDisplay.pointerGrabKeyboardMode = GrabModeAsync;
-	browserDisplay.pointerGrabPassive = 0;
-	browserDisplay.motionHistoryStart = 0;
-	browserDisplay.motionHistoryCount = 0;
-	browserDisplay.keyboardGrabWindow = None;
-	browserDisplay.keyboardGrabOwnerEvents = 0;
-	browserDisplay.keyboardGrabPointerMode = GrabModeAsync;
-	browserDisplay.keyboardGrabKeyboardMode = GrabModeAsync;
-	browserDisplay.keyboardGrabPassive = 0;
-	browserDisplay.serverGrabDepth = 0;
+	x11wasm_browserDisplay.pointerGrabEventMask = 0;
+	x11wasm_browserDisplay.pointerGrabOwnerEvents = 0;
+	x11wasm_browserDisplay.pointerGrabPointerMode = GrabModeAsync;
+	x11wasm_browserDisplay.pointerGrabKeyboardMode = GrabModeAsync;
+	x11wasm_browserDisplay.pointerGrabPassive = 0;
+	x11wasm_browserDisplay.motionHistoryStart = 0;
+	x11wasm_browserDisplay.motionHistoryCount = 0;
+	x11wasm_browserDisplay.keyboardGrabWindow = None;
+	x11wasm_browserDisplay.keyboardGrabOwnerEvents = 0;
+	x11wasm_browserDisplay.keyboardGrabPointerMode = GrabModeAsync;
+	x11wasm_browserDisplay.keyboardGrabKeyboardMode = GrabModeAsync;
+	x11wasm_browserDisplay.keyboardGrabPassive = 0;
+	x11wasm_browserDisplay.serverGrabDepth = 0;
 	BrowserSyncServerGrabState();
-	browserDisplay.synchronize = 0;
-	browserDisplay.threadsInitialized = 0;
-	browserDisplay.displayLockDepth = 0;
-	browserDisplay.afterFunction = NULL;
-	browserDisplay.runningAfterFunction = 0;
-	browserDisplay.display.db = NULL;
+	x11wasm_browserDisplay.synchronize = 0;
+	x11wasm_browserDisplay.threadsInitialized = 0;
+	x11wasm_browserDisplay.displayLockDepth = 0;
+	x11wasm_browserDisplay.afterFunction = NULL;
+	x11wasm_browserDisplay.runningAfterFunction = 0;
+	x11wasm_browserDisplay.display.db = NULL;
 	BrowserSyncSynchronizeState(display);
 	BrowserApplyCloseDownMode();
-	browserDisplay.closeDownMode = DestroyAll;
-	browserDisplay.closeSerial++;
+	x11wasm_browserDisplay.closeDownMode = DestroyAll;
+	x11wasm_browserDisplay.closeSerial++;
 	BrowserStartNextClient();
 	BrowserSyncPointerGrabCursor();
 	BrowserSyncPointerGrabState();
@@ -2508,7 +2508,7 @@ BrowserDestroyWindowResource(
 
     if ((resourcePtr == NULL)
 	    || (resourcePtr->type != X11_WASM_RESOURCE_WINDOW)
-	    || (resourcePtr == &browserDisplay.rootResource)) {
+	    || (resourcePtr == &x11wasm_browserDisplay.rootResource)) {
 	return Success;
     }
     (void)BrowserUnmapWindowResource(resourcePtr, False);
@@ -2593,8 +2593,8 @@ BrowserMapWindowResource(
     BrowserRefreshVisibilityTree((parentPtr != NULL) ? parentPtr
 	    : resourcePtr);
     BrowserQueueViewableExposeTree(resourcePtr);
-    (void)BrowserQueuePointerCrossingEvents(browserDisplay.pointerState,
-	    browserDisplay.pointerX, browserDisplay.pointerY, CurrentTime);
+    (void)BrowserQueuePointerCrossingEvents(x11wasm_browserDisplay.pointerState,
+	    x11wasm_browserDisplay.pointerX, x11wasm_browserDisplay.pointerY, CurrentTime);
     if (mappedReturn != NULL) {
 	*mappedReturn = 1;
     }
@@ -2678,8 +2678,8 @@ BrowserUnmapWindowResource(
     BrowserQueueNewlyVisibleExposes(visibilityRootPtr, &visibilitySnapshot,
 	    (Window)resourcePtr->id);
     BrowserFreeVisibilitySnapshot(&visibilitySnapshot);
-    (void)BrowserQueuePointerCrossingEvents(browserDisplay.pointerState,
-	    browserDisplay.pointerX, browserDisplay.pointerY, CurrentTime);
+    (void)BrowserQueuePointerCrossingEvents(x11wasm_browserDisplay.pointerState,
+	    x11wasm_browserDisplay.pointerX, x11wasm_browserDisplay.pointerY, CurrentTime);
     return Success;
 }
 
@@ -2787,7 +2787,7 @@ XConfigureWindow(
 	    valueMask, changes, X11_WASM_XREQ_CONFIGURE_WINDOW)) {
 	return Success;
     }
-    if (resourcePtr == &browserDisplay.rootResource) {
+    if (resourcePtr == &x11wasm_browserDisplay.rootResource) {
 	return Success;
     }
     if (changes == NULL) {
@@ -2855,8 +2855,8 @@ XConfigureWindow(
 	(void)BrowserQueueExpose(resourcePtr, 0, 0, resourcePtr->width,
 		resourcePtr->height);
     }
-    (void)BrowserQueuePointerCrossingEvents(browserDisplay.pointerState,
-	    browserDisplay.pointerX, browserDisplay.pointerY, CurrentTime);
+    (void)BrowserQueuePointerCrossingEvents(x11wasm_browserDisplay.pointerState,
+	    x11wasm_browserDisplay.pointerX, x11wasm_browserDisplay.pointerY, CurrentTime);
     return Success;
 }
 
@@ -2934,7 +2934,7 @@ BrowserWindowColormapInstalled(
 	return True;
     }
     colormap = (resourcePtr->atts.colormap != None)
-	    ? resourcePtr->atts.colormap : browserDisplay.defaultColormap;
+	    ? resourcePtr->atts.colormap : x11wasm_browserDisplay.defaultColormap;
     colormapPtr = BrowserColormapResource(colormap);
     return (colormapPtr == NULL) || colormapPtr->colormapInstalled;
 }
@@ -3613,7 +3613,7 @@ Status
 XInitThreads(void)
 {
     BrowserInitDisplay();
-    browserDisplay.threadsInitialized = 1;
+    x11wasm_browserDisplay.threadsInitialized = 1;
     return True;
 }
 
@@ -3621,8 +3621,8 @@ Status
 XFreeThreads(void)
 {
     BrowserInitDisplay();
-    browserDisplay.threadsInitialized = 0;
-    browserDisplay.displayLockDepth = 0;
+    x11wasm_browserDisplay.threadsInitialized = 0;
+    x11wasm_browserDisplay.displayLockDepth = 0;
     return True;
 }
 
@@ -3633,8 +3633,8 @@ XLockDisplay(
     if (display == NULL) {
 	display = X11WasmGetDisplay(NULL);
     }
-    if (display == &browserDisplay.display) {
-	browserDisplay.displayLockDepth++;
+    if (display == &x11wasm_browserDisplay.display) {
+	x11wasm_browserDisplay.displayLockDepth++;
     }
 }
 
@@ -3645,9 +3645,9 @@ XUnlockDisplay(
     if (display == NULL) {
 	display = X11WasmGetDisplay(NULL);
     }
-    if ((display == &browserDisplay.display)
-	    && (browserDisplay.displayLockDepth > 0)) {
-	browserDisplay.displayLockDepth--;
+    if ((display == &x11wasm_browserDisplay.display)
+	    && (x11wasm_browserDisplay.displayLockDepth > 0)) {
+	x11wasm_browserDisplay.displayLockDepth--;
     }
 }
 
@@ -3692,7 +3692,7 @@ XCreatePixmap(
     resourcePtr->height = height;
     resourcePtr->depth = depth;
     resourcePtr->atts.colormap = (drawablePtr->atts.colormap != None)
-	    ? drawablePtr->atts.colormap : browserDisplay.defaultColormap;
+	    ? drawablePtr->atts.colormap : x11wasm_browserDisplay.defaultColormap;
     (void)X11WasmJsCreatePixmap(BrowserJsXId(resourcePtr->id),
 	    BrowserJsXId(drawable), width, height, depth);
     return (Pixmap)resourcePtr->id;
@@ -3761,7 +3761,7 @@ XCopyColormapAndFree(
 	return None;
     }
     sourcePtr = BrowserColormapResource(colormap);
-    copy = XCreateColormap(display, browserDisplay.rootWindow,
+    copy = XCreateColormap(display, x11wasm_browserDisplay.rootWindow,
 	    DefaultVisual(display, DefaultScreen(display)), AllocNone);
     if (copy == None) {
 	return None;
@@ -3785,7 +3785,7 @@ XFreeColormap(
 	    X11_WASM_XREQ_FREE_COLORMAP, 0)) {
 	return Success;
     }
-    if (colormap == browserDisplay.defaultColormap) {
+    if (colormap == x11wasm_browserDisplay.defaultColormap) {
 	return Success;
     }
     X11WasmDeleteResource(colormap);
@@ -3849,9 +3849,9 @@ XListInstalledColormaps(
 	return NULL;
     }
     colormap = (windowPtr->atts.colormap != None)
-	    ? windowPtr->atts.colormap : browserDisplay.defaultColormap;
+	    ? windowPtr->atts.colormap : x11wasm_browserDisplay.defaultColormap;
     if (!BrowserWindowColormapInstalled(windowPtr)) {
-	colormap = browserDisplay.defaultColormap;
+	colormap = x11wasm_browserDisplay.defaultColormap;
     }
     colormaps = (Colormap *)ckalloc(sizeof(Colormap));
     colormaps[0] = colormap;

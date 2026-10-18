@@ -1451,7 +1451,7 @@ XInternAtom(
     if (predefined != None) {
 	return predefined;
     }
-    for (atomPtr = atomList; atomPtr != NULL; atomPtr = atomPtr->nextPtr) {
+    for (atomPtr = x11wasm_atomList; atomPtr != NULL; atomPtr = atomPtr->nextPtr) {
 	if (strcmp(atomPtr->name, name) == 0) {
 	    return atomPtr->atom;
 	}
@@ -1460,10 +1460,10 @@ XInternAtom(
 	return None;
     }
     atomPtr = (X11WasmAtomName *)ckalloc(sizeof(X11WasmAtomName));
-    atomPtr->atom = ++nextAtom;
+    atomPtr->atom = ++x11wasm_nextAtom;
     atomPtr->name = BrowserDupString(name);
-    atomPtr->nextPtr = atomList;
-    atomList = atomPtr;
+    atomPtr->nextPtr = x11wasm_atomList;
+    x11wasm_atomList = atomPtr;
     return atomPtr->atom;
 }
 
@@ -1523,7 +1523,7 @@ XGetAtomName(
     if (predefined != NULL) {
 	return BrowserDupString(predefined);
     }
-    for (atomPtr = atomList; atomPtr != NULL; atomPtr = atomPtr->nextPtr) {
+    for (atomPtr = x11wasm_atomList; atomPtr != NULL; atomPtr = atomPtr->nextPtr) {
 	if (atomPtr->atom == atom) {
 	    return BrowserDupString(atomPtr->name);
 	}
@@ -1735,17 +1735,17 @@ BrowserClearFontPath(void)
 {
     int i;
 
-    if (browserDisplay.fontPath != NULL) {
-	for (i = 0; i < browserDisplay.fontPathCount; i++) {
-	    if (browserDisplay.fontPath[i] != NULL) {
-		ckfree(browserDisplay.fontPath[i]);
+    if (x11wasm_browserDisplay.fontPath != NULL) {
+	for (i = 0; i < x11wasm_browserDisplay.fontPathCount; i++) {
+	    if (x11wasm_browserDisplay.fontPath[i] != NULL) {
+		ckfree(x11wasm_browserDisplay.fontPath[i]);
 	    }
 	}
-	ckfree(browserDisplay.fontPath);
+	ckfree(x11wasm_browserDisplay.fontPath);
     }
-    browserDisplay.fontPathSet = 0;
-    browserDisplay.fontPathCount = 0;
-    browserDisplay.fontPath = NULL;
+    x11wasm_browserDisplay.fontPathSet = 0;
+    x11wasm_browserDisplay.fontPathCount = 0;
+    x11wasm_browserDisplay.fontPath = NULL;
 }
 
 Font
@@ -1906,7 +1906,7 @@ XListFonts(
 		familyPattern, familyPatternLength);
     }
 
-    while (browserFontFallbackFamilies[fallbackCount] != NULL) {
+    while (x11wasm_browserFontFallbackFamilies[fallbackCount] != NULL) {
 	fallbackCount++;
     }
     names = (char **)ckalloc(sizeof(char *) * (size_t)(maxnames + 1));
@@ -1915,7 +1915,7 @@ XListFonts(
 	size_t patternLength = strlen(pattern);
 
 	for (i = 0; (i < fallbackCount) && (count < maxnames); i++) {
-	    char *candidate = BrowserFontXLFD(browserFontFallbackFamilies[i], 1);
+	    char *candidate = BrowserFontXLFD(x11wasm_browserFontFallbackFamilies[i], 1);
 
 	    if (BrowserFontPatternMatches(pattern, patternLength, candidate)) {
 		names[count++] = candidate;
@@ -1926,14 +1926,14 @@ XListFonts(
     } else if (familyPatternIsWildcard) {
 	for (i = 0; (i < fallbackCount) && (count < maxnames); i++) {
 	    names[count++] = BrowserFontXLFD(
-		    browserFontFallbackFamilies[i], 1);
+		    x11wasm_browserFontFallbackFamilies[i], 1);
 	}
     } else {
 	for (i = 0; (i < fallbackCount) && (count < maxnames); i++) {
 	    if (BrowserFontPatternMatches(familyPattern, familyPatternLength,
-		    browserFontFallbackFamilies[i])) {
+		    x11wasm_browserFontFallbackFamilies[i])) {
 		names[count++] = BrowserFontXLFD(
-			browserFontFallbackFamilies[i], 1);
+			x11wasm_browserFontFallbackFamilies[i], 1);
 	    }
 	}
 	if ((count == 0) && !familyPatternHasWildcards) {
@@ -2048,9 +2048,9 @@ XGetFontPath(
     int count;
 
     (void)display;
-    if (browserDisplay.fontPathSet) {
-	count = browserDisplay.fontPathCount;
-	path = BrowserCopyStringList((const char *const *)browserDisplay.fontPath,
+    if (x11wasm_browserDisplay.fontPathSet) {
+	count = x11wasm_browserDisplay.fontPathCount;
+	path = BrowserCopyStringList((const char *const *)x11wasm_browserDisplay.fontPath,
 		count);
     } else {
 	count = (int)(sizeof(browserDefaultFontPath)
@@ -2094,9 +2094,9 @@ XSetFontPath(
     }
     newPath = BrowserCopyStringList((const char *const *)directories, ndirs);
     BrowserClearFontPath();
-    browserDisplay.fontPathSet = 1;
-    browserDisplay.fontPathCount = ndirs;
-    browserDisplay.fontPath = newPath;
+    x11wasm_browserDisplay.fontPathSet = 1;
+    x11wasm_browserDisplay.fontPathCount = ndirs;
+    x11wasm_browserDisplay.fontPath = newPath;
     return Success;
 }
 
@@ -3415,10 +3415,10 @@ XStringToKeysym(
 	    && BrowserParseKeySymHex(name + 2, 1, 8, &value)) {
 	return (KeySym)value;
     }
-    for (i = 0; i < browserKeySymNameCount;
+    for (i = 0; i < x11wasm_browserKeySymNameCount;
 	    i++) {
-	if (strcmp(name, browserKeySymNames[i].name) == 0) {
-	    return browserKeySymNames[i].keySym;
+	if (strcmp(name, x11wasm_browserKeySymNames[i].name) == 0) {
+	    return x11wasm_browserKeySymNames[i].keySym;
 	}
     }
     return NoSymbol;
@@ -3442,10 +3442,10 @@ XKeysymToString(
 		(unsigned long)(keySym - XK_KP_0));
 	return buffer;
     }
-    for (i = 0; i < browserKeySymNameCount;
+    for (i = 0; i < x11wasm_browserKeySymNameCount;
 	    i++) {
-	if (keySym == browserKeySymNames[i].keySym) {
-	    return (char *)browserKeySymNames[i].name;
+	if (keySym == x11wasm_browserKeySymNames[i].keySym) {
+	    return (char *)x11wasm_browserKeySymNames[i].name;
 	}
     }
     if ((keySym >= 0x21) && (keySym <= 0x7e)) {
@@ -3551,7 +3551,7 @@ XChangeKeyboardMapping(
 		keysymsPerKeycode);
     }
     if (changed > 0) {
-	browserDisplay.keyboardMapSerial++;
+	x11wasm_browserDisplay.keyboardMapSerial++;
     }
     (void)BrowserQueueMappingNotify(MappingKeyboard, firstKeycode, numCodes);
     return XNoOp(display);
@@ -3638,7 +3638,7 @@ BrowserLookupReboundKeySymRequired(
     if (stringPtr != NULL) {
 	*stringPtr = NULL;
     }
-    for (bindingPtr = keyBindingList; bindingPtr != NULL;
+    for (bindingPtr = x11wasm_keyBindingList; bindingPtr != NULL;
 	    bindingPtr = bindingPtr->nextPtr) {
 	if ((bindingPtr->keySym == keySym)
 		&& (bindingPtr->state == modifierState)) {
@@ -3770,12 +3770,12 @@ BrowserICAllowsLookup(
 	    && (event->window == focusWindow)) {
 	return 1;
     }
-    if (inputContext->focused && (focusedInputContext == inputContext)
+    if (inputContext->focused && (x11wasm_focusedInputContext == inputContext)
 	    && (event->window == focusWindow)) {
 	return 1;
     }
     if ((event->type == KeyPress) || (event->type == KeyRelease)) {
-	Window grabWindow = browserDisplay.keyboardGrabWindow;
+	Window grabWindow = x11wasm_browserDisplay.keyboardGrabWindow;
 
 	if (!BrowserWindowCanReceiveEvents(grabWindow)) {
 	    grabWindow = BrowserGetGrabWindow();
@@ -3784,7 +3784,7 @@ BrowserICAllowsLookup(
 		&& (event->window == grabWindow)) {
 	    return (event->window == focusWindow)
 		    || (inputContext->focused
-			    && (focusedInputContext == inputContext));
+			    && (x11wasm_focusedInputContext == inputContext));
 	}
     }
     return 0;
@@ -3829,7 +3829,7 @@ BrowserSyncInputContext(
     Window window;
 
     if ((inputContext == NULL) || !inputContext->focused
-	    || (focusedInputContext != inputContext)) {
+	    || (x11wasm_focusedInputContext != inputContext)) {
 	return;
     }
     window = BrowserInputContextWindow(inputContext);
