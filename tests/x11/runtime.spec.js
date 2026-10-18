@@ -170,6 +170,14 @@ test("text event injection preserves characters across keymap levels", async ({ 
   })).toBe(1);
 });
 
+test("pointer events identify the child of their final delivery window", async ({ page }) => {
+  await waitForX11Runtime(page);
+  expect(await page.evaluate(() => {
+    const module = /** @type {Window & { Module?: { _X11WasmTestPointerEventSubwindows?: () => number } }} */ (window).Module;
+    return module?._X11WasmTestPointerEventSubwindows?.();
+  })).toBe(1);
+});
+
 test("X event queue and display keycode APIs preserve ordering", async ({
   page,
 }) => {

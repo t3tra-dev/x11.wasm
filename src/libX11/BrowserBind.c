@@ -559,6 +559,17 @@ BrowserQueuePointerEventFieldsWithState(
 	browserDisplay.pointerCaptureWindow = captureTarget;
 	BrowserSyncPointerState();
     }
+    {
+	X11WasmResource *childPtr = BrowserFindTopVisibleChildAt(
+		BrowserWindowResource(target), x, y);
+	Window child = (childPtr != NULL) ? (Window)childPtr->id : None;
+
+	if (type == MotionNotify) {
+	    event.xmotion.subwindow = child;
+	} else {
+	    event.xbutton.subwindow = child;
+	}
+    }
     queued = BrowserQueueEvent(&event);
     if (type == ButtonRelease) {
 	BrowserReleasePassivePointerGrabIfIdle(pointerState);

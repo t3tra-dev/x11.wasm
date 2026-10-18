@@ -3532,6 +3532,96 @@ cleanup:
     return result;
 }
 
+static int
+BrowserTestPointerSubwindow(
+    int type,
+    int x,
+    int y,
+    Window target,
+    Window child)
+{
+    XEvent event;
+    int localX, localY;
+
+    BrowserClearEventQueue();
+    BrowserWindowCoordinatesFromRoot(target, x, y, &localX, &localY);
+    return X11WasmQueuePointerEvent(type, 0, type == MotionNotify ? 0 : 1,
+	    type == ButtonRelease ? Button1Mask : 0, x, y, 1)
+	    && XCheckTypedWindowEvent(&browserDisplay.display, target, type, &event)
+	    && (event.xmotion.subwindow == child)
+	    && (event.xmotion.x == localX) && (event.xmotion.y == localY)
+	    && (event.xmotion.x_root == x) && (event.xmotion.y_root == y);
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestPointerEventSubwindows(void)
+{
+    Display *display = XOpenDisplay(NULL);
+    Window root = DefaultRootWindow(display);
+    Window parent = XCreateSimpleWindow(display, root, 10, 20, 40, 30, 0, 0, 0);
+    Window child = XCreateSimpleWindow(display, parent, 5, 7, 20, 15, 0, 0, 0);
+    Window grandchild = XCreateSimpleWindow(display, child, 1, 1, 5, 5, 0, 0, 0);
+    Window front = None;
+    int result = 0;
+
+    XMapWindow(display, parent);
+    XMapWindow(display, child);
+    XMapWindow(display, grandchild);
+    XSelectInput(display, parent,
+	    PointerMotionMask | ButtonPressMask | ButtonReleaseMask);
+    result = 10;
+    if (!BrowserTestPointerSubwindow(MotionNotify, 17, 30, parent, child)
+	    || !BrowserTestPointerSubwindow(ButtonPress, 17, 30, parent, child)
+	    || !BrowserTestPointerSubwindow(ButtonRelease, 17, 30, parent, child)) {
+	goto cleanup;
+    }
+    XSelectInput(display, grandchild, PointerMotionMask);
+    result = 11;
+    if (!BrowserTestPointerSubwindow(MotionNotify, 17, 30, grandchild, None)) {
+	goto cleanup;
+    }
+    XSelectInput(display, grandchild, NoEventMask);
+    front = XCreateSimpleWindow(display, parent, 5, 7, 10, 10, 0, 0, 0);
+    XMapWindow(display, front);
+    result = 12;
+    if (!BrowserTestPointerSubwindow(MotionNotify, 17, 30, parent, front)) {
+	goto cleanup;
+    }
+    XUnmapWindow(display, front);
+    result = 13;
+    if (!BrowserTestPointerSubwindow(MotionNotify, 17, 30, parent, child)) {
+	goto cleanup;
+    }
+    result = 14;
+    if ((XGrabPointer(display, root, False, PointerMotionMask, GrabModeAsync,
+	    GrabModeAsync, None, None, CurrentTime) != GrabSuccess)
+	    || !BrowserTestPointerSubwindow(MotionNotify, 17, 30, root, parent)
+	    || !BrowserTestPointerSubwindow(MotionNotify, 2, 2, root, None)) {
+	goto cleanup;
+    }
+    XUngrabPointer(display, CurrentTime);
+    result = 15;
+    if ((XGrabPointer(display, parent, True, PointerMotionMask, GrabModeAsync,
+	    GrabModeAsync, None, None, CurrentTime) != GrabSuccess)
+	    || !BrowserTestPointerSubwindow(MotionNotify, 17, 30, parent, child)
+	    || !BrowserTestPointerSubwindow(MotionNotify, 2, 2, root, None)) {
+	goto cleanup;
+    }
+    XUngrabPointer(display, CurrentTime);
+    result = 16;
+    if ((XGrabPointer(display, parent, False, PointerMotionMask, GrabModeAsync,
+	    GrabModeAsync, None, None, CurrentTime) != GrabSuccess)
+	    || !BrowserTestPointerSubwindow(MotionNotify, 2, 2, parent, None)) {
+	goto cleanup;
+    }
+    result = 1;
+cleanup:
+    XUngrabPointer(display, CurrentTime);
+    XDestroyWindow(display, parent);
+    BrowserClearEventQueue();
+    return result;
+}
+
 EMSCRIPTEN_KEEPALIVE int
 X11WasmTestQueryPointerApis(void)
 {
