@@ -184,6 +184,28 @@
      * @param {number} y
      * @param {number} width
      * @param {number} height
+     * @returns {boolean}
+     */
+    fillResourceBackground(context, resource, x, y, width, height) {
+      const pattern = this.createBackgroundPattern(context, resource);
+      if (pattern) {
+        context.fillStyle = pattern;
+      } else if (resource.backgroundColor) {
+        context.fillStyle = resource.backgroundColor;
+      } else {
+        return false;
+      }
+      context.fillRect(x, y, width, height);
+      return true;
+    },
+
+    /**
+     * @param {CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D} context
+     * @param {X11WasmDOMResource} resource
+     * @param {number} x
+     * @param {number} y
+     * @param {number} width
+     * @param {number} height
      */
     clearResourceArea(context, resource, x, y, width, height) {
       const clearX = Math.floor(x);
@@ -191,17 +213,9 @@
       const clearWidth = Math.floor(width);
       const clearHeight = Math.floor(height);
 
-      if (clearWidth <= 0 || clearHeight <= 0) {
-        return;
-      }
-      const pattern = this.createBackgroundPattern(context, resource);
-      if (pattern) {
-        context.fillStyle = pattern;
-        context.fillRect(clearX, clearY, clearWidth, clearHeight);
-      } else if (resource.backgroundColor) {
-        context.fillStyle = resource.backgroundColor;
-        context.fillRect(clearX, clearY, clearWidth, clearHeight);
-      } else {
+      if (clearWidth <= 0 || clearHeight <= 0 ||
+          !this.fillResourceBackground(context, resource,
+            clearX, clearY, clearWidth, clearHeight)) {
         return;
       }
       this.markDirty(resource, clearX, clearY, clearWidth, clearHeight);
@@ -944,6 +958,9 @@ refreshWindowStateGeometry() {
         canvas.width = newWidth;
         canvas.height = newHeight;
         resource.context = canvas.getContext("2d");
+        if (resource.context) {
+          this.fillResourceBackground(resource.context, resource, 0, 0, newWidth, newHeight);
+        }
         return;
       }
 
@@ -953,6 +970,9 @@ refreshWindowStateGeometry() {
         canvas.width = newWidth;
         canvas.height = newHeight;
         resource.context = canvas.getContext("2d");
+        if (resource.context) {
+          this.fillResourceBackground(resource.context, resource, 0, 0, newWidth, newHeight);
+        }
         return;
       }
       snapshotContext.drawImage(canvas, 0, 0);
@@ -961,6 +981,7 @@ refreshWindowStateGeometry() {
       const context = canvas.getContext("2d");
       resource.context = context;
       if (context) {
+        this.fillResourceBackground(context, resource, 0, 0, newWidth, newHeight);
         context.drawImage(snapshot, offset.x, offset.y);
       }
     },

@@ -106,6 +106,106 @@ cleanup:
     return result;
 }
 
+static unsigned long
+BrowserTestReadWindowPixel(Display *display, Drawable drawable, int x, int y)
+{
+    XImage *image = XGetImage(display, drawable, x, y, 1, 1, AllPlanes, ZPixmap);
+    unsigned long pixel = image ? XGetPixel(image, 0, 0) : ~0UL;
+
+    if (image) {
+	XDestroyImage(image);
+    }
+    return pixel;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestWindowBackgroundReadback(void)
+{
+    Display *display = XOpenDisplay(NULL);
+    Window root = DefaultRootWindow(display);
+    Window window = XCreateSimpleWindow(display, root, 0, 0, 6, 4, 0, 0, 0x123456);
+    Window parent = None;
+    Window tiled = None;
+    Pixmap tile = None;
+    GC gc = XCreateGC(display, window, 0, NULL);
+    XSetWindowAttributes atts;
+    int result = 10;
+
+    XMapWindow(display, window);
+    XSetWindowBackground(display, window, 0x00ff00);
+    if (BrowserTestReadWindowPixel(display, window, 0, 0) != 0x123456) {
+	goto cleanup;
+    }
+    EM_ASM({
+	const context = Module.x11WasmBackend.getContext($0);
+	context.fillStyle = "rgba(0, 0, 0, 0.5)";
+	context.fillRect(3, 2, 1, 1);
+    }, window);
+    if (BrowserTestReadWindowPixel(display, window, 3, 2) != 0x091a2b) {
+	goto cleanup;
+    }
+    XSetForeground(display, gc, 0x0000ff);
+    XFillRectangle(display, window, gc, 2, 1, 1, 1);
+    XResizeWindow(display, window, 8, 5);
+    result = 11;
+    if ((BrowserTestReadWindowPixel(display, window, 7, 4) != 0x00ff00)
+	    || (BrowserTestReadWindowPixel(display, window, 0, 0) != 0x123456)
+	    || (BrowserTestReadWindowPixel(display, window, 2, 1) != 0x0000ff)) {
+	goto cleanup;
+    }
+    XClearArea(display, window, 0, 0, 1, 1, False);
+    result = 12;
+    if ((BrowserTestReadWindowPixel(display, window, 0, 0) != 0x00ff00)
+	    || (BrowserTestReadWindowPixel(display, window, 1, 0) != 0x123456)) {
+	goto cleanup;
+    }
+    tile = XCreatePixmap(display, window, 2, 1, DefaultDepth(display, 0));
+    XSetForeground(display, gc, 0xff0000);
+    XFillRectangle(display, tile, gc, 0, 0, 1, 1);
+    XSetForeground(display, gc, 0x0000ff);
+    XFillRectangle(display, tile, gc, 1, 0, 1, 1);
+    XSetWindowBackgroundPixmap(display, window, tile);
+    XClearWindow(display, window);
+    result = 13;
+    if ((BrowserTestReadWindowPixel(display, window, 0, 0) != 0xff0000)
+	    || (BrowserTestReadWindowPixel(display, window, 1, 0) != 0x0000ff)
+	    || (BrowserTestReadWindowPixel(display, window, 2, 0) != 0xff0000)) {
+	goto cleanup;
+    }
+    atts.background_pixmap = tile;
+    tiled = XCreateWindow(display, root, 40, 20, 4, 4, 0,
+	    CopyFromParent, InputOutput, CopyFromParent, CWBackPixmap, &atts);
+    XMapWindow(display, tiled);
+    if ((BrowserTestReadWindowPixel(display, tiled, 1, 1) != 0x0000ff)
+	    || (BrowserTestReadWindowPixel(display, tiled, 2, 1) != 0xff0000)) {
+	goto cleanup;
+    }
+    parent = XCreateSimpleWindow(display, root, 20, 20, 20, 20, 0, 0, 0xabcdef);
+    atts.background_pixmap = ParentRelative;
+    Window child = XCreateWindow(display, parent, 3, 4, 4, 4, 0,
+	    CopyFromParent, InputOutput, CopyFromParent, CWBackPixmap, &atts);
+    XMapWindow(display, parent);
+    XMapWindow(display, child);
+    result = 14;
+    if (BrowserTestReadWindowPixel(display, child, 1, 1) != 0xabcdef) {
+	goto cleanup;
+    }
+    XSetWindowBackgroundPixmap(display, child, None);
+    XClearWindow(display, child);
+    if (BrowserTestReadWindowPixel(display, child, 1, 1) != 0xabcdef) {
+	goto cleanup;
+    }
+    result = 1;
+cleanup:
+    if (parent) XDestroyWindow(display, parent);
+    if (tiled) XDestroyWindow(display, tiled);
+    XDestroyWindow(display, window);
+    if (tile) XFreePixmap(display, tile);
+    XFreeGC(display, gc);
+    BrowserClearEventQueue();
+    return result;
+}
+
 static int browserTestAfterFunctionCount;
 
 static int

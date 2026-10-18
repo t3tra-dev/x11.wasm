@@ -866,6 +866,16 @@ applyRootPointerState() {
       const resource = this.resources.get(id);
       if (resource && resource.element) {
         this.applyInitialWmState(resource);
+        if (!resource.pendingMapped) {
+          const context = this.getContext(id);
+          if (context) {
+            // Preserve existing drawing while materializing the visible background.
+            context.save();
+            context.globalCompositeOperation = "destination-over";
+            this.clearResourceArea(context, resource, 0, 0, resource.width, resource.height);
+            context.restore();
+          }
+        }
         resource.pendingMapped = true;
         this.markGeometryDirty(resource);
         this.markDirty(

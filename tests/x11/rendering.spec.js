@@ -1568,6 +1568,14 @@ test("browser backend applies multiple clip rectangles to image writes", async (
   }
 });
 
+test("window image readback includes map and resize backgrounds without repainting old pixels", async ({ page }) => {
+  await waitForX11Runtime(page);
+  expect(await page.evaluate(() => {
+    const module = /** @type {Window & { Module?: { _X11WasmTestWindowBackgroundReadback?: () => number } }} */ (window).Module;
+    return module?._X11WasmTestWindowBackgroundReadback?.();
+  })).toBe(1);
+});
+
 test("browser backend clears windows with background pixmap", async ({
   page,
 }) => {
