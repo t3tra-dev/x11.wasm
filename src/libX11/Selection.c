@@ -403,7 +403,7 @@ BrowserFailQueuedSelectionRequestsForOwner(
 	return;
     }
     for (offset = 0; offset < eventQueueCount; offset++) {
-	int index = (eventQueueHead + offset) % X11_WASM_EVENT_QUEUE_LIMIT;
+	int index = (eventQueueHead + offset) % eventQueueCapacity;
 	XSelectionRequestEvent request;
 	XEvent notify;
 
@@ -776,7 +776,7 @@ BrowserTakeQueuedEvent(
     }
     BrowserInitDisplay();
     for (offset = 0; offset < eventQueueCount; offset++) {
-	int index = (eventQueueHead + offset) % X11_WASM_EVENT_QUEUE_LIMIT;
+	int index = (eventQueueHead + offset) % eventQueueCapacity;
 
 	if ((predicate != NULL)
 		&& !predicate(display, &eventQueue[index].event, arg)) {
@@ -789,14 +789,16 @@ BrowserTakeQueuedEvent(
 	    *internalPtr = eventQueue[index].internal;
 	}
 	if (remove) {
-	    while (offset < eventQueueCount - 1) {
-		int dest = (eventQueueHead + offset)
-			% X11_WASM_EVENT_QUEUE_LIMIT;
-		int src = (eventQueueHead + offset + 1)
-			% X11_WASM_EVENT_QUEUE_LIMIT;
+	    if (offset == 0) {
+		eventQueueHead = (eventQueueHead + 1) % eventQueueCapacity;
+	    } else {
+		while (offset < eventQueueCount - 1) {
+		    int dest = (eventQueueHead + offset) % eventQueueCapacity;
+		    int src = (eventQueueHead + offset + 1) % eventQueueCapacity;
 
-		eventQueue[dest] = eventQueue[src];
-		offset++;
+		    eventQueue[dest] = eventQueue[src];
+		    offset++;
+		}
 	    }
 	    eventQueueCount--;
 	}

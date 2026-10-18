@@ -546,11 +546,12 @@ XPutBackEvent(
 {
     (void)display;
     BrowserInitDisplay();
-    if ((event == NULL) || (eventQueueCount >= X11_WASM_EVENT_QUEUE_LIMIT)) {
+    if (event == NULL) {
 	return Success;
     }
-    eventQueueHead = (eventQueueHead + X11_WASM_EVENT_QUEUE_LIMIT - 1)
-	    % X11_WASM_EVENT_QUEUE_LIMIT;
+    BrowserEnsureEventQueueSpace();
+    eventQueueHead = (eventQueueHead + eventQueueCapacity - 1)
+	    % eventQueueCapacity;
     eventQueue[eventQueueHead].event = *event;
     eventQueue[eventQueueHead].internal = 0;
     eventQueueCount++;

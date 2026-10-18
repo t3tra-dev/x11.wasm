@@ -181,6 +181,40 @@ test("X event queue and display keycode APIs preserve ordering", async ({
   expect(result).toBe(1);
 });
 
+test("event queue growth preserves FIFO, filtered events, and selection cleanup", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestGrowingEventQueue?: () => number } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestGrowingEventQueue) {
+      throw new Error("missing event queue growth test export");
+    }
+    return module._X11WasmTestGrowingEventQueue();
+  });
+  expect(result).toBe(1);
+});
+
+test("XPutBackEvent grows a full queue without losing or reordering events", async ({
+  page,
+}) => {
+  await waitForX11Runtime(page);
+  const result = await page.evaluate(() => {
+    const module =
+      /** @type {Window & { Module?: { _X11WasmTestPutBackEventQueueGrowth?: () => number } }} */ (
+        window
+      ).Module;
+    if (!module?._X11WasmTestPutBackEventQueueGrowth) {
+      throw new Error("missing put-back queue growth test export");
+    }
+    return module._X11WasmTestPutBackEventQueueGrowth();
+  });
+  expect(result).toBe(1);
+});
+
 test("XBell applies keyboard control before notifying the browser backend", async ({
   page,
 }) => {

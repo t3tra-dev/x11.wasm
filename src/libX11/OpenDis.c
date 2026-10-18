@@ -300,6 +300,36 @@ BrowserSetCommonEventFields(
     }
 }
 
+void
+BrowserEnsureEventQueueSpace(void)
+{
+    X11WasmQueuedEvent *newQueue;
+    int capacity;
+    int i;
+
+    if (eventQueueCount < eventQueueCapacity) {
+	return;
+    }
+    if (eventQueueCapacity > INT_MAX / 2) {
+	abort();
+    }
+    capacity = eventQueueCapacity ? eventQueueCapacity * 2
+	    : X11_WASM_EVENT_QUEUE_INITIAL_CAPACITY;
+    if ((size_t)capacity > SIZE_MAX / sizeof(*newQueue)) {
+	abort();
+    }
+    newQueue = (X11WasmQueuedEvent *)ckalloc(
+	    (size_t)capacity * sizeof(*newQueue));
+    /* Linearize the live ring before changing its modulus. */
+    for (i = 0; i < eventQueueCount; i++) {
+	newQueue[i] = eventQueue[(eventQueueHead + i) % eventQueueCapacity];
+    }
+    ckfree(eventQueue);
+    eventQueue = newQueue;
+    eventQueueCapacity = capacity;
+    eventQueueHead = 0;
+}
+
 int
 BrowserQueueEventInternal(
     XEvent *eventPtr,
@@ -308,10 +338,8 @@ BrowserQueueEventInternal(
     int tail;
 
     BrowserInitDisplay();
-    if (eventQueueCount >= X11_WASM_EVENT_QUEUE_LIMIT) {
-	return 0;
-    }
-    tail = (eventQueueHead + eventQueueCount) % X11_WASM_EVENT_QUEUE_LIMIT;
+    BrowserEnsureEventQueueSpace();
+    tail = (eventQueueHead + eventQueueCount) % eventQueueCapacity;
     eventQueue[tail].event = *eventPtr;
     eventQueue[tail].internal = internal;
     eventQueueCount++;

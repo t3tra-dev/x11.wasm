@@ -36,7 +36,7 @@
 #define UCHAR(c) ((unsigned char)(c))
 #endif
 
-#define X11_WASM_EVENT_QUEUE_LIMIT 256
+#define X11_WASM_EVENT_QUEUE_INITIAL_CAPACITY 256
 #define X11_WASM_UNICODE_KEYSYM_BASE 0x01000000U
 #define X11_WASM_COMPOSITION_START 1
 #define X11_WASM_COMPOSITION_UPDATE 2
@@ -435,11 +435,12 @@ extern Time externalClipboardTime;
 extern Atom nextAtom;
 extern XErrorHandler errorHandler;
 extern XIOErrorHandler ioErrorHandler;
-extern X11WasmQueuedEvent eventQueue[X11_WASM_EVENT_QUEUE_LIMIT];
+extern X11WasmQueuedEvent *eventQueue;
 extern X11WasmCompositionPayload *compositionPayloadList;
 extern unsigned long nextCompositionPayloadId;
 extern int eventQueueHead;
 extern int eventQueueCount;
+extern int eventQueueCapacity;
 extern unsigned long eventSerial;
 extern unsigned long damageSerial;
 extern Time eventTime;
@@ -622,6 +623,7 @@ unsigned short BrowserClampUShort(
 short BrowserClampShort(
     int value);
 void BrowserClearEventQueue(void);
+void BrowserEnsureEventQueueSpace(void);
 void BrowserClearExternalClipboardText(void);
 void BrowserClearFontPath(void);
 void BrowserClearHostAccessList(void);

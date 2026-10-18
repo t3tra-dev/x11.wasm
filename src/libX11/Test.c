@@ -976,6 +976,142 @@ X11WasmTestEventQueueAndKeycodeApis(void)
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestGrowingEventQueue(void)
+{
+    Display *display;
+    XEvent event;
+    XEvent readEvent;
+    long match = 2048;
+    int internal;
+    int i;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    BrowserClearEventQueue();
+    BrowserSetCommonEventFields(&event, ClientMessage,
+	    browserDisplay.rootWindow, CurrentTime);
+    event.xclient.format = 32;
+
+    for (i = 0; i < 256; i++) {
+	event.xclient.data.l[0] = i;
+	if (!BrowserQueueEventInternal(&event, i & 1)) {
+	    return 10;
+	}
+    }
+    for (i = 0; i < 129; i++) {
+	if (!BrowserPopEvent(&readEvent, &internal)
+		|| (readEvent.xclient.data.l[0] != i)
+		|| (internal != (i & 1))) {
+	    return 11;
+	}
+    }
+    for (i = 256; i < 8193; i++) {
+	event.xclient.data.l[0] = i;
+	if (!BrowserQueueEventInternal(&event, i & 1)) {
+	    return 12;
+	}
+    }
+    if ((XEventsQueued(display, QueuedAlready) != 8064)
+	    || (QLength(display) != 8064)
+	    || (XPeekEvent(display, &readEvent) != Success)
+	    || (readEvent.xclient.data.l[0] != 129)) {
+	return 13;
+    }
+    if (!XCheckIfEvent(display, &readEvent,
+	    BrowserTestClientMessageDataPredicate, (XPointer)&match)
+	    || (readEvent.xclient.data.l[0] != match)) {
+	return 14;
+    }
+    if (!BrowserQueueSelectionRequest(browserDisplay.rootWindow,
+	    browserDisplay.rootWindow, XA_PRIMARY, XA_STRING, XA_CUT_BUFFER0,
+	    CurrentTime)) {
+	return 15;
+    }
+    BrowserFailQueuedSelectionRequestsForOwner(browserDisplay.rootWindow);
+    if (!XCheckTypedEvent(display, SelectionNotify, &readEvent)
+	    || (readEvent.xselection.property != None)
+	    || (readEvent.xselection.requestor != browserDisplay.rootWindow)) {
+	return 16;
+    }
+    BrowserSetCommonEventFields(&event, MapNotify,
+	    browserDisplay.rootWindow, CurrentTime);
+    event.xmap.event = browserDisplay.rootWindow;
+    event.xmap.window = browserDisplay.rootWindow;
+    if (!BrowserQueueEvent(&event)
+	    || !XCheckWindowEvent(display, browserDisplay.rootWindow,
+		    StructureNotifyMask, &readEvent)
+	    || (readEvent.type != MapNotify)) {
+	return 17;
+    }
+    for (i = 129; i < 8193; i++) {
+	if (i == match) {
+	    continue;
+	}
+	if (!BrowserPopEvent(&readEvent, &internal)
+		|| (readEvent.type != ClientMessage)
+		|| (readEvent.xclient.data.l[0] != i)
+		|| (internal != (i & 1))) {
+	    return 18;
+	}
+    }
+    if ((XEventsQueued(display, QueuedAlready) != 0)
+	    || (QLength(display) != 0)) {
+	return 19;
+    }
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestPutBackEventQueueGrowth(void)
+{
+    Display *display;
+    XEvent event;
+    XEvent readEvent;
+    int i;
+
+    BrowserInitDisplay();
+    display = &browserDisplay.display;
+    BrowserClearEventQueue();
+    BrowserSetCommonEventFields(&event, ClientMessage,
+	    browserDisplay.rootWindow, CurrentTime);
+    event.xclient.format = 32;
+    for (i = 0; i < 256; i++) {
+	event.xclient.data.l[0] = i;
+	if (!BrowserQueueEvent(&event)) {
+	    return 10;
+	}
+    }
+    for (i = 1; i <= 4097; i++) {
+	event.xclient.data.l[0] = -i;
+	if (XPutBackEvent(display, &event) != Success) {
+	    return 11;
+	}
+    }
+    if ((XEventsQueued(display, QueuedAlready) != 4353)
+	    || (XPeekEvent(display, &readEvent) != Success)
+	    || (readEvent.xclient.data.l[0] != -4097)) {
+	return 12;
+    }
+    for (i = 4097; i > 0; i--) {
+	if ((XNextEvent(display, &readEvent) != Success)
+		|| (readEvent.xclient.data.l[0] != -i)) {
+	    return 13;
+	}
+    }
+    for (i = 0; i < 256; i++) {
+	if ((XNextEvent(display, &readEvent) != Success)
+		|| (readEvent.xclient.data.l[0] != i)) {
+	    return 14;
+	}
+    }
+    if (XEventsQueued(display, QueuedAlready) != 0) {
+	return 15;
+    }
+    BrowserClearEventQueue();
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestBellKeyboardControlApis(void)
 {
     Display *display;
