@@ -154,6 +154,7 @@ build $x11wasm_builddir/header-xlib-only.o: x11wasm_compile_c $x11wasm_root/test
 build $x11wasm_builddir/header-xresource.o: x11wasm_compile_c $x11wasm_root/test/headers/xresource.c | $x11wasm_xlib_common_deps
 build $x11wasm_builddir/header-xkb-narrow.o: x11wasm_compile_c $x11wasm_root/test/headers/xkb_narrow.c | $x11wasm_xlib_common_deps
 build $x11wasm_builddir/header-xkb-wide.o: x11wasm_compile_c $x11wasm_root/test/headers/xkb_wide.c | $x11wasm_xlib_common_deps
+build $x11wasm_builddir/header-caller-macros.o: x11wasm_compile_c $x11wasm_root/test/headers/caller_macros.c | $x11wasm_xlib_common_deps
 build $x11wasm_lib: x11wasm_archive $x11wasm_xlib_objects
 build $x11wasm_js_library: x11wasm_bundle_library_js $
   $x11wasm_js_library_bridge $
@@ -178,5 +179,5 @@ build $x11wasm_js_pre: x11wasm_bundle_dom_js $
 build x11wasm_licenses: phony $x11wasm_builddir/LICENSE
 build x11wasm_lib: phony $x11wasm_lib x11wasm_licenses
 build x11wasm_js: phony $x11wasm_js_library $x11wasm_js_pre x11wasm_licenses
-build x11wasm_header_tests: phony $x11wasm_builddir/header-xlib-only.o $x11wasm_builddir/header-xresource.o $x11wasm_builddir/header-xkb-narrow.o $x11wasm_builddir/header-xkb-wide.o
+build x11wasm_header_tests: phony $x11wasm_builddir/header-xlib-only.o $x11wasm_builddir/header-xresource.o $x11wasm_builddir/header-xkb-narrow.o $x11wasm_builddir/header-xkb-wide.o $x11wasm_builddir/header-caller-macros.o
 build x11wasm: phony $x11wasm_lib $x11wasm_js_library $x11wasm_js_pre x11wasm_header_tests x11wasm_licenses

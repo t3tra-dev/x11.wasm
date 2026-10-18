@@ -6,6 +6,14 @@
 
 #include <X11/Xlib.h>
 
+#ifdef EXTERN
+#error Xlib must not define a generic EXTERN macro
+#endif
+
+struct X11WasmHeaderApplicationTokens {
+    void *EXTERN;
+};
+
 int
 X11WasmHeaderXlibOnlyPrototypeTest(void)
 {
