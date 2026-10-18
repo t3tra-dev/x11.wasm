@@ -469,6 +469,12 @@ extern const X11WasmNamedColor browserNamedColors[];
 extern const size_t browserNamedColorCount;
 extern const char *const browserFontFallbackFamilies[];
 
+int X11WasmQueueTextEventFields(
+    int type, unsigned int window, unsigned int codepoint,
+    unsigned int state, unsigned int time);
+int X11WasmQueueTextEventFieldsAtWindow(
+    int type, unsigned int window, unsigned int codepoint,
+    unsigned int state, unsigned int time);
 int X11WasmQueuePointerEvent(
     int type,
     unsigned int window,

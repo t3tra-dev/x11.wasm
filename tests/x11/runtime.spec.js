@@ -162,6 +162,14 @@ test("X11 keyboard mapping APIs resolve and rebind ASCII key events", async ({
   expect(result).toBe(1);
 });
 
+test("text event injection preserves characters across keymap levels", async ({ page }) => {
+  await waitForX11Runtime(page);
+  expect(await page.evaluate(() => {
+    const module = /** @type {Window & { Module?: { _X11WasmTestTextEventLevels?: () => number } }} */ (window).Module;
+    return module?._X11WasmTestTextEventLevels?.();
+  })).toBe(1);
+});
+
 test("X event queue and display keycode APIs preserve ordering", async ({
   page,
 }) => {

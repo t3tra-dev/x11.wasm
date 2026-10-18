@@ -31,6 +31,81 @@ BrowserTestMaskHasContiguousBits(
     return mask == 0UL;
 }
 
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestTextEventLevels(void)
+{
+    static const unsigned int characters[] = {'A', '!', 'a', '1', ' ',
+	0x3042, '@', '#'};
+    Display *display = XOpenDisplay(NULL);
+    Window window = XCreateSimpleWindow(display, DefaultRootWindow(display),
+	    0, 0, 40, 30, 0, 0, 0);
+    KeySym mapping[] = {XK_at, XK_numbersign};
+    KeySym savedMapping[X11_WASM_KEYSYMS_PER_KEYCODE];
+    int savedExplicit = browserDisplay.keycodeMapExplicit[200];
+    XEvent event;
+    int direct, type, shifted, i;
+    int result = 0;
+
+    memcpy(savedMapping, browserDisplay.keycodeMap[200], sizeof(savedMapping));
+    XSelectInput(display, window, KeyPressMask | KeyReleaseMask);
+    XMapWindow(display, window);
+    XSetInputFocus(display, window, RevertToParent, CurrentTime);
+    XChangeKeyboardMapping(display, 200, 2, mapping, 1);
+    for (direct = 0; direct < 2; direct++) {
+	for (type = KeyPress; type <= KeyRelease; type++) {
+	    for (shifted = 0; shifted < 2; shifted++) {
+		for (i = 0; i < (int)(sizeof(characters) / sizeof(characters[0])); i++) {
+		    unsigned int state = Mod1Mask | LockMask
+			    | (shifted ? ShiftMask : 0);
+		    KeySym expected = BrowserKeySymFromCodepoint(characters[i]);
+		    KeySym actual = NoSymbol;
+		    char bytes[8], expectedBytes[8];
+		    int expectedLength = BrowserUtf8FromCodepoint(characters[i],
+			    expectedBytes, sizeof(expectedBytes));
+		    int queued;
+
+		    BrowserClearEventQueue();
+		    queued = direct
+			    ? X11WasmQueueTextEventFieldsAtWindow(type, window,
+				    characters[i], state, 1)
+			    : X11WasmQueueTextEventFields(type, window,
+				    characters[i], state, 1);
+		    if (!queued || !XCheckWindowEvent(display, window,
+			    KeyPressMask | KeyReleaseMask, &event)
+			    || (event.type != type)
+			    || ((event.xkey.state & ~(ShiftMask
+				    | X11_WASM_PINNED_KEY_EVENT_STATE))
+				    != (state & ~ShiftMask))
+			    || (XLookupString(&event.xkey, bytes, sizeof(bytes),
+				    &actual, NULL) != expectedLength)
+			    || (actual != expected)
+			    || memcmp(bytes, expectedBytes, (size_t)expectedLength)) {
+			goto cleanup;
+		    }
+		    if ((i >= 6) && (event.xkey.keycode != 200)) {
+			goto cleanup;
+		    }
+		}
+	    }
+	}
+    }
+    BrowserClearEventQueue();
+    if (!BrowserQueueKeyEventFields(KeyPress, window,
+	    BrowserKeycodeFromKeySym(XK_A), XK_A, ControlMask, 0, 0, 1, 0)
+	    || !XCheckWindowEvent(display, window, KeyPressMask, &event)
+	    || (event.xkey.state != ControlMask)
+	    || (XLookupKeysym(&event.xkey, 0) != XK_a)) {
+	goto cleanup;
+    }
+    result = 1;
+cleanup:
+    memcpy(browserDisplay.keycodeMap[200], savedMapping, sizeof(savedMapping));
+    browserDisplay.keycodeMapExplicit[200] = savedExplicit;
+    XDestroyWindow(display, window);
+    BrowserClearEventQueue();
+    return result;
+}
+
 static int browserTestAfterFunctionCount;
 
 static int

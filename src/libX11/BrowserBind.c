@@ -52,6 +52,21 @@ X11WasmQueueKeyEvent(
 	    browserDisplay.pointerX, browserDisplay.pointerY, time);
 }
 
+static unsigned int
+BrowserTextKeycode(
+    KeySym keySym,
+    unsigned int *statePtr)
+{
+    unsigned int keycode = BrowserKeycodeFromKeySym(keySym);
+    int level = (*statePtr & ShiftMask) ? 1 : 0;
+
+    if ((BrowserKeySymForKeycodeLevel(keycode, level) != keySym)
+	    && (BrowserKeySymForKeycodeLevel(keycode, level ^ 1) == keySym)) {
+	*statePtr ^= ShiftMask;
+    }
+    return keycode;
+}
+
 EMSCRIPTEN_KEEPALIVE int
 X11WasmQueueTextEventFields(
     int type,
@@ -61,14 +76,16 @@ X11WasmQueueTextEventFields(
     unsigned int time)
 {
     KeySym keySym = BrowserKeySymFromCodepoint(codepoint);
+    unsigned int keycode;
 
     BrowserInitDisplay();
     if (((type != KeyPress) && (type != KeyRelease))
 	    || (keySym == NoSymbol)) {
 	return 0;
     }
+    keycode = BrowserTextKeycode(keySym, &state);
     return X11WasmQueueKeyEventFields(type, window,
-	    BrowserKeycodeFromKeySym(keySym), (unsigned int)keySym, state,
+	    keycode, (unsigned int)keySym, state,
 	    browserDisplay.pointerX, browserDisplay.pointerY, time);
 }
 
@@ -81,14 +98,16 @@ X11WasmQueueTextEventFieldsAtWindow(
     unsigned int time)
 {
     KeySym keySym = BrowserKeySymFromCodepoint(codepoint);
+    unsigned int keycode;
 
     BrowserInitDisplay();
     if (((type != KeyPress) && (type != KeyRelease))
 	    || (keySym == NoSymbol)) {
 	return 0;
     }
+    keycode = BrowserTextKeycode(keySym, &state);
     return BrowserQueueKeyEventFieldsAtWindow(type, window,
-	    BrowserKeycodeFromKeySym(keySym), (unsigned int)keySym, state,
+	    keycode, (unsigned int)keySym, state,
 	    browserDisplay.pointerX, browserDisplay.pointerY, time, 0);
 }
 
