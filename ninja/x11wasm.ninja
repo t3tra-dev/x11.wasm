@@ -115,6 +115,20 @@ rule x11wasm_bundle_library_js
   command = mkdir -p "$x11wasm_builddir/js/emscripten" && cat $x11wasm_js_library_sources > "$x11wasm_js_library"
   description = bundle x11.wasm Emscripten js-library
 
+rule x11wasm_stage_licenses
+  command = mkdir -p "$x11wasm_license_dest/LICENSES" && cp "$x11wasm_root/LICENSE" "$x11wasm_root/THIRD_PARTY_NOTICES.md" "$x11wasm_license_dest/" && cp "$x11wasm_root/LICENSES/X11.txt" "$x11wasm_root/LICENSES/Tk.txt" "$x11wasm_license_dest/LICENSES/"
+  description = collect x11.wasm licenses in $x11wasm_license_dest
+
+build $x11wasm_builddir/LICENSE $
+  $x11wasm_builddir/THIRD_PARTY_NOTICES.md $
+  $x11wasm_builddir/LICENSES/X11.txt $
+  $x11wasm_builddir/LICENSES/Tk.txt: x11wasm_stage_licenses $
+  $x11wasm_root/LICENSE $
+  $x11wasm_root/THIRD_PARTY_NOTICES.md $
+  $x11wasm_root/LICENSES/X11.txt $
+  $x11wasm_root/LICENSES/Tk.txt
+  x11wasm_license_dest = $x11wasm_builddir
+
 build $x11wasm_builddir/XlibInt.o: x11wasm_compile_c $x11wasm_root/src/libX11/XlibInt.c | $x11wasm_xlib_common_deps
 build $x11wasm_builddir/Context.o: x11wasm_compile_c $x11wasm_root/src/libX11/Context.c | $x11wasm_xlib_common_deps
 build $x11wasm_builddir/Geometry.o: x11wasm_compile_c $x11wasm_root/src/libX11/Geometry.c | $x11wasm_xlib_common_deps
@@ -159,7 +173,8 @@ build $x11wasm_js_pre: x11wasm_bundle_dom_js $
   $x11wasm_js_dom_backend_render $
   $x11wasm_js_dom_backend_export
 
-build x11wasm_lib: phony $x11wasm_lib
-build x11wasm_js: phony $x11wasm_js_library $x11wasm_js_pre
+build x11wasm_licenses: phony $x11wasm_builddir/LICENSE
+build x11wasm_lib: phony $x11wasm_lib x11wasm_licenses
+build x11wasm_js: phony $x11wasm_js_library $x11wasm_js_pre x11wasm_licenses
 build x11wasm_header_tests: phony $x11wasm_builddir/header-xlib-only.o $x11wasm_builddir/header-xresource.o
-build x11wasm: phony $x11wasm_lib $x11wasm_js_library $x11wasm_js_pre x11wasm_header_tests
+build x11wasm: phony $x11wasm_lib $x11wasm_js_library $x11wasm_js_pre x11wasm_header_tests x11wasm_licenses

@@ -21,6 +21,11 @@ time.
 
 ## License
 
-This project is released under the MIT License.
+Original project code is licensed under the [MIT License](LICENSE).
+X11-derived public headers and generated tables retain their upstream terms.
+See [Third-Party Notices](THIRD_PARTY_NOTICES.md) and [LICENSES](LICENSES/).
 
-Some X11 public header code depends on the original license.
+Library and JavaScript build targets collect the license texts next to the
+archive and JS build directory; the browser target also collects them in
+`build/browser/`. Include these notices when redistributing build outputs.
+To collect only the notices, run `ninja -f build.ninja x11wasm_licenses`.

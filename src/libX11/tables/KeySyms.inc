@@ -1,5 +1,6 @@
 /*
  * Generated from the x11.wasm X11 keysym headers.
+ * Upstream header notices are reproduced in LICENSES/X11.txt.
  * XStringToKeysym and XKeysymToString use these canonical names after
  * their algorithmic F-key, keypad, Unicode, and hex handling.
  */

@@ -1,6 +1,6 @@
 /*
- * Generated from the x11.wasm X11 rgb table. Names are normalized by
- * BrowserParseColor before lookup.
+ * Generated from Tk's xlib/rgb.txt. Names are normalized by BrowserParseColor
+ * before lookup. See LICENSES/Tk.txt and the source notice in LICENSES/X11.txt.
  */
     {"aliceblue", 0xf0f0, 0xf8f8, 0xffff},
     {"antiquewhite", 0xfafa, 0xebeb, 0xd7d7},

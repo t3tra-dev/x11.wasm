@@ -56,9 +56,19 @@ build build/typecheck-js.stamp: x11wasm_typecheck_js $
 build build/compile_commands.json: x11wasm_compile_commands tools/gen_compile_commands.py build.ninja ninja/x11wasm.ninja
 build $x11wasm_browser_main: x11wasm_compile_c test/browser/main.c | $x11wasm_xlib_common_deps
 build $x11wasm_browser_app: x11wasm_link_browser $x11wasm_browser_main $x11wasm_lib build/typecheck-js.stamp $x11wasm_js_library $x11wasm_js_pre test/browser/shell.html | x11wasm_header_tests
+build $x11wasm_browser_dist/LICENSE $
+  $x11wasm_browser_dist/THIRD_PARTY_NOTICES.md $
+  $x11wasm_browser_dist/LICENSES/X11.txt $
+  $x11wasm_browser_dist/LICENSES/Tk.txt: x11wasm_stage_licenses $
+  $x11wasm_root/LICENSE $
+  $x11wasm_root/THIRD_PARTY_NOTICES.md $
+  $x11wasm_root/LICENSES/X11.txt $
+  $x11wasm_root/LICENSES/Tk.txt
+  x11wasm_license_dest = $x11wasm_browser_dist
 
 build typecheck_js: phony build/typecheck-js.stamp
 build compile_commands: phony build/compile_commands.json
-build browser: phony $x11wasm_browser_app x11wasm_header_tests
+build browser_licenses: phony $x11wasm_browser_dist/LICENSE
+build browser: phony $x11wasm_browser_app x11wasm_header_tests browser_licenses
 
 default x11wasm
