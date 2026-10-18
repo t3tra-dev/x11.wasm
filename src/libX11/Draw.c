@@ -3493,7 +3493,13 @@ KeySym XKeycodeToKeysym(Display *display, unsigned int keycode, int index)
     (void)display;
     return BrowserKeySymForKeycodeLevel(keycode, index);
 }
-KeySym XkbKeycodeToKeysym(Display *display, unsigned int keycode, int group, int level)
+KeySym XkbKeycodeToKeysym(Display *display,
+#if NeedWidePrototypes
+    unsigned int keycode,
+#else
+    KeyCode keycode,
+#endif
+    int group, int level)
 {
     if (group != 0) {
 	return NoSymbol;

@@ -67,7 +67,13 @@ EXTERN int XSetAccessControl(Display *d, int mode);
 EXTERN char **XListExtensions(Display *d, int *i);
 EXTERN Colormap *XListInstalledColormaps(Display *d, Window w, int *i);
 EXTERN KeySym XKeycodeToKeysym(Display *d, unsigned int k, int i);
-EXTERN KeySym XkbKeycodeToKeysym(Display *d, unsigned int k, int g, int i);
+EXTERN KeySym XkbKeycodeToKeysym(Display *d,
+#if NeedWidePrototypes
+	unsigned int k,
+#else
+	KeyCode k,
+#endif
+	int g, int i);
 EXTERN KeySym XStringToKeysym(_Xconst char *c);
 EXTERN Window XRootWindow(Display *d, int i);
 EXTERN int XConnectionNumber(Display *d);
