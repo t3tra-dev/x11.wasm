@@ -113,6 +113,11 @@ for (const state of ["zoomed", "fullscreen"]) {
         state === "fullscreen" ? 4 : 2,
         state === "fullscreen" ? 0 : 3);
     }, { id, state });
+    // The browser applies its fullscreen stylesheet before fullscreenchange.
+    await expect.poll(async () => {
+      const snapshot = await geometrySnapshot(page, id);
+      return snapshot.native.every((value, index) => value === snapshot.css[index]);
+    }).toBe(true);
     const snapshot = await geometrySnapshot(page, id);
     expect(snapshot.native).toEqual(snapshot.css);
     expect(snapshot.pending).toEqual(snapshot.native);

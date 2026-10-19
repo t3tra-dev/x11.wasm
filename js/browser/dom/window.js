@@ -294,6 +294,14 @@
      * @returns {{ width: number, height: number }}
      */
     measureRootElement(root, fallbackWidth, fallbackHeight) {
+      const active = this.document && this.document.fullscreenElement;
+      const view = this.document && this.document.defaultView;
+      if (active && view && this.fullscreenResourceForElement(active)) {
+        return {
+          width: positiveInt(view.innerWidth, fallbackWidth),
+          height: positiveInt(view.innerHeight, fallbackHeight),
+        };
+      }
       let rect = root.getBoundingClientRect();
       let width = Math.floor(root.clientWidth || rect.width);
       let height = Math.floor(root.clientHeight || rect.height);
