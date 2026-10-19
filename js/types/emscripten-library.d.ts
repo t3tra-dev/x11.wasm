@@ -355,6 +355,7 @@ declare const Module: {
     backendValidationCount: number;
   };
   x11WasmRoot?: string | HTMLElement;
+  x11WasmWindowManager?: boolean;
   _X11WasmResizeRoot?: (width: number, height: number) => number;
   _X11WasmQueueKeyEvent?: (
     type: number,
@@ -613,6 +614,7 @@ declare var X11WasmDOM: {
     root?: string | HTMLElement;
     document?: Document;
     module?: typeof Module;
+    windowManager?: boolean;
   }): unknown;
   X11WasmDOMBackend: unknown;
 };

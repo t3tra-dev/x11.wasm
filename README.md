@@ -19,6 +19,19 @@ creation with `BadMatch`. Adding multiple screens, other depths, PseudoColor,
 or alternate visuals should update the runtime harness expectations at the same
 time.
 
+## Optional window manager
+
+Decorations are disabled by default. Set `Module.x11WasmWindowManager = true`
+before initializing the runtime, or pass `windowManager: true` to
+`X11WasmDOM.createBackend({ root, module, windowManager: true })` when creating
+a backend directly. The native manager bridge must be included in the build.
+
+The manager decorates normal root-level InputOutput windows, resolves Tk
+wrapper/client metadata, and excludes widgets, InputOnly and override-redirect
+windows. Closing requests `WM_DELETE_WINDOW`; the application may refuse.
+`backend.setWindowManagerEnabled(false)` removes decorations and restores the
+original DOM presentation without changing the logical X11 window tree.
+
 ## License
 
 Original project code is licensed under the [MIT License](LICENSE).

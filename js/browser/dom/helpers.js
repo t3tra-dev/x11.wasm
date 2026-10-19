@@ -706,6 +706,64 @@
   box-sizing: content-box;
   transform-origin: 0 0;
 }
+.x11-wasm-frame {
+  position: absolute;
+  box-sizing: content-box;
+  isolation: isolate;
+  border-radius: 3px 3px 0 0;
+  box-shadow: 0 0 0 1px #777, 0 3px 8px #0003;
+}
+.x11-wasm-titlebar {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  background: #e4e4e4;
+  color: #303030;
+  cursor: move;
+  font: 13px sans-serif;
+  letter-spacing: 0;
+  touch-action: none;
+}
+.x11-wasm-frame[data-x11-wasm-active="1"] > .x11-wasm-titlebar {
+  background: #21654e;
+  color: #fff;
+}
+.x11-wasm-window-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 8px;
+}
+.x11-wasm-close {
+  flex: 0 0 28px;
+  position: relative;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.x11-wasm-close::before, .x11-wasm-close::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 13px;
+  width: 12px;
+  height: 2px;
+  background: currentColor;
+  transform: rotate(45deg);
+}
+.x11-wasm-close::after { transform: rotate(-45deg); }
+.x11-wasm-close:hover:enabled { background: #ac2430; color: white; }
+.x11-wasm-close:disabled { opacity: .4; cursor: default; }
+.x11-wasm-close:focus-visible { outline: 2px solid currentColor; outline-offset: -3px; }
 .x11-wasm-root.x11-wasm-pointer-grab,
 .x11-wasm-root.x11-wasm-pointer-grab * {
   cursor: var(--x11-wasm-pointer-grab-cursor, auto) !important;

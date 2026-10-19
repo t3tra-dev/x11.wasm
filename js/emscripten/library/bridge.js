@@ -167,6 +167,7 @@
               ? module["x11WasmRoot"]
               : undefined,
           module: module || undefined,
+          windowManager: !!module && module["x11WasmWindowManager"] === true,
 });
         if (module) {
           module["x11WasmBackend"] = X11WasmBridge.backend;
