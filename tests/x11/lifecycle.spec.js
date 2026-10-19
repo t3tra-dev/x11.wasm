@@ -268,3 +268,12 @@ for (const [scenario, name] of ["ancestor unmap", "grab window unmap", "confine 
   });
 }
 
+for (const [action, name] of ["focused IC destroy", "window unmap", "window destroy", "inactive IC destroy"].entries()) {
+  test(`native composition queue and DOM ownership follow ${name}`, async ({ page }) => {
+    await waitForX11Runtime(page);
+    const result = await page.evaluate((action) =>
+      /** @type {any} */ (window).Module._X11WasmTestRetiredICInput(action), action);
+    expect(result).toBe(1);
+  });
+}
+

@@ -1866,6 +1866,91 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestRetiredICInput(
+    int action)
+{
+    Display *display = X11WasmGetDisplay(NULL);
+    Window root = DefaultRootWindow(display);
+    Window first = XCreateSimpleWindow(display, root, 10, 10, 60, 40, 0, 0, 0);
+    Window second = XCreateSimpleWindow(display, root, 90, 10, 60, 40, 0, 0, 0);
+    XIM inputMethod = XOpenIM(display, NULL, NULL, NULL);
+    XIC inputContext = NULL, inactive = NULL;
+    XEvent event;
+    int firstEvents = 0, secondEvents = 0;
+    int result = 10;
+
+    (void)XMapWindow(display, first);
+    (void)XMapWindow(display, second);
+    inputContext = XCreateIC(inputMethod, XNInputStyle,
+	    XIMPreeditNothing | XIMStatusNothing, XNClientWindow, first,
+	    XNFocusWindow, first, NULL);
+    inactive = XCreateIC(inputMethod, XNInputStyle,
+	    XIMPreeditNothing | XIMStatusNothing, XNClientWindow, first,
+	    XNFocusWindow, first, NULL);
+    if ((inputContext == NULL) || (inactive == NULL)) {
+	goto cleanup;
+    }
+    XSetICFocus(inputContext);
+    (void)XSetInputFocus(display, first, RevertToParent, CurrentTime);
+    BrowserClearEventQueue();
+    EM_ASM({ Module.x11WasmBackend.startComposition("draft"); });
+    (void)X11WasmQueueCompositionEvent(X11_WASM_COMPOSITION_UPDATE,
+	    BrowserJsXId(second), "safe", 4);
+    if (action == 0) {
+	XDestroyIC(inputContext);
+	inputContext = NULL;
+    } else if (action == 1) {
+	(void)XUnmapWindow(display, first);
+    } else if (action == 2) {
+	(void)XDestroyWindow(display, first);
+	first = None;
+    } else {
+	XDestroyIC(inactive);
+	inactive = NULL;
+    }
+    while (BrowserPopEvent(&event, NULL)) {
+	if (event.type == ClientMessage) {
+	    int length = 0;
+	    char *text = X11WasmTakeCompositionText(&event, &length);
+
+	    if (event.xclient.window == second) {
+		secondEvents += (length == 4) && (text != NULL)
+			&& (memcmp(text, "safe", 4) == 0);
+	    } else {
+		firstEvents++;
+	    }
+	    XFree(text);
+	}
+    }
+    result = 20;
+    if ((firstEvents != ((action == 3) ? 1 : 0))
+	    || (secondEvents != 1) || (x11wasm_compositionPayloadList != NULL)) {
+	goto cleanup;
+    }
+    result = 21;
+    if (!EM_ASM_INT({
+	const backend = Module.x11WasmBackend;
+	return $0 === 3 ? backend.composing && backend.compositionWindow !== 0
+	    && backend.inputContextWindow !== 0 : !backend.composing
+	    && backend.compositionWindow === 0 && backend.inputContextWindow === 0
+	    && backend.inputElement.value === "";
+    }, action)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    if (inputContext != NULL) XDestroyIC(inputContext);
+    if (inactive != NULL) XDestroyIC(inactive);
+    if (inputMethod != NULL) (void)XCloseIM(inputMethod);
+    (void)XSetInputFocus(display, root, RevertToNone, CurrentTime);
+    if (first != None) (void)XDestroyWindow(display, first);
+    (void)XDestroyWindow(display, second);
+    BrowserClearEventQueue();
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestPinnedCompositionTargets(void)
 {
     Display *display;

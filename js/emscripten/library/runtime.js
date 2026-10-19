@@ -107,6 +107,11 @@
     return X11WasmBridge.call("focusInput", [!!focused, window]) | 0;
   },
 
+  X11WasmJsCancelComposition__deps: ["$X11WasmBridge"],
+  X11WasmJsCancelComposition: function (window) {
+    return X11WasmBridge.call("cancelComposition", [window]) | 0;
+  },
+
   X11WasmJsSetInputContext__deps: ["$X11WasmBridge"],
   X11WasmJsSetInputContext: function (
     focused,

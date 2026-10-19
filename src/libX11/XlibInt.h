@@ -1598,6 +1598,8 @@ int BrowserRequestTimeIsValid(
     Time lastChangeTime);
 void BrowserReleaseInputForUnviewableWindow(
     X11WasmResource *resourcePtr);
+void BrowserDiscardICCompositionEvents(
+    XIC inputContext);
 void BrowserReleasePassiveKeyboardGrabIfIdle(void);
 void BrowserReleasePassivePointerGrabIfIdle(
     unsigned int state);

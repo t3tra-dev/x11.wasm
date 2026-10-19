@@ -301,7 +301,7 @@ BrowserCompositionQueuedEvent(
 		    eventName, False));
 }
 
-static void
+void
 BrowserDiscardICCompositionEvents(
     XIC inputContext)
 {
@@ -1136,6 +1136,12 @@ XDestroyIC(
 {
     if (inputContext != NULL) {
 	if (x11wasm_focusedInputContext == inputContext) {
+	    Window window = BrowserInputContextWindow(inputContext);
+
+	    BrowserDiscardICCompositionEvents(inputContext);
+	    if (window != None) {
+		(void)X11WasmJsCancelComposition(BrowserJsXId(window));
+	    }
 	    BrowserClearInputContext();
 	    x11wasm_focusedInputContext = NULL;
 	}

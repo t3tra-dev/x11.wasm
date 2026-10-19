@@ -263,6 +263,7 @@ BrowserReleaseInputForUnviewableWindow(
 
 	if (BrowserWindowInTree(BrowserInputContextWindow(inputContext), window)
 		|| BrowserWindowInTree(inputContext->clientWindow, window)) {
+	    BrowserDiscardICCompositionEvents(inputContext);
 	    XUnsetICFocus(inputContext);
 	    BrowserClearICPreeditText(inputContext);
 	}

@@ -310,6 +310,7 @@ extern int X11WasmJsSetHostAccessControl(int enabled,
 	const char *hostsUtf8, int hostsUtf8Length, int count);
 extern int X11WasmJsSetServerGrabState(int depth);
 extern int X11WasmJsSetInputFocus(int focused, unsigned int window);
+extern int X11WasmJsCancelComposition(unsigned int window);
 extern int X11WasmJsSetInputContext(int focused, unsigned int window,
 	int hasSpot, int spotRootX, int spotRootY);
 extern int X11WasmJsSetPointerGrabCursor(int enabled, unsigned int cursor);
@@ -573,6 +574,9 @@ X11WasmJsSetServerGrabState(int depth)
 static inline int
 X11WasmJsSetInputFocus(int focused, unsigned int window)
 { (void)focused; (void)window; return 0; }
+static inline int
+X11WasmJsCancelComposition(unsigned int window)
+{ (void)window; return 0; }
 static inline int
 X11WasmJsSetInputContext(int focused, unsigned int window, int hasSpot,
 	int spotRootX, int spotRootY)

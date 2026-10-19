@@ -256,6 +256,7 @@ interface X11WasmBackend {
     count: number,
   ): number;
   setServerGrabState(depth: number): number;
+  cancelComposition(window?: number): number;
   setInputContext(
     focused: boolean,
     window: number,

@@ -1104,7 +1104,14 @@
       this.flushInputText(finalText || undefined, targetWindow);
     },
 
-    cancelComposition() {
+    /**
+     * @param {number=} window
+     * @returns {number}
+     */
+    cancelComposition(window = 0) {
+      if (window !== 0 && window !== this.compositionWindow) {
+        return 0;
+      }
       this.composing = false;
       this.compositionCancelled = true;
       this.compositionWindow = 0;
@@ -1112,6 +1119,7 @@
       if (this.inputElement) {
         this.inputElement.value = "";
       }
+      return 0;
     },
 
     /**
