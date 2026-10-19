@@ -142,6 +142,36 @@
   Object.assign(X11WasmDOMBackend.prototype, /** @type {any} */ ({
     /**
      * @param {number} window
+     * @param {number} ancestor
+     * @returns {boolean}
+     */
+    inputWindowInTree(window, ancestor) {
+      for (let resource = this.resources.get(window); resource;
+        resource = this.resources.get(resource.parent)) {
+        if (resource.id === ancestor) {
+          return true;
+        }
+      }
+      return false;
+    },
+
+    /**
+     * @param {number} window
+     */
+    releaseWindowInput(window) {
+      if (this.inputWindowInTree(this.compositionWindow, window)) {
+        this.cancelComposition();
+      }
+      if (this.inputWindowInTree(this.inputContextWindow, window)) {
+        this.setInputContext(false);
+      }
+      if (this.inputWindowInTree(this.focusedWindow, window)) {
+        this.setFocusedWindow(0);
+      }
+    },
+
+    /**
+     * @param {number} window
      */
     setFocusedWindow(window) {
       const windowId = unsignedInt(window, 0);
@@ -519,6 +549,10 @@
         this.handlePaste(event);
       });
       input.addEventListener("input", (event) => {
+        if (this.compositionCancelled) {
+          input.value = "";
+          return;
+        }
         if (event instanceof InputEvent && event.isComposing) {
           if (event.inputType === "insertCompositionText") {
             this.updateComposition(event.data || input.value);
@@ -808,6 +842,7 @@
         this.queueImeKeyEvent(KEY_PRESS, event);
         return;
       }
+      this.compositionCancelled = false;
       if (this.isHostPasteShortcut(event)) {
         this.hostPasteShortcutActive = true;
         return;
@@ -987,6 +1022,7 @@
      * @param {string} text
      */
     startComposition(text) {
+      this.compositionCancelled = false;
       this.composing = true;
       this.compositionWindow = this.compositionTargetWindow();
       this.compositionText = text;
@@ -997,6 +1033,9 @@
      * @param {string} text
      */
     updateComposition(text) {
+      if (this.compositionCancelled) {
+        return;
+      }
       if (!this.composing) {
         this.startComposition(text);
         return;
@@ -1013,6 +1052,12 @@
      */
     endComposition(text) {
       const input = this.inputElement;
+      if (this.compositionCancelled) {
+        if (input) {
+          input.value = "";
+        }
+        return;
+      }
       const finalText = text || (input ? input.value : "");
       const targetWindow = this.compositionWindow || this.compositionTargetWindow();
 
@@ -1021,6 +1066,16 @@
       this.compositionText = "";
       this.queueCompositionEvent(COMPOSITION_END, finalText, targetWindow);
       this.flushInputText(finalText || undefined, targetWindow);
+    },
+
+    cancelComposition() {
+      this.composing = false;
+      this.compositionCancelled = true;
+      this.compositionWindow = 0;
+      this.compositionText = "";
+      if (this.inputElement) {
+        this.inputElement.value = "";
+      }
     },
 
     /**
