@@ -1184,8 +1184,8 @@ syncDocumentIconFromResources() {
       }
       const activeElement = document.fullscreenElement || null;
       if (resource.fullscreen) {
-        this.fullscreenRequestWindow = resource.id;
         if (activeElement === element) {
+          this.fullscreenRequestWindow = resource.id;
           this.fullscreenElement = element;
           this.fullscreenRequestStatus = "active";
           this.fullscreenRequestError = "";
@@ -1194,10 +1194,12 @@ syncDocumentIconFromResources() {
         if (
           previousFullscreen &&
           this.fullscreenRequestWindow === resource.id &&
-          this.fullscreenRequestStatus !== "exited"
+          (this.fullscreenRequestStatus === "requested" ||
+            this.fullscreenRequestStatus === "active")
         ) {
           return;
         }
+        this.fullscreenRequestWindow = resource.id;
         if (typeof element.requestFullscreen !== "function") {
           this.fullscreenRequestStatus = "unsupported";
           this.fullscreenRequestError = "Element.requestFullscreen unavailable";
