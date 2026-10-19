@@ -143,6 +143,7 @@
     cancelWindowManagerResource(id) {
       const gesture = this.managerGesture;
       const resource = this.resources.get(id);
+      if (resource && resource.kind !== "window") return;
       if (gesture && (gesture.id === id || (resource &&
           this.stackingResourceFor(resource).id === gesture.id))) this.cancelWindowManagerGesture();
     },
