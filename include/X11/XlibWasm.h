@@ -26,6 +26,23 @@ extern "C" {
 /* Exact browser geometry synchronization; size hints belong to manager actions. */
 extern int X11WasmConfigureWindow(unsigned int window, int x, int y,
 	unsigned int width, unsigned int height, unsigned int valueMask);
+extern unsigned int X11WasmManagerWindowIdentity(unsigned int window, int field);
+extern int X11WasmManagerCloseWindow(unsigned int window, unsigned int time);
+/* Identity fields: native root frame, metadata client, WM_DELETE_WINDOW owner. */
+#define X11_WASM_MANAGER_FRAME 0
+#define X11_WASM_MANAGER_METADATA 1
+#define X11_WASM_MANAGER_PROTOCOL 2
+/* Normal removes only maximized atoms; iconic preserves them; zoomed adds them. */
+#define X11_WASM_MANAGER_NORMAL 0
+#define X11_WASM_MANAGER_ICONIC 1
+#define X11_WASM_MANAGER_ZOOMED 2
+/* WM actions return zero on refusal, nonzero on acceptance. Configure rejects
+ * invalid hints without snapping; SetWindowState never changes geometry. */
+extern int X11WasmManagerConfigureWindow(unsigned int window, int x, int y,
+	unsigned int width, unsigned int height, unsigned int valueMask);
+extern int X11WasmManagerActivateWindow(unsigned int window, unsigned int time);
+extern int X11WasmManagerSetWindowState(unsigned int window, int state,
+	unsigned int time);
 
 extern int XSetDashes(Display *display, GC gc, int dash_offset,
 	_Xconst char *dash_list, int n);

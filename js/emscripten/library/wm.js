@@ -283,6 +283,10 @@
       },
 
   X11WasmJsSetWindowWmState__deps: ["$X11WasmBridge"],
+  X11WasmJsSetManagerGeometryOwned__deps: ["$X11WasmBridge"],
+  X11WasmJsSetManagerGeometryOwned: function(frame, metadata) {
+    return X11WasmBridge.call("setManagerGeometryOwned", [frame, metadata]) | 0;
+  },
   X11WasmJsSetWindowWmState: function(id, state) {
         return X11WasmBridge.call("setWindowWmState", [id, state]) | 0;
       },
