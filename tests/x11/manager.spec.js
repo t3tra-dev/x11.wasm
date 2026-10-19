@@ -110,7 +110,7 @@ test("dynamic titles are text and close can be refused without destroying the wi
     backend.setWindowTitle(3, '<img src=x onerror="throw 1">');
   });
   await expect(page.locator(".x11-wasm-window-title")).toHaveText('<img src=x onerror="throw 1">');
-  await expect(page.locator(".x11-wasm-titlebar img")).toHaveCount(0);
+  await expect(page.locator(".x11-wasm-window-title img")).toHaveCount(0);
   await page.locator(".x11-wasm-close").click();
   const result = await page.evaluate(() => {
     const { backend, calls } = /** @type {any} */ (window).managerTest;
