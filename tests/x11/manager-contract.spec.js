@@ -155,7 +155,7 @@ test("resize uses metadata min max base increments and fixed axes", async ({ pag
   expect(result).toEqual({ calls: [[2, 80, 60, 160, 120, 5]], hidden: true, native: [40, 200] });
 });
 
-test("move coordinates follow root CSS scale page scroll and device pixels", async ({ page }) => {
+test("move coordinates follow root CSS scale and page scroll", async ({ page }) => {
   await createManagerContract(page);
   const result = await page.evaluate(() => {
     const { backend, calls } = /** @type {any} */ (window).managerContract;
@@ -177,4 +177,26 @@ test("move coordinates follow root CSS scale page scroll and device pixels", asy
     return calls;
   });
   expect(result).toEqual([[2, 80, 100, 200, 120, 3]]);
+});
+
+test("client activation requests native focus and stacking without optimistic changes", async ({ page }) => {
+  await createManagerContract(page);
+  const result = await page.evaluate(() => {
+    const { backend, module, calls } = /** @type {any} */ (window).managerContract;
+    module._X11WasmManagerActivateWindow = (id, time) => { calls.push([id, time]); return 1; };
+    backend.createWindow(2, 1, 40, 60, 200, 120, 24, 0);
+    backend.createWindow(30, 2, 0, 0, 40, 20, 24, 0);
+    backend.mapWindow(2);
+    backend.flush();
+    let delivered = 0;
+    backend.rootElement.addEventListener("pointerdown", () => delivered++);
+    const client = backend.resources.get(30).element;
+    const event = new PointerEvent("pointerdown", { bubbles: true, pointerId: 9, button: 0, isPrimary: true });
+    client.dispatchEvent(event);
+    backend.pointerGrabWindow = 2;
+    client.dispatchEvent(event);
+    return { calls: calls.map((call) => call[0]), delivered, focus: backend.focusedWindow,
+      active: backend.managerFrames.get(2).element.getAttribute("data-x11-wasm-active") };
+  });
+  expect(result).toEqual({ calls: [2], delivered: 2, focus: 0, active: "0" });
 });

@@ -250,6 +250,18 @@
       };
       const decorationFor = (event) => event.target instanceof view.Element
         ? event.target.closest(`[${DECORATION}]`) : null;
+      view.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0 || !event.isPrimary || this.managerGesture ||
+            !(event.target instanceof view.Element) || !this.rootElement?.contains(event.target) ||
+            decorationFor(event)) return;
+        const element = event.target.closest(`[${RESOURCE_ATTR}]`);
+        const id = Number(element?.getAttribute(RESOURCE_ATTR));
+        const resource = this.resources.get(id);
+        const identity = resource && this.windowManagerIdentity(this.stackingResourceFor(resource).id);
+        if (identity && this.managerFrames.has(identity.frameId)) {
+          this.activateWindowManagerFrame(identity.frameId, event.timeStamp);
+        }
+      }, options);
       for (const type of ["pointerdown", "pointerup", "pointermove", "pointercancel",
         "lostpointercapture", "pointerover", "pointerout", "mousedown", "mouseup",
         "mousemove", "mouseover", "mouseout", "click", "dblclick", "contextmenu",
@@ -319,8 +331,10 @@
     /** @param {number} id @param {number} time */
     activateWindowManagerFrame(id, time) {
       const activate = this.module?.["_X11WasmManagerActivateWindow"];
-      return !this.windowManagerActionsBlocked() && typeof activate === "function"
+      const result = !this.windowManagerActionsBlocked() && typeof activate === "function"
         ? activate(id, Math.max(0, Math.floor(time))) : 0;
+      if (result) this.flush();
+      return result;
     },
 
   }));
