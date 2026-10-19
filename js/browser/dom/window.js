@@ -550,6 +550,7 @@
       if (!resource || resource.kind === "root") {
         return 0;
       }
+      this.releaseWindowInput(windowId);
       this.dirtyResources.delete(resource);
       if (resource.element && resource.element.parentNode) {
         resource.element.parentNode.removeChild(resource.element);
@@ -913,6 +914,7 @@ applyRootPointerState() {
     unmapWindow(id) {
       const resource = this.resources.get(id);
       if (resource && resource.element) {
+        this.releaseWindowInput(id);
         resource.pendingMapped = false;
         this.markGeometryDirty(resource);
       }

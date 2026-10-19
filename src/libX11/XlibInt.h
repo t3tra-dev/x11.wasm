@@ -478,6 +478,7 @@ int X11WasmQueueCrossingEvent(
 int X11WasmQueueTextEventFieldsAtWindow(
     int type, unsigned int window, unsigned int codepoint,
     unsigned int state, unsigned int time);
+int X11WasmCancelPointerInput(void);
 int X11WasmQueuePointerEvent(
     int type,
     unsigned int window,
@@ -1595,6 +1596,10 @@ Time BrowserRequestEffectiveTime(
 int BrowserRequestTimeIsValid(
     Time time,
     Time lastChangeTime);
+void BrowserReleaseInputForUnviewableWindow(
+    X11WasmResource *resourcePtr);
+void BrowserDiscardICCompositionEvents(
+    XIC inputContext);
 void BrowserReleasePassiveKeyboardGrabIfIdle(void);
 void BrowserReleasePassivePointerGrabIfIdle(
     unsigned int state);

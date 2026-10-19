@@ -1706,6 +1706,251 @@ cleanup:
 }
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmTestPointerCancellation(
+    int explicitGrab)
+{
+    Display *display = X11WasmGetDisplay(NULL);
+    Window root = DefaultRootWindow(display);
+    Window window = XCreateSimpleWindow(display, root, 10, 10, 80, 60,
+	    0, 0, 0);
+    unsigned int mask = ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
+    XEvent event;
+    int result = 0;
+
+    (void)XMapWindow(display, window);
+    (void)XSelectInput(display, window, mask);
+    if (explicitGrab) {
+	(void)XGrabPointer(display, window, False, mask, GrabModeAsync,
+		GrabModeAsync, None, None, CurrentTime);
+    } else {
+	(void)XGrabButton(display, Button1, ShiftMask, window, False, mask,
+		GrabModeAsync, GrabModeAsync, None, None);
+    }
+    BrowserClearEventQueue();
+    (void)X11WasmQueuePointerEvent(ButtonPress, BrowserJsXId(root),
+	    Button1, ShiftMask, 15, 15, CurrentTime);
+    if ((x11wasm_browserDisplay.pointerGrabWindow != window)
+	    || (x11wasm_browserDisplay.pointerCaptureWindow != window)
+	    || ((x11wasm_browserDisplay.pointerState & Button1Mask) == 0)) {
+	result = 10;
+	goto cleanup;
+    }
+    if (!XCheckWindowEvent(display, window, ButtonPressMask, &event)) {
+	result = 12;
+	goto cleanup;
+    }
+    (void)X11WasmCancelPointerInput();
+    if ((x11wasm_browserDisplay.pointerCaptureWindow != None)
+	    || (x11wasm_browserDisplay.pointerState != ShiftMask)
+	    || (x11wasm_browserDisplay.pointerGrabWindow
+		    != (explicitGrab ? window : None))) {
+	result = 11;
+	goto cleanup;
+    }
+    (void)X11WasmQueuePointerEvent(ButtonPress, BrowserJsXId(root),
+	    Button1, ShiftMask, 15, 15, CurrentTime);
+    (void)X11WasmQueuePointerEvent(ButtonRelease, BrowserJsXId(root),
+	    Button1, ShiftMask | Button1Mask, 15, 15, CurrentTime);
+    if (!XCheckWindowEvent(display, window, ButtonPressMask, &event)
+	    || (event.xbutton.state != ShiftMask)
+	    || !XCheckWindowEvent(display, window, ButtonReleaseMask, &event)
+	    || (event.xbutton.state != (ShiftMask | Button1Mask))
+	    || (x11wasm_browserDisplay.pointerCaptureWindow != None)) {
+	result = 13;
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    (void)XUngrabPointer(display, CurrentTime);
+    (void)XDestroyWindow(display, window);
+    BrowserClearEventQueue();
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestUnviewableInputLifetime(
+    int scenario)
+{
+    Display *display = X11WasmGetDisplay(NULL);
+    Window root = DefaultRootWindow(display);
+    Window parent = XCreateSimpleWindow(display, root, 10, 10, 160, 100,
+	    0, 0, 0);
+    Window child = XCreateSimpleWindow(display, parent, 0, 0, 60, 40,
+	    0, 0, 0);
+    Window confine = XCreateSimpleWindow(display, parent, 70, 0, 60, 40,
+	    0, 0, 0);
+    XIM inputMethod = XOpenIM(display, NULL, NULL, NULL);
+    XIC inputContext = NULL;
+    int result = 0;
+
+    (void)XMapWindow(display, parent);
+    (void)XMapWindow(display, child);
+    (void)XMapWindow(display, confine);
+    if (inputMethod == NULL) {
+	result = 10;
+	goto cleanup;
+    }
+    inputContext = XCreateIC(inputMethod, XNInputStyle,
+	    XIMPreeditNothing | XIMStatusNothing, XNClientWindow, child,
+	    XNFocusWindow, child, NULL);
+    if (inputContext == NULL) {
+	result = 11;
+	goto cleanup;
+    }
+    XSetICFocus(inputContext);
+    (void)XSetInputFocus(display, child, RevertToParent, CurrentTime);
+    if ((XGrabPointer(display, child, False,
+	    ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
+	    GrabModeAsync, GrabModeAsync, confine, None, CurrentTime)
+	    != GrabSuccess)
+	    || (XGrabKeyboard(display, child, False, GrabModeAsync,
+		    GrabModeAsync, CurrentTime) != GrabSuccess)) {
+	result = 12;
+	goto cleanup;
+    }
+    (void)X11WasmQueuePointerEvent(ButtonPress, BrowserJsXId(root),
+	    Button1, 0, 15, 15, CurrentTime);
+    if (scenario == 3) {
+	(void)XDestroyWindow(display, parent);
+	parent = None;
+    } else {
+	(void)XUnmapWindow(display, (scenario == 0) ? parent
+		: ((scenario == 1) ? child : confine));
+    }
+    if (x11wasm_browserDisplay.pointerGrabWindow != None) {
+	result = 20;
+	goto cleanup;
+    }
+    if (scenario != 2) {
+	if (x11wasm_browserDisplay.keyboardGrabWindow != None) {
+	    result = 21;
+	    goto cleanup;
+	}
+	if (x11wasm_focusedInputContext != NULL) {
+	    result = 22;
+	    goto cleanup;
+	}
+	if (x11wasm_browserDisplay.pointerCaptureWindow != None) {
+	    result = 25;
+	    goto cleanup;
+	}
+	if ((x11wasm_browserDisplay.focusWindow != ((scenario == 1)
+		? parent : root))
+		|| (x11wasm_browserDisplay.focusRevertTo != RevertToNone)) {
+	    result = 23;
+	    goto cleanup;
+	}
+    } else if ((x11wasm_browserDisplay.keyboardGrabWindow != child)
+	    || (x11wasm_focusedInputContext != inputContext)) {
+	result = 24;
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    (void)XUngrabPointer(display, CurrentTime);
+    (void)XUngrabKeyboard(display, CurrentTime);
+    (void)XSetInputFocus(display, root, RevertToNone, CurrentTime);
+    if (inputContext != NULL) {
+	XDestroyIC(inputContext);
+    }
+    if (inputMethod != NULL) {
+	(void)XCloseIM(inputMethod);
+    }
+    if (parent != None) {
+	(void)XDestroyWindow(display, parent);
+    }
+    BrowserClearEventQueue();
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestRetiredICInput(
+    int action)
+{
+    Display *display = X11WasmGetDisplay(NULL);
+    Window root = DefaultRootWindow(display);
+    Window first = XCreateSimpleWindow(display, root, 10, 10, 60, 40, 0, 0, 0);
+    Window second = XCreateSimpleWindow(display, root, 90, 10, 60, 40, 0, 0, 0);
+    XIM inputMethod = XOpenIM(display, NULL, NULL, NULL);
+    XIC inputContext = NULL, inactive = NULL;
+    XEvent event;
+    int firstEvents = 0, secondEvents = 0;
+    int result = 10;
+
+    (void)XMapWindow(display, first);
+    (void)XMapWindow(display, second);
+    inputContext = XCreateIC(inputMethod, XNInputStyle,
+	    XIMPreeditNothing | XIMStatusNothing, XNClientWindow, first,
+	    XNFocusWindow, first, NULL);
+    inactive = XCreateIC(inputMethod, XNInputStyle,
+	    XIMPreeditNothing | XIMStatusNothing, XNClientWindow, first,
+	    XNFocusWindow, first, NULL);
+    if ((inputContext == NULL) || (inactive == NULL)) {
+	goto cleanup;
+    }
+    XSetICFocus(inputContext);
+    (void)XSetInputFocus(display, first, RevertToParent, CurrentTime);
+    BrowserClearEventQueue();
+    EM_ASM({ Module.x11WasmBackend.startComposition("draft"); });
+    (void)X11WasmQueueCompositionEvent(X11_WASM_COMPOSITION_UPDATE,
+	    BrowserJsXId(second), "safe", 4);
+    if (action == 0) {
+	XDestroyIC(inputContext);
+	inputContext = NULL;
+    } else if (action == 1) {
+	(void)XUnmapWindow(display, first);
+    } else if (action == 2) {
+	(void)XDestroyWindow(display, first);
+	first = None;
+    } else {
+	XDestroyIC(inactive);
+	inactive = NULL;
+    }
+    while (BrowserPopEvent(&event, NULL)) {
+	if (event.type == ClientMessage) {
+	    int length = 0;
+	    char *text = X11WasmTakeCompositionText(&event, &length);
+
+	    if (event.xclient.window == second) {
+		secondEvents += (length == 4) && (text != NULL)
+			&& (memcmp(text, "safe", 4) == 0);
+	    } else {
+		firstEvents++;
+	    }
+	    XFree(text);
+	}
+    }
+    result = 20;
+    if ((firstEvents != ((action == 3) ? 1 : 0))
+	    || (secondEvents != 1) || (x11wasm_compositionPayloadList != NULL)) {
+	goto cleanup;
+    }
+    result = 21;
+    if (!EM_ASM_INT({
+	const backend = Module.x11WasmBackend;
+	return $0 === 3 ? backend.composing && backend.compositionWindow !== 0
+	    && backend.inputContextWindow !== 0 : !backend.composing
+	    && backend.compositionWindow === 0 && backend.inputContextWindow === 0
+	    && backend.inputElement.value === "";
+    }, action)) {
+	goto cleanup;
+    }
+    result = 1;
+
+cleanup:
+    if (inputContext != NULL) XDestroyIC(inputContext);
+    if (inactive != NULL) XDestroyIC(inactive);
+    if (inputMethod != NULL) (void)XCloseIM(inputMethod);
+    (void)XSetInputFocus(display, root, RevertToNone, CurrentTime);
+    if (first != None) (void)XDestroyWindow(display, first);
+    (void)XDestroyWindow(display, second);
+    BrowserClearEventQueue();
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmTestPinnedCompositionTargets(void)
 {
     Display *display;

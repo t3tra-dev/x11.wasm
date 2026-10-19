@@ -47,6 +47,7 @@ build build/typecheck-js.stamp: x11wasm_typecheck_js $
   tests/types/playwright-node.d.ts $
   tests/support/x11.js $
   tests/x11/bridge.spec.js $
+  tests/x11/lifecycle.spec.js $
   tests/x11/rendering.spec.js $
   tests/x11/runtime.spec.js $
   tests/x11/selection.spec.js $
