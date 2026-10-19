@@ -180,6 +180,7 @@
       /** @type {MutationObserver | null} */
       this.managerObserver = null;
       this.managerSyncing = false;
+      this.managerRetainedInputFocus = false;
       /** @private @type {Map<number, string>} */
       this.cursors = new Map();
       /** @private @type {string | null} */
