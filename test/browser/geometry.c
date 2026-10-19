@@ -95,3 +95,67 @@ X11WasmTestGeometryHit(int x, int y)
 	    &translatedX, &translatedY, &child);
     return (unsigned int)child;
 }
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmTestGeometryWmState(unsigned int window, int action, int value)
+{
+    Display *display = XOpenDisplay(NULL);
+    Atom property = XInternAtom(display, "WM_STATE", False);
+    Atom type;
+    int format, result = -1;
+    unsigned long count, after;
+    unsigned char *data = NULL;
+    XEvent event;
+
+    switch (action) {
+    case 1: return XIconifyWindow(display, window, value);
+    case 2: return XWithdrawWindow(display, window, value);
+    case 3: return XMapWindow(display, window);
+    case 4: {
+	XWMHints hints;
+	memset(&hints, 0, sizeof(hints));
+	hints.flags = StateHint;
+	hints.initial_state = value;
+	return XSetWMHints(display, window, &hints);
+    }
+    case 5: return XDeleteProperty(display, window, property);
+    case 7: {
+	int i, length;
+	Atom *properties = XListProperties(display, window, &length);
+	result = 0;
+	for (i = 0; i < length; i++) {
+	    if (properties[i] == property) result++;
+	}
+	XFree(properties);
+	return result;
+    }
+    case 8:
+	result = 0;
+	while (XCheckTypedWindowEvent(display, window, PropertyNotify, &event)) {
+	    if (event.xproperty.atom == property) result++;
+	}
+	return result;
+    case 9: {
+	long state[2] = {value, None};
+	return XChangeProperty(display, window, property, property, 32,
+		PropModeReplace, (unsigned char *)state, 2);
+    }
+    case 10: {
+	XWindowAttributes attributes;
+	return XGetWindowAttributes(display, window, &attributes)
+		? attributes.map_state : -1;
+    }
+    case 11: return XUnmapWindow(display, window);
+    case 12: XSelectInput(display, window, StructureNotifyMask | PropertyChangeMask);
+	return 1;
+    default: break;
+    }
+    if ((XGetWindowProperty(display, window, property, 0, 2,
+	    action == 6, property, &type, &format, &count, &after, &data)
+	    == Success) && (type == property) && (format == 32)
+	    && (count == 2) && (after == 0) && (data != NULL)) {
+	result = (int)((long *)data)[0];
+    }
+    XFree(data);
+    return result;
+}

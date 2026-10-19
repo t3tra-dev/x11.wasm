@@ -54,6 +54,7 @@ build build/typecheck-js.stamp: x11wasm_typecheck_js $
   tests/x11/server.spec.js $
   tests/x11/wm.spec.js $
   tests/x11/geometry.spec.js $
+  tests/x11/wm-state.spec.js $
   tests/x11/zero-width.spec.js $
   playwright.config.js
 build build/compile_commands.json: x11wasm_compile_commands tools/gen_compile_commands.py build.ninja ninja/x11wasm.ninja
