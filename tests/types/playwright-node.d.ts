@@ -43,6 +43,9 @@ declare module "@playwright/test" {
     focus(options?: unknown): Promise<void>;
     textContent(): Promise<string | null>;
     getAttribute(name: string): Promise<string | null>;
+    boundingBox(): Promise<{ x: number; y: number; width: number; height: number } | null>;
+    evaluate<Result>(callback: (element: HTMLElement) => Result | Promise<Result>): Promise<Awaited<Result>>;
+    evaluate<Arg, Result>(callback: (element: HTMLElement, arg: Arg) => Result | Promise<Result>, arg: Arg): Promise<Awaited<Result>>;
   }
 
   export interface Page {
@@ -77,11 +80,14 @@ declare module "@playwright/test" {
   export interface Matchers {
     not: Matchers;
     toBe(expected: unknown): unknown;
+    toBeCloseTo(expected: number, precision?: number): unknown;
     toBeGreaterThan(expected: number): unknown;
     toBeGreaterThanOrEqual(expected: number): unknown;
     toBeLessThan(expected: number): unknown;
     toBeNull(): unknown;
     toBeFocused(options?: unknown): Promise<void>;
+    toBeVisible(options?: unknown): Promise<void>;
+    toBeHidden(options?: unknown): Promise<void>;
     toBeTruthy(): unknown;
     toContain(expected: unknown): unknown;
     toEqual(expected: unknown): unknown;
