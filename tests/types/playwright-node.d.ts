@@ -1,14 +1,22 @@
 declare module "node:fs" {
   export function readFileSync(path: string, encoding: string): string;
+  export function accessSync(path: string, mode: number): void;
+  export const constants: { X_OK: number };
+  export function mkdirSync(path: string, options: { recursive: boolean; mode?: number }): string | undefined;
+  export function mkdtempSync(prefix: string): string;
+  export function writeFileSync(path: string, data: string, options: { mode: number; flag: string }): void;
 }
 
 declare module "node:path" {
   export function resolve(...paths: string[]): string;
+  export function join(...paths: string[]): string;
+  export function isAbsolute(path: string): boolean;
 }
 
 declare var __dirname: string;
 declare var process: {
   env: Record<string, string | undefined>;
+  platform: string;
 };
 
 declare module "@playwright/test" {

@@ -52,6 +52,21 @@ that restore target; root-size reflow does not. Native refusal leaves state
 unchanged. Gesture capture is released on cancellation, blur, unmap, destroy,
 or disabling decorations.
 
+## Chrome test logs
+
+On POSIX systems, crash reporting or updater descendants may retain Chrome's
+stderr pipe and delay Playwright shutdown. Enable per-run regular-file logs
+for the same installed Chrome without changing timeouts or exit status:
+
+```sh
+PLAYWRIGHT_CHANNEL=chrome PLAYWRIGHT_CHROME_STDIO_DIR=build/internal/chrome-stdio npm run test:browser -- --workers=1
+```
+
+The printed `run-*/chrome-<pid>.log` files are retained under that directory.
+The wrapper preserves the browser PID, arguments, and CDP pipes. For a custom
+Chrome installation, set `PLAYWRIGHT_CHROME_EXECUTABLE` to its absolute path.
+Leaving `PLAYWRIGHT_CHROME_STDIO_DIR` unset preserves the normal launch path.
+
 ## License
 
 Original project code is licensed under the [MIT License](LICENSE).
