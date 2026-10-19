@@ -113,8 +113,9 @@ test("dynamic titles are text and close can be refused without destroying the wi
   await expect(page.locator(".x11-wasm-window-title img")).toHaveCount(0);
   await page.locator(".x11-wasm-close").click();
   const result = await page.evaluate(() => {
-    const { backend, calls } = /** @type {any} */ (window).managerTest;
+    const { backend, calls, identities } = /** @type {any} */ (window).managerTest;
     backend.setWindowProtocols(3, "");
+    identities[2][2] = 0;
     backend.syncWindowManager();
     backend.managerFrames.get(2).close.click();
     return { calls: calls.map((call) => call.slice(0, 2)), exists: backend.resources.has(2),
