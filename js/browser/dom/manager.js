@@ -30,6 +30,7 @@
         for (const id of this.managerFrames.keys()) {
           this.removeWindowManagerFrame(id);
         }
+        this.removeWindowManagerTaskbar();
       } else {
         this.syncWindowManager();
       }
@@ -90,6 +91,7 @@
             this.setWindowManagerGeometryOwned(frame.identity, false);
             frame.identity = identity;
             this.setWindowManagerGeometryOwned(identity, true);
+            this.syncWindowManagerStateGeometry(resource, frame, metadata);
             this.syncWindowManagerFrame(resource, frame, metadata);
           }
         }
@@ -102,6 +104,7 @@
             !this.managerFrames.has(this.managerGesture.id))) {
           this.cancelWindowManagerGesture();
         }
+        this.syncWindowManagerTaskbar();
       } finally {
         this.managerSyncing = false;
       }
@@ -113,6 +116,18 @@
         const resource = this.resources.get(id);
         if (resource) resource.managerGeometryOwned = owned;
       }
+    },
+
+    /** @param {string} action @param {string} label @returns {HTMLButtonElement} */
+    createWindowManagerButton(action, label) {
+      const button = this.document.createElement("button");
+      button.className = `x11-wasm-window-button x11-wasm-${action}`;
+      button.type = "button";
+      button.title = label;
+      button.setAttribute("aria-label", label);
+      button.setAttribute(DECORATION, action);
+      button.append(privateApi.managerIcon(this.document, action));
+      return button;
     },
 
     /**
@@ -138,14 +153,10 @@
       icon.className = "x11-wasm-window-icon";
       icon.alt = "";
       icon.hidden = true;
-      const close = document.createElement("button");
-      close.className = "x11-wasm-close";
-      close.type = "button";
-      close.title = "Close";
-      close.setAttribute("aria-label", "Close");
-      close.setAttribute(DECORATION, "close");
-      close.append(privateApi.managerIcon(document, "close"));
-      titlebar.append(icon, title, close);
+      const close = this.createWindowManagerButton("close", "Close");
+      const minimize = this.createWindowManagerButton("minimize", "Minimize");
+      const maximize = this.createWindowManagerButton("maximize", "Maximize");
+      titlebar.append(icon, title, minimize, maximize, close);
       client.parentElement.insertBefore(element, client);
       element.append(titlebar, client);
       const handles = ["n", "ne", "e", "se", "s", "sw", "w", "nw"].map((edge) => {
@@ -156,7 +167,7 @@
         element.append(handle);
         return handle;
       });
-      const frame = { identity, element, titlebar, title, icon, close, handles };
+      const frame = { identity, element, titlebar, title, icon, close, minimize, maximize, handles };
       this.managerFrames.set(resource.id, frame);
       return frame;
     },
@@ -172,19 +183,21 @@
         return;
       }
       const geometry = this.windowDisplayGeometry(resource);
+      const titleHeight = resource.fullscreen || metadata.fullscreen ? 0 : TITLE_HEIGHT;
       const visible = this.isResourceDisplayable(resource) &&
         metadata.wmState !== "iconic" && metadata.wmState !== "withdrawn";
       const setStyle = (element, key, value) => {
         if (element.style[key] !== value) element.style[key] = value;
       };
       setStyle(frame.element, "left", `${geometry.x}px`);
-      setStyle(frame.element, "top", `${geometry.y - TITLE_HEIGHT}px`);
+      setStyle(frame.element, "top", `${geometry.y - titleHeight}px`);
       setStyle(frame.element, "width", `${geometry.width + resource.borderWidth * 2}px`);
-      setStyle(frame.element, "height", `${geometry.height + resource.borderWidth * 2 + TITLE_HEIGHT}px`);
+      setStyle(frame.element, "height", `${geometry.height + resource.borderWidth * 2 + titleHeight}px`);
       setStyle(frame.element, "display", visible ? "" : "none");
       setStyle(frame.element, "zIndex", this.isEffectivelyTopmost(resource) ? "1" : "");
       setStyle(client, "left", "0px");
-      setStyle(client, "top", `${TITLE_HEIGHT}px`);
+      setStyle(client, "top", `${titleHeight}px`);
+      frame.titlebar.hidden = !titleHeight;
       const title = metadata.title || "Untitled";
       if (frame.title.textContent !== title) frame.title.textContent = title;
       if (frame.title.title !== title) frame.title.title = title;
@@ -193,7 +206,19 @@
       if (iconHref && frame.icon.getAttribute("src") !== iconHref) frame.icon.src = iconHref;
       if (!iconHref) frame.icon.removeAttribute("src");
       frame.close.disabled = !frame.identity.protocolId ||
-        !metadata.protocols.includes("WM_DELETE_WINDOW") || this.windowManagerActionsBlocked();
+        this.windowManagerActionsBlocked() ||
+        typeof this.module?.["_X11WasmManagerCloseWindow"] !== "function";
+      const stateBlocked = this.windowManagerActionsBlocked() ||
+        typeof this.module?.["_X11WasmManagerSetWindowState"] !== "function";
+      frame.minimize.disabled = stateBlocked;
+      const zoomed = metadata.zoomed || resource.zoomed;
+      frame.maximize.disabled = stateBlocked || (!zoomed && !this.windowManagerMaximizeGeometry(resource, metadata));
+      const maximizeLabel = zoomed ? "Restore" : "Maximize";
+      if (frame.maximize.title !== maximizeLabel) {
+        frame.maximize.title = maximizeLabel;
+        frame.maximize.setAttribute("aria-label", maximizeLabel);
+        frame.maximize.replaceChildren(privateApi.managerIcon(this.document, zoomed ? "restore" : "maximize"));
+      }
       const axes = this.windowManagerResizable(metadata);
       for (const handle of frame.handles) {
         const edge = handle.getAttribute(DECORATION) || "";
@@ -278,8 +303,14 @@
             /** @type {KeyboardEvent} */ (event).key === "Escape";
           if (!decoration && !gesturePointer && !gestureEscape) return;
           const frameElement = decoration?.closest("[data-x11-wasm-frame]");
-          if (frameElement && !this.rootElement?.contains(frameElement)) return;
+          if (decoration && !this.rootElement?.contains(decoration)) return;
+          const id = Number(frameElement?.getAttribute("data-x11-wasm-frame") ||
+            decoration?.getAttribute("data-x11-wasm-task"));
+          const action = decoration?.getAttribute(DECORATION) || "";
           consume(event);
+          if (type === "wheel" && decoration?.closest("[data-x11-wasm-taskbar]")) {
+            this.managerTaskbar.scrollLeft += event.deltaX || event.deltaY;
+          }
           if (gestureEscape) {
             this.cancelWindowManagerGesture();
           } else if (type === "pointerdown" && decoration) {
@@ -288,18 +319,29 @@
             this.moveWindowManagerGesture?.(pointer);
           } else if (gestureEvent && type !== "pointermove") {
             this.cancelWindowManagerGesture();
-          } else if (type === "click" && decoration?.getAttribute(DECORATION) === "close") {
-            this.closeWindowManagerFrame(Number(frameElement?.getAttribute("data-x11-wasm-frame")), event.timeStamp);
-          } else if (type === "keydown" && decoration?.getAttribute(DECORATION) === "close") {
+          } else if (type === "dblclick" && action === "move") {
+            this.toggleWindowManagerMaximize(id, event.timeStamp);
+          } else if (type === "click" && action !== "move" && !action.startsWith("resize-")) {
+            this.windowManagerDecorationAction(id, action, event.timeStamp);
+          } else if (type === "keydown" && action !== "move" && !action.startsWith("resize-")) {
             const keyboard = /** @type {KeyboardEvent} */ (event);
             if (!keyboard.repeat && !keyboard.altKey && !keyboard.ctrlKey && !keyboard.metaKey &&
                 (keyboard.key === "Enter" || keyboard.key === " ")) {
-              this.closeWindowManagerFrame(Number(frameElement?.getAttribute("data-x11-wasm-frame")), event.timeStamp);
+              this.windowManagerDecorationAction(id, action, event.timeStamp);
             }
           }
         }, { ...options, passive: false });
       }
-      view.addEventListener("blur", () => this.cancelWindowManagerGesture(), options);
+      view.addEventListener("blur", (event) => {
+        const destination = event.relatedTarget;
+        if (event.target === this.inputElement && destination instanceof view.Element &&
+            this.rootElement?.contains(destination) && destination.closest(`[${DECORATION}]`)) {
+          // Decoration focus is browser UI focus, not a native client FocusOut.
+          event.stopImmediatePropagation();
+          return;
+        }
+        this.cancelWindowManagerGesture();
+      }, options);
       this.managerObserver = new view.MutationObserver((records) => {
         if (records.some((record) => record.type === "childList" ||
             (record.target instanceof view.Element && record.target.hasAttribute(RESOURCE_ATTR)))) {
