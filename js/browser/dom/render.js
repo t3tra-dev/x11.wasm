@@ -835,10 +835,17 @@ scheduleFlush() {
       if (resource.managerGeometryOwned) return;
       const configure = this.module && this.module["_X11WasmConfigureWindow"];
       const expanded = resource.zoomed || resource.fullscreen;
-      if (typeof configure !== "function" || (!expanded && !resource.normalGeometry)) {
+      if (typeof configure !== "function") {
         return;
       }
       const target = this.nativeWindowGeometryResource(resource);
+      const managedFullscreen = target.managerFullscreenGeometry;
+      if (managedFullscreen) {
+        // Only the metadata resource owns state when a managed wrapper is detached.
+        if (managedFullscreen.metadataId !== resource.id) return;
+        resource.normalGeometry ||= this.managerRestoreGeometries.get(target.id) || managedFullscreen;
+      }
+      if (!expanded && !resource.normalGeometry) return;
       if (target !== resource && target.geometryDirty) {
         this.flushResourceGeometry(target);
       }
@@ -863,16 +870,18 @@ scheduleFlush() {
         // Re-enter the normal C configure path before changing CSS or canvas size.
         resource.syncingNativeGeometry = true;
         try {
-          if (configure(target.id, geometry.x, geometry.y,
-              geometry.width, geometry.height, 15)) {
-            this.flushResourceGeometry(target);
-          }
+          if (!configure(target.id, geometry.x, geometry.y,
+              geometry.width, geometry.height, 15)) return;
+          this.flushResourceGeometry(target);
         } finally {
           resource.syncingNativeGeometry = false;
         }
       }
       if (!expanded) {
         resource.normalGeometry = undefined;
+      }
+      if (!resource.fullscreen && managedFullscreen) {
+        target.managerFullscreenGeometry = undefined;
       }
     },
 

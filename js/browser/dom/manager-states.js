@@ -78,24 +78,32 @@
     syncWindowManagerStateGeometry(resource, frame, metadata) {
       const zoomed = metadata.zoomed || resource.zoomed;
       const root = this.resources.get(this.rootWindow);
+      if (!root) return;
       const bounds = `${root.width},${root.height}`;
       const previousZoomed = frame.lastZoomed;
       const fullscreen = metadata.fullscreen || resource.fullscreen;
       const resized = frame.lastBounds !== bounds || (frame.lastFullscreen && !fullscreen);
       const geometry = [resource.x, resource.y, resource.width, resource.height].join(",");
       if (zoomed && previousZoomed === true && frame.lastGeometry && frame.lastGeometry !== geometry &&
-          this.managerConfiguring !== resource.id && this.managerStateChanging !== resource.id && !fullscreen) {
+          this.managerConfiguring !== resource.id && this.managerStateChanging !== resource.id &&
+          !fullscreen && !frame.lastFullscreen && !resource.managerFullscreenGeometry) {
         this.managerRestoreGeometries.set(resource.id,
           { x: resource.x, y: resource.y, width: resource.width, height: resource.height });
       }
-      frame.lastGeometry = geometry;
-      if (metadata.wmState === "iconic") return;
-      frame.lastZoomed = zoomed;
-      frame.lastBounds = bounds;
-      frame.lastFullscreen = fullscreen;
-      if (this.managerStateChanging === resource.id || fullscreen) return;
+      if (metadata.wmState === "iconic" || this.managerStateChanging === resource.id) return;
       let next;
-      if (zoomed && (previousZoomed !== true || resized)) {
+      if (fullscreen) {
+        // Fullscreen is temporary geometry, not a new pre-zoom restore target.
+        resource.managerFullscreenGeometry ||= {
+          x: resource.x, y: resource.y, width: resource.width, height: resource.height,
+          zoomed, metadataId: metadata.id,
+        };
+        next = this.windowStateFillGeometry(resource);
+      } else if (resource.managerFullscreenGeometry) {
+        const saved = resource.managerFullscreenGeometry;
+        next = zoomed ? this.windowManagerMaximizeGeometry(resource, metadata)
+          : (saved.zoomed ? this.managerRestoreGeometries.get(resource.id) : null) || saved;
+      } else if (zoomed && (previousZoomed !== true || resized)) {
         if (previousZoomed === false && !this.managerRestoreGeometries.has(resource.id)) {
           this.managerRestoreGeometries.set(resource.id,
             { x: resource.x, y: resource.y, width: resource.width, height: resource.height });
@@ -104,13 +112,42 @@
       } else if (!zoomed && previousZoomed === true) {
         next = this.managerRestoreGeometries.get(resource.id);
       }
-      if (!next) return;
-      const changed = resource.x !== next.x || resource.y !== next.y ||
-        resource.width !== next.width || resource.height !== next.height;
-      if (!changed || this.configureWindowManager(resource.id, next.x, next.y, next.width, next.height, GEOMETRY_MASK)) {
-        frame.lastGeometry = [resource.x, resource.y, resource.width, resource.height].join(",");
-        if (!zoomed) this.managerRestoreGeometries.delete(resource.id);
+      if (next) {
+        const changed = resource.x !== next.x || resource.y !== next.y ||
+          resource.width !== next.width || resource.height !== next.height;
+        if (changed) {
+          if (fullscreen || resource.managerFullscreenGeometry) {
+            // Viewport geometry must not be restricted by normal WM size hints.
+            const configure = this.module?.["_X11WasmConfigureWindow"];
+            if (this.windowManagerActionsBlocked() || typeof configure !== "function") return;
+            const previous = this.managerConfiguring;
+            this.managerConfiguring = resource.id;
+            try {
+              if (!configure(resource.id, next.x, next.y, next.width, next.height, GEOMETRY_MASK)) return;
+              this.flush();
+            } finally {
+              this.managerConfiguring = previous;
+            }
+          } else if (!this.configureWindowManager(resource.id, next.x, next.y, next.width, next.height, GEOMETRY_MASK)) {
+            return;
+          }
+          if (this.resources.get(resource.id) !== resource || this.managerFrames.get(resource.id) !== frame) return;
+        }
+        if (!fullscreen) {
+          if (resource.managerFullscreenGeometry) {
+            resource.managerFullscreenGeometry = undefined;
+            resource.normalGeometry = undefined;
+            metadata.normalGeometry = undefined;
+          }
+          if (!zoomed) this.managerRestoreGeometries.delete(resource.id);
+        }
+      } else if (zoomed && (previousZoomed !== true || resized)) {
+        return;
       }
+      frame.lastGeometry = [resource.x, resource.y, resource.width, resource.height].join(",");
+      frame.lastZoomed = zoomed;
+      frame.lastBounds = bounds;
+      frame.lastFullscreen = fullscreen;
     },
 
     /** @param {number} id @param {number} time */

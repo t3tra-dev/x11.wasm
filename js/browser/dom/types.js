@@ -126,6 +126,7 @@
  * @property {boolean=} managerGeometryOwned
  * @property {boolean=} syncingNativeGeometry
  * @property {{ x: number, y: number, width: number, height: number }=} normalGeometry
+ * @property {{ x: number, y: number, width: number, height: number, zoomed: boolean, metadataId: number }=} managerFullscreenGeometry
  * @property {boolean} dirty
  * @property {X11WasmDOMDamage | null} damage
  * @property {number} damageSerial
