@@ -2,12 +2,22 @@ declare module "node:fs" {
   export function readFileSync(path: string, encoding: string): string;
 }
 
+declare module "node:path" {
+  export function resolve(...paths: string[]): string;
+}
+
+declare var __dirname: string;
+declare var process: {
+  env: Record<string, string | undefined>;
+};
+
 declare module "@playwright/test" {
   export interface PlaywrightTestConfig {
     testDir?: string;
     timeout?: number;
     webServer?: {
       command?: string;
+      cwd?: string;
       url?: string;
       reuseExistingServer?: boolean;
       timeout?: number;

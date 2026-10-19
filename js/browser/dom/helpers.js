@@ -325,6 +325,11 @@
     const value =
       typeof family === "string" && family.trim() ? family.trim() : "sans-serif";
 
+    if (
+      /^(serif|sans-serif|monospace|cursive|fantasy|system-ui|ui-serif|ui-sans-serif|ui-monospace|ui-rounded|math|fangsong)$/i.test(value)
+    ) {
+      return value;
+    }
     return `"${value.replace(/["\\]/g, "\\$&")}", sans-serif`;
   }
 
