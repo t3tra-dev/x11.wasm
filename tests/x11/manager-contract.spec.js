@@ -338,3 +338,76 @@ test("maximized root reflow preserves normal geometry and explicit geometry upda
   expect(result).toEqual({ reflow: [0, 28, 400, 240], saved: { x: 40, y: 60, width: 200, height: 120 },
     explicit: [20, 50, 220, 140], restored: [20, 50, 220, 140] });
 });
+
+test("aspect and increment constraints produce a jointly valid resize candidate", async ({ page }) => {
+  await createManagerContract(page);
+  const result = await page.evaluate(() => {
+    const { backend, calls } = /** @type {any} */ (window).managerContract;
+    backend.createWindow(2, 1, 40, 60, 200, 120, 24, 0);
+    backend.resources.get(2).sizeHints = { flags: 16 | 32 | 64 | 128 | 256,
+      minWidth: 80, minHeight: 60, maxWidth: 400, maxHeight: 300,
+      baseWidth: 0, baseHeight: 0, widthInc: 20, heightInc: 10,
+      minAspectX: 4, minAspectY: 3, maxAspectX: 4, maxAspectY: 3 };
+    backend.mapWindow(2); backend.flush();
+    const handle = backend.managerFrames.get(2).element.querySelector('[data-x11-wasm-decoration="resize-se"]');
+    handle.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 9,
+      button: 0, isPrimary: true, clientX: 100, clientY: 100 }));
+    handle.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, pointerId: 9,
+      buttons: 1, clientX: 120, clientY: 110 }));
+    handle.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 9 }));
+    return calls;
+  });
+  expect(result).toEqual([[2, 40, 60, 200, 150, 8]]);
+});
+
+test("ICCCM aspect subtracts explicit base only and base supplies a missing minimum", async ({ page }) => {
+  await createManagerContract(page);
+  const result = await page.evaluate(() => {
+    const { backend } = /** @type {any} */ (window).managerContract;
+    const hints = { flags: 64 | 128 | 256, minWidth: 20, minHeight: 10,
+      baseWidth: 20, baseHeight: 10, widthInc: 10, heightInc: 5,
+      minAspectX: 4, minAspectY: 3, maxAspectX: 4, maxAspectY: 3 };
+    return [backend.constrainSizeByHints(hints, 100, 70),
+      backend.constrainSizeByHints({ ...hints, flags: 16 | 64 | 128 }, 100, 70),
+      backend.constrainSizeByHints({ ...hints, flags: 256 }, 1, 1),
+      backend.constrainSizeByHints({ ...hints, flags: 16 | 64 | 128 | 256,
+        minWidth: 80, minHeight: 50, widthInc: 20, heightInc: 10 }, 220, 130)];
+  });
+  expect(result).toEqual([{ width: 100, height: 70 }, { width: 100, height: 75 },
+    { width: 20, height: 10 }, { width: 220, height: 160 }]);
+});
+
+test("shared hint correction stays on feasible base increment and aspect lattices", async ({ page }) => {
+  await createManagerContract(page);
+  const result = await page.evaluate(() => {
+    const { backend } = /** @type {any} */ (window).managerContract;
+    const cases = [
+      { flags: 16 | 32 | 64 | 128, minWidth: 16, minHeight: 18, baseWidth: 99, baseHeight: 99, widthInc: 8, heightInc: 6 },
+      { flags: 32 | 64 | 128 | 256, baseWidth: 24, baseHeight: 17, widthInc: 7, heightInc: 11 },
+      { flags: 16 | 32 | 64 | 128 | 256, minWidth: 80, minHeight: 50, baseWidth: 20, baseHeight: 10, widthInc: 20, heightInc: 10 },
+    ];
+    let samples = 0;
+    const invalid = [];
+    for (const entry of cases) {
+      const hints = { ...entry, maxWidth: 400, maxHeight: 300,
+        minAspectX: 4, minAspectY: 3, maxAspectX: 4, maxAspectY: 3 };
+      const explicitBase = !!(hints.flags & 256);
+      const minWidth = (hints.flags & 16 ? hints.minWidth : hints.baseWidth) || 1;
+      const minHeight = (hints.flags & 16 ? hints.minHeight : hints.baseHeight) || 1;
+      const baseWidth = explicitBase ? hints.baseWidth : minWidth;
+      const baseHeight = explicitBase ? hints.baseHeight : minHeight;
+      for (let width = 30; width <= 390; width += 37) {
+        for (let height = 30; height <= 290; height += 41) {
+          const size = backend.constrainSizeByHints(hints, width, height);
+          samples++;
+          if (size.width < minWidth || size.height < minHeight || size.width > 400 || size.height > 300 ||
+              (size.width - baseWidth) % hints.widthInc || (size.height - baseHeight) % hints.heightInc ||
+              (size.width - (explicitBase ? hints.baseWidth : 0)) * 3 !==
+                (size.height - (explicitBase ? hints.baseHeight : 0)) * 4) invalid.push(size);
+        }
+      }
+    }
+    return { samples, invalid };
+  });
+  expect(result).toEqual({ samples: 210, invalid: [] });
+});
