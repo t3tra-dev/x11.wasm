@@ -10,7 +10,7 @@
   "use strict";
 
   const privateApi = global["X11WasmDOMPrivate"];
-  const { X11WasmDOMBackend, RESOURCE_ATTR } = privateApi;
+  const { X11WasmDOMBackend, RESOURCE_ATTR, FOCUS_OUT, eventTime } = privateApi;
   const TITLE_HEIGHT = 28;
   const DECORATION = "data-x11-wasm-decoration";
   const MANAGED_TYPES = ["NORMAL", "DIALOG", "UTILITY"];
@@ -23,6 +23,12 @@
       this.windowManagerEnabled = enabled === true;
       if (!this.windowManagerEnabled) {
         this.cancelWindowManagerGesture();
+        if (this.managerRetainedInputFocus) {
+          const restored = this.document?.activeElement === this.inputElement ||
+            this.restoreFocusedInput({ suppressFocusEvent: true });
+          this.managerRetainedInputFocus = false;
+          if (!restored) this.queueFocusEvent(FOCUS_OUT, 0, this.focusedWindow || this.rootWindow);
+        }
         this.managerListeners?.abort();
         this.managerListeners = null;
         this.managerObserver?.disconnect();
@@ -275,6 +281,8 @@
       };
       const decorationFor = (event) => event.target instanceof view.Element
         ? event.target.closest(`[${DECORATION}]`) : null;
+      const ownsDecorationFocus = (target) => target instanceof view.Element &&
+        this.rootElement?.contains(target) && !!target.closest(`[${DECORATION}]`);
       view.addEventListener("pointerdown", (event) => {
         if (event.button !== 0 || !event.isPrimary || this.managerGesture ||
             !(event.target instanceof view.Element) || !this.rootElement?.contains(event.target) ||
@@ -334,11 +342,19 @@
       }
       view.addEventListener("blur", (event) => {
         const destination = event.relatedTarget;
-        if (event.target === this.inputElement && destination instanceof view.Element &&
-            this.rootElement?.contains(destination) && destination.closest(`[${DECORATION}]`)) {
+        const ownDestination = ownsDecorationFocus(destination);
+        if (event.target === this.inputElement && ownDestination) {
           // Decoration focus is browser UI focus, not a native client FocusOut.
+          this.managerRetainedInputFocus = true;
           event.stopImmediatePropagation();
           return;
+        }
+        if (this.managerRetainedInputFocus && !ownDestination &&
+            (event.target === view || ownsDecorationFocus(event.target))) {
+          this.managerRetainedInputFocus = false;
+          if (destination !== this.inputElement) {
+            this.queueFocusEvent(FOCUS_OUT, eventTime(event.timeStamp), this.focusedWindow || this.rootWindow);
+          }
         }
         this.cancelWindowManagerGesture();
       }, options);

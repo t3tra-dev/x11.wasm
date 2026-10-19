@@ -109,3 +109,38 @@ test("native close protocol owner may differ from the metadata client without an
   await page.locator(`[data-x11-wasm-frame="${result.frame}"] [data-x11-wasm-decoration="close"]`).click();
   expect(await page.evaluate((id) => /** @type {any} */ (window).Module._X11WasmTestManagerCloseEvent(id), result.frame)).toBe(1);
 });
+
+for (const lookalike of [false, true]) {
+  test(`decoration focus releases native focus when leaving the root: lookalike=${lookalike}`, async ({ page }) => {
+    await waitForX11Runtime(page);
+    const result = await page.evaluate((lookalike) => {
+      const m = /** @type {any} */ (window).Module;
+      const frame = m._X11WasmTestManagerWindow(1);
+      const child = m._X11WasmTestManagerPart(2);
+      const b = m.x11WasmBackend;
+      b.setWindowManagerEnabled(true);
+      b.flush();
+      const outside = document.createElement("button");
+      outside.textContent = "Outside";
+      if (lookalike) outside.setAttribute("data-x11-wasm-decoration", "close");
+      document.body.append(outside);
+      m._X11WasmTestManagerOptions(child, 8, 0);
+      const focusClient = () => {
+        m._X11WasmTestManagerOptions(child, 3, 0);
+        b.focusInput(true, child);
+      };
+      const focus = () => m._X11WasmTestManagerOptions(0, 6, 0);
+      focusClient();
+      outside.focus();
+      const direct = focus();
+      focusClient();
+      b.managerFrames.get(frame).close.focus();
+      const decoration = focus();
+      outside.focus();
+      return { child, direct, decoration, outside: focus(),
+        browserOutside: document.activeElement === outside };
+    }, lookalike);
+    expect(result).toEqual({ child: result.child, direct: 0, decoration: result.child,
+      outside: 0, browserOutside: true });
+  });
+}
