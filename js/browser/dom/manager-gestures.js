@@ -12,9 +12,15 @@
     configureWindowManager(id, x, y, width, height, mask) {
       const configure = this.module?.["_X11WasmManagerConfigureWindow"];
       if (this.windowManagerActionsBlocked() || typeof configure !== "function") return 0;
-      const result = configure(id, x, y, width, height, mask);
-      if (result) this.flush();
-      return result;
+      const previous = this.managerConfiguring;
+      this.managerConfiguring = id;
+      try {
+        const result = configure(id, x, y, width, height, mask);
+        if (result) this.flush();
+        return result;
+      } finally {
+        this.managerConfiguring = previous;
+      }
     },
 
     /** @param {X11WasmDOMResource} metadata @returns {{ x: boolean, y: boolean }} */

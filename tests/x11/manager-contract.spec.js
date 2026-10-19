@@ -200,3 +200,141 @@ test("client activation requests native focus and stacking without optimistic ch
   });
   expect(result).toEqual({ calls: [2], delivered: 2, focus: 0, active: "0" });
 });
+
+test("state buttons never fabricate native state and keep maximized restore geometry", async ({ page }) => {
+  await createManagerContract(page);
+  const result = await page.evaluate(() => {
+    const { backend, module, calls } = /** @type {any} */ (window).managerContract;
+    backend.createWindow(2, 1, 40, 60, 200, 120, 24, 0);
+    backend.mapWindow(2);
+    backend.flush();
+    const frame = backend.managerFrames.get(2);
+    const minimize = frame.element.querySelector('[data-x11-wasm-decoration="minimize"]');
+    const maximize = frame.element.querySelector('[data-x11-wasm-decoration="maximize"]');
+    if (!minimize || !maximize) return { missing: "state buttons" };
+    module._X11WasmManagerSetWindowState = (id, state) => { calls.push(["state", id, state]); return 0; };
+    backend.syncWindowManager();
+    minimize.click();
+    const refused = !backend.resources.get(2).zoomed && backend.resources.get(2).mapped;
+    module._X11WasmManagerConfigureWindow = (id, x, y, w, h, mask) => {
+      calls.push(["geometry", id, x, y, w, h, mask]);
+      backend.configureWindow(id, x, y, w, h, 0, mask);
+      backend.flush();
+      return 1;
+    };
+    module._X11WasmManagerSetWindowState = (id, state) => {
+      calls.push(["state", id, state]);
+      const resource = backend.resources.get(id);
+      if (state !== 1) resource.zoomed = state === 2;
+      resource.wmState = state === 1 ? "iconic" : "normal";
+      resource.mapped = state !== 1;
+      backend.syncWindowManager();
+      return 1;
+    };
+    maximize.click();
+    const max = backend.resources.get(2);
+    const maximized = [max.x, max.y, max.width, max.height];
+    minimize.click();
+    const task = document.querySelector('[data-x11-wasm-task="2"]');
+    if (!task) throw new Error("missing taskbar restore button");
+    task.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const restoredZoomed = max.zoomed && max.mapped;
+    maximize.click();
+    return { refused, maximized, restoredZoomed,
+      geometry: [max.x, max.y, max.width, max.height],
+      states: calls.filter((call) => call[0] === "state").map((call) => call[2]) };
+  });
+  expect(result).toEqual({ refused: true, maximized: [0, 28, 640, 420], restoredZoomed: true,
+    geometry: [40, 60, 200, 120], states: [1, 2, 1, 2, 0] });
+});
+
+test("taskbar explicitly recovers y zero negative and position-hinted windows after root shrink", async ({ page }) => {
+  await createManagerContract(page);
+  const result = await page.evaluate(() => {
+    const { backend, module, calls } = /** @type {any} */ (window).managerContract;
+    module._X11WasmManagerConfigureWindow = (id, x, y, w, h, mask) => {
+      calls.push([id, x, y]); backend.configureWindow(id, x, y, w, h, 0, mask); backend.flush(); return 1;
+    };
+    module._X11WasmManagerActivateWindow = () => 1;
+    const before = [];
+    for (const [index, y] of [0, -80, 380, 0].entries()) {
+      const id = index + 2;
+      backend.createWindow(id, 1, 440, y, 200, 120, 24, 0);
+      if (index) backend.resources.get(id).sizeHints = { flags: index === 1 ? 1 : 4, x: 440, y };
+      backend.mapWindow(id);
+      backend.flush();
+      before.push([backend.resources.get(id).x, backend.resources.get(id).y]);
+    }
+    backend.setWindowManagerEnabled(false);
+    backend.setWindowManagerEnabled(true);
+    const implicit = calls.length;
+    backend.rootElement.style.width = "320px";
+    backend.rootElement.style.height = "240px";
+    backend.syncRootElementSize(false);
+    for (const id of [2, 3, 4, 5]) backend.managerTasks.get(id).click();
+    const after = [2, 3, 4, 5].map((id) => {
+      const frame = backend.managerFrames.get(id);
+      const rect = frame.titlebar.getBoundingClientRect();
+      const root = backend.rootElement.getBoundingClientRect();
+      return rect.left >= root.left && rect.right <= root.right && rect.top >= root.top && rect.bottom <= root.bottom - 32;
+    });
+    return { before, implicit, after, calls };
+  });
+  expect(result).toEqual({ before: [[440, 0], [440, -80], [440, 380], [440, 0]], implicit: 0,
+    after: [true, true, true, true], calls: [[2, 120, 28], [3, 120, 28], [4, 120, 208], [5, 120, 28]] });
+});
+
+test("state refusal rolls geometry back and disable removes taskbar ownership and gestures", async ({ page }) => {
+  await createManagerContract(page);
+  const result = await page.evaluate(() => {
+    const { backend, module, calls } = /** @type {any} */ (window).managerContract;
+    module._X11WasmManagerConfigureWindow = (id, x, y, w, h, mask) => {
+      calls.push([x, y, w, h]); backend.configureWindow(id, x, y, w, h, 0, mask); backend.flush(); return 1;
+    };
+    module._X11WasmManagerSetWindowState = () => 0;
+    backend.createWindow(2, 1, 40, 60, 200, 120, 24, 0);
+    backend.mapWindow(2); backend.flush();
+    backend.managerFrames.get(2).maximize.click();
+    const resource = backend.resources.get(2);
+    const geometry = [resource.x, resource.y, resource.width, resource.height];
+    backend.setWindowManagerEnabled(false);
+    return { calls, geometry, owned: resource.managerGeometryOwned,
+      taskbar: backend.managerTaskbar, tasks: backend.managerTasks.size, gesture: backend.managerGesture };
+  });
+  expect(result).toEqual({ calls: [[0, 28, 640, 420], [40, 60, 200, 120]], geometry: [40, 60, 200, 120],
+    owned: false, taskbar: null, tasks: 0, gesture: null });
+});
+
+test("maximized root reflow preserves normal geometry and explicit geometry updates its restore target", async ({ page }) => {
+  await createManagerContract(page);
+  const result = await page.evaluate(async () => {
+    const { backend, module } = /** @type {any} */ (window).managerContract;
+    module._X11WasmManagerConfigureWindow = (id, x, y, w, h, mask) => {
+      backend.configureWindow(id, x, y, w, h, 0, mask); backend.flush(); return 1;
+    };
+    module._X11WasmManagerSetWindowState = (id, state) => {
+      const resource = backend.resources.get(id);
+      resource.zoomed = state === 2;
+      resource.wmState = "normal";
+      backend.syncWindowManager(); return 1;
+    };
+    backend.createWindow(2, 1, 40, 60, 200, 120, 24, 0);
+    backend.mapWindow(2); backend.flush();
+    backend.managerFrames.get(2).maximize.click();
+    backend.rootElement.style.width = "400px";
+    backend.rootElement.style.height = "300px";
+    backend.syncRootElementSize(false);
+    backend.syncWindowManager();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const resource = backend.resources.get(2);
+    const reflow = [resource.x, resource.y, resource.width, resource.height];
+    const saved = backend.managerRestoreGeometries.get(2);
+    backend.configureWindow(2, 20, 50, 220, 140, 0, 15);
+    backend.flush();
+    const explicit = [resource.x, resource.y, resource.width, resource.height];
+    backend.managerFrames.get(2).maximize.click();
+    return { reflow, saved, explicit, restored: [resource.x, resource.y, resource.width, resource.height] };
+  });
+  expect(result).toEqual({ reflow: [0, 28, 400, 240], saved: { x: 40, y: 60, width: 200, height: 120 },
+    explicit: [20, 50, 220, 140], restored: [20, 50, 220, 140] });
+});

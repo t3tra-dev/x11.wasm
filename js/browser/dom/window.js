@@ -539,6 +539,7 @@
      */
     destroyResource(id) {
       this.cancelWindowManagerResource?.(id);
+      this.managerRestoreGeometries.delete(id);
       this.removeWindowManagerFrame?.(id);
       const resource = this.resources.get(id);
       const windowId = unsignedInt(id, 0);
