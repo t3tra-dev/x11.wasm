@@ -563,9 +563,8 @@
         this.handlePaste(event);
       });
       input.addEventListener("input", (event) => {
-        if (this.compositionCancelled &&
-          (!(event instanceof InputEvent) || !event.inputType ||
-            event.isComposing || event.inputType === "insertCompositionText" ||
+        if (this.compositionCancelled && event instanceof InputEvent &&
+          (event.isComposing || event.inputType === "insertCompositionText" ||
             event.inputType === "insertFromComposition")) {
           input.value = "";
           return;

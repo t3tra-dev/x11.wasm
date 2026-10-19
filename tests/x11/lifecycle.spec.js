@@ -150,7 +150,10 @@ for (const action of ["destroy", "unmap"]) {
       input.value = "late";
       backend.endComposition("late");
       input.value = "late";
-      input.dispatchEvent(new InputEvent("input", { inputType: "insertFromComposition", data: "late" }));
+      const lateInput = new InputEvent("input", { data: "late" });
+      // Chrome normalizes legacy inputType values in constructed InputEvents.
+      Object.defineProperty(lateInput, "inputType", { value: "insertFromComposition" });
+      input.dispatchEvent(lateInput);
       const events = [...host.lifecycleEvents];
       input.value = "next";
       input.dispatchEvent(new InputEvent("input", { inputType: "insertText", data: "next" }));
@@ -171,6 +174,68 @@ for (const action of ["destroy", "unmap"]) {
       [1, "fresh", 4], [3, "fresh", 4],
       ...[..."fresh"].map((char) => [2, char, 4]),
     ]);
+  });
+}
+
+for (const action of ["destroy", "unmap"]) {
+  for (const inputType of ["insertText", "insertReplacementText", "insertFromPaste", "insertFromDrop", "", "generic"]) {
+    test(`cancelled composition accepts keyless ${inputType || "untyped input"} after ${action}`, async ({ page }) => {
+      await createBackend(page);
+      const result = await page.evaluate(({ action, inputType }) => {
+        const host = /** @type {any} */ (window);
+        const backend = host.lifecycleBackend;
+        const input = backend.inputElement;
+        let keydowns = 0;
+        input.addEventListener("keydown", () => keydowns++);
+        input.dispatchEvent(new CompositionEvent("compositionstart", { data: "draft" }));
+        if (action === "destroy") backend.destroyResource(2);
+        else backend.unmapWindow(2);
+        backend.focusInput(true, 4);
+        backend.setInputContext(true, 4);
+        host.lifecycleEvents.length = 0;
+        for (const text of ["first", "second"]) {
+          input.value = text;
+          input.dispatchEvent(inputType === "generic" ? new Event("input") :
+            new InputEvent("input", { inputType, data: text }));
+        }
+        for (const inputType of ["insertCompositionText", "insertFromComposition"]) {
+          input.value = "late";
+          const event = new InputEvent("input", { inputType, data: "late" });
+          if (event.inputType !== inputType) {
+            Object.defineProperty(event, "inputType", { value: inputType });
+          }
+          input.dispatchEvent(event);
+        }
+        input.dispatchEvent(new CompositionEvent("compositionupdate", { data: "late" }));
+        input.dispatchEvent(new CompositionEvent("compositionend", { data: "late" }));
+        return { events: host.lifecycleEvents, value: input.value, keydowns, active: document.activeElement === input };
+      }, { action, inputType });
+      expect(result).toEqual({
+        events: [..."firstsecond"].map((char) => [2, char, 0]),
+        value: "", keydowns: 0, active: true,
+      });
+    });
+  }
+
+  test(`cancelled composition accepts browser text insertion after ${action}`, async ({ page }) => {
+    await createBackend(page);
+    await page.evaluate((action) => {
+      const host = /** @type {any} */ (window);
+      const backend = host.lifecycleBackend;
+      backend.inputElement.dispatchEvent(new CompositionEvent("compositionstart", { data: "draft" }));
+      if (action === "destroy") backend.destroyResource(2);
+      else backend.unmapWindow(2);
+      backend.focusInput(true, 4);
+      backend.setInputContext(true, 4);
+      host.lifecycleEvents.length = 0;
+      host.lifecycleKeydowns = 0;
+      backend.inputElement.addEventListener("keydown", () => host.lifecycleKeydowns++);
+    }, action);
+    await /** @type {any} */ (page).keyboard.insertText("fresh");
+    expect(await page.evaluate(() => {
+      const host = /** @type {any} */ (window);
+      return { events: host.lifecycleEvents, keydowns: host.lifecycleKeydowns, value: host.lifecycleBackend.inputElement.value };
+    })).toEqual({ events: [..."fresh"].map((char) => [2, char, 0]), keydowns: 0, value: "" });
   });
 }
 
