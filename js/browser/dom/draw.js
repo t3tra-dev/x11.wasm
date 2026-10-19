@@ -160,6 +160,8 @@
       fontFamily,
     )}`;
     context.textBaseline = "alphabetic";
+    context.textAlign = "left";
+    context.direction = "ltr";
     if ("fontKerning" in context) {
       context.fontKerning = "none";
     }
