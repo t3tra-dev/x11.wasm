@@ -35,6 +35,7 @@ interface X11WasmResource {
   fullscreen?: boolean;
   topmost?: boolean;
   zoomed?: boolean;
+  managerGeometryOwned?: boolean;
   wmState?: "" | "normal" | "iconic" | "withdrawn";
   wmHints?: X11WasmWmHints | null;
   iconPhotoCount?: number;
@@ -115,6 +116,8 @@ interface X11WasmSelectionOwner {
 }
 
 interface X11WasmBackend {
+  windowManagerEnabled: boolean;
+  setWindowManagerEnabled(enabled: boolean): void;
   resources: Map<number, X11WasmResource>;
   dirtyResources: Set<X11WasmResource>;
   flushScheduled: boolean;
@@ -356,6 +359,7 @@ declare const Module: {
     backendValidationCount: number;
   };
   x11WasmRoot?: string | HTMLElement;
+  x11WasmWindowManager?: boolean;
   _X11WasmResizeRoot?: (width: number, height: number) => number;
   _X11WasmManagerWindowIdentity?: (window: number, field: number) => number;
   _X11WasmManagerCloseWindow?: (window: number, time: number) => number;
@@ -634,6 +638,7 @@ declare var X11WasmDOM: {
     root?: string | HTMLElement;
     document?: Document;
     module?: typeof Module;
+    windowManager?: boolean;
   }): unknown;
   X11WasmDOMBackend: unknown;
 };

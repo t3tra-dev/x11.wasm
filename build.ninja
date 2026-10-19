@@ -45,6 +45,10 @@ build build/typecheck-js.stamp: x11wasm_typecheck_js $
   $x11wasm_js_dom_backend_wm $
   $x11wasm_js_dom_backend_input $
   $x11wasm_js_dom_backend_render $
+  $x11wasm_js_dom_manager_icons $
+  $x11wasm_js_dom_manager_gestures $
+  $x11wasm_js_dom_manager_states $
+  $x11wasm_js_dom_backend_manager $
   $x11wasm_js_dom_backend_export $
   tests/types/playwright-node.d.ts $
   tests/support/x11.js $
@@ -55,6 +59,9 @@ build build/typecheck-js.stamp: x11wasm_typecheck_js $
   tests/x11/selection.spec.js $
   tests/x11/server.spec.js $
   tests/x11/wm.spec.js $
+  tests/x11/manager.spec.js $
+  tests/x11/manager-contract.spec.js $
+  tests/x11/manager-actions.spec.js $
   tests/x11/geometry.spec.js $
   tests/x11/wm-state.spec.js $
   tests/x11/zero-width.spec.js $
@@ -72,11 +79,13 @@ build $x11wasm_browser_dist/zero-width.html: x11wasm_link_browser $builddir/zero
 build $x11wasm_browser_dist/LICENSE $
   $x11wasm_browser_dist/THIRD_PARTY_NOTICES.md $
   $x11wasm_browser_dist/LICENSES/X11.txt $
-  $x11wasm_browser_dist/LICENSES/Tk.txt: x11wasm_stage_licenses $
+  $x11wasm_browser_dist/LICENSES/Tk.txt $
+  $x11wasm_browser_dist/LICENSES/Lucide.txt: x11wasm_stage_licenses $
   $x11wasm_root/LICENSE $
   $x11wasm_root/THIRD_PARTY_NOTICES.md $
   $x11wasm_root/LICENSES/X11.txt $
-  $x11wasm_root/LICENSES/Tk.txt
+  $x11wasm_root/LICENSES/Tk.txt $
+  $x11wasm_root/LICENSES/Lucide.txt
   x11wasm_license_dest = $x11wasm_browser_dist
 
 build typecheck_js: phony build/typecheck-js.stamp

@@ -711,6 +711,106 @@
   box-sizing: content-box;
   transform-origin: 0 0;
 }
+.x11-wasm-frame {
+  position: absolute;
+  box-sizing: content-box;
+  isolation: isolate;
+  border-radius: 3px 3px 0 0;
+  box-shadow: 0 0 0 1px #777, 0 3px 8px #0003;
+}
+.x11-wasm-titlebar {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  background: #e4e4e4;
+  color: #303030;
+  cursor: move;
+  font: 13px sans-serif;
+  letter-spacing: 0;
+  touch-action: none;
+  container-type: inline-size;
+}
+.x11-wasm-frame[data-x11-wasm-active="1"] > .x11-wasm-titlebar {
+  background: #21654e;
+  color: #fff;
+}
+.x11-wasm-titlebar[hidden] { display: none; }
+.x11-wasm-window-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 8px;
+}
+.x11-wasm-window-icon {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  object-fit: contain;
+}
+.x11-wasm-window-icon[hidden] { display: none; }
+@container (max-width: 100px) {
+  .x11-wasm-window-icon { display: none; }
+  .x11-wasm-window-title { padding: 0; }
+}
+.x11-wasm-window-button {
+  flex: 0 1 28px;
+  min-width: 0;
+  position: relative;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.x11-wasm-window-button svg {
+  display: block;
+  width: 16px;
+  max-width: 100%;
+  height: 16px;
+  margin: auto;
+  pointer-events: none;
+}
+.x11-wasm-close:hover:enabled { background: #ac2430; color: white; }
+.x11-wasm-window-button:not(.x11-wasm-close):hover:enabled { background: #0001; }
+.x11-wasm-window-button:disabled { opacity: .4; cursor: default; }
+.x11-wasm-window-button:focus-visible { outline: 2px solid currentColor; outline-offset: -3px; }
+.x11-wasm-taskbar {
+  position: absolute; left: 0; right: 0; bottom: 0; height: min(32px, 100%);
+  z-index: 2147483647; display: flex; align-items: stretch; gap: 2px;
+  overflow-x: auto; overflow-y: hidden; background: #e7e7e7; border-top: 1px solid #aaa;
+  box-sizing: border-box; padding: 2px; touch-action: pan-x;
+}
+.x11-wasm-task {
+  flex: 0 1 160px; min-width: 28px; max-width: 160px;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  border: 1px solid transparent; border-radius: 2px; padding: 2px 8px;
+  background: #f8f8f8; color: #303030; font: 12px sans-serif; letter-spacing: 0;
+  cursor: pointer;
+}
+.x11-wasm-task[aria-pressed="true"] { border-color: #47866d; background: #fff; }
+.x11-wasm-task:focus-visible { outline: 2px solid #21654e; outline-offset: -2px; }
+.x11-wasm-task:disabled { opacity: .5; cursor: default; }
+.x11-wasm-resize { position: absolute; z-index: 2; touch-action: none; }
+.x11-wasm-resize[hidden] { display: none; }
+.x11-wasm-resize-n, .x11-wasm-resize-s { left: 6px; right: 6px; height: 6px; cursor: ns-resize; }
+.x11-wasm-resize-n { top: -3px; }
+.x11-wasm-resize-s { bottom: -3px; }
+.x11-wasm-resize-e, .x11-wasm-resize-w { top: 6px; bottom: 6px; width: 6px; cursor: ew-resize; }
+.x11-wasm-resize-e { right: -3px; }
+.x11-wasm-resize-w { left: -3px; }
+.x11-wasm-resize-ne, .x11-wasm-resize-nw, .x11-wasm-resize-se, .x11-wasm-resize-sw { width: 9px; height: 9px; }
+.x11-wasm-resize-ne { right: -3px; top: -3px; cursor: nesw-resize; }
+.x11-wasm-resize-sw { left: -3px; bottom: -3px; cursor: nesw-resize; }
+.x11-wasm-resize-nw { left: -3px; top: -3px; cursor: nwse-resize; }
+.x11-wasm-resize-se { right: -3px; bottom: -3px; cursor: nwse-resize; }
 .x11-wasm-root.x11-wasm-pointer-grab,
 .x11-wasm-root.x11-wasm-pointer-grab * {
   cursor: var(--x11-wasm-pointer-grab-cursor, auto) !important;
