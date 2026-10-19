@@ -37,6 +37,25 @@ async function openActualManager(page) {
   await page.evaluate(() => /** @type {any} */ (window).Module.x11WasmBackend.setWindowManagerEnabled(true));
 }
 
+async function openFocusedManager(page) {
+  await openActualManager(page);
+  const ids = await page.evaluate(() => {
+    const module = /** @type {any} */ (window).Module;
+    const frame = module._X11WasmTestManagerWindow(2);
+    const child = module._X11WasmTestManagerPart(2);
+    module._X11WasmManagerConfigureWindow(frame, 80, 90, 160, 100, 15);
+    if (module._X11WasmTestManagerFocusChild(child) !== 1) throw new Error("native child focus failed");
+    module.x11WasmBackend.flush();
+    return { frame, child };
+  });
+  await expect(page.locator(".x11-wasm-input")).toBeFocused();
+  return ids;
+}
+
+async function nativeFocus(page) {
+  return page.evaluate(() => /** @type {any} */ (window).Module._X11WasmTestManagerFocusWindow());
+}
+
 test("actual native titlebar activation raises and focuses its frame", async ({ page }) => {
   await openActualManager(page);
   const ids = await page.evaluate(() => {
@@ -118,3 +137,118 @@ for (const mode of [0, 1, 2]) {
     }, ids)).toEqual({ protocol: 1, duplicate: 0, frame: ids.frame, metadata: ids.metadata, retained: true });
   });
 }
+
+test("actual native trusted titlebar activation retains a focused child and raises its frame", async ({ page }) => {
+  const { frame, child } = await openFocusedManager(page);
+  await page.evaluate(() => {
+    const module = /** @type {any} */ (window).Module;
+    const other = module._X11WasmTestManagerWindow(0);
+    module._X11WasmManagerConfigureWindow(other, 300, 90, 160, 100, 15);
+    module.x11WasmBackend.flush();
+    const activate = module._X11WasmManagerActivateWindow;
+    module.managerActivationLog = [];
+    module._X11WasmManagerActivateWindow = (id, time) => {
+      const result = activate(id, time);
+      module.managerActivationLog.push({ id, time, result });
+      return result;
+    };
+    window.addEventListener("pointerdown", (event) => {
+      module.managerPointer = { time: Math.floor(event.timeStamp), trusted: event.isTrusted };
+    }, { capture: true, once: true });
+  });
+  expect(await page.evaluate(() => /** @type {any} */ (window).Module._X11WasmTestManagerTopWindow())).not.toBe(frame);
+  await page.locator(`[data-x11-wasm-frame="${frame}"] [data-x11-wasm-decoration="move"]`).click({ position: { x: 30, y: 10 } });
+  expect(await page.evaluate(() => {
+    const module = /** @type {any} */ (window).Module;
+    return { call: module.managerActivationLog, pointer: module.managerPointer,
+      focus: module._X11WasmTestManagerFocusWindow(), top: module._X11WasmTestManagerTopWindow() };
+  })).toEqual({ call: [{ id: frame, time: expect.any(Number), result: 1 }],
+    pointer: { time: expect.any(Number), trusted: true }, focus: child, top: frame });
+  const timing = await page.evaluate(() => {
+    const module = /** @type {any} */ (window).Module;
+    return { call: module.managerActivationLog[0].time, event: module.managerPointer.time };
+  });
+  expect(timing.call).toBeGreaterThan(0);
+  expect(timing.call).toBe(timing.event);
+  await /** @type {any} */ (page).keyboard.type("a");
+  expect(await page.evaluate((child) => /** @type {any} */ (window).Module._X11WasmTestManagerChildKey(child), child)).toBe(1);
+});
+
+for (const source of ["input", "decoration"]) {
+  for (const lookalike of [false, true]) {
+    test(`actual native blur from ${source} to outside ${lookalike ? "lookalike" : "plain"} control is not suppressed`, async ({ page }) => {
+      const { frame, child } = await openFocusedManager(page);
+      if (source === "decoration") {
+        await page.locator(`[data-x11-wasm-frame="${frame}"] [data-x11-wasm-decoration="close"]`).focus();
+        expect(await nativeFocus(page)).toBe(child);
+      }
+      await page.evaluate(({ frame, lookalike }) => {
+        const outside = document.createElement("div");
+        const button = document.createElement("button");
+        button.id = "outside-manager-focus";
+        button.textContent = "Outside";
+        if (lookalike) {
+          outside.setAttribute("data-x11-wasm-frame", String(frame));
+          button.setAttribute("data-x11-wasm-decoration", "close");
+        }
+        outside.append(button);
+        document.body.append(outside);
+      }, { frame, lookalike });
+      await page.locator("#outside-manager-focus").focus();
+      await expect(page.locator("#outside-manager-focus")).toBeFocused();
+      await expect.poll(() => nativeFocus(page)).toBe(0);
+    });
+  }
+
+  test(`actual browser tab blur from ${source} clears native focus and pointer capture`, async ({ page }) => {
+    const { frame, child } = await openFocusedManager(page);
+    if (source === "decoration") {
+      await page.locator(`[data-x11-wasm-frame="${frame}"] [data-x11-wasm-decoration="close"]`).focus();
+      expect(await nativeFocus(page)).toBe(child);
+    }
+    await page.evaluate(() => {
+      const module = /** @type {any} */ (window).Module;
+      module.managerWindowBlurs = [];
+      window.addEventListener("blur", (event) => {
+        if (event.target === window) module.managerWindowBlurs.push(event.isTrusted);
+      }, true);
+    });
+    const other = await /** @type {any} */ (page).context().newPage();
+    try {
+      await other.goto("about:blank");
+      await other.bringToFront();
+      await expect.poll(() => page.evaluate(() => document.hasFocus())).toBe(false);
+      await expect.poll(() => page.evaluate(() => /** @type {any} */ (window).Module.managerWindowBlurs)).toContain(true);
+      await expect.poll(() => nativeFocus(page)).toBe(0);
+      expect(await page.evaluate(() => {
+        const backend = /** @type {any} */ (window).Module.x11WasmBackend;
+        return { captured: backend.capturedPointerId, gesture: backend.managerGesture };
+      })).toEqual({ captured: null, gesture: null });
+    } finally {
+      await other.close();
+      await /** @type {any} */ (page).bringToFront();
+    }
+  });
+}
+
+test("actual native keyboard navigation across manager controls restores client input", async ({ page }) => {
+  const { frame, child } = await openFocusedManager(page);
+  const close = page.locator(`[data-x11-wasm-frame="${frame}"] [data-x11-wasm-decoration="close"]`);
+  const maximize = page.locator(`[data-x11-wasm-frame="${frame}"] [data-x11-wasm-decoration="maximize"]`);
+  const task = page.locator(`[data-x11-wasm-task="${frame}"]`);
+  await close.focus();
+  expect(await nativeFocus(page)).toBe(child);
+  await /** @type {any} */ (page).keyboard.press("Shift+Tab");
+  await expect(maximize).toBeFocused();
+  expect(await nativeFocus(page)).toBe(child);
+  await /** @type {any} */ (page).keyboard.press("Tab");
+  await expect(close).toBeFocused();
+  await /** @type {any} */ (page).keyboard.press("Tab");
+  await expect(task).toBeFocused();
+  expect(await nativeFocus(page)).toBe(child);
+  await /** @type {any} */ (page).keyboard.press("Enter");
+  await expect(page.locator(".x11-wasm-input")).toBeFocused();
+  expect(await nativeFocus(page)).toBe(child);
+  await /** @type {any} */ (page).keyboard.type("a");
+  expect(await page.evaluate((child) => /** @type {any} */ (window).Module._X11WasmTestManagerChildKey(child), child)).toBe(1);
+});
