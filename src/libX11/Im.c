@@ -342,6 +342,20 @@ BrowserUpdateFocusedICPreedit(
     }
 }
 
+static void
+BrowserResetFocusedICComposition(
+    XIC inputContext)
+{
+    if ((inputContext == x11wasm_focusedInputContext)
+	    && inputContext->focused) {
+	Window window = BrowserInputContextWindow(inputContext);
+
+	if (window != None) {
+	    (void)X11WasmJsCancelComposition(BrowserJsXId(window));
+	}
+    }
+}
+
 static char *
 BrowserResetICUtf8String(
     XIC inputContext)
@@ -359,6 +373,7 @@ BrowserResetICUtf8String(
 	    result[inputContext->preeditTextLength] = '\0';
 	}
 	BrowserClearICPreeditText(inputContext);
+	BrowserResetFocusedICComposition(inputContext);
     }
     return result;
 }
@@ -382,6 +397,7 @@ XwcResetIC(
 	    result[length] = L'\0';
 	}
 	BrowserClearICPreeditText(inputContext);
+	BrowserResetFocusedICComposition(inputContext);
     }
     return result;
 }
@@ -642,7 +658,7 @@ X11WasmTestXICSpotLocationSync(
     int result = 0;
 
     BrowserInitDisplay();
-    if ((phase < 0) || (phase > 2)) {
+    if ((phase < 0) || (phase > 6)) {
 	return 0;
     }
     if ((phase == 0) || (phase == 1)) {
@@ -668,6 +684,34 @@ X11WasmTestXICSpotLocationSync(
     }
     if (BrowserWindowResource(window) == NULL) {
 	return 0;
+    }
+    if (phase >= 3) {
+	if (inputContext == NULL) {
+	    return 0;
+	}
+	if (phase == 5) {
+	    wchar_t *text = XwcResetIC(inputContext);
+
+	    XFree(text);
+	} else if (phase == 6) {
+	    XIC inactive = XCreateIC(inputMethod,
+		    XNInputStyle, XIMPreeditNothing | XIMStatusNothing,
+		    XNClientWindow, window, XNFocusWindow, window, NULL);
+	    char *text;
+
+	    if (inactive == NULL) {
+		return 0;
+	    }
+	    text = Xutf8ResetIC(inactive);
+	    XFree(text);
+	    XDestroyIC(inactive);
+	} else {
+	    char *text = (phase == 3) ? Xutf8ResetIC(inputContext)
+		    : XmbResetIC(inputContext);
+
+	    XFree(text);
+	}
+	return 1;
     }
     if (inputContext == NULL) {
 	savedLocaleModifiers = (x11wasm_localeModifiers != NULL)

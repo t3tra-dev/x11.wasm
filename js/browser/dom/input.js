@@ -178,6 +178,9 @@
      */
     setFocusedWindow(window) {
       const windowId = unsignedInt(window, 0);
+      if (windowId !== this.focusedWindow) {
+        this.hideCompositionPreedit();
+      }
       if (this.focusedElement) {
         this.focusedElement.removeAttribute("data-x11-wasm-focused");
       }
@@ -311,6 +314,7 @@
      * @param {boolean=} hasSpot
      * @param {number=} spotRootX
      * @param {number=} spotRootY
+     * @param {X11WasmDOMPreeditStyle=} preedit
      * @returns {number}
      */
     setInputContext(
@@ -319,15 +323,47 @@
       hasSpot = false,
       spotRootX = 0,
       spotRootY = 0,
+      preedit,
     ) {
       const input = this.ensureInputElement();
+      const windowId = focused ? unsignedInt(window, 0) : 0;
+      const previous = this.inputContextPreedit;
+      let spotX = Math.trunc(spotRootX) || 0;
+      let spotY = Math.trunc(spotRootY) || 0;
+      if (!preedit) {
+        // Legacy JS callers supply root coordinates; retain a local anchor.
+        for (let resource = this.resources.get(windowId);
+          resource && resource.id !== this.rootWindow;
+          resource = this.resources.get(resource.parent)) {
+          spotX -= resource.x + resource.borderWidth;
+          spotY -= resource.y + resource.borderWidth;
+        }
+      }
+      const next = focused ? {
+        context: preedit ? unsignedInt(preedit.context, 0) : 0,
+        hasSpot: !!hasSpot,
+        spotX: preedit ? Math.trunc(preedit.spotX) || 0 : spotX,
+        spotY: preedit ? Math.trunc(preedit.spotY) || 0 : spotY,
+        fontPixelSize: positiveInt(preedit?.fontPixelSize, 14),
+        fontFamily: preedit?.fontFamily || "sans-serif",
+        foreground: unsignedInt(preedit?.foreground, 0),
+        background: unsignedInt(preedit?.background, 0xffffff),
+      } : null;
+      if (!next || this.inputContextWindow !== windowId ||
+          previous?.context !== next.context) {
+        // Presentation may end without changing the pinned commit destination.
+        this.hideCompositionPreedit();
+      }
       this.inputContextFocused = !!focused;
-      this.inputContextWindow = this.inputContextFocused
-        ? unsignedInt(window, 0)
-        : 0;
+      this.inputContextWindow = windowId;
+      this.inputContextPreedit = next;
       this.inputContextHasSpot = this.inputContextFocused && !!hasSpot;
       this.inputContextSpotX = Math.trunc(spotRootX) || 0;
       this.inputContextSpotY = Math.trunc(spotRootY) || 0;
+      if (this.compositionPreedit && this.compositionWindow === windowId && next) {
+        this.compositionPreedit = { ...next };
+        this.renderCompositionPreedit();
+      }
       if (!input) {
         return 0;
       }
@@ -368,6 +404,63 @@
         input.style.top = "0px";
       }
       return 0;
+    },
+
+    removeCompositionPreedit() {
+      this.preeditClipElement?.remove();
+      this.preeditClipElement = null;
+      this.preeditElement = null;
+    },
+
+    hideCompositionPreedit() {
+      this.compositionPreedit = null;
+      this.removeCompositionPreedit();
+    },
+
+    renderCompositionPreedit() {
+      const document = this.document;
+      const resource = this.resources.get(this.compositionWindow);
+      const style = this.compositionPreedit;
+      if (!document || !resource?.element || !this.composing ||
+          !this.compositionText || !style) {
+        this.removeCompositionPreedit();
+        return;
+      }
+      if (!this.preeditClipElement || !this.preeditElement) {
+        const clip = document.createElement("div");
+        const text = document.createElement("span");
+        clip.className = "x11-wasm-preedit-clip";
+        clip.setAttribute("aria-hidden", "true");
+        text.className = "x11-wasm-preedit";
+        clip.appendChild(text);
+        resource.element.appendChild(clip);
+        this.preeditClipElement = clip;
+        this.preeditElement = text;
+      }
+      const text = this.preeditElement;
+      const fontSize = positiveInt(style.fontPixelSize, 14);
+      const font = `${fontSize}px ${fontFamilyToCss(style.fontFamily)}`;
+      const context = document.createElement("canvas").getContext("2d");
+      let ascent = Math.ceil(fontSize * 0.8);
+      let descent = Math.max(1, fontSize - ascent);
+      if (context) {
+        context.font = font;
+        const metrics = context.measureText(this.compositionText);
+        if (Number.isFinite(metrics.fontBoundingBoxAscent) &&
+            Number.isFinite(metrics.fontBoundingBoxDescent)) {
+          ascent = metrics.fontBoundingBoxAscent;
+          descent = metrics.fontBoundingBoxDescent;
+        }
+      }
+      const x = style.hasSpot ? style.spotX : 0;
+      const y = style.hasSpot ? style.spotY : ascent;
+      text.textContent = this.compositionText;
+      text.style.font = font;
+      text.style.lineHeight = `${ascent + descent}px`;
+      text.style.left = `${x}px`;
+      text.style.top = `${y - ascent}px`;
+      text.style.color = pixelToCss(style.foreground);
+      text.style.backgroundColor = pixelToCss(style.background);
     },
 
     /**
@@ -501,7 +594,10 @@
         }
       });
       if (typeof global.addEventListener === "function") {
-        global.addEventListener("blur", () => this.cancelPointerInput());
+        global.addEventListener("blur", () => {
+          this.cancelPointerInput();
+          this.hideCompositionPreedit();
+        });
       }
       root.addEventListener("focus", () => {
         this.restoreFocusedInput();
@@ -525,6 +621,7 @@
           this.transientInputBlurred = true;
           return;
         }
+        this.hideCompositionPreedit();
         this.queueFocusEvent(
           FOCUS_OUT,
           eventTime(event.timeStamp),
@@ -1060,10 +1157,24 @@
      * @param {string} text
      */
     startComposition(text) {
+      this.removeCompositionPreedit();
       this.compositionCancelled = false;
       this.composing = true;
       this.compositionWindow = this.compositionTargetWindow();
       this.compositionText = text;
+      this.compositionPreedit = this.inputContextPreedit
+        ? { ...this.inputContextPreedit }
+        : {
+          context: 0,
+          hasSpot: false,
+          spotX: 0,
+          spotY: 0,
+          fontPixelSize: 14,
+          fontFamily: "sans-serif",
+          foreground: 0,
+          background: 0xffffff,
+        };
+      this.renderCompositionPreedit();
       this.queueCompositionEvent(COMPOSITION_START, text, this.compositionWindow);
     },
 
@@ -1082,6 +1193,7 @@
         return;
       }
       this.compositionText = text;
+      this.renderCompositionPreedit();
       this.queueCompositionEvent(COMPOSITION_UPDATE, text, this.compositionWindow);
     },
 
@@ -1089,6 +1201,7 @@
      * @param {string} text
      */
     endComposition(text) {
+      this.hideCompositionPreedit();
       const input = this.inputElement;
       if (this.compositionCancelled) {
         if (input) {
@@ -1114,6 +1227,7 @@
       if (window !== 0 && window !== this.compositionWindow) {
         return 0;
       }
+      this.hideCompositionPreedit();
       this.composing = false;
       this.compositionCancelled = true;
       this.compositionWindow = 0;

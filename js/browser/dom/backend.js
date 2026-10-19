@@ -158,6 +158,14 @@
       this.inputContextHasSpot = false;
       this.inputContextSpotX = 0;
       this.inputContextSpotY = 0;
+      /** @private @type {X11WasmDOMPreeditStyle | null} */
+      this.inputContextPreedit = null;
+      /** @private @type {HTMLElement | null} */
+      this.preeditElement = null;
+      /** @private @type {HTMLElement | null} */
+      this.preeditClipElement = null;
+      /** @private @type {X11WasmDOMPreeditStyle | null} */
+      this.compositionPreedit = null;
       /** @private @type {HTMLElement | null} */
       this.focusedElement = null;
       /** @private @type {Map<number, X11WasmDOMResource>} */

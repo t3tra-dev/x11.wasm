@@ -3880,6 +3880,9 @@ BrowserSyncInputContext(
     int hasSpot = 0;
     int spotRootX = 0;
     int spotRootY = 0;
+    int fontPixelSize = 14;
+    const char *fontFamily = "sans-serif";
+    XFontSet fontSet;
     Window window;
 
     if ((inputContext == NULL) || !inputContext->focused
@@ -3888,7 +3891,8 @@ BrowserSyncInputContext(
     }
     window = BrowserInputContextWindow(inputContext);
     if ((window == None) || (BrowserWindowResource(window) == NULL)) {
-	(void)X11WasmJsSetInputContext(1, 0, 0, 0, 0);
+	(void)X11WasmJsSetInputContext(1, 0, 0, 0, 0, 0,
+		0, 0, 14, "sans-serif", 0, 0xffffffUL);
 	return;
     }
     hasSpot = inputContext->preedit.hasSpotLocation
@@ -3898,13 +3902,30 @@ BrowserSyncInputContext(
 	spotRootX += inputContext->preedit.spotLocation.x;
 	spotRootY += inputContext->preedit.spotLocation.y;
     }
+    fontSet = inputContext->preedit.hasFontSet
+	    ? inputContext->preedit.fontSet : NULL;
+    if ((fontSet != NULL) && (fontSet->fontStruct != NULL)) {
+	X11WasmResource *fontPtr = X11WasmFindResource(fontSet->fontStruct->fid);
+
+	if ((fontPtr != NULL) && (fontPtr->type == X11_WASM_RESOURCE_FONT)) {
+	    fontPixelSize = fontPtr->fontPixelSize;
+	    fontFamily = fontPtr->fontFamily;
+	}
+    }
     (void)X11WasmJsSetInputContext(1, BrowserJsXId(window), hasSpot,
-	    spotRootX, spotRootY);
+	    spotRootX, spotRootY, (unsigned int)(uintptr_t)inputContext,
+	    inputContext->preedit.spotLocation.x,
+	    inputContext->preedit.spotLocation.y, fontPixelSize, fontFamily,
+	    inputContext->preedit.hasForeground
+		    ? inputContext->preedit.foreground : 0,
+	    inputContext->preedit.hasBackground
+		    ? inputContext->preedit.background : 0xffffffUL);
 }
 
 void
 BrowserClearInputContext(
     void)
 {
-    (void)X11WasmJsSetInputContext(0, 0, 0, 0, 0);
+    (void)X11WasmJsSetInputContext(0, 0, 0, 0, 0, 0,
+	    0, 0, 14, "sans-serif", 0, 0xffffffUL);
 }
