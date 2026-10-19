@@ -134,16 +134,21 @@
       titlebar.setAttribute(DECORATION, "move");
       const title = document.createElement("span");
       title.className = "x11-wasm-window-title";
+      const icon = document.createElement("img");
+      icon.className = "x11-wasm-window-icon";
+      icon.alt = "";
+      icon.hidden = true;
       const close = document.createElement("button");
       close.className = "x11-wasm-close";
       close.type = "button";
       close.title = "Close";
       close.setAttribute("aria-label", "Close");
       close.setAttribute(DECORATION, "close");
-      titlebar.append(title, close);
+      close.append(privateApi.managerIcon(document, "close"));
+      titlebar.append(icon, title, close);
       client.parentElement.insertBefore(element, client);
       element.append(titlebar, client);
-      const frame = { identity, element, titlebar, title, close };
+      const frame = { identity, element, titlebar, title, icon, close };
       this.managerFrames.set(resource.id, frame);
       return frame;
     },
@@ -175,6 +180,10 @@
       const title = metadata.title || "Untitled";
       if (frame.title.textContent !== title) frame.title.textContent = title;
       if (frame.title.title !== title) frame.title.title = title;
+      const iconHref = metadata.iconPhotoHref || metadata.iconBitmapHref;
+      frame.icon.hidden = !iconHref;
+      if (iconHref && frame.icon.getAttribute("src") !== iconHref) frame.icon.src = iconHref;
+      if (!iconHref) frame.icon.removeAttribute("src");
       frame.close.disabled = !frame.identity.protocolId ||
         !metadata.protocols.includes("WM_DELETE_WINDOW") || this.windowManagerActionsBlocked();
       const focused = this.resources.get(this.focusedWindow);
@@ -273,7 +282,8 @@
           "data-x11-wasm-window-types", "data-x11-wasm-class", "data-x11-wasm-class-name",
           "data-x11-wasm-override-redirect", "data-x11-wasm-focused", "data-x11-wasm-wm-state",
           "data-x11-wasm-pointer-grab-active", "data-x11-wasm-keyboard-grab-active",
-          "data-x11-wasm-server-grab-depth"],
+          "data-x11-wasm-server-grab-depth", "data-x11-wasm-icon-photo-href",
+          "data-x11-wasm-icon-bitmap-href"],
       });
     },
 

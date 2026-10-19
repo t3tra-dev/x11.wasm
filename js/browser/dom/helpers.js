@@ -730,6 +730,7 @@
   font: 13px sans-serif;
   letter-spacing: 0;
   touch-action: none;
+  container-type: inline-size;
 }
 .x11-wasm-frame[data-x11-wasm-active="1"] > .x11-wasm-titlebar {
   background: #21654e;
@@ -743,8 +744,21 @@
   white-space: nowrap;
   padding: 0 8px;
 }
+.x11-wasm-window-icon {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  object-fit: contain;
+}
+.x11-wasm-window-icon[hidden] { display: none; }
+@container (max-width: 100px) {
+  .x11-wasm-window-icon { display: none; }
+  .x11-wasm-window-title { padding: 0; }
+}
 .x11-wasm-close {
-  flex: 0 0 28px;
+  flex: 0 1 28px;
+  min-width: 0;
   position: relative;
   width: 28px;
   height: 28px;
@@ -755,17 +769,14 @@
   background: transparent;
   cursor: pointer;
 }
-.x11-wasm-close::before, .x11-wasm-close::after {
-  content: "";
-  position: absolute;
-  left: 8px;
-  top: 13px;
-  width: 12px;
-  height: 2px;
-  background: currentColor;
-  transform: rotate(45deg);
+.x11-wasm-close svg {
+  display: block;
+  width: 16px;
+  max-width: 100%;
+  height: 16px;
+  margin: auto;
+  pointer-events: none;
 }
-.x11-wasm-close::after { transform: rotate(-45deg); }
 .x11-wasm-close:hover:enabled { background: #ac2430; color: white; }
 .x11-wasm-close:disabled { opacity: .4; cursor: default; }
 .x11-wasm-close:focus-visible { outline: 2px solid currentColor; outline-offset: -3px; }

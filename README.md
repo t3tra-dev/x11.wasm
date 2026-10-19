@@ -21,6 +21,9 @@ time.
 
 ## Optional window manager
 
+Decoration controls bundle Lucide icons locally. See `THIRD_PARTY_NOTICES.md`
+and `LICENSES/Lucide.txt` for the pinned source and redistribution terms.
+
 Decorations are disabled by default. Set `Module.x11WasmWindowManager = true`
 before initializing the runtime, or pass `windowManager: true` to
 `X11WasmDOM.createBackend({ root, module, windowManager: true })` when creating

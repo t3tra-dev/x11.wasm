@@ -74,3 +74,30 @@ test("the first recognized EWMH type wins before fallback NORMAL", async ({ page
   });
   expect(result).toEqual([3, 4, 6, 7]);
 });
+
+test("titlebar uses bundled icons and keeps long titles inside narrow frames", async ({ page }) => {
+  await createManagerContract(page);
+  const result = await page.evaluate(() => {
+    const { backend } = /** @type {any} */ (window).managerContract;
+    backend.createWindow(2, 1, 30, 70, 200, 90, 24, 0);
+    backend.setWindowTitle(2, "A very long title ".repeat(40));
+    backend.setWindowProtocols(2, "WM_DELETE_WINDOW");
+    backend.resources.get(2).iconPhotoHref = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+    backend.mapWindow(2);
+    backend.flush();
+    const frame = backend.managerFrames.get(2);
+    const hasIcon = !frame.icon.hidden && frame.icon.getAttribute("src").startsWith("data:");
+    const samples = [200, 100, 30, 12].map((width) => {
+      backend.configureWindow(2, 30, 70, width, 90, 0, 4);
+      backend.flush();
+      const bar = frame.titlebar.getBoundingClientRect();
+      const button = frame.close.getBoundingClientRect();
+      const title = frame.title.getBoundingClientRect();
+      return button.left >= bar.left && button.right <= bar.right + 0.1 &&
+        title.right <= button.left + 0.1;
+    });
+    return { hasIcon, samples, paths: frame.close.querySelectorAll("svg path").length,
+      label: frame.close.getAttribute("aria-label") };
+  });
+  expect(result).toEqual({ hasIcon: true, samples: [true, true, true, true], paths: 2, label: "Close" });
+});

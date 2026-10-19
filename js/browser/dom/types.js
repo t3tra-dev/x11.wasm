@@ -210,6 +210,7 @@
  * @property {HTMLElement} element
  * @property {HTMLElement} titlebar
  * @property {HTMLElement} title
+ * @property {HTMLImageElement} icon
  * @property {HTMLButtonElement} close
  */
 
