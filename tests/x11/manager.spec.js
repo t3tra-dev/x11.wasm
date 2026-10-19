@@ -218,3 +218,128 @@ test("Module opt-in is forwarded by the standard bridge", async ({ page }) => {
   });
   expect(result).toEqual([false, false, true, false]);
 });
+
+test("title dragging requests native geometry without optimistic DOM movement", async ({ page }) => {
+  await createManagedBackend(page);
+  const result = await page.evaluate(() => {
+    const { backend, module, calls } = /** @type {any} */ (window).managerTest;
+    module._X11WasmManagerConfigureWindow = (...args) => { calls.push(args); return 1; };
+    const frame = backend.managerFrames.get(2);
+    frame.titlebar.dispatchEvent(new PointerEvent("pointerdown", {
+      bubbles: true, cancelable: true, pointerId: 8, button: 0, isPrimary: true,
+      clientX: 50, clientY: 50,
+    }));
+    frame.titlebar.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true, cancelable: true, pointerId: 8, buttons: 1,
+      clientX: 80, clientY: 70,
+    }));
+    frame.titlebar.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 8 }));
+    return { calls, geometry: [backend.resources.get(2).x, backend.resources.get(2).y],
+      activeGesture: backend.managerGesture };
+  });
+  expect(result).toEqual({ calls: [[2, 70, 80, 200, 120, 3]], geometry: [40, 60], activeGesture: null });
+});
+
+test("enabling decorations never requests implicit native placement", async ({ page }) => {
+  await createManagedBackend(page);
+  const result = await page.evaluate(() => {
+    const { backend, module, calls } = /** @type {any} */ (window).managerTest;
+    backend.setWindowManagerEnabled(false);
+    backend.configureWindow(2, 40, 4, 200, 120, 0, 2);
+    backend.flush();
+    module._X11WasmManagerConfigureWindow = (...args) => {
+      calls.push(args);
+      backend.configureWindow(...args.slice(0, 5), 0, args[5]);
+      backend.flush();
+      return 1;
+    };
+    backend.setWindowManagerEnabled(true);
+    backend.configureWindow(2, 40, 0, 200, 120, 0, 2);
+    backend.flush();
+    backend.setWindowManagerEnabled(false);
+    backend.setWindowManagerEnabled(true);
+    return { calls, y: backend.resources.get(2).y };
+  });
+  expect(result).toEqual({ calls: [], y: 0 });
+});
+
+test("gestures cancel on pointer cancellation, blur, unmap, destroy, disable and grabs", async ({ page }) => {
+  await createManagedBackend(page);
+  const result = await page.evaluate(() => {
+    const { backend, module } = /** @type {any} */ (window).managerTest;
+    module._X11WasmManagerConfigureWindow = () => 1;
+    const outcomes = [];
+    const begin = () => backend.managerFrames.get(2).titlebar.dispatchEvent(new PointerEvent("pointerdown", {
+      bubbles: true, cancelable: true, pointerId: 8, button: 0, isPrimary: true,
+    }));
+    for (const action of ["pointercancel", "lostpointercapture", "blur", "unmap", "disable", "grab", "destroy"]) {
+      backend.mapWindow(2);
+      backend.flush();
+      backend.setWindowManagerEnabled(true);
+      backend.pointerGrabWindow = 0;
+      begin();
+      const started = backend.managerGesture !== null;
+      if (action === "blur") window.dispatchEvent(new Event("blur"));
+      else if (action === "unmap") backend.unmapWindow(2);
+      else if (action === "disable") backend.setWindowManagerEnabled(false);
+      else if (action === "grab") {
+        backend.pointerGrabWindow = 3;
+        backend.syncWindowManager();
+      } else if (action === "destroy") backend.destroyResource(3);
+      else backend.managerFrames.get(2).titlebar.dispatchEvent(new PointerEvent(action, { bubbles: true, pointerId: 8 }));
+      outcomes.push([action, started, backend.managerGesture === null]);
+    }
+    return outcomes;
+  });
+  expect(result).toEqual(["pointercancel", "lostpointercapture", "blur", "unmap", "disable", "grab", "destroy"]
+    .map((name) => [name, true, true]));
+});
+
+test("grabs, secondary pointers and native refusal cannot start or continue manager actions", async ({ page }) => {
+  await createManagedBackend(page);
+  const result = await page.evaluate(() => {
+    const { backend, module, calls } = /** @type {any} */ (window).managerTest;
+    module._X11WasmManagerConfigureWindow = (...args) => { calls.push(args); return 0; };
+    const titlebar = backend.managerFrames.get(2).titlebar;
+    const down = (pointerId, isPrimary = true) => titlebar.dispatchEvent(new PointerEvent("pointerdown", {
+      bubbles: true, pointerId, isPrimary, button: 0,
+    }));
+    const rejected = [];
+    for (const field of ["pointerGrabWindow", "keyboardGrabWindow", "serverGrabDepth"]) {
+      backend[field] = 3;
+      down(8);
+      rejected.push(backend.managerGesture === null);
+      backend.closeWindowManagerFrame(2, 1);
+      backend[field] = 0;
+    }
+    down(8);
+    down(9, false);
+    const primary = backend.managerGesture.pointerId;
+    titlebar.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, pointerId: 9, clientX: 30 }));
+    const ignored = calls.length === 0;
+    titlebar.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, pointerId: 8, clientX: 30 }));
+    return { rejected, primary, ignored, calls: calls.length, cancelled: backend.managerGesture === null };
+  });
+  expect(result).toEqual({ rejected: [true, true, true], primary: 8, ignored: true, calls: 1, cancelled: true });
+});
+
+test("real Chrome pointer capture releases when a managed client is destroyed", async ({ page }) => {
+  await createManagedBackend(page);
+  await page.evaluate(() => {
+    const { module } = /** @type {any} */ (window).managerTest;
+    module._X11WasmManagerConfigureWindow = () => 1;
+  });
+  const mouse = /** @type {any} */ (page).mouse;
+  await mouse.move(70, 50);
+  await mouse.down();
+  const result = await page.evaluate(() => {
+    const { backend } = /** @type {any} */ (window).managerTest;
+    const gesture = backend.managerGesture;
+    const captured = gesture?.capture.hasPointerCapture(gesture.pointerId);
+    backend.destroyResource(2);
+    return { captured, released: !gesture.capture.hasPointerCapture(gesture.pointerId),
+      cancelled: backend.managerGesture === null };
+  });
+  await mouse.up();
+  expect(result).toEqual({ captured: true, released: true, cancelled: true });
+});

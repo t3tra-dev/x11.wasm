@@ -538,6 +538,7 @@
      * @returns {number}
      */
     destroyResource(id) {
+      this.cancelWindowManagerResource?.(id);
       this.removeWindowManagerFrame?.(id);
       const resource = this.resources.get(id);
       const windowId = unsignedInt(id, 0);
@@ -913,7 +914,7 @@ applyRootPointerState() {
      * @returns {number}
      */
     unmapWindow(id) {
-      if (this.managerGesture?.id === id) this.cancelWindowManagerGesture();
+      this.cancelWindowManagerResource?.(id);
       const resource = this.resources.get(id);
       if (resource && resource.element) {
         resource.pendingMapped = false;
@@ -1341,6 +1342,7 @@ applyRootPointerState() {
      * @returns {number}
      */
     reparentWindow(id, parent, x, y) {
+      this.cancelWindowManagerResource?.(id);
       this.removeWindowManagerFrame?.(id);
       const resource = this.resources.get(id);
       const parentResource = this.resources.get(parent);

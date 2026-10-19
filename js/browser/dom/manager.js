@@ -10,7 +10,7 @@
   "use strict";
 
   const privateApi = global["X11WasmDOMPrivate"];
-  const { X11WasmDOMBackend, RESOURCE_ATTR } = privateApi;
+  const { X11WasmDOMBackend, RESOURCE_ATTR, CW_X, CW_Y } = privateApi;
   const TITLE_HEIGHT = 28;
   const DECORATION = "data-x11-wasm-decoration";
   const MANAGED_TYPES = ["NORMAL", "DIALOG", "UTILITY"];
@@ -246,12 +246,17 @@
           const gestureEvent = gesture &&
             ["pointermove", "pointerup", "pointercancel", "lostpointercapture"].includes(type) &&
             pointer.pointerId === gesture.pointerId;
-          if (!decoration && !gestureEvent) return;
+          const gesturePointer = gesture && type.startsWith("pointer");
+          const gestureEscape = gesture && type === "keydown" &&
+            /** @type {KeyboardEvent} */ (event).key === "Escape";
+          if (!decoration && !gesturePointer && !gestureEscape) return;
           const frameElement = decoration?.closest("[data-x11-wasm-frame]");
           if (frameElement && !this.rootElement?.contains(frameElement)) return;
           consume(event);
-          if (type === "pointerdown" && decoration) {
-            this.beginWindowManagerGesture?.(pointer, decoration);
+          if (gestureEscape) {
+            this.cancelWindowManagerGesture();
+          } else if (type === "pointerdown" && decoration) {
+            this.beginWindowManagerGesture(pointer, decoration);
           } else if (type === "pointermove" && gestureEvent) {
             this.moveWindowManagerGesture?.(pointer);
           } else if (gestureEvent && type !== "pointermove") {
@@ -292,15 +297,98 @@
       const frame = this.managerFrames.get(id);
       const close = this.module?.["_X11WasmManagerCloseWindow"];
       if (!frame || frame.close.disabled || this.windowManagerActionsBlocked() ||
-          typeof close !== "function") return 0;
+          this.managerGesture || typeof close !== "function") return 0;
       return close(id, Math.max(0, Math.floor(time)));
+    },
+
+    /** @param {number} id @param {number} time */
+    activateWindowManagerFrame(id, time) {
+      const activate = this.module?.["_X11WasmManagerActivateWindow"];
+      return !this.windowManagerActionsBlocked() && typeof activate === "function"
+        ? activate(id, Math.max(0, Math.floor(time))) : 0;
+    },
+
+    /**
+     * @param {number} id @param {number} x @param {number} y
+     * @param {number} width @param {number} height @param {number} mask
+     */
+    configureWindowManager(id, x, y, width, height, mask) {
+      const configure = this.module?.["_X11WasmManagerConfigureWindow"];
+      if (this.windowManagerActionsBlocked() || typeof configure !== "function") return 0;
+      const result = configure(id, x, y, width, height, mask);
+      if (result) this.flush();
+      return result;
+    },
+
+    /** @param {PointerEvent} event @param {Element} decoration */
+    beginWindowManagerGesture(event, decoration) {
+      if (this.managerGesture || this.windowManagerActionsBlocked() ||
+          event.button !== 0 || !event.isPrimary ||
+          decoration.getAttribute(DECORATION) !== "move" ||
+          typeof this.module?.["_X11WasmManagerConfigureWindow"] !== "function") return;
+      const id = Number(decoration.closest("[data-x11-wasm-frame]")?.getAttribute("data-x11-wasm-frame"));
+      const resource = this.resources.get(id);
+      const frame = this.managerFrames.get(id);
+      if (!resource || !frame || !resource.mapped || resource.zoomed || resource.fullscreen) return;
+      this.activateWindowManagerFrame(id, event.timeStamp);
+      const position = this.windowManagerPointerPosition(event);
+      this.managerGesture = { id, pointerId: event.pointerId, capture: frame.titlebar,
+        edge: "move", startX: position.x, startY: position.y,
+        x: resource.x, y: resource.y, width: resource.width, height: resource.height };
+      try {
+        frame.titlebar.setPointerCapture(event.pointerId);
+      } catch (error) {
+        // Synthetic pointers cannot capture; window listeners still isolate input.
+      }
+    },
+
+    /** @param {PointerEvent} event @returns {{ x: number, y: number }} */
+    windowManagerPointerPosition(event) {
+      const rect = this.rootElement.getBoundingClientRect();
+      const root = this.resources.get(this.rootWindow);
+      return { x: (event.clientX - rect.left) * root.width / (rect.width || root.width),
+        y: (event.clientY - rect.top) * root.height / (rect.height || root.height) };
+    },
+
+    /** @param {PointerEvent} event */
+    moveWindowManagerGesture(event) {
+      const gesture = this.managerGesture;
+      if (!gesture || event.pointerId !== gesture.pointerId) return;
+      if (this.windowManagerActionsBlocked() ||
+          (event.pointerType === "mouse" && event.buttons === 0)) {
+        this.cancelWindowManagerGesture();
+        return;
+      }
+      const position = this.windowManagerPointerPosition(event);
+      if (!this.configureWindowManager(gesture.id,
+          gesture.x + Math.round(position.x - gesture.startX),
+          gesture.y + Math.round(position.y - gesture.startY),
+          gesture.width, gesture.height, CW_X | CW_Y)) {
+        this.cancelWindowManagerGesture();
+      }
+    },
+
+    /** @param {number} id */
+    cancelWindowManagerResource(id) {
+      const gesture = this.managerGesture;
+      const resource = this.resources.get(id);
+      if (gesture && (gesture.id === id || (resource &&
+          this.stackingResourceFor(resource).id === gesture.id))) {
+        this.cancelWindowManagerGesture();
+      }
     },
 
     cancelWindowManagerGesture() {
       const gesture = this.managerGesture;
       this.managerGesture = null;
-      if (gesture && gesture.capture.hasPointerCapture(gesture.pointerId)) {
-        gesture.capture.releasePointerCapture(gesture.pointerId);
+      if (gesture) {
+        try {
+          if (gesture.capture.hasPointerCapture(gesture.pointerId)) {
+            gesture.capture.releasePointerCapture(gesture.pointerId);
+          }
+        } catch (error) {
+          // Capture can already be released by removal or a browser cancellation.
+        }
       }
     },
   }));
