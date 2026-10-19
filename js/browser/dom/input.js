@@ -443,9 +443,12 @@
       const context = document.createElement("canvas").getContext("2d");
       let ascent = Math.ceil(fontSize * 0.8);
       let descent = Math.max(1, fontSize - ascent);
+      let width = 0;
       if (context) {
         context.font = font;
+        context.fontKerning = "none";
         const metrics = context.measureText(this.compositionText);
+        width = metrics.width;
         if (Number.isFinite(metrics.fontBoundingBoxAscent) &&
             Number.isFinite(metrics.fontBoundingBoxDescent)) {
           ascent = metrics.fontBoundingBoxAscent;
@@ -454,11 +457,17 @@
       }
       const x = style.hasSpot ? style.spotX : 0;
       const y = style.hasSpot ? style.spotY : ascent;
+      const height = ascent + descent;
       text.textContent = this.compositionText;
       text.style.font = font;
-      text.style.lineHeight = `${ascent + descent}px`;
-      text.style.left = `${x}px`;
-      text.style.top = `${y - ascent}px`;
+      text.style.lineHeight = `${height}px`;
+      if (!context) width = text.offsetWidth;
+      // Keep a short preedit visible at the edge without changing its IC spot.
+      text.style.left = `${width <= resource.width
+        ? Math.max(0, Math.min(x, resource.width - width)) : x}px`;
+      text.style.top = `${height <= resource.height
+        ? Math.max(0, Math.min(y - ascent, resource.height - height))
+        : y - ascent}px`;
       text.style.color = pixelToCss(style.foreground);
       text.style.backgroundColor = pixelToCss(style.background);
     },
