@@ -13,6 +13,9 @@
   const { X11WasmDOMBackend, RESOURCE_ATTR } = privateApi;
   const TITLE_HEIGHT = 28;
   const DECORATION = "data-x11-wasm-decoration";
+  const MANAGED_TYPES = ["NORMAL", "DIALOG", "UTILITY"];
+  const KNOWN_TYPES = [...MANAGED_TYPES, "DESKTOP", "DOCK", "TOOLBAR", "MENU",
+    "SPLASH", "DROPDOWN_MENU", "POPUP_MENU", "TOOLTIP", "NOTIFICATION", "COMBO", "DND"];
 
   Object.assign(X11WasmDOMBackend.prototype, /** @type {any} */ ({
     /** @param {boolean} enabled */
@@ -73,11 +76,11 @@
           }
           const identity = this.windowManagerIdentity(resource.id);
           const metadata = identity && this.resources.get(identity.metadataId);
+          const type = metadata?.windowTypes.find((value) =>
+            KNOWN_TYPES.some((known) => value === `_NET_WM_WINDOW_TYPE_${known}`));
           if (!identity || identity.frameId !== resource.id || !metadata ||
               metadata.overrideRedirect || metadata.windowClass !== 1 ||
-              (metadata.windowTypes.length &&
-                !metadata.windowTypes.some((type) => ["_NET_WM_WINDOW_TYPE_NORMAL",
-                  "_NET_WM_WINDOW_TYPE_DIALOG", "_NET_WM_WINDOW_TYPE_UTILITY"].includes(type)))) {
+              (type && !MANAGED_TYPES.some((known) => type === `_NET_WM_WINDOW_TYPE_${known}`))) {
             continue;
           }
           eligible.add(resource.id);

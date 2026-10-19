@@ -55,3 +55,22 @@ test("native identity and window types determine eligibility instead of class na
   });
   expect(result).toEqual([2, 3, 4, 5]);
 });
+
+test("the first recognized EWMH type wins before fallback NORMAL", async ({ page }) => {
+  await createManagerContract(page);
+  const result = await page.evaluate(() => {
+    const { backend } = /** @type {any} */ (window).managerContract;
+    const types = ["POPUP_MENU NORMAL", "NORMAL POPUP_MENU", "CUSTOM NORMAL",
+      "CUSTOM TOOLTIP NORMAL", "CUSTOM", ""];
+    types.forEach((list, index) => {
+      const id = index + 2;
+      backend.createWindow(id, 1, 30, 70, 100, 90, 24, 0);
+      backend.setWindowTypes(id, list.split(" ").filter(Boolean)
+        .map((type) => `_NET_WM_WINDOW_TYPE_${type}`).join(" "));
+      backend.mapWindow(id);
+    });
+    backend.flush();
+    return Array.from(backend.managerFrames.keys());
+  });
+  expect(result).toEqual([3, 4, 6, 7]);
+});
