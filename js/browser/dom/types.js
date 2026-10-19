@@ -123,6 +123,7 @@
  * @property {boolean} pendingMapped
  * @property {boolean} geometryDirty
  * @property {boolean=} nativeGeometry
+ * @property {boolean=} managerGeometryOwned
  * @property {boolean=} syncingNativeGeometry
  * @property {{ x: number, y: number, width: number, height: number }=} normalGeometry
  * @property {boolean} dirty
