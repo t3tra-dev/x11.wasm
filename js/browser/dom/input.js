@@ -160,7 +160,7 @@
      */
     releaseWindowInput(window) {
       if (this.inputWindowInTree(this.capturedPointerWindow, window)) {
-        this.releaseCapturedPointer();
+        this.cancelPointerInput();
       }
       if (this.inputWindowInTree(this.compositionWindow, window)) {
         this.cancelComposition();
@@ -469,6 +469,11 @@
         event.preventDefault();
         this.serviceUserActivationEvents();
       });
+      root.addEventListener("pointercancel", (event) => {
+        if (this.capturedPointerId === event.pointerId) {
+          this.cancelPointerInput();
+        }
+      });
       root.addEventListener("pointermove", (event) => {
         this.recordUserActivity();
         this.queuePointerEvent(MOTION_NOTIFY, event);
@@ -488,10 +493,16 @@
         },
         { passive: false },
       );
-      root.addEventListener("lostpointercapture", () => {
-        this.capturedPointerId = null;
-        this.capturedPointerElement = null;
+      root.addEventListener("lostpointercapture", (event) => {
+        if (this.capturedPointerId === event.pointerId &&
+          (typeof root.hasPointerCapture !== "function" ||
+            !root.hasPointerCapture(event.pointerId))) {
+          this.cancelPointerInput();
+        }
       });
+      if (typeof global.addEventListener === "function") {
+        global.addEventListener("blur", () => this.cancelPointerInput());
+      }
       root.addEventListener("focus", () => {
         this.restoreFocusedInput();
       });
@@ -661,6 +672,18 @@
         } catch (error) {
           /* The browser may have already released capture. */
         }
+      }
+    },
+
+    cancelPointerInput() {
+      this.releaseCapturedPointer();
+      const cancel = this.module && this.module["_X11WasmCancelPointerInput"];
+      if (typeof cancel === "function") {
+        cancel();
+      } else {
+        this.setPointerState(this.lastPointerRootX, this.lastPointerRootY,
+          this.pointerWindow, this.pointerState &
+          ~(BUTTON1_MASK | BUTTON2_MASK | BUTTON3_MASK), 0);
       }
     },
 

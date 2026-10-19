@@ -30,6 +30,75 @@ async function createBackend(page) {
   });
 }
 
+for (const action of ["pointercancel", "lostpointercapture", "blur"]) {
+  test(`DOM capture retires on ${action}`, async ({ page }) => {
+    await createBackend(page);
+    const mouse = /** @type {any} */ (page).mouse;
+    const point = await page.evaluate(() => {
+      const rect = /** @type {any} */ (window).lifecycleBackend.resources.get(3).element.getBoundingClientRect();
+      return { x: rect.left + 10, y: rect.top + 10 };
+    });
+    await mouse.move(point.x, point.y);
+    await mouse.down();
+    await mouse.move(point.x + 1, point.y);
+    try {
+      const pointerId = await page.evaluate((action) => {
+        const backend = /** @type {any} */ (window).lifecycleBackend;
+        const pointerId = backend.capturedPointerId;
+        if (action === "blur") window.dispatchEvent(new Event("blur"));
+        else if (action === "lostpointercapture") backend.rootElement.releasePointerCapture(pointerId);
+        else backend.rootElement.dispatchEvent(new PointerEvent("pointercancel", { pointerId }));
+        return pointerId;
+      }, action);
+      await mouse.move(point.x + 2, point.y);
+      const state = await page.evaluate((pointerId) => {
+        const backend = /** @type {any} */ (window).lifecycleBackend;
+        return {
+          captured: backend.capturedPointerId,
+          owner: backend.capturedPointerWindow,
+          nativeCapture: backend.rootElement.hasPointerCapture(pointerId),
+        };
+      }, pointerId);
+      expect(state).toEqual({ captured: null, owner: 0, nativeCapture: false });
+      await mouse.up();
+      await mouse.down();
+      const resumed = await page.evaluate(() => {
+        const backend = /** @type {any} */ (window).lifecycleBackend;
+        return {
+          owner: backend.capturedPointerWindow,
+          captured: backend.rootElement.hasPointerCapture(backend.capturedPointerId),
+        };
+      });
+      expect(resumed).toEqual({ owner: 3, captured: true });
+    } finally {
+      await mouse.up();
+    }
+  });
+}
+
+for (const action of ["pointercancel", "lostpointercapture"]) {
+  test(`unrelated ${action} does not retire the active pointer`, async ({ page }) => {
+    await createBackend(page);
+    const result = await page.evaluate((action) => {
+      const backend = /** @type {any} */ (window).lifecycleBackend;
+      backend.capturedPointerId = 42;
+      backend.capturedPointerWindow = 3;
+      backend.rootElement.dispatchEvent(new PointerEvent(action, { pointerId: 41 }));
+      return { pointerId: backend.capturedPointerId, owner: backend.capturedPointerWindow };
+    }, action);
+    expect(result).toEqual({ pointerId: 42, owner: 3 });
+  });
+}
+
+for (const explicitGrab of [false, true]) {
+  test(`pointer cancellation ${explicitGrab ? "preserves explicit" : "releases passive"} grabs`, async ({ page }) => {
+    await waitForX11Runtime(page);
+    const result = await page.evaluate((explicitGrab) =>
+      /** @type {any} */ (window).Module._X11WasmTestPointerCancellation(explicitGrab ? 1 : 0), explicitGrab);
+    expect(result).toBe(1);
+  });
+}
+
 for (const action of ["destroy", "unmap"]) {
   test(`DOM pointer capture releases on ancestor ${action}`, async ({ page }) => {
     await createBackend(page);

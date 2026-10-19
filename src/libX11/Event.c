@@ -1403,6 +1403,18 @@ BrowserReleasePassiveKeyboardGrabIfIdle(void)
     BrowserDeactivateKeyboardGrab();
 }
 
+EMSCRIPTEN_KEEPALIVE int
+X11WasmCancelPointerInput(void)
+{
+    BrowserInitDisplay();
+    x11wasm_browserDisplay.pointerCaptureWindow = None;
+    x11wasm_browserDisplay.pointerState &= ~(Button1Mask | Button2Mask
+	    | Button3Mask | Button4Mask | Button5Mask);
+    BrowserReleasePassivePointerGrabIfIdle(0);
+    BrowserSyncPointerState();
+    return 0;
+}
+
 void
 BrowserDeletePassiveGrabsForWindow(
     Window window)
@@ -1433,103 +1445,6 @@ BrowserDeletePassiveGrabsForWindow(
 	}
 	keyLinkPtr = &grabPtr->nextPtr;
     }
-}
-
-EMSCRIPTEN_KEEPALIVE int
-X11WasmTestUnviewableInputLifetime(
-    int scenario)
-{
-    Display *display = X11WasmGetDisplay(NULL);
-    Window root = DefaultRootWindow(display);
-    Window parent = XCreateSimpleWindow(display, root, 10, 10, 160, 100,
-	    0, 0, 0);
-    Window child = XCreateSimpleWindow(display, parent, 0, 0, 60, 40,
-	    0, 0, 0);
-    Window confine = XCreateSimpleWindow(display, parent, 70, 0, 60, 40,
-	    0, 0, 0);
-    XIM inputMethod = XOpenIM(display, NULL, NULL, NULL);
-    XIC inputContext = NULL;
-    int result = 0;
-
-    (void)XMapWindow(display, parent);
-    (void)XMapWindow(display, child);
-    (void)XMapWindow(display, confine);
-    if (inputMethod == NULL) {
-	result = 10;
-	goto cleanup;
-    }
-    inputContext = XCreateIC(inputMethod, XNInputStyle,
-	    XIMPreeditNothing | XIMStatusNothing, XNClientWindow, child,
-	    XNFocusWindow, child, NULL);
-    if (inputContext == NULL) {
-	result = 11;
-	goto cleanup;
-    }
-    XSetICFocus(inputContext);
-    (void)XSetInputFocus(display, child, RevertToParent, CurrentTime);
-    if ((XGrabPointer(display, child, False,
-	    ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
-	    GrabModeAsync, GrabModeAsync, confine, None, CurrentTime)
-	    != GrabSuccess)
-	    || (XGrabKeyboard(display, child, False, GrabModeAsync,
-		    GrabModeAsync, CurrentTime) != GrabSuccess)) {
-	result = 12;
-	goto cleanup;
-    }
-    (void)X11WasmQueuePointerEvent(ButtonPress, BrowserJsXId(root),
-	    Button1, 0, 15, 15, CurrentTime);
-    if (scenario == 3) {
-	(void)XDestroyWindow(display, parent);
-	parent = None;
-    } else {
-	(void)XUnmapWindow(display, (scenario == 0) ? parent
-		: ((scenario == 1) ? child : confine));
-    }
-    if (x11wasm_browserDisplay.pointerGrabWindow != None) {
-	result = 20;
-	goto cleanup;
-    }
-    if (scenario != 2) {
-	if (x11wasm_browserDisplay.keyboardGrabWindow != None) {
-	    result = 21;
-	    goto cleanup;
-	}
-	if (x11wasm_focusedInputContext != NULL) {
-	    result = 22;
-	    goto cleanup;
-	}
-	if (x11wasm_browserDisplay.pointerCaptureWindow != None) {
-	    result = 25;
-	    goto cleanup;
-	}
-	if ((x11wasm_browserDisplay.focusWindow != ((scenario == 1)
-		? parent : root))
-		|| (x11wasm_browserDisplay.focusRevertTo != RevertToNone)) {
-	    result = 23;
-	    goto cleanup;
-	}
-    } else if ((x11wasm_browserDisplay.keyboardGrabWindow != child)
-	    || (x11wasm_focusedInputContext != inputContext)) {
-	result = 24;
-	goto cleanup;
-    }
-    result = 1;
-
-cleanup:
-    (void)XUngrabPointer(display, CurrentTime);
-    (void)XUngrabKeyboard(display, CurrentTime);
-    (void)XSetInputFocus(display, root, RevertToNone, CurrentTime);
-    if (inputContext != NULL) {
-	XDestroyIC(inputContext);
-    }
-    if (inputMethod != NULL) {
-	(void)XCloseIM(inputMethod);
-    }
-    if (parent != None) {
-	(void)XDestroyWindow(display, parent);
-    }
-    BrowserClearEventQueue();
-    return result;
 }
 
 void

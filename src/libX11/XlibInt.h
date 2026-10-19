@@ -478,6 +478,7 @@ int X11WasmQueueCrossingEvent(
 int X11WasmQueueTextEventFieldsAtWindow(
     int type, unsigned int window, unsigned int codepoint,
     unsigned int state, unsigned int time);
+int X11WasmCancelPointerInput(void);
 int X11WasmQueuePointerEvent(
     int type,
     unsigned int window,
