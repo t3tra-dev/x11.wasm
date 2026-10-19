@@ -1275,6 +1275,7 @@ syncDocumentIconFromResources() {
       const previousWindow = this.fullscreenRequestWindow;
       this.fullscreenChangeCount += 1;
       this.fullscreenElement = activeElement;
+      this.syncRootElementSize(true);
       if (activeResource) {
         this.fullscreenRequestWindow = activeResource.id;
         this.fullscreenRequestStatus = "active";
@@ -1286,6 +1287,7 @@ syncDocumentIconFromResources() {
             eventTime(event.timeStamp),
           );
         }
+        this.applyGeometry(activeResource);
         return;
       }
       if (previousWindow) {
@@ -1296,6 +1298,7 @@ syncDocumentIconFromResources() {
       }
       this.fullscreenRequestWindow = 0;
       this.fullscreenRequestStatus = "exited";
+      this.refreshWindowStateGeometry();
     },
 
     /**

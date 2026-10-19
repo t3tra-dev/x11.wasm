@@ -294,6 +294,14 @@
      * @returns {{ width: number, height: number }}
      */
     measureRootElement(root, fallbackWidth, fallbackHeight) {
+      const active = this.document && this.document.fullscreenElement;
+      const view = this.document && this.document.defaultView;
+      if (active && view && this.fullscreenResourceForElement(active)) {
+        return {
+          width: positiveInt(view.innerWidth, fallbackWidth),
+          height: positiveInt(view.innerHeight, fallbackHeight),
+        };
+      }
       let rect = root.getBoundingClientRect();
       let width = Math.floor(root.clientWidth || rect.width);
       let height = Math.floor(root.clientHeight || rect.height);
@@ -356,6 +364,7 @@
       }
       const size = this.measureRootElement(root, resource.width, resource.height);
       if (size.width === resource.width && size.height === resource.height) {
+        this.refreshWindowStateGeometry();
         return 0;
       }
       resource.width = size.width;
@@ -418,6 +427,7 @@
      * @param {number} depth
      * @param {number} eventMask
      * @param {number=} windowClass
+     * @param {boolean=} nativeGeometry
      * @returns {number}
      */
     createWindow(
@@ -430,6 +440,7 @@
       depth,
       eventMask,
       windowClass = 1,
+      nativeGeometry = false,
     ) {
       const document = this.document;
       if (!document || !this.rootElement) {
@@ -458,6 +469,7 @@
         canvas,
         windowClass,
       );
+      resource.nativeGeometry = nativeGeometry;
 
       element.className = "x11-wasm-window";
       if (isInputOnly) {
@@ -1053,11 +1065,10 @@ applyRootPointerState() {
         mask & CW_HEIGHT ? height : resource.pendingHeight,
         resource.pendingHeight,
       );
-      const constrainedSize = this.constrainWindowSize(
-        resource,
-        requestedWidth,
-        requestedHeight,
-      );
+      // Native configure has already committed the X11 geometry.
+      const constrainedSize = resource.nativeGeometry
+        ? { width: requestedWidth, height: requestedHeight }
+        : this.constrainWindowSize(resource, requestedWidth, requestedHeight);
       const nextWidth =
         mask & CW_WIDTH ? constrainedSize.width : resource.pendingWidth;
       const nextHeight =

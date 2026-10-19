@@ -1430,9 +1430,24 @@ BrowserSetWindowWmState(
     Window window,
     int state)
 {
-    Window stateWindow = BrowserWindowMetadataTarget(window);
+    X11WasmResource *resourcePtr = BrowserWindowResource(window);
+    Atom property;
+    X11WasmProperty *propertyPtr;
+    long values[2] = {state, None};
 
-    (void)X11WasmJsSetWindowWmState(BrowserJsXId(stateWindow), state);
+    if (resourcePtr == NULL) {
+	return;
+    }
+    property = XInternAtom(resourcePtr->display, "WM_STATE", False);
+    propertyPtr = BrowserFindProperty(resourcePtr, property);
+    if ((propertyPtr != NULL) && (propertyPtr->type == property)
+	    && (propertyPtr->format == 32) && (propertyPtr->nitems == 2)
+	    && (BrowserPropertyAtomAt(propertyPtr->data, 0) == (Atom)state)
+	    && (BrowserPropertyAtomAt(propertyPtr->data, 1) == None)) {
+	return;
+    }
+    (void)XChangeProperty(resourcePtr->display, window, property, property,
+	    32, PropModeReplace, (unsigned char *)values, 2);
 }
 
 int
@@ -2035,6 +2050,15 @@ BrowserApplyWindowMetadataProperty(
 	BrowserApplyWindowColormapWindowsProperty(window, propertyPtr);
     } else if (property == BrowserNetWmStateAtom()) {
 	BrowserApplyWindowStateProperty(window, propertyPtr);
+    } else if (property == XInternAtom(X11WasmGetDisplay(NULL), "WM_STATE", False)) {
+	int state = WithdrawnState;
+
+	if ((propertyPtr != NULL) && (type == (int)property) && (format == 32)
+		&& (nitems == 2)) {
+	    state = (int)BrowserPropertyAtomAt(data, 0);
+	}
+	(void)X11WasmJsSetWindowWmState(
+		BrowserJsXId(BrowserWindowMetadataTarget(window)), state);
     } else if (property == BrowserWindowOpacityAtom()) {
 	BrowserApplyWindowOpacityProperty(window, property, type, format, data,
 		nitems);
