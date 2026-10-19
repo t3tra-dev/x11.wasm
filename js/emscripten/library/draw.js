@@ -85,17 +85,103 @@
     );
   },
 
-  X11WasmJsDrawText__deps: ["$X11WasmBridge"],
+  $X11WasmDecodeTextRun: function (utf8, length) {
+    if (!Number.isInteger(utf8) || !Number.isInteger(length) || utf8 < 0 ||
+        length < 0 || utf8 + length > HEAPU8.length) {
+      return null;
+    }
+    var text = "";
+    var offsets = [0];
+    for (var byte = 0; byte < length;) {
+      var start = byte;
+      var lead = HEAPU8[utf8 + byte++];
+      var count = lead >= 0xf0 && lead <= 0xf4 ? 4 :
+        lead >= 0xe0 && lead < 0xf0 ? 3 :
+        lead >= 0xc0 && lead < 0xe0 ? 2 : 1;
+      var valid = start + count <= length;
+      for (var trail = 1; valid && trail < count; trail++) {
+        valid = (HEAPU8[utf8 + start + trail] & 0xc0) === 0x80;
+      }
+      var codepoint = lead;
+      if (valid && count > 1) {
+        codepoint = lead & (count === 4 ? 7 : count === 3 ? 15 : 31);
+        for (var part = 1; part < count; part++) {
+          codepoint = (codepoint << 6) | (HEAPU8[utf8 + byte++] & 63);
+        }
+        if ((count === 2 && codepoint !== 0 && codepoint < 0x80) ||
+            (count === 3 && codepoint < 0x800) ||
+            (count === 4 && (codepoint < 0x10000 || codepoint > 0x10ffff))) {
+          codepoint = lead;
+          byte = start + 1;
+        }
+      }
+      var unit = text.length;
+      for (var offset = start + 1; offset < byte; offset++) {
+        offsets[offset] = unit;
+      }
+      if (codepoint > 0xffff && codepoint <= 0x10ffff) {
+        // Tcl 8.6 can address the high surrogate after the UTF-8 lead byte.
+        for (var interior = start + 1; interior < byte; interior++) {
+          offsets[interior] = unit + 1;
+        }
+        text += String.fromCodePoint(codepoint);
+      } else {
+        text += String.fromCharCode(codepoint);
+      }
+      offsets[byte] = text.length;
+    }
+    return { text: text, offsets: offsets };
+  },
+
+  X11WasmJsDrawText__deps: ["$X11WasmBridge", "$X11WasmDecodeTextRun"],
   X11WasmJsDrawText: function (id, pixel, x, y, utf8, utf8Length) {
     var text = "";
     if (utf8 && utf8Length > 0) {
-      // @ts-ignore UTF8ToString is provided by Emscripten generated code.
-      text = UTF8ToString(utf8, utf8Length);
+      var run = X11WasmDecodeTextRun(utf8, utf8Length);
+      text = run ? run.text : "";
     }
     return X11WasmBridge.call("drawText", [id, pixel, x, y, text]) | 0;
   },
 
-  X11WasmJsMeasureText__deps: ["$X11WasmBridge"],
+  X11WasmJsDrawTextInContext__deps: ["$X11WasmBridge", "$X11WasmDecodeTextRun"],
+  X11WasmJsDrawTextInContext: function (
+    id, pixel, x, y, utf8, length, rangeStart, rangeLength,
+  ) {
+    var run = X11WasmDecodeTextRun(utf8, length);
+    if (!run) {
+      return 0;
+    }
+    return X11WasmBridge.call("drawText", [id, pixel, x, y, run.text,
+      run.offsets[rangeStart], run.offsets[rangeStart + rangeLength]]) | 0;
+  },
+
+  X11WasmJsTextRunWidths__deps: ["$X11WasmBridge", "$X11WasmDecodeTextRun"],
+  X11WasmJsTextRunWidths: function (size, familyUtf8, utf8, length, widths) {
+    var run = X11WasmDecodeTextRun(utf8, length);
+    if (!run) {
+      return -1;
+    }
+    var family = familyUtf8 ? UTF8ToString(familyUtf8) : "sans-serif";
+    var result;
+    try {
+      result = X11WasmBridge.call("textRunWidths", [size, family, run.text], null);
+    } catch (error) {
+      return -1;
+    }
+    if (!Array.isArray(result) || result.length !== run.text.length + 1 ||
+        result[0] !== 0 || result.some(function (width, index) {
+          return !Number.isInteger(width) || width < 0 || width > 0x7fffffff ||
+            (index > 0 && width < result[index - 1]);
+        })) {
+      return -1;
+    }
+    for (var byte = 0; byte <= length; byte++) {
+      HEAP32[(widths >> 2) + byte] = result[run.offsets[byte]];
+    }
+    return 0;
+  },
+
+  X11WasmJsMeasureText__deps: ["$X11WasmBridge", "$X11WasmDecodeTextRun"],
   X11WasmJsMeasureText: function (
     fontPixelSize,
     fontFamilyUtf8,
@@ -109,8 +195,11 @@
       fontFamily = UTF8ToString(fontFamilyUtf8);
     }
     if (utf8 && utf8Length > 0) {
-      // @ts-ignore UTF8ToString is provided by Emscripten generated code.
-      text = UTF8ToString(utf8, utf8Length);
+      var run = X11WasmDecodeTextRun(utf8, utf8Length);
+      if (!run) {
+        return -1;
+      }
+      text = run.text;
     }
     try {
       var args = [fontPixelSize, fontFamily, text];

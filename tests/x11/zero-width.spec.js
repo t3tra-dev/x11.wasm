@@ -64,6 +64,8 @@ test("X11 bridge distinguishes missing backend and method from measured zero", a
     const library = target.LibraryManager.library;
     const bridge = library.$X11WasmBridge;
     target.X11WasmBridge = bridge;
+    target.X11WasmDecodeTextRun = library.$X11WasmDecodeTextRun;
+    target.HEAPU8 = new Uint8Array([0, 0x65]);
     target.UTF8ToString = () => "e";
     const measure = () => library.X11WasmJsMeasureText(14, 0, 1, 1);
     const missingBackend = measure();

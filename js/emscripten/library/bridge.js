@@ -97,6 +97,7 @@
       "setWindowWMHints",
       "setWindowWmState",
       "setWindowZoomHints",
+      "textRunWidths",
       "unmapWindow",
       "warpPointer",
     ],
