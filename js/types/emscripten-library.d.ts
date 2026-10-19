@@ -35,6 +35,7 @@ interface X11WasmResource {
   fullscreen?: boolean;
   topmost?: boolean;
   zoomed?: boolean;
+  managerGeometryOwned?: boolean;
   wmState?: "" | "normal" | "iconic" | "withdrawn";
   wmHints?: X11WasmWmHints | null;
   iconPhotoCount?: number;
@@ -115,6 +116,8 @@ interface X11WasmSelectionOwner {
 }
 
 interface X11WasmBackend {
+  windowManagerEnabled: boolean;
+  setWindowManagerEnabled(enabled: boolean): void;
   resources: Map<number, X11WasmResource>;
   dirtyResources: Set<X11WasmResource>;
   flushScheduled: boolean;

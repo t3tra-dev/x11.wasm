@@ -90,3 +90,22 @@ for (const [name, width, height, dpr] of screens) {
     }
   });
 }
+
+test("native close protocol owner may differ from the metadata client without an alias", async ({ page }) => {
+  await waitForX11Runtime(page);
+  const result = await page.evaluate(() => {
+    const m = /** @type {any} */ (window).Module;
+    const frame = m._X11WasmTestManagerWindow(2);
+    const metadata = m._X11WasmTestManagerPart(1);
+    const b = m.x11WasmBackend;
+    b.setWindowManagerEnabled(true);
+    b.flush();
+    return { frame, metadata, owner: m._X11WasmManagerWindowIdentity(frame, 2),
+      disabled: b.managerFrames.get(frame).close.disabled };
+  });
+  expect(result.owner).toBe(result.frame);
+  expect(result.metadata).not.toBe(result.frame);
+  expect(result.disabled).toBe(false);
+  await page.locator(`[data-x11-wasm-frame="${result.frame}"] [data-x11-wasm-decoration="close"]`).click();
+  expect(await page.evaluate((id) => /** @type {any} */ (window).Module._X11WasmTestManagerCloseEvent(id), result.frame)).toBe(1);
+});
