@@ -1257,6 +1257,7 @@ syncDocumentIconFromResources() {
       const previousWindow = this.fullscreenRequestWindow;
       this.fullscreenChangeCount += 1;
       this.fullscreenElement = activeElement;
+      this.syncRootElementSize(true);
       if (activeResource) {
         this.fullscreenRequestWindow = activeResource.id;
         this.fullscreenRequestStatus = "active";
@@ -1268,6 +1269,7 @@ syncDocumentIconFromResources() {
             eventTime(event.timeStamp),
           );
         }
+        this.applyGeometry(activeResource);
         return;
       }
       if (previousWindow) {
@@ -1278,6 +1280,7 @@ syncDocumentIconFromResources() {
       }
       this.fullscreenRequestWindow = 0;
       this.fullscreenRequestStatus = "exited";
+      this.refreshWindowStateGeometry();
     },
 
     /**
@@ -1287,6 +1290,15 @@ syncDocumentIconFromResources() {
       this.fullscreenErrorCount += 1;
       this.fullscreenRequestStatus = "error";
       this.fullscreenRequestError = event.type || "fullscreenerror";
+    },
+
+    /** @param {number} frame @param {number} metadata @returns {number} */
+    setManagerGeometryOwned(frame, metadata) {
+      for (const id of [frame, metadata]) {
+        const resource = this.resources.get(id);
+        if (resource) resource.managerGeometryOwned = true;
+      }
+      return 0;
     },
 
     /**

@@ -615,6 +615,79 @@ BrowserWindowStateSource(
     return fallback;
 }
 
+static int
+BrowserManagerWindowTypeIsEligible(X11WasmResource *framePtr, Window metadata)
+{
+    static const char *types[] = {
+	"NORMAL", "DIALOG", "UTILITY", "DESKTOP", "DOCK", "TOOLBAR", "MENU",
+	"SPLASH", "DROPDOWN_MENU", "POPUP_MENU", "TOOLTIP", "NOTIFICATION",
+	"COMBO", "DND"
+    };
+    Atom property = XInternAtom(framePtr->display, "_NET_WM_WINDOW_TYPE", False);
+    X11WasmProperty *propertyPtr = BrowserFindProperty(framePtr, property);
+    unsigned long i;
+    unsigned int type;
+
+    if (propertyPtr == NULL) {
+	propertyPtr = BrowserFindProperty(BrowserWindowResource(metadata), property);
+    }
+    if ((propertyPtr == NULL) || (propertyPtr->type != XA_ATOM)
+	    || (propertyPtr->format != 32)) return 1;
+    for (i = 0; i < propertyPtr->nitems; i++) {
+	for (type = 0; type < sizeof(types) / sizeof(types[0]); type++) {
+	    char name[80];
+	    snprintf(name, sizeof(name), "_NET_WM_WINDOW_TYPE_%s", types[type]);
+	    if (BrowserPropertyAtomAt(propertyPtr->data, i)
+		    == XInternAtom(framePtr->display, name, True)) return type < 3;
+	}
+    }
+    return 1;
+}
+
+X11WasmResource *
+BrowserManagerWindowResource(
+    Window window,
+    Window *metadataReturn)
+{
+    X11WasmResource *framePtr = BrowserWindowToplevel(window);
+    X11WasmResource *candidatePtr;
+    Window metadata;
+
+    if (metadataReturn != NULL) {
+	*metadataReturn = None;
+    }
+    if ((framePtr == NULL)
+	    || (framePtr->parent != x11wasm_browserDisplay.rootWindow)
+	    || (framePtr->c_class != InputOutput)
+	    || framePtr->atts.override_redirect) {
+	return NULL;
+    }
+    metadata = BrowserWindowMetadataTarget((Window)framePtr->id);
+    if (metadata == (Window)framePtr->id) {
+	/* Tk wrappers need not have their own metadata alias. */
+	for (candidatePtr = x11wasm_browserDisplay.resourceList;
+		candidatePtr != NULL; candidatePtr = candidatePtr->nextPtr) {
+	    if ((candidatePtr->type == X11_WASM_RESOURCE_WINDOW)
+		    && (candidatePtr != framePtr)
+		    && (candidatePtr->metadataTarget == (Window)candidatePtr->id)
+		    && (BrowserWindowToplevel((Window)candidatePtr->id) == framePtr)) {
+		metadata = (Window)candidatePtr->id;
+		break;
+	    }
+	}
+    }
+    if ((BrowserWindowResource(metadata) == NULL)
+	    || (BrowserWindowToplevel(metadata) != framePtr)
+	    || !BrowserManagerWindowTypeIsEligible(framePtr, metadata)
+	    || ((window != (Window)framePtr->id) && (window != metadata))) {
+	return NULL;
+    }
+    if (metadataReturn != NULL) {
+	*metadataReturn = metadata;
+    }
+    return framePtr;
+}
+
 static Atom
 BrowserWindowMetadataTargetAtom(void)
 {
@@ -1255,8 +1328,8 @@ BrowserResourceSupportsProtocol(
     return 0;
 }
 
-int
-BrowserWindowSupportsProtocol(
+Window
+BrowserWindowProtocolTarget(
     X11WasmResource *resourcePtr,
     Atom protocolAtom)
 {
@@ -1264,17 +1337,17 @@ BrowserWindowSupportsProtocol(
     Window targetWindow;
 
     if ((resourcePtr == NULL) || (protocolAtom == None)) {
-	return 0;
+	return None;
     }
     if (BrowserResourceSupportsProtocol(resourcePtr, protocolAtom)) {
-	return 1;
+	return (Window)resourcePtr->id;
     }
 
     targetWindow = BrowserWindowMetadataTarget((Window)resourcePtr->id);
     if (targetWindow != (Window)resourcePtr->id) {
 	candidatePtr = X11WasmFindResource(targetWindow);
 	if (BrowserResourceSupportsProtocol(candidatePtr, protocolAtom)) {
-	    return 1;
+	    return (Window)candidatePtr->id;
 	}
     }
     for (candidatePtr = x11wasm_browserDisplay.resourceList; candidatePtr != NULL;
@@ -1286,10 +1359,18 @@ BrowserWindowSupportsProtocol(
 	    continue;
 	}
 	if (BrowserResourceSupportsProtocol(candidatePtr, protocolAtom)) {
-	    return 1;
+	    return (Window)candidatePtr->id;
 	}
     }
-    return 0;
+    return None;
+}
+
+int
+BrowserWindowSupportsProtocol(
+    X11WasmResource *resourcePtr,
+    Atom protocolAtom)
+{
+    return BrowserWindowProtocolTarget(resourcePtr, protocolAtom) != None;
 }
 
 void
@@ -1412,6 +1493,18 @@ BrowserApplyWindowStandardColormapProperty(
 	    propertyPtr->dataLength / (int)sizeof(XStandardColormap));
 }
 
+static Window
+BrowserWindowStateMetadataTarget(Window window)
+{
+    Window metadata = BrowserWindowMetadataTarget(window);
+    Window candidate;
+
+    if ((metadata == window) && (BrowserManagerWindowResource(window, &candidate) != NULL)) {
+	metadata = candidate;
+    }
+    return metadata;
+}
+
 void
 BrowserSetWindowState(
     Window window,
@@ -1419,7 +1512,7 @@ BrowserSetWindowState(
     int zoomed,
     int fullscreen)
 {
-    Window stateWindow = BrowserWindowMetadataTarget(window);
+    Window stateWindow = BrowserWindowStateMetadataTarget(window);
 
     (void)X11WasmJsSetWindowState(BrowserJsXId(stateWindow), topmost,
 	    zoomed, fullscreen);
@@ -1430,9 +1523,24 @@ BrowserSetWindowWmState(
     Window window,
     int state)
 {
-    Window stateWindow = BrowserWindowMetadataTarget(window);
+    X11WasmResource *resourcePtr = BrowserWindowResource(window);
+    Atom property;
+    X11WasmProperty *propertyPtr;
+    long values[2] = {state, None};
 
-    (void)X11WasmJsSetWindowWmState(BrowserJsXId(stateWindow), state);
+    if (resourcePtr == NULL) {
+	return;
+    }
+    property = XInternAtom(resourcePtr->display, "WM_STATE", False);
+    propertyPtr = BrowserFindProperty(resourcePtr, property);
+    if ((propertyPtr != NULL) && (propertyPtr->type == property)
+	    && (propertyPtr->format == 32) && (propertyPtr->nitems == 2)
+	    && (BrowserPropertyAtomAt(propertyPtr->data, 0) == (Atom)state)
+	    && (BrowserPropertyAtomAt(propertyPtr->data, 1) == None)) {
+	return;
+    }
+    (void)XChangeProperty(resourcePtr->display, window, property, property,
+	    32, PropModeReplace, (unsigned char *)values, 2);
 }
 
 int
@@ -2035,6 +2143,15 @@ BrowserApplyWindowMetadataProperty(
 	BrowserApplyWindowColormapWindowsProperty(window, propertyPtr);
     } else if (property == BrowserNetWmStateAtom()) {
 	BrowserApplyWindowStateProperty(window, propertyPtr);
+    } else if (property == XInternAtom(X11WasmGetDisplay(NULL), "WM_STATE", False)) {
+	int state = WithdrawnState;
+
+	if ((propertyPtr != NULL) && (type == (int)property) && (format == 32)
+		&& (nitems == 2)) {
+	    state = (int)BrowserPropertyAtomAt(data, 0);
+	}
+	(void)X11WasmJsSetWindowWmState(
+		BrowserJsXId(BrowserWindowStateMetadataTarget(window)), state);
     } else if (property == BrowserWindowOpacityAtom()) {
 	BrowserApplyWindowOpacityProperty(window, property, type, format, data,
 		nitems);

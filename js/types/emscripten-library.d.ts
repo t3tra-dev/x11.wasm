@@ -357,6 +357,22 @@ declare const Module: {
   x11WasmRoot?: string | HTMLElement;
   x11WasmWindowManager?: boolean;
   _X11WasmResizeRoot?: (width: number, height: number) => number;
+  _X11WasmManagerWindowIdentity?: (window: number, field: number) => number;
+  _X11WasmManagerCloseWindow?: (window: number, time: number) => number;
+  _X11WasmManagerActivateWindow?: (window: number, time: number) => number;
+  /** 0 normal: remove maximized atoms; 1 iconic: preserve zoom; 2 zoomed: add maximized atoms. Geometry is unchanged. */
+  _X11WasmManagerSetWindowState?: (window: number, state: 0 | 1 | 2, time: number) => number;
+  /** WM validation only; no snapping. Rejected requests leave geometry unchanged. */
+  _X11WasmManagerConfigureWindow?: (window: number, x: number, y: number,
+    width: number, height: number, mask: number) => number;
+  _X11WasmConfigureWindow?: (
+    window: number,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    valueMask: number,
+  ) => number;
   _X11WasmQueueKeyEvent?: (
     type: number,
     window: number,

@@ -2584,7 +2584,9 @@ BrowserMapWindowResource(
     window = (Window)resourcePtr->id;
     resourcePtr->mapped = 1;
     (void)X11WasmJsMapWindow(BrowserJsXId(window));
-    if (BrowserWindowMetadataTarget(window) == window) {
+    if ((resourcePtr->parent == x11wasm_browserDisplay.rootWindow)
+	    && (resourcePtr->c_class == InputOutput)
+	    && !resourcePtr->atts.override_redirect) {
 	BrowserSetWindowWmState(window,
 		BrowserInitialWmStateForMap(display, window));
     }

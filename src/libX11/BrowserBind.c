@@ -1,6 +1,41 @@
 #include "XlibInt.h"
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmConfigureWindow(
+    unsigned int window,
+    int x,
+    int y,
+    unsigned int width,
+    unsigned int height,
+    unsigned int valueMask)
+{
+    X11WasmResource *resourcePtr;
+    XWindowChanges changes;
+
+    BrowserInitDisplay();
+    resourcePtr = BrowserWindowResource((Window)window);
+    if ((resourcePtr == NULL)
+	    || (resourcePtr == &x11wasm_browserDisplay.rootResource)
+	    || (valueMask == 0)
+	    || (valueMask & ~(CWX | CWY | CWWidth | CWHeight))
+	    || ((valueMask & CWWidth) && ((width == 0) || (width > INT_MAX)))
+	    || ((valueMask & CWHeight) && ((height == 0) || (height > INT_MAX)))) {
+	return 0;
+    }
+    memset(&changes, 0, sizeof(changes));
+    changes.x = x;
+    changes.y = y;
+    changes.width = (int)width;
+    changes.height = (int)height;
+    (void)XConfigureWindow(resourcePtr->display, (Window)window, valueMask,
+	    &changes);
+    return (!(valueMask & CWX) || (resourcePtr->x == x))
+	    && (!(valueMask & CWY) || (resourcePtr->y == y))
+	    && (!(valueMask & CWWidth) || (resourcePtr->width == width))
+	    && (!(valueMask & CWHeight) || (resourcePtr->height == height));
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmResizeRoot(
     unsigned int width,
     unsigned int height)
@@ -365,6 +400,225 @@ X11WasmQueueFullscreenState(
     event.xclient.data.l[4] = 0L;
     BrowserApplyNetWmStateClientMessage(&event.xclient);
     return 1;
+}
+
+static Window
+BrowserManagerProtocolTarget(
+    X11WasmResource *framePtr,
+    Window metadata,
+    Atom protocol)
+{
+    if (BrowserResourceSupportsProtocol(framePtr, protocol)) {
+	return (Window)framePtr->id;
+    }
+    return BrowserWindowProtocolTarget(BrowserWindowResource(metadata), protocol);
+}
+
+static int
+BrowserManagerIsGrabbed(void)
+{
+    return BrowserWindowCanReceiveEvents(x11wasm_browserDisplay.pointerGrabWindow)
+	    || BrowserWindowCanReceiveEvents(x11wasm_browserDisplay.keyboardGrabWindow)
+	    || (x11wasm_browserDisplay.serverGrabDepth > 0);
+}
+
+static int
+BrowserManagerSizeAxisValid(unsigned int size, int min, int max, int inc, int base)
+{
+    min = (min > 0) ? min : 1;
+    max = (max > 0) ? max : INT_MAX;
+    base = (base > 0) ? base : 0;
+    return (size >= (unsigned int)min) && (size <= (unsigned int)max)
+	    && ((inc <= 1)
+		    || (((long long)size >= base) && (((long long)size - base) % inc == 0)));
+}
+
+static int
+BrowserManagerSizeIsValid(X11WasmResource *framePtr, Window metadata,
+    unsigned int width, unsigned int height, unsigned int mask)
+{
+    XSizeHints hints;
+    long supplied;
+    int baseWidth, baseHeight;
+
+    if (!(mask & (CWWidth | CWHeight))) return 1;
+    if (!XGetWMNormalHints(framePtr->display, framePtr->id, &hints, &supplied)
+	    && !XGetWMNormalHints(framePtr->display, metadata, &hints, &supplied)) return 1;
+    if (((hints.flags & PBaseSize) && ((hints.base_width < 0) || (hints.base_height < 0)))
+	    || ((hints.flags & PResizeInc) && ((hints.width_inc <= 0) || (hints.height_inc <= 0)))) return 0;
+    baseWidth = (hints.flags & PBaseSize) ? hints.base_width
+	    : (hints.flags & PMinSize) ? hints.min_width : 0;
+    baseHeight = (hints.flags & PBaseSize) ? hints.base_height
+	    : (hints.flags & PMinSize) ? hints.min_height : 0;
+    if (((mask & CWWidth) && !BrowserManagerSizeAxisValid(width,
+	    (hints.flags & PMinSize) ? hints.min_width : baseWidth,
+	    (hints.flags & PMaxSize) ? hints.max_width : 0,
+	    (hints.flags & PResizeInc) ? hints.width_inc : 0, baseWidth))
+	    || ((mask & CWHeight) && !BrowserManagerSizeAxisValid(height,
+	    (hints.flags & PMinSize) ? hints.min_height : baseHeight,
+	    (hints.flags & PMaxSize) ? hints.max_height : 0,
+	    (hints.flags & PResizeInc) ? hints.height_inc : 0, baseHeight))) return 0;
+    if ((hints.flags & PAspect) && (hints.min_aspect.x > 0)
+	    && (hints.min_aspect.y > 0) && (hints.max_aspect.x > 0)
+	    && (hints.max_aspect.y > 0)) {
+	if ((long long)hints.min_aspect.x * hints.max_aspect.y
+		> (long long)hints.max_aspect.x * hints.min_aspect.y) return 0;
+	long long aspectWidth = (long long)width
+		- ((hints.flags & PBaseSize) ? hints.base_width : 0);
+	long long aspectHeight = (long long)height
+		- ((hints.flags & PBaseSize) ? hints.base_height : 0);
+	long long min = aspectWidth * hints.min_aspect.y
+		- aspectHeight * hints.min_aspect.x;
+	long long max = aspectWidth * hints.max_aspect.y
+		- aspectHeight * hints.max_aspect.x;
+	if ((aspectWidth < 0) || (aspectHeight < 0)) return 0;
+	return (min >= 0) && (max <= 0);
+    }
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmManagerConfigureWindow(unsigned int window, int x, int y,
+    unsigned int width, unsigned int height, unsigned int valueMask)
+{
+    X11WasmResource *framePtr;
+    Window metadata;
+    int nextX, nextY;
+    unsigned int nextWidth, nextHeight;
+
+    BrowserInitDisplay();
+    framePtr = BrowserManagerWindowResource(window, &metadata);
+    if ((framePtr == NULL) || BrowserManagerIsGrabbed() || (valueMask == 0)
+	    || (valueMask & ~(CWX | CWY | CWWidth | CWHeight))
+	    || ((valueMask & CWWidth) && ((width == 0) || (width > INT_MAX)))
+	    || ((valueMask & CWHeight) && ((height == 0) || (height > INT_MAX)))) return 0;
+    nextX = (valueMask & CWX) ? x : framePtr->x;
+    nextY = (valueMask & CWY) ? y : framePtr->y;
+    nextWidth = (valueMask & CWWidth) ? width : framePtr->width;
+    nextHeight = (valueMask & CWHeight) ? height : framePtr->height;
+    if ((nextX >= (int)x11wasm_browserDisplay.rootResource.width)
+	    || (nextY >= (int)x11wasm_browserDisplay.rootResource.height)
+	    || ((long long)nextX + nextWidth + 2LL * framePtr->borderWidth <= 0)
+	    || ((long long)nextY + nextHeight + 2LL * framePtr->borderWidth <= 0)
+	    || !BrowserManagerSizeIsValid(framePtr, metadata, nextWidth, nextHeight,
+		valueMask)) return 0;
+    (void)X11WasmJsSetManagerGeometryOwned(framePtr->id, metadata);
+    return X11WasmConfigureWindow(framePtr->id, x, y, width, height, valueMask);
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmManagerActivateWindow(unsigned int window, unsigned int time)
+{
+    X11WasmResource *framePtr;
+    Window metadata, focus, takeFocus;
+    XWMHints *hints;
+    int input = 1;
+
+    BrowserInitDisplay();
+    framePtr = BrowserManagerWindowResource(window, &metadata);
+    if ((framePtr == NULL) || BrowserManagerIsGrabbed()
+	    || !BrowserResourceIsVisible(framePtr)
+	    || !BrowserRequestTimeIsValid(time, x11wasm_browserDisplay.focusTime)) return 0;
+    hints = XGetWMHints(framePtr->display, framePtr->id);
+    if (hints == NULL) hints = XGetWMHints(framePtr->display, metadata);
+    if (hints != NULL) {
+	if (hints->flags & InputHint) input = hints->input;
+	XFree(hints);
+    }
+    takeFocus = BrowserManagerProtocolTarget(framePtr, metadata,
+	    XInternAtom(framePtr->display, "WM_TAKE_FOCUS", True));
+    if (input) {
+	focus = BrowserGetFocusWindow();
+	if (!BrowserWindowInTree(focus, framePtr->id)
+		|| !BrowserWindowCanReceiveEvents(focus)) {
+	    focus = BrowserWindowCanReceiveEvents(metadata) ? metadata : framePtr->id;
+	}
+	(void)XSetInputFocus(framePtr->display, focus, RevertToParent, time);
+    }
+    if (takeFocus != None) {
+	(void)X11WasmQueueWindowProtocol(takeFocus, "WM_TAKE_FOCUS", -1, time);
+    }
+    (void)XRaiseWindow(framePtr->display, framePtr->id);
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmManagerSetWindowState(unsigned int window, int state, unsigned int time)
+{
+    X11WasmResource *framePtr;
+    Window metadata;
+    Atom netState;
+
+    BrowserInitDisplay();
+    framePtr = BrowserManagerWindowResource(window, &metadata);
+    if ((framePtr == NULL) || BrowserManagerIsGrabbed()
+	    || (state < X11_WASM_MANAGER_NORMAL) || (state > X11_WASM_MANAGER_ZOOMED)) return 0;
+    (void)time;
+    (void)X11WasmJsSetManagerGeometryOwned(framePtr->id, metadata);
+    if (state == X11_WASM_MANAGER_ICONIC) {
+	return XIconifyWindow(framePtr->display, framePtr->id,
+		DefaultScreen(framePtr->display));
+    }
+    netState = BrowserNetWmStateAtom();
+    BrowserApplyNetWmStateAtom(framePtr->id, framePtr, netState,
+	    state == X11_WASM_MANAGER_ZOOMED,
+	    XInternAtom(framePtr->display, "_NET_WM_STATE_MAXIMIZED_VERT", False));
+    BrowserApplyNetWmStateAtom(framePtr->id, framePtr, netState,
+	    state == X11_WASM_MANAGER_ZOOMED,
+	    XInternAtom(framePtr->display, "_NET_WM_STATE_MAXIMIZED_HORZ", False));
+    (void)XMapWindow(framePtr->display, framePtr->id);
+    BrowserSetWindowWmState(framePtr->id, NormalState);
+    return framePtr->mapped ? 1 : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE unsigned int
+X11WasmManagerWindowIdentity(
+    unsigned int window,
+    int field)
+{
+    X11WasmResource *framePtr;
+    Window metadata;
+    Atom protocol;
+
+    BrowserInitDisplay();
+    framePtr = BrowserManagerWindowResource((Window)window, &metadata);
+    if (framePtr == NULL) {
+	return 0;
+    }
+    switch (field) {
+    case 0:
+	return BrowserJsXId(framePtr->id);
+    case 1:
+	return BrowserJsXId(metadata);
+    case 2:
+	protocol = XInternAtom(framePtr->display, "WM_DELETE_WINDOW", True);
+	return BrowserJsXId(BrowserManagerProtocolTarget(framePtr, metadata, protocol));
+    default:
+	return 0;
+    }
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmManagerCloseWindow(
+    unsigned int window,
+    unsigned int time)
+{
+    X11WasmResource *framePtr;
+    Window metadata, target;
+    Atom protocol;
+
+    BrowserInitDisplay();
+    framePtr = BrowserManagerWindowResource((Window)window, &metadata);
+    if ((framePtr == NULL) || BrowserManagerIsGrabbed()) {
+	return 0;
+    }
+    protocol = XInternAtom(framePtr->display, "WM_DELETE_WINDOW", True);
+    target = BrowserManagerProtocolTarget(framePtr, metadata, protocol);
+    if (target == None) {
+	return 0;
+    }
+    return X11WasmQueueWindowProtocol(BrowserJsXId(target),
+	    "WM_DELETE_WINDOW", -1, time);
 }
 
 static void
