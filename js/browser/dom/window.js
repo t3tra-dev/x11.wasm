@@ -268,6 +268,7 @@
       this.applyRootSelectionOwnerState();
       this.installWindowCloseListener(this.resources.get(rootXid));
       this.installFullscreenEventListeners();
+      this.syncWindowManager?.();
       return 0;
     },
 
@@ -537,6 +538,8 @@
      * @returns {number}
      */
     destroyResource(id) {
+      this.cancelWindowManagerResource?.(id);
+      this.removeWindowManagerFrame?.(id);
       const resource = this.resources.get(id);
       const windowId = unsignedInt(id, 0);
       const iconWindow = this.ownerIconWindow(resource);
@@ -912,6 +915,7 @@ applyRootPointerState() {
      * @returns {number}
      */
     unmapWindow(id) {
+      this.cancelWindowManagerResource?.(id);
       const resource = this.resources.get(id);
       if (resource && resource.element) {
         this.releaseWindowInput(id);
@@ -1308,7 +1312,7 @@ applyRootPointerState() {
      */
     restackWindow(id, previousSibling) {
       const resource = this.resources.get(id);
-      const element = resource && resource.element;
+      const element = resource && (this.displayElement?.(resource) || resource.element);
       if (!resource || !element) {
         return 0;
       }
@@ -1340,6 +1344,8 @@ applyRootPointerState() {
      * @returns {number}
      */
     reparentWindow(id, parent, x, y) {
+      this.cancelWindowManagerResource?.(id);
+      this.removeWindowManagerFrame?.(id);
       const resource = this.resources.get(id);
       const parentResource = this.resources.get(parent);
       const parentElement =

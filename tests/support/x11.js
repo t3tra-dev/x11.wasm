@@ -22,6 +22,9 @@ const X11_WASM_DOM_SOURCES = [
   "js/browser/dom/wm.js",
   "js/browser/dom/input.js",
   "js/browser/dom/render.js",
+  "js/browser/dom/manager-icons.js",
+  "js/browser/dom/manager-gestures.js",
+  "js/browser/dom/manager.js",
   "js/browser/dom/export.js",
 ];
 

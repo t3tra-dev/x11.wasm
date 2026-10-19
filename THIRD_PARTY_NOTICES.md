@@ -43,6 +43,18 @@ Tk's distribution terms are reproduced verbatim in `LICENSES/Tk.txt`. The
 upstream notices and Tk terms are retained for this generated table; it is not
 represented as original MIT-licensed project data.
 
+## Window Manager Icons
+
+`js/browser/dom/manager-icons.js` bundles only the `x`, `minus`, `square`, and
+`copy` SVG geometry from Lucide, pinned to commit
+`02eb9161b57917ccaa262f1bf070507cddde3b08`:
+
+<https://github.com/lucide-icons/lucide/tree/02eb9161b57917ccaa262f1bf070507cddde3b08/icons>
+
+Lucide's ISC license and the Feather-derived icons' MIT notice are reproduced
+verbatim in `LICENSES/Lucide.txt`. The icons are bundled locally; no CDN or
+runtime download is required.
+
 ## Redistribution
 
 Keep the existing notices in source distributions. When distributing the

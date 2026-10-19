@@ -194,4 +194,38 @@
  * @property {string | HTMLElement=} root
  * @property {Document=} document
  * @property {any=} module
+ * @property {boolean=} windowManager
+ */
+
+/**
+ * @typedef {object} X11WasmDOMManagerIdentity
+ * @property {number} frameId
+ * @property {number} metadataId
+ * @property {number} protocolId
+ */
+
+/**
+ * @typedef {object} X11WasmDOMManagerFrame
+ * @property {X11WasmDOMManagerIdentity} identity
+ * @property {HTMLElement} element
+ * @property {HTMLElement} titlebar
+ * @property {HTMLElement} title
+ * @property {HTMLImageElement} icon
+ * @property {HTMLButtonElement} close
+ * @property {HTMLElement[]} handles
+ */
+
+/**
+ * @typedef {object} X11WasmDOMManagerGesture
+ * @property {number} id
+ * @property {number} pointerId
+ * @property {HTMLElement} capture
+ * @property {string} edge
+ * @property {number} startX
+ * @property {number} startY
+ * @property {number} x
+ * @property {number} y
+ * @property {number} width
+ * @property {number} height
+ * @property {string=} lastCandidate
  */
