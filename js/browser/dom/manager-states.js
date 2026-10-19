@@ -38,8 +38,8 @@
       const width = root.width - resource.borderWidth * 2;
       const height = root.height - TITLE_HEIGHT - TASKBAR_HEIGHT - resource.borderWidth * 2;
       if (width < 1 || height < 1) return null;
-      const size = metadata.sizeHints ? this.constrainSizeByHints(metadata.sizeHints, width, height) : { width, height };
-      if (size.width > width || size.height > height) return null;
+      const size = this.constrainWindowManagerSize(metadata, width, height, width, height);
+      if (!size) return null;
       return { x: 0, y: TITLE_HEIGHT, width: size.width, height: size.height };
     },
 
