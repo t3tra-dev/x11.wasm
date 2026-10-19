@@ -1208,16 +1208,24 @@ syncDocumentIconFromResources() {
         this.fullscreenRequestCount += 1;
         this.fullscreenRequestStatus = "requested";
         this.fullscreenRequestError = "";
-        try {
-          Promise.resolve(element.requestFullscreen()).catch((error) => {
-            this.fullscreenRequestStatus = "error";
-            this.fullscreenRequestError =
-              error instanceof Error ? error.message : String(error);
-          });
-        } catch (error) {
+        const requestCount = this.fullscreenRequestCount;
+        const fail = (error) => {
+          if (
+            this.fullscreenRequestCount !== requestCount ||
+            this.fullscreenRequestWindow !== resource.id ||
+            !resource.fullscreen ||
+            this.resources.get(resource.id) !== resource
+          ) {
+            return;
+          }
           this.fullscreenRequestStatus = "error";
           this.fullscreenRequestError =
             error instanceof Error ? error.message : String(error);
+        };
+        try {
+          Promise.resolve(element.requestFullscreen()).catch(fail);
+        } catch (error) {
+          fail(error);
         }
         return;
       }
@@ -1226,16 +1234,26 @@ syncDocumentIconFromResources() {
         this.fullscreenExitCount += 1;
         this.fullscreenRequestStatus = "exit-requested";
         this.fullscreenRequestError = "";
-        try {
-          Promise.resolve(document.exitFullscreen()).catch((error) => {
-            this.fullscreenRequestStatus = "error";
-            this.fullscreenRequestError =
-              error instanceof Error ? error.message : String(error);
-          });
-        } catch (error) {
+        const requestCount = this.fullscreenRequestCount;
+        const exitCount = this.fullscreenExitCount;
+        const fail = (error) => {
+          if (
+            this.fullscreenRequestCount !== requestCount ||
+            this.fullscreenExitCount !== exitCount ||
+            this.fullscreenRequestWindow !== resource.id ||
+            resource.fullscreen ||
+            this.resources.get(resource.id) !== resource
+          ) {
+            return;
+          }
           this.fullscreenRequestStatus = "error";
           this.fullscreenRequestError =
             error instanceof Error ? error.message : String(error);
+        };
+        try {
+          Promise.resolve(document.exitFullscreen()).catch(fail);
+        } catch (error) {
+          fail(error);
         }
       } else if (this.fullscreenRequestWindow === resource.id) {
         this.fullscreenRequestWindow = 0;
