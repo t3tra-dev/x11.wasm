@@ -124,16 +124,20 @@ test("manager activate preserves child focus and obeys input hints and WM_TAKE_F
     const focusedChild = m._X11WasmTestManagerOptions(0,6,0);
     const raised = m._X11WasmTestManagerOptions(0,7,0);
     m._X11WasmTestManagerOptions(other,3,0);
+    m._X11WasmManagerActivateWindow(client,0);
+    const fallback = m._X11WasmTestManagerOptions(0,6,0);
+    m._X11WasmTestManagerOptions(other,3,0);
     m._X11WasmTestManagerOptions(frame,1,0);
     m._X11WasmTestManagerOptions(frame,2,1);
     const passive = m._X11WasmManagerActivateWindow(frame,0);
-    return {frame,child,other,activated,focusedChild,raised,passive,
+    return {frame,child,other,activated,focusedChild,raised,fallback,passive,
       focusAfter:m._X11WasmTestManagerOptions(0,6,0),
       protocol:m._X11WasmTestManagerOptions(frame,5,0)};
   });
   expect(result.activated).toBe(1);
   expect(result.focusedChild).toBe(result.child);
   expect(result.raised).toBe(result.frame);
+  expect(result.fallback).toBe(result.frame);
   expect(result.passive).toBe(1);
   expect(result.focusAfter).toBe(result.other);
   expect(result.protocol).toBe(1);
