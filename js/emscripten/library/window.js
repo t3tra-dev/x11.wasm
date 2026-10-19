@@ -52,6 +52,7 @@
         depth,
         eventMask,
         clazz,
+        true,
       ]) | 0
     );
   },

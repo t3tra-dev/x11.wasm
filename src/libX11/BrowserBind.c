@@ -1,6 +1,41 @@
 #include "XlibInt.h"
 
 EMSCRIPTEN_KEEPALIVE int
+X11WasmConfigureWindow(
+    unsigned int window,
+    int x,
+    int y,
+    unsigned int width,
+    unsigned int height,
+    unsigned int valueMask)
+{
+    X11WasmResource *resourcePtr;
+    XWindowChanges changes;
+
+    BrowserInitDisplay();
+    resourcePtr = BrowserWindowResource((Window)window);
+    if ((resourcePtr == NULL)
+	    || (resourcePtr == &x11wasm_browserDisplay.rootResource)
+	    || (valueMask == 0)
+	    || (valueMask & ~(CWX | CWY | CWWidth | CWHeight))
+	    || ((valueMask & CWWidth) && ((width == 0) || (width > INT_MAX)))
+	    || ((valueMask & CWHeight) && ((height == 0) || (height > INT_MAX)))) {
+	return 0;
+    }
+    memset(&changes, 0, sizeof(changes));
+    changes.x = x;
+    changes.y = y;
+    changes.width = (int)width;
+    changes.height = (int)height;
+    (void)XConfigureWindow(resourcePtr->display, (Window)window, valueMask,
+	    &changes);
+    return (!(valueMask & CWX) || (resourcePtr->x == x))
+	    && (!(valueMask & CWY) || (resourcePtr->y == y))
+	    && (!(valueMask & CWWidth) || (resourcePtr->width == width))
+	    && (!(valueMask & CWHeight) || (resourcePtr->height == height));
+}
+
+EMSCRIPTEN_KEEPALIVE int
 X11WasmResizeRoot(
     unsigned int width,
     unsigned int height)

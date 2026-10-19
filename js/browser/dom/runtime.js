@@ -139,6 +139,9 @@
     throw new Error("X11WasmDOMBackend core must be loaded first");
   }
 
+  /** @type {WeakMap<object, number>} */
+  const clipboardWriteRequests = new WeakMap();
+
   Object.assign(X11WasmDOMBackend.prototype, /** @type {any} */ ({
     /**
      * @param {number} percent
@@ -693,6 +696,8 @@ applyRootServerGrabState() {
      * @returns {number}
      */
     setClipboardText(text) {
+      const requestId = (clipboardWriteRequests.get(this) || 0) + 1;
+      clipboardWriteRequests.set(this, requestId);
       this.clipboardText = text;
       this.clipboardWriteStatus = "stored";
       this.clipboardWriteError = "";
@@ -714,13 +719,13 @@ applyRootServerGrabState() {
 
       Promise.resolve(writeResult)
         .then(() => {
-          if (this.clipboardText === text) {
+          if (clipboardWriteRequests.get(this) === requestId) {
             this.clipboardWriteStatus = "written";
             this.clipboardWriteError = "";
           }
         })
         .catch((error) => {
-          if (this.clipboardText === text) {
+          if (clipboardWriteRequests.get(this) === requestId) {
             this.clipboardWriteStatus = "failed";
             this.clipboardWriteError = this.errorMessage(error);
           }

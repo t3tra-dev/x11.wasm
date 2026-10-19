@@ -256,6 +256,7 @@ interface X11WasmBackend {
     count: number,
   ): number;
   setServerGrabState(depth: number): number;
+  cancelComposition(window?: number): number;
   setInputContext(
     focused: boolean,
     window: number,
@@ -357,6 +358,14 @@ declare const Module: {
   x11WasmRoot?: string | HTMLElement;
   x11WasmWindowManager?: boolean;
   _X11WasmResizeRoot?: (width: number, height: number) => number;
+  _X11WasmConfigureWindow?: (
+    window: number,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    valueMask: number,
+  ) => number;
   _X11WasmQueueKeyEvent?: (
     type: number,
     window: number,

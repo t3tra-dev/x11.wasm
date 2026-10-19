@@ -142,6 +142,39 @@
   Object.assign(X11WasmDOMBackend.prototype, /** @type {any} */ ({
     /**
      * @param {number} window
+     * @param {number} ancestor
+     * @returns {boolean}
+     */
+    inputWindowInTree(window, ancestor) {
+      for (let resource = this.resources.get(window); resource;
+        resource = this.resources.get(resource.parent)) {
+        if (resource.id === ancestor) {
+          return true;
+        }
+      }
+      return false;
+    },
+
+    /**
+     * @param {number} window
+     */
+    releaseWindowInput(window) {
+      if (this.inputWindowInTree(this.capturedPointerWindow, window)) {
+        this.cancelPointerInput();
+      }
+      if (this.inputWindowInTree(this.compositionWindow, window)) {
+        this.cancelComposition();
+      }
+      if (this.inputWindowInTree(this.inputContextWindow, window)) {
+        this.setInputContext(false);
+      }
+      if (this.inputWindowInTree(this.focusedWindow, window)) {
+        this.setFocusedWindow(0);
+      }
+    },
+
+    /**
+     * @param {number} window
      */
     setFocusedWindow(window) {
       const windowId = unsignedInt(window, 0);
@@ -436,6 +469,11 @@
         event.preventDefault();
         this.serviceUserActivationEvents();
       });
+      root.addEventListener("pointercancel", (event) => {
+        if (this.capturedPointerId === event.pointerId) {
+          this.cancelPointerInput();
+        }
+      });
       root.addEventListener("pointermove", (event) => {
         this.recordUserActivity();
         this.queuePointerEvent(MOTION_NOTIFY, event);
@@ -455,10 +493,16 @@
         },
         { passive: false },
       );
-      root.addEventListener("lostpointercapture", () => {
-        this.capturedPointerId = null;
-        this.capturedPointerElement = null;
+      root.addEventListener("lostpointercapture", (event) => {
+        if (this.capturedPointerId === event.pointerId &&
+          (typeof root.hasPointerCapture !== "function" ||
+            !root.hasPointerCapture(event.pointerId))) {
+          this.cancelPointerInput();
+        }
       });
+      if (typeof global.addEventListener === "function") {
+        global.addEventListener("blur", () => this.cancelPointerInput());
+      }
       root.addEventListener("focus", () => {
         this.restoreFocusedInput();
       });
@@ -519,6 +563,12 @@
         this.handlePaste(event);
       });
       input.addEventListener("input", (event) => {
+        if (this.compositionCancelled && event instanceof InputEvent &&
+          (event.isComposing || event.inputType === "insertCompositionText" ||
+            event.inputType === "insertFromComposition")) {
+          input.value = "";
+          return;
+        }
         if (event instanceof InputEvent && event.isComposing) {
           if (event.inputType === "insertCompositionText") {
             this.updateComposition(event.data || input.value);
@@ -592,6 +642,8 @@
       }
       this.capturedPointerId = event.pointerId;
       this.capturedPointerElement = captureTarget;
+      this.capturedPointerWindow = this.pointerCaptureWindow ||
+        this.inputResourceForEvent(event)?.id || this.rootWindow;
     },
 
     /**
@@ -602,17 +654,36 @@
       if (this.capturedPointerId !== event.pointerId) {
         return;
       }
-      const captureTarget = this.capturedPointerElement || root;
+      this.releaseCapturedPointer();
+    },
 
-      if (typeof captureTarget.releasePointerCapture === "function") {
+    releaseCapturedPointer() {
+      const pointerId = this.capturedPointerId;
+      const captureTarget = this.capturedPointerElement;
+      this.capturedPointerId = null;
+      this.capturedPointerElement = null;
+      this.capturedPointerWindow = 0;
+
+      if (captureTarget && pointerId !== null &&
+        typeof captureTarget.releasePointerCapture === "function") {
         try {
-          captureTarget.releasePointerCapture(event.pointerId);
+          captureTarget.releasePointerCapture(pointerId);
         } catch (error) {
           /* The browser may have already released capture. */
         }
       }
-      this.capturedPointerId = null;
-      this.capturedPointerElement = null;
+    },
+
+    cancelPointerInput() {
+      this.releaseCapturedPointer();
+      const cancel = this.module && this.module["_X11WasmCancelPointerInput"];
+      if (typeof cancel === "function") {
+        cancel();
+      } else {
+        this.setPointerState(this.lastPointerRootX, this.lastPointerRootY,
+          this.pointerWindow, this.pointerState &
+          ~(BUTTON1_MASK | BUTTON2_MASK | BUTTON3_MASK), 0);
+      }
     },
 
     /**
@@ -620,7 +691,9 @@
      * @returns {{x: number, y: number}}
      */
     eventRootCoordinates(event) {
-      const element = this.rootElement;
+      const active = this.document && this.document.fullscreenElement;
+      const element = active && this.fullscreenResourceForElement(active)
+        ? active : this.rootElement;
       if (!element) {
         return { x: 0, y: 0 };
       }
@@ -987,6 +1060,7 @@
      * @param {string} text
      */
     startComposition(text) {
+      this.compositionCancelled = false;
       this.composing = true;
       this.compositionWindow = this.compositionTargetWindow();
       this.compositionText = text;
@@ -997,6 +1071,9 @@
      * @param {string} text
      */
     updateComposition(text) {
+      if (this.compositionCancelled) {
+        return;
+      }
       if (!this.composing) {
         this.startComposition(text);
         return;
@@ -1013,6 +1090,12 @@
      */
     endComposition(text) {
       const input = this.inputElement;
+      if (this.compositionCancelled) {
+        if (input) {
+          input.value = "";
+        }
+        return;
+      }
       const finalText = text || (input ? input.value : "");
       const targetWindow = this.compositionWindow || this.compositionTargetWindow();
 
@@ -1021,6 +1104,24 @@
       this.compositionText = "";
       this.queueCompositionEvent(COMPOSITION_END, finalText, targetWindow);
       this.flushInputText(finalText || undefined, targetWindow);
+    },
+
+    /**
+     * @param {number=} window
+     * @returns {number}
+     */
+    cancelComposition(window = 0) {
+      if (window !== 0 && window !== this.compositionWindow) {
+        return 0;
+      }
+      this.composing = false;
+      this.compositionCancelled = true;
+      this.compositionWindow = 0;
+      this.compositionText = "";
+      if (this.inputElement) {
+        this.inputElement.value = "";
+      }
+      return 0;
     },
 
     /**

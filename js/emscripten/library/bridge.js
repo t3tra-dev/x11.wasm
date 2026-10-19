@@ -32,6 +32,7 @@
       "bell",
       "clearWindow",
       "clearWindowArea",
+      "cancelComposition",
       "clearWindowMetadata",
       "configureWindow",
       "copyArea",

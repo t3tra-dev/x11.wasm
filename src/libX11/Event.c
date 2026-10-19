@@ -235,6 +235,41 @@ BrowserDeactivateKeyboardGrab(void)
     BrowserSyncKeyboardGrabState();
 }
 
+void
+BrowserReleaseInputForUnviewableWindow(
+    X11WasmResource *resourcePtr)
+{
+    Window window;
+
+    if ((resourcePtr == NULL)
+	    || (resourcePtr == &x11wasm_browserDisplay.rootResource)) {
+	return;
+    }
+    window = (Window)resourcePtr->id;
+    if (BrowserWindowInTree(x11wasm_browserDisplay.pointerGrabWindow, window)
+	    || BrowserWindowInTree(
+		    x11wasm_browserDisplay.pointerGrabConfineWindow, window)) {
+	BrowserDeactivatePointerGrab();
+    }
+    if (BrowserWindowInTree(x11wasm_browserDisplay.keyboardGrabWindow, window)) {
+	BrowserDeactivateKeyboardGrab();
+    }
+    if (BrowserWindowInTree(x11wasm_browserDisplay.pointerCaptureWindow, window)) {
+	x11wasm_browserDisplay.pointerCaptureWindow = None;
+	BrowserSyncPointerState();
+    }
+    if (x11wasm_focusedInputContext != NULL) {
+	XIC inputContext = x11wasm_focusedInputContext;
+
+	if (BrowserWindowInTree(BrowserInputContextWindow(inputContext), window)
+		|| BrowserWindowInTree(inputContext->clientWindow, window)) {
+	    BrowserDiscardICCompositionEvents(inputContext);
+	    XUnsetICFocus(inputContext);
+	    BrowserClearICPreeditText(inputContext);
+	}
+    }
+}
+
 static X11WasmPassiveButtonGrab *
 BrowserFindPassiveButtonGrab(
     Window eventWindow,
@@ -1367,6 +1402,18 @@ BrowserReleasePassiveKeyboardGrabIfIdle(void)
 	}
     }
     BrowserDeactivateKeyboardGrab();
+}
+
+EMSCRIPTEN_KEEPALIVE int
+X11WasmCancelPointerInput(void)
+{
+    BrowserInitDisplay();
+    x11wasm_browserDisplay.pointerCaptureWindow = None;
+    x11wasm_browserDisplay.pointerState &= ~(Button1Mask | Button2Mask
+	    | Button3Mask | Button4Mask | Button5Mask);
+    BrowserReleasePassivePointerGrabIfIdle(0);
+    BrowserSyncPointerState();
+    return 0;
 }
 
 void
