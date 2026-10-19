@@ -1,4 +1,6 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
 const { execFileSync } = require("node:child_process");
 const path = require("node:path");
 const { test } = require("node:test");
@@ -8,7 +10,8 @@ const configPath = path.resolve(__dirname, "../../playwright.config.js");
 function readConfig(overrides = {}) {
   const env = { ...process.env };
   for (const name of ["PLAYWRIGHT_PORT", "PLAYWRIGHT_BROWSER_DIR",
-    "PLAYWRIGHT_CHANNEL", "PLAYWRIGHT_REUSE_SERVER"]) {
+    "PLAYWRIGHT_CHANNEL", "PLAYWRIGHT_REUSE_SERVER",
+    "PLAYWRIGHT_CHROME_STDIO_DIR", "PLAYWRIGHT_CHROME_EXECUTABLE"]) {
     delete env[name];
   }
   return JSON.parse(execFileSync(process.execPath,
@@ -35,6 +38,29 @@ test("isolated runs can select their port, browser and read-only artifacts", () 
   assert.equal(config.webServer.command,
     "python3 -m http.server 8811 --bind 127.0.0.1 -d '/tmp/browser'\\''s build $data'");
   assert.equal(config.workers, undefined);
+  assert.equal(config.use.launchOptions, undefined);
+});
+
+test("Chrome stdio wrapper is an explicit per-run launch option", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "chrome-config-"));
+  try {
+    const logs = path.join(root, "browser's logs");
+    const config = readConfig({ PLAYWRIGHT_CHANNEL: "chrome",
+      PLAYWRIGHT_CHROME_STDIO_DIR: logs, PLAYWRIGHT_CHROME_EXECUTABLE: process.execPath });
+    const wrapper = config.use.launchOptions.executablePath;
+    assert.equal(config.use.channel, "chrome");
+    assert.ok(wrapper.startsWith(logs + path.sep));
+    assert.match(fs.readFileSync(wrapper, "utf8"), /"\$@"/);
+    assert.deepEqual(Object.keys(config.use.launchOptions), ["executablePath"]);
+    assert.equal(fs.statSync(wrapper).mode & 0o777, 0o700);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("stdio isolation does not silently switch browser channels", () => {
+  assert.throws(() => readConfig({ PLAYWRIGHT_CHROME_STDIO_DIR: os.tmpdir() }),
+    /requires PLAYWRIGHT_CHANNEL=chrome/);
 });
 
 test("invalid ports fail before starting a server", () => {
