@@ -332,7 +332,16 @@
           }
         }, { ...options, passive: false });
       }
-      view.addEventListener("blur", () => this.cancelWindowManagerGesture(), options);
+      view.addEventListener("blur", (event) => {
+        const destination = event.relatedTarget;
+        if (event.target === this.inputElement && destination instanceof view.Element &&
+            this.rootElement?.contains(destination) && destination.closest(`[${DECORATION}]`)) {
+          // Decoration focus is browser UI focus, not a native client FocusOut.
+          event.stopImmediatePropagation();
+          return;
+        }
+        this.cancelWindowManagerGesture();
+      }, options);
       this.managerObserver = new view.MutationObserver((records) => {
         if (records.some((record) => record.type === "childList" ||
             (record.target instanceof view.Element && record.target.hasAttribute(RESOURCE_ATTR)))) {

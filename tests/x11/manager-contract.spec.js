@@ -411,3 +411,22 @@ test("shared hint correction stays on feasible base increment and aspect lattice
   });
   expect(result).toEqual({ samples: 210, invalid: [] });
 });
+
+test("keyboard decoration focus does not clear the native client's focus", async ({ page }) => {
+  await createManagerContract(page);
+  const result = await page.evaluate(() => {
+    const { backend, module, calls } = /** @type {any} */ (window).managerContract;
+    module._X11WasmManagerCloseWindow = () => 0;
+    module._X11WasmQueueFocusEvent = (...args) => { calls.push(args); return 1; };
+    backend.createWindow(2, 1, 40, 60, 200, 120, 24, 0);
+    backend.setWindowProtocols(2, "WM_DELETE_WINDOW");
+    backend.mapWindow(2); backend.flush();
+    backend.focusInput(true, 2);
+    const close = backend.managerFrames.get(2).close;
+    close.focus();
+    close.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" }));
+    return { focusEvents: calls, browserFocus: document.activeElement === backend.inputElement,
+      clientFocus: backend.focusedWindow };
+  });
+  expect(result).toEqual({ focusEvents: [], browserFocus: true, clientFocus: 2 });
+});
