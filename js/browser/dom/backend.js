@@ -172,7 +172,6 @@
       /** @type {MutationObserver | null} */
       this.managerObserver = null;
       this.managerSyncing = false;
-      this.managerPlaced = new Set();
       /** @private @type {Map<number, string>} */
       this.cursors = new Map();
       /** @private @type {string | null} */

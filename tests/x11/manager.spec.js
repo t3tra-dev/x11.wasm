@@ -7,7 +7,6 @@ async function loadManagerBackend(page) {
   for (const path of X11_WASM_DOM_SOURCES) {
     await page.addScriptTag({ content: fs.readFileSync(path, "utf8") });
   }
-  await page.addScriptTag({ content: fs.readFileSync("js/browser/dom/manager.js", "utf8") });
 }
 
 async function createManagedBackend(page) {
@@ -86,7 +85,7 @@ test("native identity decorates a wrapper once without shifting client coordinat
   await expect(page.locator(".x11-wasm-window-title")).toHaveText("Client title");
 });
 
-test("only normal root InputOutput non-Widget windows are eligible", async ({ page }) => {
+test("native identity excludes root InputOnly, override and menu windows", async ({ page }) => {
   await createManagedBackend(page);
   const result = await page.evaluate(() => {
     const { backend } = /** @type {any} */ (window).managerTest;
@@ -101,7 +100,7 @@ test("only normal root InputOutput non-Widget windows are eligible", async ({ pa
     backend.syncWindowManager();
     return Array.from(backend.managerFrames.keys());
   });
-  expect(result).toEqual([2, 13]);
+  expect(result).toEqual([2, 11, 13]);
 });
 
 test("dynamic titles are text and close can be refused without destroying the window", async ({ page }) => {

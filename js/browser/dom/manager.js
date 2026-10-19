@@ -74,17 +74,19 @@
           const identity = this.windowManagerIdentity(resource.id);
           const metadata = identity && this.resources.get(identity.metadataId);
           if (!identity || identity.frameId !== resource.id || !metadata ||
-              metadata.wmClass === "Widget" || metadata.wmClassName === "Widget" ||
               metadata.overrideRedirect || metadata.windowClass !== 1 ||
               (metadata.windowTypes.length &&
-                !metadata.windowTypes.includes("_NET_WM_WINDOW_TYPE_NORMAL"))) {
+                !metadata.windowTypes.some((type) => ["_NET_WM_WINDOW_TYPE_NORMAL",
+                  "_NET_WM_WINDOW_TYPE_DIALOG", "_NET_WM_WINDOW_TYPE_UTILITY"].includes(type)))) {
             continue;
           }
           eligible.add(resource.id);
           const frame = this.managerFrames.get(resource.id) ||
             this.createWindowManagerFrame(resource, identity);
           if (frame) {
+            this.setWindowManagerGeometryOwned(frame.identity, false);
             frame.identity = identity;
+            this.setWindowManagerGeometryOwned(identity, true);
             this.syncWindowManagerFrame(resource, frame, metadata);
           }
         }
@@ -99,6 +101,14 @@
         }
       } finally {
         this.managerSyncing = false;
+      }
+    },
+
+    /** @param {X11WasmDOMManagerIdentity} identity @param {boolean} owned */
+    setWindowManagerGeometryOwned(identity, owned) {
+      for (const id of [identity.frameId, identity.metadataId]) {
+        const resource = this.resources.get(id);
+        if (resource) resource.managerGeometryOwned = owned;
       }
     },
 
@@ -180,6 +190,7 @@
       const frame = this.managerFrames.get(id);
       if (!frame) return;
       if (this.managerGesture?.id === id) this.cancelWindowManagerGesture();
+      this.setWindowManagerGeometryOwned(frame.identity, false);
       this.managerFrames.delete(id);
       const resource = this.resources.get(id);
       const client = resource?.element;
