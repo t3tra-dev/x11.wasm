@@ -262,6 +262,7 @@ extern int X11WasmJsFillPolygon(unsigned int drawable, unsigned long pixel,
 	const int *points, int pointCount, int fillRule);
 extern int X11WasmJsDrawText(unsigned int drawable, unsigned long pixel,
 	int x, int y, const char *utf8, int utf8Length);
+/* Nonnegative pixel width (including zero) on success, -1 if unavailable. */
 extern int X11WasmJsMeasureText(int fontPixelSize, const char *fontFamily,
 	const char *utf8, int utf8Length);
 extern int X11WasmJsPutImage(unsigned int drawable, const void *data,
@@ -645,7 +646,7 @@ X11WasmJsMeasureText(int fontPixelSize, const char *fontFamily,
     (void)fontFamily;
     (void)utf8;
     (void)utf8Length;
-    return 0;
+    return -1;
 }
 static inline int
 X11WasmJsSetWindowTitle(unsigned int window, const char *utf8, int utf8Length,

@@ -212,18 +212,19 @@
       X11WasmBridge.getDiagnostics();
     },
 
-    call: function (method, args) {
+    call: function (method, args, unavailableResult) {
+      var unavailable = unavailableResult === undefined ? 0 : unavailableResult;
       var backend = X11WasmBridge.getBackend();
       if (!backend) {
         X11WasmBridge.recordMissing(method, "backend");
-        return 0;
+        return unavailable;
       }
       if (typeof backend[method] !== "function") {
         X11WasmBridge.recordMissing(method, "method");
-        return 0;
+        return unavailable;
       }
       var result = backend[method].apply(backend, args);
-      return result === undefined ? 0 : result;
+      return result === undefined ? unavailable : result;
     },
   },
   });

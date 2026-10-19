@@ -112,9 +112,15 @@
       // @ts-ignore UTF8ToString is provided by Emscripten generated code.
       text = UTF8ToString(utf8, utf8Length);
     }
-    return (
-      X11WasmBridge.call("measureText", [fontPixelSize, fontFamily, text]) | 0
-    );
+    try {
+      var args = [fontPixelSize, fontFamily, text];
+      var measured = X11WasmBridge.call("measureText", args, -1);
+      return Number.isInteger(measured) && measured >= 0 && measured <= 2147483647
+        ? measured
+        : -1;
+    } catch (error) {
+      return -1;
+    }
   },
 
   X11WasmJsPutImage__deps: ["$X11WasmBridge"],

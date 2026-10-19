@@ -26,7 +26,7 @@ BrowserFontResourceTextWidth(
 	}
     }
     measured = X11WasmJsMeasureText(pixelSize, family, utf8, length);
-    return (measured > 0) ? measured : fallback;
+    return (measured >= 0) ? measured : fallback;
 }
 
 int

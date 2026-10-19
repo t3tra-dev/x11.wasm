@@ -1474,14 +1474,17 @@
      * @returns {number}
      */
     measureText(fontPixelSize, fontFamily, text) {
+      if (text.length === 0) {
+        return 0;
+      }
       const rootCanvas = this.rootElement?.querySelector(":scope > canvas");
       const canvas =
         rootCanvas instanceof HTMLCanvasElement
           ? rootCanvas
           : this.createCanvas(1, 1);
       const context = canvas.getContext("2d");
-      if (!context || text.length === 0) {
-        return 0;
+      if (!context) {
+        return -1;
       }
       prepareTextContext(context, fontPixelSize, fontFamily);
       return textAdvanceWidth(
