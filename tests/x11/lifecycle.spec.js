@@ -83,12 +83,21 @@ for (const action of ["destroy", "unmap"]) {
       input.value = "late";
       input.dispatchEvent(new InputEvent("input", { inputType: "insertFromComposition", data: "late" }));
       const events = [...host.lifecycleEvents];
+      input.value = "next";
+      input.dispatchEvent(new InputEvent("input", { inputType: "insertText", data: "next" }));
+      backend.handleKeyDown(new KeyboardEvent("keydown", { key: "x" }));
+      backend.updateComposition("late-again");
+      backend.endComposition("late-again");
+      input.value = "late-again";
+      input.dispatchEvent(new InputEvent("input", { inputType: "insertCompositionText", data: "late-again" }));
+      const normal = host.lifecycleEvents.slice(events.length);
       backend.startComposition("fresh");
       backend.endComposition("fresh");
-      return { retired, events, fresh: host.lifecycleEvents.slice(events.length) };
+      return { retired, events, normal, fresh: host.lifecycleEvents.slice(events.length + normal.length) };
     }, action);
     expect(result.retired).toEqual({ composing: false, target: 0, context: 0, focus: 0 });
     expect(result.events).toEqual([[1, "draft", 3]]);
+    expect(result.normal).toEqual([..."next"].map((char) => [2, char, 0]));
     expect(result.fresh).toEqual([
       [1, "fresh", 4], [3, "fresh", 4],
       ...[..."fresh"].map((char) => [2, char, 4]),

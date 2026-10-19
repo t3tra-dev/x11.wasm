@@ -552,7 +552,10 @@
         this.handlePaste(event);
       });
       input.addEventListener("input", (event) => {
-        if (this.compositionCancelled) {
+        if (this.compositionCancelled &&
+          (!(event instanceof InputEvent) || !event.inputType ||
+            event.isComposing || event.inputType === "insertCompositionText" ||
+            event.inputType === "insertFromComposition")) {
           input.value = "";
           return;
         }
@@ -854,7 +857,6 @@
         this.queueImeKeyEvent(KEY_PRESS, event);
         return;
       }
-      this.compositionCancelled = false;
       if (this.isHostPasteShortcut(event)) {
         this.hostPasteShortcutActive = true;
         return;
