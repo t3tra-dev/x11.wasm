@@ -11,6 +11,8 @@ include ninja/x11wasm.ninja
 x11wasm_browser_dist = build/browser
 x11wasm_browser_main = $builddir/browser-main.o
 x11wasm_browser_manager_focus = $builddir/browser-manager-focus.o
+x11wasm_browser_geometry = $builddir/browser-geometry.o
+x11wasm_browser_manager = $builddir/browser-manager.o
 x11wasm_browser_app = $x11wasm_browser_dist/x11.html
 
 rule x11wasm_typecheck_js
@@ -22,7 +24,7 @@ rule x11wasm_compile_commands
   description = generate x11.wasm compile_commands.json
 
 rule x11wasm_link_browser
-  command = root=$$(pwd) && emcache="$x11wasm_emcache" && case "$$emcache" in /*) ;; *) emcache="$$root/$$emcache";; esac && mkdir -p "$$root/$x11wasm_browser_dist" "$$emcache" && EM_CACHE="$$emcache" emcc "$$root/$x11wasm_browser_main" "$$root/$x11wasm_browser_manager_focus" "$$root/$x11wasm_lib" --js-library "$$root/$x11wasm_js_library" --pre-js "$$root/$x11wasm_js_pre" --shell-file "$$root/test/browser/shell.html" -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=0 -sERROR_ON_UNDEFINED_SYMBOLS=1 -sEXPORTED_FUNCTIONS=_main,_malloc,_free -o "$$root/$x11wasm_browser_app"
+  command = root=$$(pwd) && emcache="$x11wasm_emcache" && case "$$emcache" in /*) ;; *) emcache="$$root/$$emcache";; esac && mkdir -p "$$root/$x11wasm_browser_dist" "$$emcache" && EM_CACHE="$$emcache" emcc "$$root/$x11wasm_browser_main" "$$root/$x11wasm_browser_geometry" "$$root/$x11wasm_browser_manager" "$$root/$x11wasm_browser_manager_focus" "$$root/$x11wasm_lib" --js-library "$$root/$x11wasm_js_library" --pre-js "$$root/$x11wasm_js_pre" --shell-file "$$root/test/browser/shell.html" -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=0 -sERROR_ON_UNDEFINED_SYMBOLS=1 -sEXPORTED_FUNCTIONS=_main,_malloc,_free -o "$$root/$x11wasm_browser_app"
   description = link x11.wasm browser harness
 
 build build/typecheck-js.stamp: x11wasm_typecheck_js $
@@ -60,14 +62,19 @@ build build/typecheck-js.stamp: x11wasm_typecheck_js $
   tests/x11/wm.spec.js $
   tests/x11/manager.spec.js $
   tests/x11/manager-contract.spec.js $
+  tests/x11/geometry.spec.js $
+  tests/x11/wm-state.spec.js $
   tests/x11/zero-width.spec.js $
+  tests/x11/manager-native.spec.js $
   playwright.config.js
 build build/compile_commands.json: x11wasm_compile_commands tools/gen_compile_commands.py build.ninja ninja/x11wasm.ninja
 build $x11wasm_browser_main: x11wasm_compile_c test/browser/main.c | $x11wasm_xlib_common_deps
 build $x11wasm_browser_manager_focus: x11wasm_compile_c test/browser/manager-focus.c | $x11wasm_xlib_common_deps
-build $x11wasm_browser_app: x11wasm_link_browser $x11wasm_browser_main $x11wasm_browser_manager_focus $x11wasm_lib build/typecheck-js.stamp $x11wasm_js_library $x11wasm_js_pre test/browser/shell.html | x11wasm_header_tests
+build $x11wasm_browser_geometry: x11wasm_compile_c test/browser/geometry.c | $x11wasm_xlib_common_deps
+build $x11wasm_browser_manager: x11wasm_compile_c test/browser/manager.c | $x11wasm_xlib_common_deps
+build $x11wasm_browser_app: x11wasm_link_browser $x11wasm_browser_main $x11wasm_browser_geometry $x11wasm_browser_manager $x11wasm_browser_manager_focus $x11wasm_lib build/typecheck-js.stamp $x11wasm_js_library $x11wasm_js_pre test/browser/shell.html | x11wasm_header_tests
 build $builddir/zero-width.o: x11wasm_compile_c test/browser/zero-width.c | $x11wasm_xlib_common_deps
-build $x11wasm_browser_dist/zero-width.html: x11wasm_link_browser $builddir/zero-width.o $x11wasm_browser_manager_focus $x11wasm_lib build/typecheck-js.stamp $x11wasm_js_library $x11wasm_js_pre test/browser/shell.html | x11wasm_header_tests
+build $x11wasm_browser_dist/zero-width.html: x11wasm_link_browser $builddir/zero-width.o $x11wasm_browser_geometry $x11wasm_browser_manager $x11wasm_browser_manager_focus $x11wasm_lib build/typecheck-js.stamp $x11wasm_js_library $x11wasm_js_pre test/browser/shell.html | x11wasm_header_tests
   x11wasm_browser_main = $builddir/zero-width.o
   x11wasm_browser_app = $x11wasm_browser_dist/zero-width.html
 build $x11wasm_browser_dist/LICENSE $

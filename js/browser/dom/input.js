@@ -691,7 +691,9 @@
      * @returns {{x: number, y: number}}
      */
     eventRootCoordinates(event) {
-      const element = this.rootElement;
+      const active = this.document && this.document.fullscreenElement;
+      const element = active && this.fullscreenResourceForElement(active)
+        ? active : this.rootElement;
       if (!element) {
         return { x: 0, y: 0 };
       }
