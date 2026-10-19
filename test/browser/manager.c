@@ -1,5 +1,6 @@
 #include <X11/XlibWasm.h>
 #include <X11/Xatom.h>
+#include "../../src/libX11/XlibInt.h"
 #include <emscripten.h>
 #include <string.h>
 
@@ -128,6 +129,8 @@ X11WasmTestManagerOptions(unsigned int window, int option, int value)
 	XSetWMNormalHints(display, window, &hints);
 	return 1;
     }
+    if (option == 10) return (int)(value ? x11wasm_browserDisplay.focusTime : x11wasm_eventTime);
+    if (option == 11) return XSetInputFocus(display, window, RevertToParent, (Time)(uint32_t)value);
     return 0;
 }
 
