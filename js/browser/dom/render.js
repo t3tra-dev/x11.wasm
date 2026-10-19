@@ -749,6 +749,13 @@ scheduleFlush() {
       if (!resource.element) {
         return;
       }
+      if (resource.nativeGeometry && !resource.syncingNativeGeometry) {
+        if (resource.geometryDirty) {
+          this.flushResourceGeometry(resource);
+          return;
+        }
+        this.syncNativeWindowStateGeometry(resource);
+      }
       const iconProxyOwner = this.activeIconProxyOwner(resource);
       const geometry = this.windowDisplayGeometry(resource, iconProxyOwner);
       const displayable = this.isResourceDisplayable(resource, iconProxyOwner);
@@ -806,7 +813,7 @@ scheduleFlush() {
           height: resource.height,
         };
       }
-      if (!resource.zoomed && !resource.fullscreen) {
+      if (resource.nativeGeometry || (!resource.zoomed && !resource.fullscreen)) {
         return {
           x: resource.x,
           y: resource.y,
@@ -818,6 +825,49 @@ scheduleFlush() {
         return this.windowStateFillGeometry(resource);
       }
       return this.windowZoomGeometry(resource);
+    },
+
+    /**
+     * @param {X11WasmDOMResource} resource
+     */
+    syncNativeWindowStateGeometry(resource) {
+      const configure = this.module && this.module["_X11WasmConfigureWindow"];
+      const expanded = resource.zoomed || resource.fullscreen;
+      if (typeof configure !== "function" || (!expanded && !resource.normalGeometry)) {
+        return;
+      }
+      if (expanded && !resource.normalGeometry) {
+        resource.normalGeometry = {
+          x: resource.x,
+          y: resource.y,
+          width: resource.width,
+          height: resource.height,
+        };
+      }
+      const geometry = expanded
+        ? (resource.fullscreen
+          ? this.windowStateFillGeometry(resource)
+          : this.windowZoomGeometry(resource))
+        : resource.normalGeometry;
+      if (!geometry) {
+        return;
+      }
+      if (geometry.x !== resource.x || geometry.y !== resource.y ||
+          geometry.width !== resource.width || geometry.height !== resource.height) {
+        // Re-enter the normal C configure path before changing CSS or canvas size.
+        resource.syncingNativeGeometry = true;
+        try {
+          if (configure(resource.id, geometry.x, geometry.y,
+              geometry.width, geometry.height, 15)) {
+            this.flushResourceGeometry(resource);
+          }
+        } finally {
+          resource.syncingNativeGeometry = false;
+        }
+      }
+      if (!expanded) {
+        resource.normalGeometry = undefined;
+      }
     },
 
     /**
@@ -905,6 +955,13 @@ scheduleFlush() {
      * @returns {{ width: number, height: number }}
      */
     windowStateBounds(resource) {
+      const view = this.document && this.document.defaultView;
+      if (resource.nativeGeometry && resource.fullscreen && view) {
+        return {
+          width: positiveInt(view.innerWidth, resource.width),
+          height: positiveInt(view.innerHeight, resource.height),
+        };
+      }
       const rootResource = this.resources.get(this.rootWindow);
       const parentResource = resource.fullscreen
         ? rootResource
@@ -1257,7 +1314,7 @@ syncTransientStacking() {
       if (!element) {
         return;
       }
-      if (!hints) {
+      if (!hints || resource.nativeGeometry) {
         element.style.minWidth = "";
         element.style.minHeight = "";
         element.style.maxWidth = "";

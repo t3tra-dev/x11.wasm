@@ -23,6 +23,10 @@ typedef int (*XAfterFunction)(Display *display);
 extern "C" {
 #endif
 
+/* Exact browser geometry synchronization; size hints belong to manager actions. */
+extern int X11WasmConfigureWindow(unsigned int window, int x, int y,
+	unsigned int width, unsigned int height, unsigned int valueMask);
+
 extern int XSetDashes(Display *display, GC gc, int dash_offset,
 	_Xconst char *dash_list, int n);
 extern XModifierKeymap *XDeleteModifiermapEntry(XModifierKeymap *x,
