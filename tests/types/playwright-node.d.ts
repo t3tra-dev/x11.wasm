@@ -85,6 +85,9 @@ declare module "@playwright/test" {
 
   export interface Expect {
     (actual: unknown, message?: string): Matchers;
+    poll(actual: () => unknown | Promise<unknown>, options?: {
+      timeout?: number; intervals?: number[];
+    }): Matchers;
     any(constructor: unknown): unknown;
     objectContaining(value: unknown): unknown;
   }

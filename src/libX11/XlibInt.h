@@ -2234,6 +2234,10 @@ Window BrowserWindowMetadataTarget(
     Window window);
 Window BrowserWindowStateSource(
     Window window);
+X11WasmResource *BrowserManagerWindowResource(Window window,
+    Window *metadataReturn);
+Window BrowserWindowProtocolTarget(X11WasmResource *resourcePtr,
+    Atom protocolAtom);
 Atom BrowserWindowOpacityAtom(void);
 X11WasmResource *BrowserWindowParentResource(
     X11WasmResource *resourcePtr);
