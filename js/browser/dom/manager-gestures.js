@@ -31,6 +31,22 @@
         y: !(fixed && hints.minHeight === hints.maxHeight) };
     },
 
+    /** @param {X11WasmDOMResource} metadata @param {number} width @param {number} height
+     * @param {number=} widthLimit @param {number=} heightLimit
+     * @returns {{ width: number, height: number } | null} */
+    constrainWindowManagerSize(metadata, width, height, widthLimit = 65535, heightLimit = 65535) {
+      if (widthLimit < 1 || heightLimit < 1) return null;
+      const hints = metadata.sizeHints;
+      const flags = hints?.flags || 0;
+      const maxWidth = Math.min(65535, Math.floor(widthLimit),
+        hints && (flags & P_MAX_SIZE) && hints.maxWidth > 0 ? hints.maxWidth : 65535);
+      const maxHeight = Math.min(65535, Math.floor(heightLimit),
+        hints && (flags & P_MAX_SIZE) && hints.maxHeight > 0 ? hints.maxHeight : 65535);
+      const size = this.constrainSizeByHints({ ...hints, flags: flags | P_MAX_SIZE,
+        maxWidth, maxHeight }, width, height);
+      return size.width > maxWidth || size.height > maxHeight ? null : size;
+    },
+
     /** @param {PointerEvent} event @param {Element} decoration */
     beginWindowManagerGesture(event, decoration) {
       const action = decoration.getAttribute(DECORATION) || "";
@@ -104,8 +120,8 @@
         const south = axes.y && gesture.edge.includes("s");
         if (west || east) width = Math.max(1, width + (west ? -dx : dx));
         if (north || south) height = Math.max(1, height + (north ? -dy : dy));
-        const constrained = metadata.sizeHints
-          ? this.constrainSizeByHints(metadata.sizeHints, width, height) : { width, height };
+        const constrained = this.constrainWindowManagerSize(metadata, width, height);
+        if (!constrained) { this.cancelWindowManagerGesture(); return; }
         width = constrained.width;
         height = constrained.height;
         if (west) x += gesture.width - width;
