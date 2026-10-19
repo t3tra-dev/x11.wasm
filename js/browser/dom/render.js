@@ -836,12 +836,16 @@ scheduleFlush() {
       if (typeof configure !== "function" || (!expanded && !resource.normalGeometry)) {
         return;
       }
+      const target = this.nativeWindowGeometryResource(resource);
+      if (target !== resource && target.geometryDirty) {
+        this.flushResourceGeometry(target);
+      }
       if (expanded && !resource.normalGeometry) {
         resource.normalGeometry = {
-          x: resource.x,
-          y: resource.y,
-          width: resource.width,
-          height: resource.height,
+          x: target.x,
+          y: target.y,
+          width: target.width,
+          height: target.height,
         };
       }
       const geometry = expanded
@@ -852,14 +856,14 @@ scheduleFlush() {
       if (!geometry) {
         return;
       }
-      if (geometry.x !== resource.x || geometry.y !== resource.y ||
-          geometry.width !== resource.width || geometry.height !== resource.height) {
+      if (geometry.x !== target.x || geometry.y !== target.y ||
+          geometry.width !== target.width || geometry.height !== target.height) {
         // Re-enter the normal C configure path before changing CSS or canvas size.
         resource.syncingNativeGeometry = true;
         try {
-          if (configure(resource.id, geometry.x, geometry.y,
+          if (configure(target.id, geometry.x, geometry.y,
               geometry.width, geometry.height, 15)) {
-            this.flushResourceGeometry(resource);
+            this.flushResourceGeometry(target);
           }
         } finally {
           resource.syncingNativeGeometry = false;
@@ -868,6 +872,17 @@ scheduleFlush() {
       if (!expanded) {
         resource.normalGeometry = undefined;
       }
+    },
+
+    /** @param {X11WasmDOMResource} resource @returns {X11WasmDOMResource} */
+    nativeWindowGeometryResource(resource) {
+      let target = resource;
+      while (target.parent && target.parent !== this.rootWindow) {
+        const parent = this.resources.get(target.parent);
+        if (!parent || parent.kind !== "window" || !parent.nativeGeometry) break;
+        target = parent;
+      }
+      return target;
     },
 
     /**
@@ -956,7 +971,11 @@ scheduleFlush() {
      */
     windowStateBounds(resource) {
       const view = this.document && this.document.defaultView;
-      if (resource.nativeGeometry && resource.fullscreen && view) {
+      const target = resource.nativeGeometry
+        ? this.nativeWindowGeometryResource(resource) : resource;
+      const active = this.document && this.document.fullscreenElement;
+      if (resource.nativeGeometry && resource.fullscreen && view && active &&
+          (active === resource.element || active === target.element)) {
         return {
           width: positiveInt(view.innerWidth, resource.width),
           height: positiveInt(view.innerHeight, resource.height),
@@ -965,7 +984,7 @@ scheduleFlush() {
       const rootResource = this.resources.get(this.rootWindow);
       const parentResource = resource.fullscreen
         ? rootResource
-        : this.resources.get(resource.parent) || rootResource;
+        : this.resources.get(target.parent) || rootResource;
       const boundsResource =
         parentResource && parentResource.kind !== "pixmap"
           ? parentResource
