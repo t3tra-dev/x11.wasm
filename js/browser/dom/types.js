@@ -212,6 +212,7 @@
  * @property {HTMLElement} title
  * @property {HTMLImageElement} icon
  * @property {HTMLButtonElement} close
+ * @property {HTMLElement[]} handles
  */
 
 /**
@@ -226,4 +227,5 @@
  * @property {number} y
  * @property {number} width
  * @property {number} height
+ * @property {string=} lastCandidate
  */

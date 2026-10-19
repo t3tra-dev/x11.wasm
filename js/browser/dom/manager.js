@@ -10,7 +10,7 @@
   "use strict";
 
   const privateApi = global["X11WasmDOMPrivate"];
-  const { X11WasmDOMBackend, RESOURCE_ATTR, CW_X, CW_Y } = privateApi;
+  const { X11WasmDOMBackend, RESOURCE_ATTR } = privateApi;
   const TITLE_HEIGHT = 28;
   const DECORATION = "data-x11-wasm-decoration";
   const MANAGED_TYPES = ["NORMAL", "DIALOG", "UTILITY"];
@@ -148,7 +148,15 @@
       titlebar.append(icon, title, close);
       client.parentElement.insertBefore(element, client);
       element.append(titlebar, client);
-      const frame = { identity, element, titlebar, title, icon, close };
+      const handles = ["n", "ne", "e", "se", "s", "sw", "w", "nw"].map((edge) => {
+        const handle = document.createElement("div");
+        handle.className = `x11-wasm-resize x11-wasm-resize-${edge}`;
+        handle.setAttribute(DECORATION, `resize-${edge}`);
+        handle.setAttribute("aria-hidden", "true");
+        element.append(handle);
+        return handle;
+      });
+      const frame = { identity, element, titlebar, title, icon, close, handles };
       this.managerFrames.set(resource.id, frame);
       return frame;
     },
@@ -186,6 +194,13 @@
       if (!iconHref) frame.icon.removeAttribute("src");
       frame.close.disabled = !frame.identity.protocolId ||
         !metadata.protocols.includes("WM_DELETE_WINDOW") || this.windowManagerActionsBlocked();
+      const axes = this.windowManagerResizable(metadata);
+      for (const handle of frame.handles) {
+        const edge = handle.getAttribute(DECORATION) || "";
+        handle.hidden = metadata.zoomed || metadata.fullscreen || resource.zoomed || resource.fullscreen ||
+          this.windowManagerActionsBlocked() ||
+          !((/[ew]/.test(edge.slice(7)) && axes.x) || (/[ns]/.test(edge.slice(7)) && axes.y));
+      }
       const focused = this.resources.get(this.focusedWindow);
       const active = focused && this.stackingResourceFor(focused).id === resource.id;
       const activeText = active ? "1" : "0";
@@ -308,88 +323,5 @@
         ? activate(id, Math.max(0, Math.floor(time))) : 0;
     },
 
-    /**
-     * @param {number} id @param {number} x @param {number} y
-     * @param {number} width @param {number} height @param {number} mask
-     */
-    configureWindowManager(id, x, y, width, height, mask) {
-      const configure = this.module?.["_X11WasmManagerConfigureWindow"];
-      if (this.windowManagerActionsBlocked() || typeof configure !== "function") return 0;
-      const result = configure(id, x, y, width, height, mask);
-      if (result) this.flush();
-      return result;
-    },
-
-    /** @param {PointerEvent} event @param {Element} decoration */
-    beginWindowManagerGesture(event, decoration) {
-      if (this.managerGesture || this.windowManagerActionsBlocked() ||
-          event.button !== 0 || !event.isPrimary ||
-          decoration.getAttribute(DECORATION) !== "move" ||
-          typeof this.module?.["_X11WasmManagerConfigureWindow"] !== "function") return;
-      const id = Number(decoration.closest("[data-x11-wasm-frame]")?.getAttribute("data-x11-wasm-frame"));
-      const resource = this.resources.get(id);
-      const frame = this.managerFrames.get(id);
-      if (!resource || !frame || !resource.mapped || resource.zoomed || resource.fullscreen) return;
-      this.activateWindowManagerFrame(id, event.timeStamp);
-      const position = this.windowManagerPointerPosition(event);
-      this.managerGesture = { id, pointerId: event.pointerId, capture: frame.titlebar,
-        edge: "move", startX: position.x, startY: position.y,
-        x: resource.x, y: resource.y, width: resource.width, height: resource.height };
-      try {
-        frame.titlebar.setPointerCapture(event.pointerId);
-      } catch (error) {
-        // Synthetic pointers cannot capture; window listeners still isolate input.
-      }
-    },
-
-    /** @param {PointerEvent} event @returns {{ x: number, y: number }} */
-    windowManagerPointerPosition(event) {
-      const rect = this.rootElement.getBoundingClientRect();
-      const root = this.resources.get(this.rootWindow);
-      return { x: (event.clientX - rect.left) * root.width / (rect.width || root.width),
-        y: (event.clientY - rect.top) * root.height / (rect.height || root.height) };
-    },
-
-    /** @param {PointerEvent} event */
-    moveWindowManagerGesture(event) {
-      const gesture = this.managerGesture;
-      if (!gesture || event.pointerId !== gesture.pointerId) return;
-      if (this.windowManagerActionsBlocked() ||
-          (event.pointerType === "mouse" && event.buttons === 0)) {
-        this.cancelWindowManagerGesture();
-        return;
-      }
-      const position = this.windowManagerPointerPosition(event);
-      if (!this.configureWindowManager(gesture.id,
-          gesture.x + Math.round(position.x - gesture.startX),
-          gesture.y + Math.round(position.y - gesture.startY),
-          gesture.width, gesture.height, CW_X | CW_Y)) {
-        this.cancelWindowManagerGesture();
-      }
-    },
-
-    /** @param {number} id */
-    cancelWindowManagerResource(id) {
-      const gesture = this.managerGesture;
-      const resource = this.resources.get(id);
-      if (gesture && (gesture.id === id || (resource &&
-          this.stackingResourceFor(resource).id === gesture.id))) {
-        this.cancelWindowManagerGesture();
-      }
-    },
-
-    cancelWindowManagerGesture() {
-      const gesture = this.managerGesture;
-      this.managerGesture = null;
-      if (gesture) {
-        try {
-          if (gesture.capture.hasPointerCapture(gesture.pointerId)) {
-            gesture.capture.releasePointerCapture(gesture.pointerId);
-          }
-        } catch (error) {
-          // Capture can already be released by removal or a browser cancellation.
-        }
-      }
-    },
   }));
 })(typeof globalThis !== "undefined" ? globalThis : window);

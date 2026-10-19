@@ -780,6 +780,19 @@
 .x11-wasm-close:hover:enabled { background: #ac2430; color: white; }
 .x11-wasm-close:disabled { opacity: .4; cursor: default; }
 .x11-wasm-close:focus-visible { outline: 2px solid currentColor; outline-offset: -3px; }
+.x11-wasm-resize { position: absolute; z-index: 2; touch-action: none; }
+.x11-wasm-resize[hidden] { display: none; }
+.x11-wasm-resize-n, .x11-wasm-resize-s { left: 6px; right: 6px; height: 6px; cursor: ns-resize; }
+.x11-wasm-resize-n { top: -3px; }
+.x11-wasm-resize-s { bottom: -3px; }
+.x11-wasm-resize-e, .x11-wasm-resize-w { top: 6px; bottom: 6px; width: 6px; cursor: ew-resize; }
+.x11-wasm-resize-e { right: -3px; }
+.x11-wasm-resize-w { left: -3px; }
+.x11-wasm-resize-ne, .x11-wasm-resize-nw, .x11-wasm-resize-se, .x11-wasm-resize-sw { width: 9px; height: 9px; }
+.x11-wasm-resize-ne { right: -3px; top: -3px; cursor: nesw-resize; }
+.x11-wasm-resize-sw { left: -3px; bottom: -3px; cursor: nesw-resize; }
+.x11-wasm-resize-nw { left: -3px; top: -3px; cursor: nwse-resize; }
+.x11-wasm-resize-se { right: -3px; bottom: -3px; cursor: nwse-resize; }
 .x11-wasm-root.x11-wasm-pointer-grab,
 .x11-wasm-root.x11-wasm-pointer-grab * {
   cursor: var(--x11-wasm-pointer-grab-cursor, auto) !important;

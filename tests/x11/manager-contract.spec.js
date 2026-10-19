@@ -101,3 +101,80 @@ test("titlebar uses bundled icons and keeps long titles inside narrow frames", a
   });
   expect(result).toEqual({ hasIcon: true, samples: [true, true, true, true], paths: 2, label: "Close" });
 });
+
+test("all eight resize edges preserve their opposite client anchor", async ({ page }) => {
+  await createManagerContract(page);
+  const result = await page.evaluate(() => {
+    const { backend, calls } = /** @type {any} */ (window).managerContract;
+    backend.createWindow(2, 1, 40, 60, 200, 120, 24, 0);
+    backend.mapWindow(2);
+    backend.flush();
+    const edges = ["n", "ne", "e", "se", "s", "sw", "w", "nw"];
+    for (const edge of edges) {
+      const handle = backend.managerFrames.get(2).element.querySelector(`[data-x11-wasm-decoration="resize-${edge}"]`);
+      if (!handle) return { missing: edge };
+      handle.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 9,
+        button: 0, isPrimary: true, clientX: 100, clientY: 100 }));
+      handle.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, pointerId: 9,
+        buttons: 1, clientX: 120, clientY: 110 }));
+      handle.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 9 }));
+    }
+    return calls;
+  });
+  expect(result).toEqual([
+    [2, 40, 70, 200, 110, 10], [2, 40, 70, 220, 110, 14],
+    [2, 40, 60, 220, 120, 4], [2, 40, 60, 220, 130, 12],
+    [2, 40, 60, 200, 130, 8], [2, 60, 60, 180, 130, 13],
+    [2, 60, 60, 180, 120, 5], [2, 60, 70, 180, 110, 15],
+  ]);
+});
+
+test("resize uses metadata min max base increments and fixed axes", async ({ page }) => {
+  await createManagerContract(page);
+  const result = await page.evaluate(() => {
+    const { backend, module, calls } = /** @type {any} */ (window).managerContract;
+    module._X11WasmManagerWindowIdentity = (id, field) => id === 2 || id === 3 ? (field ? 3 : 2) : 0;
+    backend.createWindow(2, 1, 40, 60, 200, 120, 24, 0);
+    backend.createWindow(3, 2, 0, 0, 200, 120, 24, 0);
+    const metadata = backend.resources.get(3);
+    metadata.sizeHints = { flags: 16 | 32 | 64 | 256, minWidth: 100, minHeight: 120,
+      maxWidth: 240, maxHeight: 120, baseWidth: 0, baseHeight: 0, widthInc: 20, heightInc: 1 };
+    backend.mapWindow(2);
+    backend.mapWindow(3);
+    backend.flush();
+    const frame = backend.managerFrames.get(2);
+    const west = frame.element.querySelector('[data-x11-wasm-decoration="resize-w"]');
+    west.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 9,
+      button: 0, isPrimary: true, clientX: 100, clientY: 100 }));
+    west.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, pointerId: 9,
+      buttons: 1, clientX: 137, clientY: 150 }));
+    west.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 9 }));
+    return { calls, hidden: frame.element.querySelector('[data-x11-wasm-decoration="resize-n"]').hidden,
+      native: [backend.resources.get(2).x, backend.resources.get(2).width] };
+  });
+  expect(result).toEqual({ calls: [[2, 80, 60, 160, 120, 5]], hidden: true, native: [40, 200] });
+});
+
+test("move coordinates follow root CSS scale page scroll and device pixels", async ({ page }) => {
+  await createManagerContract(page);
+  const result = await page.evaluate(() => {
+    const { backend, calls } = /** @type {any} */ (window).managerContract;
+    document.body.style.height = "2000px";
+    backend.rootElement.style.transformOrigin = "top left";
+    backend.rootElement.style.transform = "scale(0.75, 0.5)";
+    backend.rootElement.style.marginTop = "600px";
+    window.scrollTo(0, 400);
+    backend.createWindow(2, 1, 40, 60, 200, 120, 24, 0);
+    backend.mapWindow(2);
+    backend.flush();
+    const title = backend.managerFrames.get(2).titlebar;
+    const rect = title.getBoundingClientRect();
+    title.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 9,
+      button: 0, isPrimary: true, clientX: rect.left + 10, clientY: rect.top + 10 }));
+    title.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, pointerId: 9,
+      buttons: 1, clientX: rect.left + 40, clientY: rect.top + 30 }));
+    title.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 9 }));
+    return calls;
+  });
+  expect(result).toEqual([[2, 80, 100, 200, 120, 3]]);
+});
