@@ -32,8 +32,7 @@ async function openActualManager(page) {
     if (typeof module.x11WasmBackend?.setWindowManagerEnabled !== "function") missing.push("manager UI");
     return missing;
   });
-  if (process.env.PLAYWRIGHT_REQUIRE_MANAGER === "1") expect(missing).toEqual([]);
-  /** @type {any} */ (test).skip(missing.length > 0, `expected pending: ${missing.join(", ")}`);
+  expect(missing).toEqual([]);
   await page.evaluate(() => /** @type {any} */ (window).Module.x11WasmBackend.setWindowManagerEnabled(true));
 }
 
