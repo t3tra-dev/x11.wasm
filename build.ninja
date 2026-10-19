@@ -63,6 +63,7 @@ build build/typecheck-js.stamp: x11wasm_typecheck_js $
   tests/x11/fullscreen-lifecycle.spec.js $
   tests/x11/manager.spec.js $
   tests/x11/manager-contract.spec.js $
+  tests/x11/manager-actions.spec.js $
   tests/x11/geometry.spec.js $
   tests/x11/wm-state.spec.js $
   tests/x11/zero-width.spec.js $
