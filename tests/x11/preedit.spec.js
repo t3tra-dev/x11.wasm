@@ -107,6 +107,67 @@ test("preedit is hidden while the browser window is blurred", async ({ page }) =
   await expect(preedit).toBeHidden();
 });
 
+for (const [name, x, y] of /** @type {Array<[string, number, number]>} */ (
+  [["right", 78, 14], ["bottom", 5, 17], ["bottom-right", 78, 17]])) {
+  test(`short preedit stays fully visible near the ${name} client edge`, async ({ page }) => {
+    await createBackend(page);
+    await page.evaluate(() => {
+      const backend = /** @type {any} */ (window).preeditBackend;
+      backend.configureWindow(3, 0, 0, 80, 18, 0, 12);
+      backend.flush();
+      backend.setInputContext(true, 3, true, 35, 64);
+    });
+    const preedit = page.locator(".x11-wasm-preedit");
+    const client = page.locator('[data-x11-wasm-xid="3"]');
+    const clip = await client.boundingBox();
+    expect(clip?.width).toBe(80);
+    expect(clip?.height).toBe(18);
+    const blank = await /** @type {any} */ (page).screenshot({ clip });
+    await dispatchComposition(page, "compositionstart", "日本語");
+    await expect(preedit).toBeVisible();
+    const reference = await /** @type {any} */ (page).screenshot({ clip });
+    const referencePixels = await screenshotDifference(page, blank, reference);
+    expect(referencePixels.count).toBeGreaterThan(50);
+    await page.evaluate(({ x, y }) => {
+      const backend = /** @type {any} */ (window).preeditBackend;
+      backend.cancelComposition(3);
+      backend.setInputContext(true, 3, true, 30 + x, 50 + y);
+    }, { x, y });
+    const before = await page.evaluate(() => {
+      const backend = /** @type {any} */ (window).preeditBackend;
+      const resource = backend.resources.get(3);
+      const input = backend.inputElement;
+      return { geometry: [resource.x, resource.y, resource.width, resource.height],
+        inputStyle: input.style.cssText, inputSize: [input.offsetWidth, input.offsetHeight],
+        scroll: [resource.element.scrollLeft, resource.element.scrollTop] };
+    });
+    await dispatchComposition(page, "compositionstart", "日本語");
+    await expect(preedit).toBeVisible();
+    await expect(preedit).toHaveText("日本語");
+    const displayed = await /** @type {any} */ (page).screenshot({ clip });
+    const edgePixels = await screenshotDifference(page, blank, displayed);
+    const rects = await preedit.evaluate((element) => {
+      const text = element.getBoundingClientRect();
+      const backend = /** @type {any} */ (window).preeditBackend;
+      const resource = backend.resources.get(3);
+      const client = resource.element.getBoundingClientRect();
+      const input = backend.inputElement;
+      return { left: text.left, top: text.top, right: text.right, bottom: text.bottom,
+        client: { left: client.left, top: client.top, right: client.right, bottom: client.bottom },
+        state: { geometry: [resource.x, resource.y, resource.width, resource.height],
+          inputStyle: input.style.cssText, inputSize: [input.offsetWidth, input.offsetHeight],
+          scroll: [resource.element.scrollLeft, resource.element.scrollTop] } };
+    });
+    expect(rects.left).toBeGreaterThanOrEqual(rects.client.left);
+    expect(rects.top).toBeGreaterThanOrEqual(rects.client.top);
+    expect(rects.right).toBeLessThanOrEqual(rects.client.right + 0.1);
+    expect(rects.bottom).toBeLessThanOrEqual(rects.client.bottom + 0.1);
+    expect(edgePixels.count, "all three glyphs must remain painted at the edge").toBeGreaterThanOrEqual(referencePixels.count * 0.95);
+    expect(rects.state).toEqual(before);
+    expect(rects.state.scroll).toEqual([0, 0]);
+  });
+}
+
 for (const [phase, name] of [[3, "utf8"], [4, "mb"], [5, "wc"], [6, "inactive same-window"]]) {
   test(`native ${name} IC reset ${phase === 6 ? "preserves" : "clears"} preedit`, async ({ page }) => {
     await waitForX11Runtime(page);

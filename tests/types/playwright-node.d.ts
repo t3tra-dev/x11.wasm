@@ -84,6 +84,7 @@ declare module "@playwright/test" {
     toBeGreaterThan(expected: number): unknown;
     toBeGreaterThanOrEqual(expected: number): unknown;
     toBeLessThan(expected: number): unknown;
+    toBeLessThanOrEqual(expected: number): unknown;
     toBeNull(): unknown;
     toBeFocused(options?: unknown): Promise<void>;
     toBeVisible(options?: unknown): Promise<void>;
