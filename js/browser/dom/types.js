@@ -212,6 +212,13 @@
  * @property {HTMLElement} title
  * @property {HTMLImageElement} icon
  * @property {HTMLButtonElement} close
+ * @property {HTMLButtonElement} minimize
+ * @property {HTMLButtonElement} maximize
+ * @property {HTMLElement[]} handles
+ * @property {boolean=} lastZoomed
+ * @property {boolean=} lastFullscreen
+ * @property {string=} lastBounds
+ * @property {string=} lastGeometry
  */
 
 /**
@@ -226,4 +233,5 @@
  * @property {number} y
  * @property {number} width
  * @property {number} height
+ * @property {string=} lastCandidate
  */

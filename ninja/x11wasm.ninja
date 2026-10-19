@@ -52,8 +52,10 @@ x11wasm_js_dom_backend_input = $x11wasm_root/js/browser/dom/input.js
 x11wasm_js_dom_backend_render = $x11wasm_root/js/browser/dom/render.js
 x11wasm_js_dom_backend_manager = $x11wasm_root/js/browser/dom/manager.js
 x11wasm_js_dom_manager_icons = $x11wasm_root/js/browser/dom/manager-icons.js
+x11wasm_js_dom_manager_gestures = $x11wasm_root/js/browser/dom/manager-gestures.js
+x11wasm_js_dom_manager_states = $x11wasm_root/js/browser/dom/manager-states.js
 x11wasm_js_dom_backend_export = $x11wasm_root/js/browser/dom/export.js
-x11wasm_js_pre_sources = $x11wasm_js_dom_private $x11wasm_js_dom_types $x11wasm_js_dom_constants $x11wasm_js_dom_helpers $x11wasm_js_dom_backend_core $x11wasm_js_dom_backend_window $x11wasm_js_dom_backend_runtime $x11wasm_js_dom_backend_draw $x11wasm_js_dom_backend_wm $x11wasm_js_dom_backend_input $x11wasm_js_dom_backend_render $x11wasm_js_dom_manager_icons $x11wasm_js_dom_backend_manager $x11wasm_js_dom_backend_export
+x11wasm_js_pre_sources = $x11wasm_js_dom_private $x11wasm_js_dom_types $x11wasm_js_dom_constants $x11wasm_js_dom_helpers $x11wasm_js_dom_backend_core $x11wasm_js_dom_backend_window $x11wasm_js_dom_backend_runtime $x11wasm_js_dom_backend_draw $x11wasm_js_dom_backend_wm $x11wasm_js_dom_backend_input $x11wasm_js_dom_backend_render $x11wasm_js_dom_manager_icons $x11wasm_js_dom_manager_gestures $x11wasm_js_dom_manager_states $x11wasm_js_dom_backend_manager $x11wasm_js_dom_backend_export
 
 build $x11wasm_xlib_common_deps: phony $
   $x11wasm_root/src/libX11/XlibInt.h $
@@ -180,6 +182,8 @@ build $x11wasm_js_pre: x11wasm_bundle_dom_js $
   $x11wasm_js_dom_backend_render $
   $x11wasm_js_dom_backend_manager $
   $x11wasm_js_dom_manager_icons $
+  $x11wasm_js_dom_manager_gestures $
+  $x11wasm_js_dom_manager_states $
   $x11wasm_js_dom_backend_export
 
 build x11wasm_licenses: phony $x11wasm_builddir/LICENSE
