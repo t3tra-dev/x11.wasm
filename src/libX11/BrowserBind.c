@@ -557,7 +557,7 @@ X11WasmManagerActivateWindow(unsigned int window, unsigned int time)
 	focus = BrowserGetFocusWindow();
 	if (!BrowserWindowInTree(focus, framePtr->id)
 		|| !BrowserWindowCanReceiveEvents(focus)) {
-	    focus = BrowserWindowCanReceiveEvents(metadata) ? metadata : framePtr->id;
+	    focus = framePtr->id;
 	}
 	/* Accepted host input may cross the 32-bit clock boundary. */
 	BrowserRecordFocusChangeTime(CurrentTime);
