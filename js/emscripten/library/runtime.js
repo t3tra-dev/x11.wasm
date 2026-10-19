@@ -112,13 +112,20 @@
     return X11WasmBridge.call("cancelComposition", [window]) | 0;
   },
 
-  X11WasmJsSetInputContext__deps: ["$X11WasmBridge"],
+  X11WasmJsSetInputContext__deps: ["$X11WasmBridge", "$UTF8ToString"],
   X11WasmJsSetInputContext: function (
     focused,
     window,
     hasSpot,
     spotRootX,
     spotRootY,
+    context,
+    spotX,
+    spotY,
+    fontPixelSize,
+    fontFamily,
+    foreground,
+    background,
   ) {
     return (
       X11WasmBridge.call("setInputContext", [
@@ -127,6 +134,16 @@
         !!hasSpot,
         spotRootX,
         spotRootY,
+        {
+          context: context >>> 0,
+          hasSpot: !!hasSpot,
+          spotX,
+          spotY,
+          fontPixelSize,
+          fontFamily: fontFamily ? UTF8ToString(fontFamily) : "sans-serif",
+          foreground: foreground >>> 0,
+          background: background >>> 0,
+        },
       ]) | 0
     );
   },

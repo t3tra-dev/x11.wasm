@@ -312,7 +312,9 @@ extern int X11WasmJsSetServerGrabState(int depth);
 extern int X11WasmJsSetInputFocus(int focused, unsigned int window);
 extern int X11WasmJsCancelComposition(unsigned int window);
 extern int X11WasmJsSetInputContext(int focused, unsigned int window,
-	int hasSpot, int spotRootX, int spotRootY);
+	int hasSpot, int spotRootX, int spotRootY, unsigned int context,
+	int spotX, int spotY, int fontPixelSize, const char *fontFamily,
+	unsigned long foreground, unsigned long background);
 extern int X11WasmJsSetPointerGrabCursor(int enabled, unsigned int cursor);
 extern int X11WasmJsSetPointerGrabState(int enabled, unsigned int window,
 	int ownerEvents, unsigned int eventMask, unsigned int confineWindow,
@@ -581,13 +583,22 @@ X11WasmJsCancelComposition(unsigned int window)
 { (void)window; return 0; }
 static inline int
 X11WasmJsSetInputContext(int focused, unsigned int window, int hasSpot,
-	int spotRootX, int spotRootY)
+	int spotRootX, int spotRootY, unsigned int context, int spotX, int spotY,
+	int fontPixelSize, const char *fontFamily, unsigned long foreground,
+	unsigned long background)
 {
     (void)focused;
     (void)window;
     (void)hasSpot;
     (void)spotRootX;
     (void)spotRootY;
+    (void)context;
+    (void)spotX;
+    (void)spotY;
+    (void)fontPixelSize;
+    (void)fontFamily;
+    (void)foreground;
+    (void)background;
     return 0;
 }
 static inline int

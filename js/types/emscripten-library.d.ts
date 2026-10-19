@@ -115,6 +115,17 @@ interface X11WasmSelectionOwner {
   time: number;
 }
 
+interface X11WasmPreeditStyle {
+  context: number;
+  hasSpot?: boolean;
+  spotX: number;
+  spotY: number;
+  fontPixelSize: number;
+  fontFamily: string;
+  foreground: number;
+  background: number;
+}
+
 interface X11WasmBackend {
   windowManagerEnabled: boolean;
   setWindowManagerEnabled(enabled: boolean): void;
@@ -266,6 +277,7 @@ interface X11WasmBackend {
     hasSpot: boolean,
     spotRootX: number,
     spotRootY: number,
+    preedit?: X11WasmPreeditStyle,
   ): number;
   setRequestState(
     requestSerial: number,

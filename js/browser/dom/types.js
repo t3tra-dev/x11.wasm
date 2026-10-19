@@ -194,6 +194,18 @@
  */
 
 /**
+ * @typedef {object} X11WasmDOMPreeditStyle
+ * @property {number} context
+ * @property {boolean=} hasSpot
+ * @property {number} spotX
+ * @property {number} spotY
+ * @property {number} fontPixelSize
+ * @property {string} fontFamily
+ * @property {number} foreground
+ * @property {number} background
+ */
+
+/**
  * @typedef {object} X11WasmDOMBackendOptions
  * @property {string | HTMLElement=} root
  * @property {Document=} document

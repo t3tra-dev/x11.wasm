@@ -823,6 +823,28 @@
   height: 100%;
   pointer-events: none;
 }
+.x11-wasm-preedit-clip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  contain: strict;
+  pointer-events: none;
+  user-select: none;
+  z-index: 1;
+}
+.x11-wasm-preedit {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  white-space: pre;
+  font-kerning: none;
+  letter-spacing: 0;
+  word-spacing: 0;
+  text-decoration: underline;
+  text-underline-offset: 1px;
+  pointer-events: none;
+}
 .x11-wasm-input {
   position: absolute;
   left: 0;
