@@ -611,6 +611,10 @@ declare const HEAPU16: Uint16Array;
 declare const HEAP32: Int32Array;
 
 declare const X11WasmBridge: any;
+declare function X11WasmDecodeTextRun(utf8: number, length: number): {
+  text: string;
+  offsets: number[];
+} | null;
 
 interface Window {
   Module?: typeof Module;

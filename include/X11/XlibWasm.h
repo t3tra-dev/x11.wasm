@@ -690,6 +690,13 @@ extern char **XGetFontPath(Display *display, int *npaths_return);
 extern int XSetFontPath(Display *display, char **directories, int ndirs);
 extern int XTextWidth(XFontStruct *font_struct, _Xconst char *string,
 	int count);
+/* widths has numBytes + 1 entries, indexed by original UTF-8/Tcl UTF bytes.
+ * Success is zero; an unavailable layout backend returns -1. */
+extern int X11WasmTextRunWidths(XFontStruct *font, const char *source,
+	int numBytes, int *widths);
+extern int X11WasmDrawTextInContext(Display *display, Drawable drawable, GC gc,
+	const char *source, int numBytes, int rangeStart, int rangeLength,
+	int x, int y);
 	extern int XTextWidth16(XFontStruct *font_struct, _Xconst XChar2b *string,
 		int count);
 	extern int XTextExtents(XFontStruct *font_struct, _Xconst char *string,

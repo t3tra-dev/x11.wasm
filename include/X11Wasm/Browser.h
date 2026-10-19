@@ -262,6 +262,12 @@ extern int X11WasmJsFillPolygon(unsigned int drawable, unsigned long pixel,
 	const int *points, int pointCount, int fillRule);
 extern int X11WasmJsDrawText(unsigned int drawable, unsigned long pixel,
 	int x, int y, const char *utf8, int utf8Length);
+extern int X11WasmJsDrawTextInContext(unsigned int drawable, unsigned long pixel,
+	int x, int y, const char *utf8, int utf8Length, int rangeStart,
+	int rangeLength);
+extern int X11WasmJsTextRunWidths(int fontPixelSize, const char *fontFamily,
+	const char *utf8, int utf8Length, int *widths);
+/* Nonnegative pixel width (including zero) on success, -1 if unavailable. */
 extern int X11WasmJsMeasureText(int fontPixelSize, const char *fontFamily,
 	const char *utf8, int utf8Length);
 extern int X11WasmJsPutImage(unsigned int drawable, const void *data,
@@ -468,6 +474,15 @@ X11WasmJsDrawText(unsigned int drawable, unsigned long pixel, int x, int y,
 	const char *utf8, int utf8Length)
 { (void)drawable; (void)pixel; (void)x; (void)y; (void)utf8; (void)utf8Length; return 0; }
 static inline int
+X11WasmJsDrawTextInContext(unsigned int drawable, unsigned long pixel,
+	int x, int y, const char *utf8, int utf8Length, int rangeStart,
+	int rangeLength)
+{ (void)drawable; (void)pixel; (void)x; (void)y; (void)utf8; (void)utf8Length; (void)rangeStart; (void)rangeLength; return 0; }
+static inline int
+X11WasmJsTextRunWidths(int fontPixelSize, const char *fontFamily,
+	const char *utf8, int utf8Length, int *widths)
+{ (void)fontPixelSize; (void)fontFamily; (void)utf8; (void)utf8Length; (void)widths; return -1; }
+static inline int
 X11WasmJsPutImage(unsigned int drawable, const void *data, int dataLength,
 	int srcX, int srcY, int destX, int destY, unsigned int width,
 	unsigned int height, int bytesPerLine, int bitsPerPixel)
@@ -645,7 +660,7 @@ X11WasmJsMeasureText(int fontPixelSize, const char *fontFamily,
     (void)fontFamily;
     (void)utf8;
     (void)utf8Length;
-    return 0;
+    return -1;
 }
 static inline int
 X11WasmJsSetWindowTitle(unsigned int window, const char *utf8, int utf8Length,
