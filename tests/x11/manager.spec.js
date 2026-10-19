@@ -324,6 +324,39 @@ test("grabs, secondary pointers and native refusal cannot start or continue mana
   expect(result).toEqual({ rejected: [true, true, true], primary: 8, ignored: true, calls: 1, cancelled: true });
 });
 
+test("pixmap disposal preserves gestures while descendant windows and missing frames cancel", async ({ page }) => {
+  await createManagedBackend(page);
+  const result = await page.evaluate(() => {
+    const { backend, module } = /** @type {any} */ (window).managerTest;
+    module._X11WasmManagerConfigureWindow = () => 1;
+    const begin = () => backend.managerFrames.get(2).titlebar.dispatchEvent(new PointerEvent("pointerdown", {
+      bubbles: true, cancelable: true, pointerId: 8, button: 0, isPrimary: true,
+    }));
+    const outcomes = [];
+    for (const action of ["unmap", "destroy"]) {
+      backend.createWindow(4, 3, 0, 0, 20, 20, 24, 0);
+      backend.mapWindow(4);
+      backend.flush();
+      begin();
+      const gesture = backend.managerGesture;
+      backend.createPixmap(5, 4, 20, 20, 24);
+      backend.destroyResource(5);
+      const retained = backend.managerGesture === gesture && gesture !== null;
+      if (action === "unmap") backend.unmapWindow(4);
+      else backend.destroyResource(4);
+      outcomes.push([action, retained, backend.managerGesture === null]);
+    }
+    begin();
+    const frame = backend.resources.get(2);
+    backend.resources.delete(2);
+    backend.cancelWindowManagerResource(2);
+    backend.resources.set(2, frame);
+    return { outcomes, missingFrameCancelled: backend.managerGesture === null };
+  });
+  expect(result).toEqual({ outcomes: [["unmap", true, true], ["destroy", true, true]],
+    missingFrameCancelled: true });
+});
+
 test("real Chrome pointer capture releases when a managed client is destroyed", async ({ page }) => {
   await createManagedBackend(page);
   await page.evaluate(() => {
