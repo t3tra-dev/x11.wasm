@@ -139,6 +139,12 @@ for (const mode of [0, 1, 2]) {
 }
 
 test("actual native trusted titlebar activation retains a focused child and raises its frame", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.addEventListener("pointerdown", (event) => {
+      const module = /** @type {any} */ (window).Module;
+      module.managerPointer = { time: Math.floor(event.timeStamp), trusted: event.isTrusted };
+    }, { capture: true, once: true });
+  });
   const { frame, child } = await openFocusedManager(page);
   await page.evaluate(() => {
     const module = /** @type {any} */ (window).Module;
@@ -152,9 +158,6 @@ test("actual native trusted titlebar activation retains a focused child and rais
       module.managerActivationLog.push({ id, time, result });
       return result;
     };
-    window.addEventListener("pointerdown", (event) => {
-      module.managerPointer = { time: Math.floor(event.timeStamp), trusted: event.isTrusted };
-    }, { capture: true, once: true });
   });
   expect(await page.evaluate(() => /** @type {any} */ (window).Module._X11WasmTestManagerTopWindow())).not.toBe(frame);
   await page.locator(`[data-x11-wasm-frame="${frame}"] [data-x11-wasm-decoration="move"]`).click({ position: { x: 30, y: 10 } });
@@ -202,10 +205,35 @@ for (const source of ["input", "decoration"]) {
 
   test(`actual browser tab blur from ${source} clears native focus and pointer capture`, async ({ page }) => {
     const { frame, child } = await openFocusedManager(page);
+    const other = await /** @type {any} */ (page).context().newPage();
+    const cdp = await /** @type {any} */ (page).context().newCDPSession(page);
+    const otherCdp = await /** @type {any} */ (page).context().newCDPSession(other);
+    // Playwright otherwise forces every tab focused, even in headed Chrome.
+    await cdp.send("Emulation.setFocusEmulationEnabled", { enabled: false });
+    await otherCdp.send("Emulation.setFocusEmulationEnabled", { enabled: false });
+    await /** @type {any} */ (page).bringToFront();
+    await expect.poll(() => page.evaluate(() => document.hasFocus())).toBe(true);
+    await page.evaluate((child) => {
+      const module = /** @type {any} */ (window).Module;
+      if (module._X11WasmTestManagerFocusChild(child) !== 1) throw new Error("native child focus failed");
+      module.x11WasmBackend.flush();
+    }, child);
     if (source === "decoration") {
       await page.locator(`[data-x11-wasm-frame="${frame}"] [data-x11-wasm-decoration="close"]`).focus();
       expect(await nativeFocus(page)).toBe(child);
     }
+    const target = page.locator(source === "decoration"
+      ? `[data-x11-wasm-frame="${frame}"] [data-x11-wasm-decoration="move"]`
+      : `[data-x11-wasm-xid="${child}"]`);
+    const bounds = await /** @type {any} */ (target).boundingBox();
+    expect(bounds).toBeTruthy();
+    await /** @type {any} */ (page).mouse.move(bounds.x + Math.min(10, bounds.width / 2),
+      bounds.y + Math.min(5, bounds.height / 2));
+    await /** @type {any} */ (page).mouse.down();
+    expect(await page.evaluate((source) => {
+      const backend = /** @type {any} */ (window).Module.x11WasmBackend;
+      return source === "decoration" ? !!backend.managerGesture : backend.capturedPointerId !== null;
+    }, source)).toBe(true);
     await page.evaluate(() => {
       const module = /** @type {any} */ (window).Module;
       module.managerWindowBlurs = [];
@@ -213,7 +241,6 @@ for (const source of ["input", "decoration"]) {
         if (event.target === window) module.managerWindowBlurs.push(event.isTrusted);
       }, true);
     });
-    const other = await /** @type {any} */ (page).context().newPage();
     try {
       await other.goto("about:blank");
       await other.bringToFront();
@@ -225,8 +252,11 @@ for (const source of ["input", "decoration"]) {
         return { captured: backend.capturedPointerId, gesture: backend.managerGesture };
       })).toEqual({ captured: null, gesture: null });
     } finally {
+      await otherCdp.detach();
       await other.close();
       await /** @type {any} */ (page).bringToFront();
+      await /** @type {any} */ (page).mouse.up();
+      await cdp.detach();
     }
   });
 }

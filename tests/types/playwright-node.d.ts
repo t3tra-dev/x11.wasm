@@ -32,6 +32,7 @@ declare module "@playwright/test" {
 
   export interface Locator {
     click(options?: unknown): Promise<void>;
+    focus(options?: unknown): Promise<void>;
     textContent(): Promise<string | null>;
     getAttribute(name: string): Promise<string | null>;
   }
@@ -72,6 +73,7 @@ declare module "@playwright/test" {
     toBeGreaterThanOrEqual(expected: number): unknown;
     toBeLessThan(expected: number): unknown;
     toBeNull(): unknown;
+    toBeFocused(options?: unknown): Promise<void>;
     toBeTruthy(): unknown;
     toContain(expected: unknown): unknown;
     toEqual(expected: unknown): unknown;
