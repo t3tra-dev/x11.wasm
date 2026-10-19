@@ -124,19 +124,113 @@ test("manager activate preserves child focus and obeys input hints and WM_TAKE_F
     const focusedChild = m._X11WasmTestManagerOptions(0,6,0);
     const raised = m._X11WasmTestManagerOptions(0,7,0);
     m._X11WasmTestManagerOptions(other,3,0);
+    m._X11WasmManagerActivateWindow(client,0);
+    const fallback = m._X11WasmTestManagerOptions(0,6,0);
+    m._X11WasmTestManagerOptions(other,3,0);
     m._X11WasmTestManagerOptions(frame,1,0);
     m._X11WasmTestManagerOptions(frame,2,1);
     const passive = m._X11WasmManagerActivateWindow(frame,0);
-    return {frame,child,other,activated,focusedChild,raised,passive,
+    return {frame,child,other,activated,focusedChild,raised,fallback,passive,
       focusAfter:m._X11WasmTestManagerOptions(0,6,0),
       protocol:m._X11WasmTestManagerOptions(frame,5,0)};
   });
   expect(result.activated).toBe(1);
   expect(result.focusedChild).toBe(result.child);
   expect(result.raised).toBe(result.frame);
+  expect(result.fallback).toBe(result.frame);
   expect(result.passive).toBe(1);
   expect(result.focusAfter).toBe(result.other);
   expect(result.protocol).toBe(1);
+});
+
+test("manager activation accepts newly observed browser time and rejects stale focus requests", async ({ page }) => {
+  await waitForX11Runtime(page);
+  await page.evaluate(() => {
+    const m = /** @type {any} */ (window).Module;
+    const first = m._X11WasmTestManagerWindow(0);
+    const second = m._X11WasmTestManagerWindow(0);
+    m._X11WasmTestManagerOptions(first,3,0);
+    const button = document.createElement("button");
+    button.id = "native-manager-activation";
+    button.textContent = "Activate native manager window";
+    button.onpointerdown = event => {
+      event.preventDefault();
+      const time = Math.floor(event.timeStamp);
+      m.managerActivation = {first,second,time,trusted:event.isTrusted,
+        current:m._X11WasmManagerActivateWindow(second,time)};
+    };
+    document.body.prepend(button);
+  });
+  await page.waitForFunction(() => performance.now() >
+    /** @type {any} */ (window).Module._X11WasmTestManagerOptions(0,10,1)+1);
+  await page.locator("#native-manager-activation").click();
+  const result = await page.evaluate(() => {
+    const m = /** @type {any} */ (window).Module;
+    const result = m.managerActivation;
+    const snapshot = () => [m._X11WasmTestManagerOptions(0,10,0)>>>0,
+      m._X11WasmTestManagerOptions(0,10,1)>>>0,
+      m._X11WasmTestManagerOptions(0,6,0),m._X11WasmTestManagerOptions(0,7,0)];
+    const before = snapshot();
+    const invalid = m._X11WasmManagerActivateWindow(0,result.time);
+    const stale = m._X11WasmManagerActivateWindow(result.first,result.time-1);
+    const future = m._X11WasmManagerActivateWindow(result.first,Math.floor(performance.now())+100000);
+    const after = snapshot();
+    m._X11WasmTestManagerOptions(result.second,4,3);
+    const grabbedBefore = snapshot();
+    const grabbed = m._X11WasmManagerActivateWindow(result.first,Math.floor(performance.now()));
+    const grabbedAfter = snapshot();
+    m._X11WasmTestManagerOptions(result.second,4,0);
+    return {...result,before,invalid,stale,future,after,grabbedBefore,grabbed,grabbedAfter};
+  });
+  expect(result.trusted).toBe(true);
+  expect(result.current).toBe(1);
+  expect(result.before[2]).toBe(result.second);
+  expect(result.before[1]).toBe(result.time);
+  expect(result.invalid).toBe(0);
+  expect(result.stale).toBe(0);
+  expect(result.future).toBe(0);
+  expect(result.after).toEqual(result.before);
+  expect(result.grabbed).toBe(0);
+  expect(result.grabbedAfter).toEqual(result.grabbedBefore);
+});
+
+test("manager browser time wraps without losing native focus time or client future validation", async ({ page }) => {
+  await waitForX11Runtime(page);
+  const result = await page.evaluate(() => {
+    const m = /** @type {any} */ (window).Module;
+    const first = m._X11WasmTestManagerWindow(0);
+    const second = m._X11WasmTestManagerWindow(0);
+    m._X11WasmQueueFocusEvent(9,first,0xfffffff0);
+    m._X11WasmTestManagerOptions(first,3,0);
+    const previous = Object.getOwnPropertyDescriptor(performance,"now");
+    Object.defineProperty(performance,"now",{configurable:true,value:()=>4294967310});
+    try {
+      const accepted = m._X11WasmManagerActivateWindow(second,5);
+      const snapshot = () => [m._X11WasmTestManagerOptions(0,10,0)>>>0,
+        m._X11WasmTestManagerOptions(0,10,1)>>>0,
+        m._X11WasmTestManagerOptions(0,6,0),m._X11WasmTestManagerOptions(0,7,0)];
+      const before = snapshot();
+      const stale = m._X11WasmManagerActivateWindow(first,0xfffffffe);
+      const future = m._X11WasmManagerActivateWindow(first,20);
+      m._X11WasmTestManagerOptions(first,11,before[0]+1);
+      const after = snapshot();
+      const current = m._X11WasmManagerActivateWindow(first,0);
+      return {first,second,accepted,before,stale,future,after,current,
+        focus:m._X11WasmTestManagerOptions(0,6,0)};
+    } finally {
+      if (previous) Object.defineProperty(performance,"now",previous);
+      else delete /** @type {any} */ (performance).now;
+    }
+  });
+  expect(result.accepted).toBe(1);
+  expect(result.before[0]).toBeGreaterThanOrEqual(5);
+  expect(result.before[1]).toBe(5);
+  expect(result.before[2]).toBe(result.second);
+  expect(result.stale).toBe(0);
+  expect(result.future).toBe(0);
+  expect(result.after).toEqual(result.before);
+  expect(result.current).toBe(1);
+  expect(result.focus).toBe(result.first);
 });
 
 test("native grabs refuse all manager actions without changing geometry or state", async ({ page }) => {

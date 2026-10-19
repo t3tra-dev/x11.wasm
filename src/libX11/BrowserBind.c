@@ -1,4 +1,5 @@
 #include "XlibInt.h"
+#include <math.h>
 
 EMSCRIPTEN_KEEPALIVE int
 X11WasmConfigureWindow(
@@ -423,6 +424,29 @@ BrowserManagerIsGrabbed(void)
 }
 
 static int
+BrowserManagerTimeIsBefore(Time time, Time reference)
+{
+    return ((uint32_t)(time - reference) & UINT32_C(0x80000000)) != 0;
+}
+
+static int
+BrowserManagerInputTimeIsValid(Time time)
+{
+    if (time == CurrentTime) return 1;
+    if ((x11wasm_browserDisplay.focusTime != CurrentTime)
+	    && BrowserManagerTimeIsBefore(time, x11wasm_browserDisplay.focusTime)) return 0;
+#ifdef __EMSCRIPTEN__
+    /* This non-threaded browser clock shares DOM event.timeStamp's origin. */
+    double now = emscripten_get_now();
+    if (!isfinite(now) || (now < 0)) return 0;
+    if (now < 4294967296.0) return (double)time <= now;
+    return !BrowserManagerTimeIsBefore((Time)fmod(now, 4294967296.0), time);
+#else
+    return BrowserRequestTimeIsValid(time, x11wasm_browserDisplay.focusTime);
+#endif
+}
+
+static int
 BrowserManagerSizeAxisValid(unsigned int size, int min, int max, int inc, int base)
 {
     min = (min > 0) ? min : 1;
@@ -518,7 +542,9 @@ X11WasmManagerActivateWindow(unsigned int window, unsigned int time)
     framePtr = BrowserManagerWindowResource(window, &metadata);
     if ((framePtr == NULL) || BrowserManagerIsGrabbed()
 	    || !BrowserResourceIsVisible(framePtr)
-	    || !BrowserRequestTimeIsValid(time, x11wasm_browserDisplay.focusTime)) return 0;
+	    || !BrowserManagerInputTimeIsValid(time)) return 0;
+    /* Match the host-event timestamp rule without changing client requests. */
+    if (time != CurrentTime) x11wasm_eventTime = time;
     hints = XGetWMHints(framePtr->display, framePtr->id);
     if (hints == NULL) hints = XGetWMHints(framePtr->display, metadata);
     if (hints != NULL) {
@@ -531,9 +557,11 @@ X11WasmManagerActivateWindow(unsigned int window, unsigned int time)
 	focus = BrowserGetFocusWindow();
 	if (!BrowserWindowInTree(focus, framePtr->id)
 		|| !BrowserWindowCanReceiveEvents(focus)) {
-	    focus = BrowserWindowCanReceiveEvents(metadata) ? metadata : framePtr->id;
+	    focus = framePtr->id;
 	}
-	(void)XSetInputFocus(framePtr->display, focus, RevertToParent, time);
+	/* Accepted host input may cross the 32-bit clock boundary. */
+	BrowserRecordFocusChangeTime(CurrentTime);
+	(void)XSetInputFocus(framePtr->display, focus, RevertToParent, CurrentTime);
     }
     if (takeFocus != None) {
 	(void)X11WasmQueueWindowProtocol(takeFocus, "WM_TAKE_FOCUS", -1, time);
