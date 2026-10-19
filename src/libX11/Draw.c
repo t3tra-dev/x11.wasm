@@ -2140,6 +2140,27 @@ XGetFontProperty(
 }
 
 int
+X11WasmTextRunWidths(
+    XFontStruct *font,
+    const char *source,
+    int numBytes,
+    int *widths)
+{
+    X11WasmResource *resourcePtr;
+
+    if ((font == NULL) || (source == NULL) || (numBytes < 0)
+	    || (widths == NULL)) {
+	return -1;
+    }
+    resourcePtr = X11WasmFindResource(font->fid);
+    if ((resourcePtr == NULL) || (resourcePtr->type != X11_WASM_RESOURCE_FONT)) {
+	return -1;
+    }
+    return X11WasmJsTextRunWidths(resourcePtr->fontPixelSize,
+	    resourcePtr->fontFamily, source, numBytes, widths);
+}
+
+int
 XTextWidth(
     XFontStruct *font,
     _Xconst char *string,
@@ -2366,6 +2387,39 @@ BrowserDrawUtf8Text(
 	    y, utf8, length);
     BrowserMarkResourceDamage(resourcePtr, x, y - 12,
 	    (unsigned int)(width + 2), 16);
+    return Success;
+}
+
+int
+X11WasmDrawTextInContext(
+    Display *display,
+    Drawable drawable,
+    GC gc,
+    const char *source,
+    int numBytes,
+    int rangeStart,
+    int rangeLength,
+    int x,
+    int y)
+{
+    X11WasmResource *resourcePtr;
+    unsigned char requestCode = X11_WASM_XREQ_POLY_TEXT_8;
+
+    if ((source == NULL) || (rangeStart < 0) || (rangeLength <= 0)
+	    || (rangeStart > numBytes) || (rangeLength > numBytes - rangeStart)) {
+	return Success;
+    }
+    resourcePtr = BrowserDrawableResourceOrError(&display, drawable, requestCode);
+    if ((resourcePtr == NULL) || !BrowserDrawableGCDepthMatchesOrError(&display,
+	    resourcePtr, drawable, gc, requestCode)) {
+	return Success;
+    }
+    BrowserApplyGCStyle(gc);
+    BrowserApplyGCClip(gc, drawable);
+    (void)X11WasmJsDrawTextInContext(BrowserJsXId(drawable), BrowserGCPixel(gc),
+	    x, y, source, numBytes, rangeStart, rangeLength);
+    BrowserMarkResourceDamage(resourcePtr, 0, 0, resourcePtr->width,
+	    resourcePtr->height);
     return Success;
 }
 

@@ -209,11 +209,27 @@
   }
 
   /**
-   * @param {number[]} advances
-   * @returns {number}
+   * Keep scalar/Tcl caret boundaries without splitting the painted grapheme.
+   * Its first scalar owns the advance; the remaining scalars have zero width.
+   * @param {CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D} context
+   * @param {string} text
    */
-  function textAdvanceWidth(advances) {
-    return advances.reduce((total, advance) => total + advance, 0);
+  function textRunLayout(context, text) {
+    const segments = textSegments(text);
+    const advances = textSegmentAdvanceWidths(context, segments);
+    const widths = new Array(text.length + 1).fill(0);
+    let offset = 0;
+    let width = 0;
+    segments.forEach((segment, index) => {
+      const firstScalarLength = (segment.codePointAt(0) || 0) > 0xffff ? 2 : 1;
+      for (let unit = 1; unit <= segment.length; unit += 1) {
+        widths[offset + unit] = width +
+          (unit >= firstScalarLength ? advances[index] : 0);
+      }
+      width += advances[index];
+      offset += segment.length;
+    });
+    return { segments, advances, widths, width };
   }
 
   Object.assign(X11WasmDOMBackend.prototype, /** @type {any} */ ({
@@ -1401,7 +1417,7 @@
      * @param {string} text
      * @returns {number}
      */
-    drawText(id, pixel, x, y, text) {
+    drawText(id, pixel, x, y, text, rangeStart = 0, rangeEnd = text.length) {
       const context = this.getContext(id);
       const resource = this.resources.get(id);
       if (!context || text.length === 0) {
@@ -1409,18 +1425,31 @@
       }
       const fontPixelSize = this.currentDrawStyle.fontPixelSize;
       const fontFamily = this.currentDrawStyle.fontFamily;
-      const segments = textSegments(text);
       prepareTextContext(context, fontPixelSize, fontFamily);
-      const advances = textSegmentAdvanceWidths(context, segments);
-      const advanceWidth = textAdvanceWidth(advances);
+      const { segments, advances, widths, width: advanceWidth } =
+        textRunLayout(context, text);
+      const start = Math.max(0, Math.min(text.length, Math.floor(rangeStart)));
+      const end = Math.max(start, Math.min(text.length, Math.floor(rangeEnd)));
+      const partial = start !== 0 || end !== text.length;
+      if (partial && widths[end] <= widths[start]) {
+        return 0;
+      }
       const drawTextRun = (drawContext = context) => {
         let segmentX = x;
+        drawContext.save();
+        if (partial) {
+          drawContext.beginPath();
+          drawContext.rect(x + widths[start], 0,
+            widths[end] - widths[start], context.canvas.height);
+          drawContext.clip();
+        }
         drawContext.fillStyle = this.paintStyleForPixel(drawContext, pixel);
         prepareTextContext(drawContext, fontPixelSize, fontFamily);
         for (let index = 0; index < segments.length; index += 1) {
           drawContext.fillText(segments[index], segmentX, y);
           segmentX += advances[index];
         }
+        drawContext.restore();
       };
       let minLeft = 0;
       let maxRight = advanceWidth;
@@ -1484,9 +1513,26 @@
         return 0;
       }
       prepareTextContext(context, fontPixelSize, fontFamily);
-      return textAdvanceWidth(
-        textSegmentAdvanceWidths(context, textSegments(text)),
-      );
+      return textRunLayout(context, text).width;
+    },
+
+    /**
+     * Cumulative advances at UTF-16 boundaries, not grapheme indices.
+     * @param {number} fontPixelSize
+     * @param {string} fontFamily
+     * @param {string} text
+     * @returns {number[] | null}
+     */
+    textRunWidths(fontPixelSize, fontFamily, text) {
+      const rootCanvas = this.rootElement?.querySelector(":scope > canvas");
+      const canvas = rootCanvas instanceof HTMLCanvasElement
+        ? rootCanvas : this.createCanvas(1, 1);
+      const context = canvas.getContext("2d");
+      if (!context) {
+        return null;
+      }
+      prepareTextContext(context, fontPixelSize, fontFamily);
+      return textRunLayout(context, text).widths;
     },
 
     /**
