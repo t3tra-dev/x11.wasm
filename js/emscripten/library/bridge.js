@@ -66,6 +66,7 @@
       "setHostAccessControl",
       "setInputContext",
       "setKeyboardGrabState",
+      "setManagerGeometryOwned",
       "setPointerGrabCursor",
       "setPointerGrabState",
       "setPointerState",

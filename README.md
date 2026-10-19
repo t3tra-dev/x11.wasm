@@ -29,11 +29,28 @@ before initializing the runtime, or pass `windowManager: true` to
 `X11WasmDOM.createBackend({ root, module, windowManager: true })` when creating
 a backend directly. The native manager bridge must be included in the build.
 
-The manager decorates normal root-level InputOutput windows, resolves Tk
-wrapper/client metadata, and excludes widgets, InputOnly and override-redirect
-windows. Closing requests `WM_DELETE_WINDOW`; the application may refuse.
+The manager decorates normal, dialog, and utility root-level InputOutput
+windows. Native identity resolves Tk wrapper/client metadata and excludes
+widget children, InputOnly, override-redirect, and menu/popup windows. The
+first recognized EWMH window type takes precedence over fallback types.
+Closing requests `WM_DELETE_WINDOW`; the application may refuse.
 `backend.setWindowManagerEnabled(false)` removes decorations and restores the
 original DOM presentation without changing the logical X11 window tree.
+Call `backend.setWindowManagerEnabled(true)` to enable them again.
+
+The root-local window taskbar lists mapped and minimized windows. Select a
+window there to restore it or explicitly bring an offscreen titlebar back
+into the root. Enabling decorations does not move the client, including
+windows initially at `y=0` or with explicit position hints.
+
+Move, eight-direction resize, activation, and state controls use the native
+manager bridge. Resize and maximization honor normal size hints. Maximize
+reserves 28 pixels for the titlebar and 32 for the taskbar; it is separate from
+browser fullscreen. Minimize preserves maximization, and Restore returns to
+the saved normal geometry. Explicit program geometry while maximized updates
+that restore target; root-size reflow does not. Native refusal leaves state
+unchanged. Gesture capture is released on cancellation, blur, unmap, destroy,
+or disabling decorations.
 
 ## License
 

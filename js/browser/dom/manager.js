@@ -206,7 +206,7 @@
       if (iconHref && frame.icon.getAttribute("src") !== iconHref) frame.icon.src = iconHref;
       if (!iconHref) frame.icon.removeAttribute("src");
       frame.close.disabled = !frame.identity.protocolId ||
-        !metadata.protocols.includes("WM_DELETE_WINDOW") || this.windowManagerActionsBlocked() ||
+        this.windowManagerActionsBlocked() ||
         typeof this.module?.["_X11WasmManagerCloseWindow"] !== "function";
       const stateBlocked = this.windowManagerActionsBlocked() ||
         typeof this.module?.["_X11WasmManagerSetWindowState"] !== "function";
