@@ -1329,11 +1329,13 @@ applyRootPointerState() {
         parentElement,
         previousSibling,
       );
-      if (previousElement) {
-        parentElement.insertBefore(element, previousElement.nextSibling);
-      } else {
-        const firstWindow = this.firstChildWindowElement(parentElement);
-        parentElement.insertBefore(element, firstWindow);
+      const nextSibling = previousElement
+        ? previousElement.nextSibling
+        : this.firstChildWindowElement(parentElement);
+      // Reinserting at the same position can exit a descendant's fullscreen.
+      if (element.parentElement !== parentElement ||
+          (nextSibling !== element && element.nextSibling !== nextSibling)) {
+        parentElement.insertBefore(element, nextSibling);
       }
       this.restackRelatedTransientGroups(resource);
       return 0;
