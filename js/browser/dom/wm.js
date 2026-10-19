@@ -1310,6 +1310,15 @@ syncDocumentIconFromResources() {
       this.fullscreenRequestError = event.type || "fullscreenerror";
     },
 
+    /** @param {number} frame @param {number} metadata @returns {number} */
+    setManagerGeometryOwned(frame, metadata) {
+      for (const id of [frame, metadata]) {
+        const resource = this.resources.get(id);
+        if (resource) resource.managerGeometryOwned = true;
+      }
+      return 0;
+    },
+
     /**
      * @param {number} id
      * @param {boolean} topmost

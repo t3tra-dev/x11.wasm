@@ -364,6 +364,8 @@ extern int X11WasmJsSetWindowStandardColormaps(unsigned int window,
 extern int X11WasmJsSetWindowState(unsigned int window, int topmost,
 	int zoomed, int fullscreen);
 extern int X11WasmJsSetWindowWmState(unsigned int window, int state);
+extern int X11WasmJsSetManagerGeometryOwned(unsigned int frame,
+	unsigned int metadata);
 extern int X11WasmJsSetWindowSizeHints(unsigned int window, int flags,
 	int x, int y, int width, int height, int minWidth, int minHeight,
 	int maxWidth, int maxHeight, int widthInc, int heightInc,
@@ -789,6 +791,9 @@ X11WasmJsSetWindowState(unsigned int window, int topmost, int zoomed,
 static inline int
 X11WasmJsSetWindowWmState(unsigned int window, int state)
 { (void)window; (void)state; return 0; }
+static inline int
+X11WasmJsSetManagerGeometryOwned(unsigned int frame, unsigned int metadata)
+{ (void)frame; (void)metadata; return 0; }
 static inline int
 X11WasmJsSetWindowSizeHints(unsigned int window, int flags, int x, int y,
 	int width, int height, int minWidth, int minHeight, int maxWidth,

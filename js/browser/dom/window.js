@@ -1131,8 +1131,10 @@ applyRootPointerState() {
         heightBase = hints.minHeight;
       }
 
-      const minWidth = hints.flags & P_MIN_SIZE ? hints.minWidth : 0;
-      const minHeight = hints.flags & P_MIN_SIZE ? hints.minHeight : 0;
+      const minWidth = hints.flags & P_MIN_SIZE ? hints.minWidth
+        : hints.flags & P_BASE_SIZE ? hints.baseWidth : 0;
+      const minHeight = hints.flags & P_MIN_SIZE ? hints.minHeight
+        : hints.flags & P_BASE_SIZE ? hints.baseHeight : 0;
       const maxWidth = hints.flags & P_MAX_SIZE ? hints.maxWidth : 0;
       const maxHeight = hints.flags & P_MAX_SIZE ? hints.maxHeight : 0;
       const widthInc = hints.flags & P_RESIZE_INC ? hints.widthInc : 0;
@@ -1236,85 +1238,74 @@ applyRootPointerState() {
       widthBase,
       heightBase,
     ) {
-      if (
-        !(hints.flags & P_ASPECT) ||
-        hints.minAspectX <= 0 ||
-        hints.minAspectY <= 0 ||
-        hints.maxAspectX <= 0 ||
-        hints.maxAspectY <= 0
-      ) {
-        return { width, height };
+      if (!(hints.flags & P_ASPECT) || hints.minAspectX <= 0 || hints.minAspectY <= 0 ||
+          hints.maxAspectX <= 0 || hints.maxAspectY <= 0) return { width, height };
+
+      let lower = [hints.minAspectX, hints.minAspectY];
+      let upper = [hints.maxAspectX, hints.maxAspectY];
+      if (lower[0] * upper[1] > upper[0] * lower[1]) [lower, upper] = [upper, lower];
+      const baseX = hints.flags & P_BASE_SIZE ? Math.max(0, hints.baseWidth) : 0;
+      const baseY = hints.flags & P_BASE_SIZE ? Math.max(0, hints.baseHeight) : 0;
+      const withinAspect = (w, h) => w >= baseX && h >= baseY &&
+        (w - baseX) * lower[1] >= (h - baseY) * lower[0] &&
+        (w - baseX) * upper[1] <= (h - baseY) * upper[0];
+      if (withinAspect(width, height)) return { width, height };
+      const snapWidth = (value) => this.constrainWindowSizeAxis(value, minWidth,
+        maxWidth, widthInc, widthBase);
+      const snapHeight = (value) => this.constrainWindowSizeAxis(value, minHeight,
+        maxHeight, heightInc, heightBase);
+      const candidates = (width - baseX) * lower[1] < (height - baseY) * lower[0]
+        ? [[snapWidth(Math.ceil((height - baseY) * lower[0] / lower[1]) + baseX), height],
+          [width, snapHeight(Math.floor((width - baseX) * lower[1] / lower[0]) + baseY)]]
+        : [[width, snapHeight(Math.ceil((width - baseX) * upper[1] / upper[0]) + baseY)],
+          [snapWidth(Math.floor((height - baseY) * upper[0] / upper[1]) + baseX), height]];
+      for (const [w, h] of candidates) {
+        if (withinAspect(w, h)) return { width: w, height: h };
       }
 
-      let minAspect = hints.minAspectX / hints.minAspectY;
-      let maxAspect = hints.maxAspectX / hints.maxAspectY;
-      if (!Number.isFinite(minAspect) || !Number.isFinite(maxAspect)) {
-        return { width, height };
-      }
-      if (minAspect > maxAspect) {
-        const swap = minAspect;
-        minAspect = maxAspect;
-        maxAspect = swap;
-      }
-
-      const snapWidth = (value) =>
-        this.constrainWindowSizeAxis(
-          value,
-          minWidth,
-          maxWidth,
-          widthInc,
-          widthBase,
-        );
-      const snapHeight = (value) =>
-        this.constrainWindowSizeAxis(
-          value,
-          minHeight,
-          maxHeight,
-          heightInc,
-          heightBase,
-        );
-      const withinAspect = (candidateWidth, candidateHeight) => {
-        if (candidateWidth <= 0 || candidateHeight <= 0) {
-          return false;
-        }
-        const ratio = candidateWidth / candidateHeight;
-        return ratio >= minAspect && ratio <= maxAspect;
+      // Aspect correction must also remain on both resize-increment lattices.
+      // Search the smaller bounded X11 dimension when the fast candidates fail.
+      const range = (min, max, origin, increment) => {
+        const low = Math.max(1, min || 0);
+        const high = Math.min(65535, max > 0 ? max : 65535);
+        const base = Math.max(0, origin || 0);
+        const step = increment > 0 ? Math.max(1, Math.floor(increment)) : 1;
+        return { base, step, first: Math.max(0, Math.ceil((low - base) / step)),
+          last: Math.floor((high - base) / step) };
       };
-
-      let nextWidth = width;
-      let nextHeight = height;
-      if (withinAspect(nextWidth, nextHeight)) {
-        return { width: nextWidth, height: nextHeight };
-      }
-
-      if (nextWidth / nextHeight < minAspect) {
-        const widened = snapWidth(Math.ceil(nextHeight * minAspect));
-        if (withinAspect(widened, nextHeight)) {
-          return { width: widened, height: nextHeight };
+      const x = range(minWidth, maxWidth, widthBase, widthInc);
+      const y = range(minHeight, maxHeight, heightBase, heightInc);
+      const nearest = (axis, target, low, high) => {
+        const first = Math.max(axis.first, Math.ceil((low - axis.base) / axis.step));
+        const last = Math.min(axis.last, Math.floor((high - axis.base) / axis.step));
+        return first > last ? null : axis.base + Math.max(first,
+          Math.min(last, Math.round((target - axis.base) / axis.step))) * axis.step;
+      };
+      let best = null;
+      let distance = Infinity;
+      const consider = (w, h) => {
+        if (w === null || h === null || !withinAspect(w, h)) return;
+        const score = (w - width) ** 2 + (h - height) ** 2;
+        if (score < distance) { best = { width: w, height: h }; distance = score; }
+      };
+      if (x.last - x.first <= y.last - y.first) {
+        for (let index = x.first; index <= x.last; index++) {
+          const w = x.base + index * x.step;
+          const h = nearest(y, height,
+            Math.ceil((w - baseX) * upper[1] / upper[0]) + baseY,
+            Math.floor((w - baseX) * lower[1] / lower[0]) + baseY);
+          consider(w, h);
         }
-        const shortened = snapHeight(Math.floor(nextWidth / minAspect));
-        if (withinAspect(nextWidth, shortened)) {
-          return { width: nextWidth, height: shortened };
-        }
-        nextWidth = widened;
-        nextHeight = shortened;
       } else {
-        const heightened = snapHeight(Math.ceil(nextWidth / maxAspect));
-        if (withinAspect(nextWidth, heightened)) {
-          return { width: nextWidth, height: heightened };
+        for (let index = y.first; index <= y.last; index++) {
+          const h = y.base + index * y.step;
+          const w = nearest(x, width,
+            Math.ceil((h - baseY) * lower[0] / lower[1]) + baseX,
+            Math.floor((h - baseY) * upper[0] / upper[1]) + baseX);
+          consider(w, h);
         }
-        const narrowed = snapWidth(Math.floor(nextHeight * maxAspect));
-        if (withinAspect(narrowed, nextHeight)) {
-          return { width: narrowed, height: nextHeight };
-        }
-        nextWidth = narrowed;
-        nextHeight = heightened;
       }
-
-      return {
-        width: snapWidth(nextWidth),
-        height: snapHeight(nextHeight),
-      };
+      return best || { width, height };
     },
 
     /**

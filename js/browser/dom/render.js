@@ -832,6 +832,7 @@ scheduleFlush() {
      * @param {X11WasmDOMResource} resource
      */
     syncNativeWindowStateGeometry(resource) {
+      if (resource.managerGeometryOwned) return;
       const configure = this.module && this.module["_X11WasmConfigureWindow"];
       const expanded = resource.zoomed || resource.fullscreen;
       if (typeof configure !== "function" || (!expanded && !resource.normalGeometry)) {
