@@ -1595,6 +1595,8 @@ Time BrowserRequestEffectiveTime(
 int BrowserRequestTimeIsValid(
     Time time,
     Time lastChangeTime);
+void BrowserReleaseInputForUnviewableWindow(
+    X11WasmResource *resourcePtr);
 void BrowserReleasePassiveKeyboardGrabIfIdle(void);
 void BrowserReleasePassivePointerGrabIfIdle(
     unsigned int state);

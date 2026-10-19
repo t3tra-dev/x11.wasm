@@ -2664,6 +2664,7 @@ BrowserUnmapWindowResource(
     if (resourcePtr == NULL) {
 	return Success;
     }
+    BrowserReleaseInputForUnviewableWindow(resourcePtr);
     if (!resourcePtr->mapped) {
 	return Success;
     }

@@ -159,6 +159,9 @@
      * @param {number} window
      */
     releaseWindowInput(window) {
+      if (this.inputWindowInTree(this.capturedPointerWindow, window)) {
+        this.releaseCapturedPointer();
+      }
       if (this.inputWindowInTree(this.compositionWindow, window)) {
         this.cancelComposition();
       }
@@ -626,6 +629,8 @@
       }
       this.capturedPointerId = event.pointerId;
       this.capturedPointerElement = captureTarget;
+      this.capturedPointerWindow = this.pointerCaptureWindow ||
+        this.inputResourceForEvent(event)?.id || this.rootWindow;
     },
 
     /**
@@ -636,17 +641,24 @@
       if (this.capturedPointerId !== event.pointerId) {
         return;
       }
-      const captureTarget = this.capturedPointerElement || root;
+      this.releaseCapturedPointer();
+    },
 
-      if (typeof captureTarget.releasePointerCapture === "function") {
+    releaseCapturedPointer() {
+      const pointerId = this.capturedPointerId;
+      const captureTarget = this.capturedPointerElement;
+      this.capturedPointerId = null;
+      this.capturedPointerElement = null;
+      this.capturedPointerWindow = 0;
+
+      if (captureTarget && pointerId !== null &&
+        typeof captureTarget.releasePointerCapture === "function") {
         try {
-          captureTarget.releasePointerCapture(event.pointerId);
+          captureTarget.releasePointerCapture(pointerId);
         } catch (error) {
           /* The browser may have already released capture. */
         }
       }
-      this.capturedPointerId = null;
-      this.capturedPointerElement = null;
     },
 
     /**

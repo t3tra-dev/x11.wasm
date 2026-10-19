@@ -1,6 +1,6 @@
 // @ts-check
 
-const { test, expect, X11_WASM_DOM_SOURCES } = require("../support/x11");
+const { test, expect, waitForX11Runtime, X11_WASM_DOM_SOURCES } = require("../support/x11");
 
 async function createBackend(page) {
   await page.setContent('<div id="lifecycle-root" style="width:400px;height:300px"></div>');
@@ -31,6 +31,35 @@ async function createBackend(page) {
 }
 
 for (const action of ["destroy", "unmap"]) {
+  test(`DOM pointer capture releases on ancestor ${action}`, async ({ page }) => {
+    await createBackend(page);
+    const mouse = /** @type {any} */ (page).mouse;
+    const point = await page.evaluate(() => {
+      const rect = /** @type {any} */ (window).lifecycleBackend.resources.get(3).element.getBoundingClientRect();
+      return { x: rect.left + 10, y: rect.top + 10 };
+    });
+    await mouse.move(point.x, point.y);
+    await mouse.down();
+    try {
+      const result = await page.evaluate((action) => {
+        const backend = /** @type {any} */ (window).lifecycleBackend;
+        const pointerId = backend.capturedPointerId;
+        const root = backend.rootElement;
+        const before = root.hasPointerCapture(pointerId);
+        if (action === "destroy") backend.destroyResource(2);
+        else backend.unmapWindow(2);
+        return {
+          before,
+          after: root.hasPointerCapture(pointerId),
+          captured: backend.capturedPointerId,
+        };
+      }, action);
+      expect(result).toEqual({ before: true, after: false, captured: null });
+    } finally {
+      await mouse.up();
+    }
+  });
+
   test(`composition drops late input after ancestor ${action}`, async ({ page }) => {
     await createBackend(page);
     const result = await page.evaluate((action) => {
@@ -84,4 +113,15 @@ test("composition stays pinned across focus and input-context changes", async ({
     ...[..."text"].map((char) => [2, char, 3]),
   ]);
 });
+
+for (const [scenario, name] of ["ancestor unmap", "grab window unmap", "confine window unmap", "ancestor destroy"].entries()) {
+  test(`native input lifetime follows ${name}`, async ({ page }) => {
+    await waitForX11Runtime(page);
+    const result = await page.evaluate((scenario) => {
+      const module = /** @type {any} */ (window).Module;
+      return module._X11WasmTestUnviewableInputLifetime(scenario);
+    }, scenario);
+    expect(result).toBe(1);
+  });
+}
 
