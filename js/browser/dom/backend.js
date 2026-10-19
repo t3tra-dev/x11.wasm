@@ -162,6 +162,24 @@
       this.focusedElement = null;
       /** @private @type {Map<number, X11WasmDOMResource>} */
       this.resources = new Map();
+      this.windowManagerEnabled = options.windowManager === true;
+      /** @type {Map<number, X11WasmDOMManagerFrame>} */
+      this.managerFrames = new Map();
+      /** @type {Map<number, { x: number, y: number, width: number, height: number }>} */
+      this.managerRestoreGeometries = new Map();
+      this.managerStateChanging = 0;
+      this.managerConfiguring = 0;
+      /** @type {HTMLElement | null} */
+      this.managerTaskbar = null;
+      /** @type {Map<number, HTMLButtonElement>} */
+      this.managerTasks = new Map();
+      /** @type {X11WasmDOMManagerGesture | null} */
+      this.managerGesture = null;
+      /** @type {AbortController | null} */
+      this.managerListeners = null;
+      /** @type {MutationObserver | null} */
+      this.managerObserver = null;
+      this.managerSyncing = false;
       /** @private @type {Map<number, string>} */
       this.cursors = new Map();
       /** @private @type {string | null} */

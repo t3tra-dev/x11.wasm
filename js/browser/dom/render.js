@@ -774,6 +774,7 @@ scheduleFlush() {
       if (resource.canvas) {
         this.resizeCanvasForBitGravity(resource);
       }
+      this.syncWindowManager?.();
     },
 
     /**
@@ -1034,7 +1035,7 @@ refreshWindowStateGeometry() {
         return null;
       }
       const resource = this.resources.get(id);
-      const element = resource && resource.element;
+      const element = resource && (this.displayElement?.(resource) || resource.element);
       return element && element.parentElement === parentElement ? element : null;
     },
 
@@ -1043,7 +1044,7 @@ refreshWindowStateGeometry() {
      * @returns {X11WasmDOMResource | null}
      */
     windowResourceForElement(element) {
-      const idText = element.getAttribute(RESOURCE_ATTR);
+      const idText = element.getAttribute(RESOURCE_ATTR) || element.getAttribute("data-x11-wasm-frame");
       const id = idText ? Number.parseInt(idText, 10) : 0;
       return Number.isFinite(id) ? this.resources.get(id) || null : null;
     },
@@ -1143,8 +1144,8 @@ syncTransientStacking() {
           }
           const stackResource = this.stackingResourceFor(resource);
           const parentStackResource = this.stackingResourceFor(parent);
-          const element = stackResource.element;
-          const parentElement = parentStackResource.element;
+          const element = this.displayElement?.(stackResource) || stackResource.element;
+          const parentElement = this.displayElement?.(parentStackResource) || parentStackResource.element;
           const commonParent = parentElement?.parentElement;
           if (
             !element ||
@@ -1219,7 +1220,7 @@ syncTransientStacking() {
       for (const child of parentElement.children) {
         if (
           child instanceof global.HTMLElement &&
-          child.classList.contains("x11-wasm-window")
+          (child.classList.contains("x11-wasm-window") || child.classList.contains("x11-wasm-frame"))
         ) {
           return child;
         }
