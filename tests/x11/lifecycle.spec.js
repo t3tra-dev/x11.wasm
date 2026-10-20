@@ -276,4 +276,3 @@ for (const [action, name] of ["focused IC destroy", "window unmap", "window dest
     expect(result).toBe(1);
   });
 }
-
