@@ -1281,6 +1281,7 @@ applyRootPointerState() {
         return first > last ? null : axis.base + Math.max(first,
           Math.min(last, Math.round((target - axis.base) / axis.step))) * axis.step;
       };
+      /** @type {{ width: number, height: number } | null} */
       let best = null;
       let distance = Infinity;
       const consider = (w, h) => {
