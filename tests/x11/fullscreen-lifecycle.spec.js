@@ -12,6 +12,7 @@ test("mock fullscreen rejection permits retry of the same ON state", async ({ pa
       throw new Error("missing fullscreen lifecycle hooks");
     }
     let calls = 0;
+    /** @type {HTMLElement | null} */
     let active = null;
     Object.defineProperty(document, "fullscreenElement", { configurable: true, get: () => active });
     element.requestFullscreen = () => {
@@ -44,6 +45,7 @@ test("mock stale fullscreen rejection does not overwrite a newer active request"
     }
     /** @type {(error: unknown) => void} */
     let rejectFirst = (error) => { throw error; };
+    /** @type {HTMLElement | null} */
     let active = null;
     let calls = 0;
     Object.defineProperty(document, "fullscreenElement", { configurable: true, get: () => active });

@@ -663,7 +663,7 @@ test("DOM pointermove queues coalesced motion events", async ({ page }) => {
       Math.floor(timeStamp),
     ];
 
-    module._X11WasmQueuePointerEvent = (...args) => {
+    /** @type {NonNullable<typeof module>} */ (module)._X11WasmQueuePointerEvent = (...args) => {
       calls.push(args.slice(0, 7));
       return originalQueue(...args);
     };
@@ -688,7 +688,7 @@ test("DOM pointermove queues coalesced motion events", async ({ page }) => {
       };
       backend.queuePointerEvent(motionNotify, coalescedWithoutCurrent);
     } finally {
-      module._X11WasmQueuePointerEvent = originalQueue;
+      /** @type {NonNullable<typeof module>} */ (module)._X11WasmQueuePointerEvent = originalQueue;
     }
 
     return {

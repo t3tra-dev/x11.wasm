@@ -66,15 +66,25 @@ declare module "@playwright/test" {
     setContent(html: string): Promise<void>;
     addScriptTag(options: { path?: string; url?: string; content?: string }): Promise<unknown>;
     addInitScript(script: (() => void) | string): Promise<void>;
+    setViewportSize(viewportSize: { width: number; height: number }): Promise<void>;
     waitForFunction(
       pageFunction: (() => unknown) | string,
       arg?: unknown,
+      options?: unknown,
+    ): Promise<unknown>;
+    waitForFunction<Arg>(
+      pageFunction: ((arg: Arg) => unknown) | string,
+      arg: Arg,
       options?: unknown,
     ): Promise<unknown>;
   }
 
   export interface TestFixtures {
     page: Page;
+  }
+
+  export interface TestInfo {
+    attach(name: string, options: { body: string; contentType?: string }): Promise<void>;
   }
 
   export interface Matchers {
@@ -112,7 +122,7 @@ declare module "@playwright/test" {
   export interface Test {
     (
       name: string,
-      fn: (fixtures: TestFixtures) => unknown | Promise<unknown>,
+      fn: (fixtures: TestFixtures, testInfo: TestInfo) => unknown | Promise<unknown>,
     ): void;
     fixme(
       name: string,
